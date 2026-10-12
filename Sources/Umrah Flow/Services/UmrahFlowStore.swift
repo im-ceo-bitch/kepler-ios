@@ -24,41 +24,44 @@ final class UmrahFlowStore: ObservableObject {
     func load(language: UmrahGuideLanguage, forceRefresh: Bool = false) async {
         guideLanguage = language
         let code = language.rawValue
-        if !forceRefresh, loadedLanguage == code, !translations.isEmpty { return }
+        if !forceRefresh, loadedLanguage == code, !translations.isEmpty, !audioURLs.isEmpty { return }
 
+        // Always populate the selected language first, without waiting for any
+        // network operation. Avoid showing keys and an inert player on first launch.
         loadedLanguage = code
+        let bundled = UmrahFlowOfflineCatalog.shared
+        translations = bundled.translations(for: code)
+        audioURLs = bundled.audioURLs(for: code)
         loadCache(language: code)
         isLoading = translations.isEmpty
         lastError = nil
 
-        do {
-            async let translationsTask = client.translations(language: code)
-            async let audioTask = client.audioURLs(language: code)
-            let (freshTranslations, freshAudio) = try await (translationsTask, audioTask)
+        // Fetch each resource independently: a missing audio table must never
+        // discard successfully fetched translations (and vice versa).
+        async let translationsRequest = try? client.translations(language: code)
+        async let audioRequest = try? client.audioURLs(language: code)
+        let (freshTranslations, freshAudio) = await (translationsRequest, audioRequest)
 
-            if !freshTranslations.isEmpty {
-                translations = freshTranslations
-                cacheTranslations(freshTranslations, language: code)
-            }
-            if !freshAudio.isEmpty {
-                audioURLs = freshAudio
-                cacheAudio(freshAudio, language: code)
-            }
-        } catch {
-            lastError = String(describing: error)
+        // A language change can occur while the HTTP requests are in flight.
+        guard loadedLanguage == code, !Task.isCancelled else { return }
+        if let freshTranslations, !freshTranslations.isEmpty {
+            translations.merge(freshTranslations) { _, fresh in fresh }
+            cacheTranslations(translations, language: code)
+        }
+        if let freshAudio, !freshAudio.isEmpty {
+            audioURLs.merge(freshAudio) { _, fresh in fresh }
+            cacheAudio(audioURLs, language: code)
         }
 
-        // Keep every selected guide language usable even when one layer has not
-        // yet been published in Supabase. Religious copy is never fabricated:
-        // English is used only as a text fallback when the requested language
-        // contains no Umrah Flow translation rows at all.
+        // No French recordings were present in the supplied source export.
+        // Keep any existing French text; do not silently pass off English speech
+        // as a French narration or invent ritual instructions.
         if translations.isEmpty, code != UmrahGuideLanguage.english.rawValue {
-            if let fallback = try? await client.translations(language: UmrahGuideLanguage.english.rawValue),
-               !fallback.isEmpty {
-                translations = fallback
-            }
+            translations = bundled.translations(for: UmrahGuideLanguage.english.rawValue)
         }
-
+        if translations.isEmpty, freshTranslations == nil {
+            lastError = "Umrah guidance text is currently unavailable."
+        }
         isLoading = false
     }
 
@@ -88,18 +91,16 @@ final class UmrahFlowStore: ObservableObject {
     private func loadCache(language: String) {
         if let data = defaults.data(forKey: translationsCacheKey(language)),
            let map = try? JSONDecoder().decode([String: String].self, from: data) {
-            translations = map
-        } else {
-            translations = [:]
+            translations.merge(map) { _, cached in cached }
         }
 
         if let data = defaults.data(forKey: audioCacheKey(language)),
            let map = try? JSONDecoder().decode([String: String].self, from: data) {
-            audioURLs = map.reduce(into: [String: URL]()) { result, entry in
-                if let url = URL(string: entry.value) { result[entry.key] = url }
+            for (key, value) in map {
+                if let url = URL(string: value), url.scheme?.lowercased() == "https" {
+                    audioURLs[key] = url
+                }
             }
-        } else {
-            audioURLs = [:]
         }
     }
 

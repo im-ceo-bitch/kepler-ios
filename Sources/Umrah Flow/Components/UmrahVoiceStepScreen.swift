@@ -92,6 +92,44 @@ struct UmrahVoiceStepScreen: View {
                 .padding(.horizontal, 72)
                 .zIndex(2)
 
+                // Explicit playback control. The old implementation only had an
+                // invisible tappable gradient, leaving the guide apparently broken.
+                VStack(spacing: 0) {
+                    Spacer()
+                    Button {
+                        IumrahHaptics.soft()
+                        audio.toggle(key: audioKey, url: store.audioURL(for: audioKey))
+                    } label: {
+                        HStack(spacing: 9) {
+                            if isCurrentLoading {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: isCurrentPlaying ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                            Text(voiceStatus)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                        .iumrahGlass(in: Capsule(), interactive: true)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!audioAvailable || isCurrentLoading)
+                    .accessibilityIdentifier("umrahFlow.audio.toggle")
+                    .padding(.bottom, 18)
+                    if audio.currentKey == audioKey, audio.lastError != nil {
+                        Text(UmrahFlowCopy.audioUnavailable(store.guideLanguage))
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .padding(.bottom, 6)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .zIndex(3)
+
                 // Side navigation is intentionally independent of the text and
                 // gradient geometry. This keeps Previous / Next at the visual middle
                 // of the screen on every iPhone instead of falling to the bottom.

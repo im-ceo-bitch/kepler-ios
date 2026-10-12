@@ -9,6 +9,13 @@ struct HomeDashboardView: View {
     @EnvironmentObject private var journey: JourneyStore
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @State private var showZiyarats = false
+    @State private var showPrayerTimes = false
+    @State private var showTravelInfo = false
+    @State private var showGuideLanguages = false
+    @State private var showUmrahFlow = false
+    @State private var startFlowAfterLanguageDismissal = false
+    @State private var selectedGuideLanguage: UmrahGuideLanguage = .english
+    @AppStorage("iumrah.umrahFlow.guideLanguage") private var savedGuideLanguageCode = ""
     @State private var showCareRequestBuilder = false
     @State private var showFlightsService = false
     @State private var showTransferService = false
@@ -55,6 +62,36 @@ struct HomeDashboardView: View {
                 guard !Task.isCancelled else { return }
                 await storefront.prepareIfNeeded()
                 await storefront.updateDepartureAirport(journey.trip.originCode)
+            }
+            .navigationDestination(isPresented: $showTravelInfo) {
+                JourneyTravelInfoScreen(initialPage: .weather)
+                    .environmentObject(settings)
+                    .toolbar(.visible, for: .navigationBar)
+                    .toolbar(.hidden, for: .tabBar)
+            }
+            .navigationDestination(isPresented: $showUmrahFlow) {
+                UmrahFlowRootView(initialStage: .start, guideLanguage: selectedGuideLanguage)
+                    .environmentObject(chrome)
+            }
+            .sheet(isPresented: $showGuideLanguages, onDismiss: {
+                if startFlowAfterLanguageDismissal {
+                    startFlowAfterLanguageDismissal = false
+                    showUmrahFlow = true
+                }
+            }) {
+                UmrahLanguagesSheet(selection: $selectedGuideLanguage) { language in
+                    selectedGuideLanguage = language
+                    savedGuideLanguageCode = language.rawValue
+                    startFlowAfterLanguageDismissal = true
+                    showGuideLanguages = false
+                }
+                .environmentObject(settings)
+            }
+            .navigationDestination(isPresented: $showPrayerTimes) {
+                IumrahPrayerTimesView()
+                    .environmentObject(settings)
+                    .toolbar(.visible, for: .navigationBar)
+                    .toolbar(.hidden, for: .tabBar)
             }
             .navigationDestination(isPresented: $showZiyarats) {
                 ZiyaratJourneyView()
@@ -107,6 +144,7 @@ struct HomeDashboardView: View {
                         onDismiss: { dismissSystemNotification($0) }
                     )
                 }
+                tripToolsSection
                 HomeEmotionalJourneyPrompt()
                 HomeVideoCarousel()
 
@@ -516,6 +554,147 @@ struct HomeDashboardView: View {
         .background(pageBackground)
     }
 
+    private func openGuideLanguages() {
+        IumrahHaptics.selection()
+        startFlowAfterLanguageDismissal = false
+        selectedGuideLanguage = UmrahGuideLanguage(rawValue: savedGuideLanguageCode)
+            ?? UmrahGuideLanguage.preferred(for: settings.language)
+        showGuideLanguages = true
+    }
+
+    private var tripToolsSection: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 7) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(.orange)
+                Text(tripToolsTitle)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+            }
+
+            HStack(spacing: 9) {
+                tripToolButton(title: prayerEntryTitle, symbol: "moon.stars.fill", color: .orange, identifier: "home.openPrayerTimes") {
+                    showPrayerTimes = true
+                }
+                tripToolButton(title: weatherEntryTitle, symbol: "cloud.sun.fill", color: .blue, identifier: "home.openWeather") {
+                    showTravelInfo = true
+                }
+                tripToolButton(title: "Umrah Flow", symbol: "waveform", color: .purple, identifier: "home.openUmrahFlow") {
+                    openGuideLanguages()
+                }
+            }
+        }
+    }
+
+    private func tripToolButton(title: String, symbol: String, color: Color, identifier: String, action: @escaping () -> Void) -> some View {
+        Button {
+            IumrahHaptics.selection()
+            action()
+        } label: {
+            VStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(color)
+                    .frame(height: 28)
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.80)
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 98)
+            .padding(.horizontal, 5)
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+    }
+
+    private var tripToolsTitle: String {
+        switch settings.language {
+        case .russian: return "Инструменты паломника"
+        case .uzbek: return "Ziyoratchi uchun"
+        case .uzbekCyrillic: return "Зиёратчи учун"
+        case .turkish: return "Hac yolculuğu araçları"
+        case .indonesian: return "Panduan perjalanan"
+        case .malay: return "Panduan perjalanan"
+        case .english: return "Pilgrim essentials"
+        }
+    }
+
+    private var weatherEntryTitle: String {
+        switch settings.language {
+        case .russian: return "Погода"
+        case .uzbek: return "Ob-havo"
+        case .uzbekCyrillic: return "Об-ҳаво"
+        case .turkish: return "Hava durumu"
+        case .indonesian: return "Cuaca"
+        case .malay: return "Cuaca"
+        case .english: return "Weather"
+        }
+    }
+
+    private var prayerEntryTitle: String {
+        switch settings.language {
+        case .russian: return "Время молитв"
+        case .english: return "Prayer Times"
+        case .uzbek: return "Namoz vaqtlari"
+        case .uzbekCyrillic: return "Намоз вақтлари"
+        case .turkish: return "Namaz Vakitleri"
+        case .indonesian: return "Waktu Salat"
+        case .malay: return "Waktu Solat"
+        }
+    }
+
+    private var prayerEntrySubtitle: String {
+        switch settings.language {
+        case .russian: return "Мекка и Медина · Расписание"
+        case .english: return "Makkah & Madinah · Daily schedule"
+        case .uzbek: return "Makka va Madina · Kunlik jadval"
+        case .uzbekCyrillic: return "Макка ва Мадина · Кунлик жадвал"
+        case .turkish: return "Mekke ve Medine · Günlük vakitler"
+        case .indonesian: return "Makkah dan Madinah · Jadwal harian"
+        case .malay: return "Makkah dan Madinah · Jadual harian"
+        }
+    }
+
+    // The prayer screen already exists; make it reachable from the main tab.
+    private var prayerTimesEntry: some View {
+        Button {
+            IumrahHaptics.selection()
+            showPrayerTimes = true
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(.orange)
+                    .frame(width: 46, height: 46)
+                    .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 15))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(prayerEntryTitle)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Text(prayerEntrySubtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 2)
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("home.openPrayerTimes")
+    }
+
     private var readyPackageEntries: [ReadyPackageItem] {
         (storefront.flightBoard?.options ?? [])
             .compactMap { option in
@@ -555,13 +734,13 @@ struct HomeDashboardView: View {
                                 language: settings.language,
                                 onOpen: { selectedFlightPackage = entry.preview }
                             )
-                            .frame(width: 318)
+                            .frame(width: 318, height: 398, alignment: .top)
                             .id(entry.id)
 
                         }
 
                         allPackagesCard
-                            .frame(width: 318)
+                            .frame(width: 318, height: 398)
                             .id("all-flight-packages")
                     }
                     .scrollTargetLayout()
@@ -608,12 +787,13 @@ struct HomeDashboardView: View {
                         .font(.system(size: 23, weight: .bold, design: .rounded))
                         .tracking(-0.45)
                         .foregroundStyle(.black)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
 
                     Text(allPackagesBody)
                         .font(.subheadline)
                         .foregroundStyle(Color.black.opacity(0.58))
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(3)
+                    Spacer(minLength: 0)
 
                     HStack {
                         Text(allPackagesCTA)
@@ -627,6 +807,7 @@ struct HomeDashboardView: View {
                     .background(Color.black, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                 }
                 .padding(16)
+                .frame(height: 280, alignment: .topLeading)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.white)
             }
@@ -1962,11 +2143,8 @@ struct HomeDashboardView: View {
     }
 
     private var homeAdvisorProductCard: some View {
-        NavigationLink {
-            UmrahFlowRootView(
-                initialStage: .start,
-                guideLanguage: UmrahGuideLanguage.preferred(for: settings.language)
-            )
+        Button {
+            openGuideLanguages()
         } label: {
             ZStack {
                 // The living Advisor aura now fills the ENTIRE product card.

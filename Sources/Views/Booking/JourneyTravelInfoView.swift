@@ -43,7 +43,7 @@ enum IumrahHolyCity: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-private enum JourneyInfoPage: Int, CaseIterable, Identifiable {
+enum JourneyInfoPage: Int, CaseIterable, Identifiable {
     case prayer
     case weather
     case clocks
@@ -112,6 +112,10 @@ struct JourneyTravelInfoView: View {
     @AppStorage("iumrah.booking.travelInfo.city") private var selectedCityRaw = IumrahHolyCity.makkah.rawValue
     @StateObject private var model = JourneyTravelInfoModel()
     @State private var page: JourneyInfoPage = .prayer
+
+    init(initialPage: JourneyInfoPage = .prayer) {
+        _page = State(initialValue: initialPage)
+    }
 
     private var city: IumrahHolyCity {
         IumrahHolyCity(rawValue: selectedCityRaw) ?? .makkah
@@ -1119,5 +1123,58 @@ private extension JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
+    }
+}
+
+// The prayer/weather/clocks dashboard was previously visible only when a
+// booking existed. Expose the same live services directly from Home.
+struct JourneyTravelInfoScreen: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    let initialPage: JourneyInfoPage
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(title)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+                Text(subtitle)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                JourneyTravelInfoView(initialPage: initialPage)
+            }
+            .frame(maxWidth: 680)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 36)
+        }
+        .background(Color.iumrahPageBackground)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var title: String {
+        switch settings.language {
+        case .russian: return "Погода и время"
+        case .uzbek: return "Ob-havo va vaqt"
+        case .uzbekCyrillic: return "Об-ҳаво ва вақт"
+        case .turkish: return "Hava ve saat"
+        case .indonesian: return "Cuaca dan waktu"
+        case .malay: return "Cuaca dan waktu"
+        case .english: return "Weather & time"
+        }
+    }
+
+    private var subtitle: String {
+        switch settings.language {
+        case .russian: return "Мекка и Медина · прогноз, молитвы и мировое время"
+        case .uzbek: return "Makka va Madina · ob-havo, namoz va vaqt"
+        case .uzbekCyrillic: return "Макка ва Мадина · об-ҳаво, намоз ва вақт"
+        case .turkish: return "Mekke ve Medine · hava, namaz ve saat"
+        case .indonesian: return "Makkah dan Madinah · cuaca, salat, waktu"
+        case .malay: return "Makkah dan Madinah · cuaca, solat, waktu"
+        case .english: return "Makkah and Madinah · forecast, prayer and clocks"
+        }
     }
 }

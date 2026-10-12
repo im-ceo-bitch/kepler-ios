@@ -52,15 +52,26 @@ struct UmrahFlowSupabaseClient {
     }
 
     func audioURLs(language: String) async throws -> [String: URL] {
-        let rows: [UmrahFlowAudioRow] = try await request(
-            table: "audio",
-            select: "key,url",
-            language: language
-        )
-        return rows.reduce(into: [String: URL]()) { result, row in
-            guard let url = URL(string: row.url) else { return }
-            result[row.key] = url
+        // The supplied database export is `audio_urls_rows.csv` (table
+        // `audio_urls`). Older deployments may still have a table named `audio`.
+        // Never let a missing table prevent bundled guidance from working.
+        for table in ["audio_urls", "audio"] {
+            do {
+                let rows: [UmrahFlowAudioRow] = try await request(
+                    table: table, select: "key,url", language: language
+                )
+                let urls = rows.reduce(into: [String: URL]()) { result, row in
+                    guard let url = URL(string: row.url),
+                          url.scheme?.lowercased() == "https",
+                          url.host != nil else { return }
+                    result[row.key] = url
+                }
+                if !urls.isEmpty { return urls }
+            } catch {
+                if table == "audio" { throw error }
+            }
         }
+        return [:]
     }
 
     private func request<Row: Decodable>(

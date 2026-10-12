@@ -7,6 +7,7 @@ final class UmrahFlowAudioService: ObservableObject {
     @Published private(set) var currentKey: String?
     @Published private(set) var isPlaying = false
     @Published private(set) var isLoading = false
+    @Published private(set) var lastError: String?
 
     /// Smoothed, normalized output energy of the voice guide (0...1).
     ///
@@ -33,7 +34,10 @@ final class UmrahFlowAudioService: ObservableObject {
             stop()
             return
         }
-        guard let url else { return }
+        guard let url else {
+            lastError = "Voice recording is not available for this language."
+            return
+        }
         play(key: key, url: url)
     }
 
@@ -43,6 +47,7 @@ final class UmrahFlowAudioService: ObservableObject {
         let requestID = UUID()
         activeRequestID = requestID
         currentKey = key
+        lastError = nil
         isLoading = true
         amplitude = 0
 
@@ -59,7 +64,8 @@ final class UmrahFlowAudioService: ObservableObject {
                 // A new clip was selected or playback was stopped while loading.
             } catch {
                 guard self.activeRequestID == requestID else { return }
-                self.finishPlayback(clearKey: true)
+                self.finishPlayback(clearKey: false)
+                self.lastError = "Could not play this recording. Check your connection and try again."
             }
         }
     }
@@ -72,6 +78,7 @@ final class UmrahFlowAudioService: ObservableObject {
         player?.stop()
         player = nil
         stopMetering()
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
 
         isPlaying = false
         isLoading = false
@@ -106,6 +113,8 @@ final class UmrahFlowAudioService: ObservableObject {
     }
 
     private func beginPlayback(data: Data, key: String) throws {
+        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.allowAirPlay])
+        try AVAudioSession.sharedInstance().setActive(true)
         let player = try AVAudioPlayer(data: data)
         player.isMeteringEnabled = true
         player.prepareToPlay()
@@ -200,6 +209,7 @@ final class UmrahFlowAudioService: ObservableObject {
     private func finishPlayback(clearKey: Bool) {
         stopMetering()
         player = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         loadTask = nil
         isPlaying = false
         isLoading = false

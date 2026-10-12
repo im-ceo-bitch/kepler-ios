@@ -43,6 +43,10 @@ targets:
         buildPhase: resources
       - path: Resources/Animations
         buildPhase: resources
+      # Reference Umrah Flow text and published audio links bundled for offline
+      # screen rendering / recoverable playback when Supabase is unavailable.
+      - path: Resources/UmrahFlow
+        buildPhase: resources
       - path: Resources/AlternateIcons
         buildPhase: resources
       - path: Resources/en.lproj

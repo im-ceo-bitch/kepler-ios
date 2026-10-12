@@ -1,20 +1,32 @@
 import SwiftUI
 import CoreLocation
 
+// Prayer Times is an immersive destination (not a scrolling storefront).
+// Calculations, city selection, alerts and wallpapers all reuse the existing
+// persisted prayer services. No prayer or notification algorithms are changed.
 struct IumrahPrayerTimesView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var settings: AppSettingsStore
     @StateObject private var state = IumrahPrayerState()
     @StateObject private var location = IumrahPrayerLocation()
+    @StateObject private var qibla = IumrahPrayerQiblaHeading()
+
     @State private var chosenDate = Date()
     @State private var showingCity = false
     @State private var showingCalculation = false
     @State private var showingWallpapers = false
-    @AppStorage("iumrah.booking.travelInfo.city") private var holyCityRaw = "makkah"
+    @State private var showingSchedule = false
+    @State private var showingDailySchedule = false
+    @State private var showingOptions = false
+    @State private var showingNotifications = false
     @State private var editingPrayer: IumrahPrayerKind?
+    @State private var showingQibla = false
+    @AppStorage("iumrah.booking.travelInfo.city") private var holyCityRaw = "makkah"
 
     private var schedule: IumrahPrayerSchedule {
         IumrahPrayerCalculator.calculate(on: chosenDate, place: state.place, method: state.method, hanafi: state.hanafi)
     }
+
     private var isToday: Bool {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = state.place.timeZone
@@ -23,37 +35,47 @@ struct IumrahPrayerTimesView: View {
 
     var body: some View {
         ZStack {
-            wallpaperBackground
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 22) {
-                    topHeader
-                    nextPrayerHero
-                    dateSelector
-                    dailySchedule
-                    extraPrayers
-                    calculationFootnote
-                }
-                .frame(maxWidth: 680)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 40)
-            }
-        }
-        .navigationTitle(tr("Prayer Times", "Времена молитв", "Namoz vaqtlari", "Намоз вақтлари"))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button { showingWallpapers = true } label: {
-                    Image(systemName: "photo.on.rectangle.angled")
-                }
-                .accessibilityLabel(tr("Change wallpaper", "Изменить обои", "Fon rasmini o‘zgartirish", "Фон расмини ўзгартириш"))
+            immersiveWallpaper
 
-                Button { showingCalculation = true } label: {
-                    Image(systemName: "slider.horizontal.3")
-                }
-                .accessibilityLabel(tr("Calculation settings", "Метод расчёта", "Hisoblash sozlamalari", "Ҳисоблаш созламалари"))
+            VStack(spacing: 0) {
+                navigationHeader
+                Spacer(minLength: 36)
+                if showingQibla { qiblaContent }
+                else if showingSchedule { immersiveScheduleContent }
+                else { countdownContent }
+                Spacer(minLength: 34)
+                bottomActions
             }
+            .padding(.horizontal, 22)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(red: 0.04, green: 0.16, blue: 0.14))
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        .preferredColorScheme(.dark)
+        .gesture(DragGesture(minimumDistance: 35)
+            .onEnded { value in
+                if value.translation.height < -90, !showingQibla {
+                    IumrahHaptics.selection()
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) { showingSchedule = true }
+                } else if value.translation.height > 90, showingSchedule {
+                    IumrahHaptics.selection()
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) { showingSchedule = false }
+                } else if abs(value.translation.width) > 100 {
+                    withAnimation(.easeInOut(duration: 0.28)) {
+                        showingQibla.toggle()
+                        showingSchedule = false
+                    }
+                    IumrahHaptics.selection()
+                    if showingQibla { qibla.activate() } else { qibla.deactivate() }
+                }
+            })
+        .sheet(isPresented: $showingDailySchedule) { scheduleSheet }
+        .sheet(item: $editingPrayer) { kind in
+            IumrahPrayerNotificationSheet(start: kind, state: state)
+                .environmentObject(settings)
         }
         .sheet(isPresented: $showingCity) {
             IumrahPrayerCitySheet(state: state, location: location)
@@ -67,373 +89,634 @@ struct IumrahPrayerTimesView: View {
             IumrahPrayerWallpaperSheet(state: state)
                 .environmentObject(settings)
         }
-        .sheet(item: $editingPrayer) { kind in
-            IumrahPrayerNotificationSheet(start: kind, state: state)
+        .sheet(isPresented: $showingNotifications) {
+            IumrahPrayerNotificationSheet(start: .fajr, state: state)
                 .environmentObject(settings)
+        }
+        .confirmationDialog(ui("Settings", "Настройки", "Sozlamalar", "الإعدادات"), isPresented: $showingOptions) {
+            Button(ui("Prayer notifications", "Уведомления о намазе", "Namoz eslatmalari", "إشعارات الصلاة")) {
+                showingNotifications = true
+            }
+            Button(ui("City and location", "Город и местоположение", "Shahar va joylashuv", "المدينة والموقع")) {
+                showingCity = true
+            }
+            Button(ui("Calculation method", "Метод расчёта", "Hisoblash usuli", "طريقة الحساب")) {
+                showingCalculation = true
+            }
+            Button(ui("Wallpaper", "Обои", "Fon rasmi", "الخلفية")) {
+                showingWallpapers = true
+            }
         }
         .task { _ = await IumrahPrayerNotifications.synchronize(state: state) }
         .onChange(of: state.place) { _, _ in refreshNotifications() }
         .onChange(of: state.method) { _, _ in refreshNotifications() }
         .onChange(of: state.hanafi) { _, _ in refreshNotifications() }
+        .onDisappear { qibla.deactivate() }
     }
 
-    private var wallpaperBackground: some View {
-        ZStack {
+    private var immersiveWallpaper: some View {
+        GeometryReader { geometry in
             Image(state.wallpaper.assetName)
                 .resizable()
                 .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: geometry.size.width, height: geometry.size.height)
                 .clipped()
                 .overlay {
                     LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.40),
-                            Color.black.opacity(0.28),
-                            Color(red: 0.96, green: 0.97, blue: 0.99).opacity(0.84),
-                            Color(red: 0.96, green: 0.97, blue: 0.99).opacity(0.98)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
+                        colors: [Color.black.opacity(0.51), Color.black.opacity(0.20), Color.black.opacity(0.40)],
+                        startPoint: .top, endPoint: .bottom
                     )
                 }
-                .blur(radius: 20)
-            Color.iumrahPageBackground.opacity(0.18)
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
         }
         .ignoresSafeArea()
     }
 
-    private var topHeader: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(tr("YOUR DAILY PRAYERS", "РАСПИСАНИЕ НАМАЗОВ", "KUNLIK NAMOZLAR", "КУНЛИК НАМОЗЛАР"))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .tracking(1.5)
-                    .foregroundStyle(.secondary)
-                Button { showingCity = true } label: {
-                    HStack(spacing: 6) {
+    private var navigationHeader: some View {
+        VStack(spacing: 13) {
+            HStack(spacing: 10) {
+                roundAction("xmark", label: ui("Close", "Закрыть", "Yopish", "إغلاق")) { dismiss() }
+                Spacer(minLength: 0)
+                Button {
+                    IumrahHaptics.selection()
+                    showingCity = true
+                } label: {
+                    HStack(spacing: 5) {
                         Image(systemName: "location.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.orange)
-                        Text(state.place.name)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
+                            .font(.system(size: 10, weight: .bold))
+                        VStack(spacing: 3) {
+                            Text(state.place.name)
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                .lineLimit(1)
+                            Text(hijriDateLabel(Date()))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.72))
+                                .lineLimit(1)
+                        }
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 9, weight: .bold))
                     }
+                    .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("Change city", "Изменить город", "Shaharni o‘zgartirish", "Шаҳарни ўзгартириш"))
+                Spacer(minLength: 0)
+                roundAction("slider.horizontal.3", label: ui("Settings", "Настройки", "Sozlamalar", "الإعدادات")) {
+                    showingOptions = true
+                }
             }
-            Spacer(minLength: 8)
-            HStack(spacing: 10) {
-                glassCircleButton(icon: "photo") { showingWallpapers = true }
-                glassCircleButton(icon: "gearshape.fill") { showingCalculation = true }
+            if state.place.id == "makkah" || state.place.id == "madinah" {
+                HStack(spacing: 2) {
+                    holyCityButton("makkah", label: ui("Makkah", "Мекка", "Makka", "مكة"))
+                    holyCityButton("madinah", label: ui("Madinah", "Медина", "Madina", "المدينة"))
+                }
+                .padding(4)
+                .background(.black.opacity(0.20), in: Capsule())
+                .frame(maxWidth: 250)
             }
         }
     }
 
-    private var makkahMadinahPicker: some View {
-        HStack(spacing: 8) {
-            ForEach(IumrahHolyCity.allCases) { holyCity in
-                Button {
-                    guard state.place.id != holyCity.rawValue else { return }
-                    if let selected = IumrahPrayerPlace.presets.first(where: { $0.id == holyCity.rawValue }) {
-                        withAnimation(.snappy(duration: 0.26)) {
-                            state.place = selected
-                            holyCityRaw = holyCity.rawValue
+    private func holyCityButton(_ city: String, label: String) -> some View {
+        Button {
+            guard state.place.id != city,
+                  let place = IumrahPrayerPlace.presets.first(where: { $0.id == city }) else { return }
+            withAnimation(.easeInOut(duration: 0.22)) {
+                state.place = place
+                holyCityRaw = city
+            }
+            IumrahHaptics.selection()
+        } label: {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background {
+                    if state.place.id == city {
+                        Capsule().fill(Color.white.opacity(0.20))
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var countdownContent: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let upcoming = IumrahPrayerCalculator.upcoming(now: context.date, place: state.place,
+                method: state.method, hanafi: state.hanafi)
+            VStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Text(ui("Next prayer", "Следующий намаз", "Keyingi namoz", "الصلاة القادمة"))
+                    Circle().fill(.white.opacity(0.78)).frame(width: 5, height: 5)
+                    Text(upcoming.map { prayerTitle($0.kind) } ?? "—")
+                    Text(upcoming.map { timeText($0.date) } ?? "--:--")
+                        .monospacedDigit()
+                }
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.90))
+                .lineLimit(1)
+
+                Text(upcoming.map { countdown($0.date, since: context.date) } ?? "--:--:--")
+                    .font(.system(size: 60, weight: .light, design: .rounded))
+                    .monospacedDigit()
+                    .contentTransition(.numericText(countsDown: true))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .foregroundStyle(.white)
+                    .environment(\.layoutDirection, .leftToRight)
+                    .accessibilityLabel(ui("Time until next prayer", "До следующего намаза", "Keyingi namozgacha", "الوقت حتى الصلاة التالية"))
+            }
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    // The source video uses a translucent prayer list ON the wallpaper, not
+    // a white bottom sheet. Tapping any row opens that prayer's real settings.
+    private var immersiveScheduleContent: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let prayerKinds: [IumrahPrayerKind] = [.fajr, .sunrise, .dhuhr, .asr, .maghrib, .isha]
+            let prayerOnly: [IumrahPrayerKind] = [.fajr, .dhuhr, .asr, .maghrib, .isha]
+            let active = schedule.entries
+                .filter { prayerOnly.contains($0.kind) && $0.date <= context.date }
+                .max(by: { $0.date < $1.date })?.kind
+            let upcoming = IumrahPrayerCalculator.upcoming(
+                now: context.date, place: state.place, method: state.method, hanafi: state.hanafi)
+            VStack(spacing: 0) {
+                ForEach(prayerKinds) { kind in
+                    if let prayerTime = schedule.date(for: kind) {
+                        Button {
+                            IumrahHaptics.selection()
+                            editingPrayer = kind
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text(prayerTitle(kind))
+                                    .font(.system(size: 14, weight: kind == active ? .bold : .medium))
+                                    .lineLimit(1)
+                                Spacer(minLength: 5)
+                                if state.preference(for: kind).enabled {
+                                    Image(systemName: "bell.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.white.opacity(0.70))
+                                }
+                                Text(timeText(prayerTime))
+                                    .font(.system(size: 14, weight: kind == active ? .bold : .semibold, design: .rounded))
+                                    .monospacedDigit()
+                                    .environment(\.layoutDirection, .leftToRight)
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 15)
+                            .frame(height: 42)
+                            .background(kind == active ? Color(red: 0.04, green: 0.59, blue: 0.41).opacity(0.72) : .clear)
+                            .contentShape(Rectangle())
                         }
-                        IumrahHaptics.selection()
+                        .buttonStyle(.plain)
+                    }
+                }
+                if let upcoming {
+                    HStack(spacing: 8) {
+                        Text(prayerTitle(upcoming.kind))
+                            .font(.system(size: 12, weight: .semibold))
+                        Spacer()
+                        Text(countdown(upcoming.date, since: context.date))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .environment(\.layoutDirection, .leftToRight)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 15)
+                    .frame(height: 36)
+                    .background(Color(red: 0.02, green: 0.56, blue: 0.39))
+                }
+            }
+            .frame(maxWidth: 350)
+            .background(Color.black.opacity(0.43), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.13), lineWidth: 0.8)
+            }
+            .shadow(color: .black.opacity(0.20), radius: 25, y: 9)
+            .frame(maxWidth: .infinity)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+    }
+
+    private var qiblaContent: some View {
+        VStack(spacing: 24) {
+            Text(ui("Qibla", "Кибла", "Qibla", "القبلة"))
+                .font(.system(size: 26, weight: .semibold, design: .rounded))
+            ZStack {
+                Circle().strokeBorder(Color.white.opacity(0.72), lineWidth: 2)
+                ForEach(0..<72, id: \.self) { tick in
+                    Capsule()
+                        .fill(Color.white.opacity(tick.isMultiple(of: 6) ? 0.9 : 0.28))
+                        .frame(width: tick.isMultiple(of: 6) ? 2 : 1, height: tick.isMultiple(of: 6) ? 15 : 7)
+                        .offset(y: -119)
+                        .rotationEffect(.degrees(Double(tick) * 5))
+                }
+                VStack {
+                    Text("N").offset(y: -91)
+                    Spacer()
+                    Text("S").offset(y: 91)
+                }
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                Image(systemName: "location.north.fill")
+                    .font(.system(size: 85, weight: .ultraLight))
+                    .foregroundStyle(.white)
+                    .rotationEffect(.degrees(qibla.relativeQiblaBearing ?? 0))
+                    .opacity(qibla.relativeQiblaBearing == nil ? 0.30 : 1)
+                    .animation(.easeOut(duration: 0.25), value: qibla.relativeQiblaBearing)
+                Circle().fill(.white).frame(width: 11, height: 11)
+            }
+            .frame(width: 255, height: 255)
+            .environment(\.layoutDirection, .leftToRight)
+            if qibla.relativeQiblaBearing == nil {
+                Button {
+                    qibla.activate()
+                } label: {
+                    Label(ui("Allow location for Qibla direction", "Разрешите геолокацию для Киблы", "Qibla uchun joylashuvga ruxsat bering", "اسمح بالموقع لتحديد القبلة"), systemImage: "location")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.86))
+            } else {
+                Text(ui("Turn your phone toward the Qibla", "Поверните телефон к Кибле", "Telefoningizni Qiblaga qarating", "وجّه هاتفك نحو القبلة"))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var bottomActions: some View {
+        VStack(spacing: 22) {
+            if !showingQibla {
+                Button {
+                    IumrahHaptics.selection()
+                    withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) {
+                        showingSchedule.toggle()
                     }
                 } label: {
-                    Text(holyCity.title(settings.language))
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(state.place.id == holyCity.rawValue ? Color.primary : Color.secondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 42)
-                        .background {
-                            if state.place.id == holyCity.rawValue {
-                                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                                    .fill(Color.iumrahCardBackground)
-                                    .shadow(color: Color.black.opacity(0.045), radius: 4, y: 1)
+                    Image(systemName: showingSchedule ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 65, height: 21)
+                        .iumrahGlass(in: Capsule(), interactive: true, tint: Color.black.opacity(0.20), chrome: true)
+                }
+                .accessibilityLabel(ui("Show prayer schedule", "Показать расписание", "Jadvalni ko‘rish", "عرض مواقيت الصلاة"))
+            }
+            HStack(alignment: .center) {
+                roundAction(showingQibla ? "clock" : "location.north.line.fill",
+                            label: showingQibla ? ui("Prayer times", "Время молитв", "Namoz vaqtlari", "مواقيت الصلاة") : ui("Qibla", "Кибла", "Qibla", "القبلة")) {
+                    withAnimation(.easeInOut(duration: 0.27)) {
+                        showingQibla.toggle()
+                        showingSchedule = false
+                    }
+                    IumrahHaptics.selection()
+                    if showingQibla { qibla.activate() } else { qibla.deactivate() }
+                }
+                Spacer()
+                if !showingQibla {
+                    Button {
+                        IumrahHaptics.selection()
+                        if showingSchedule {
+                            showingDailySchedule = true
+                        } else {
+                            withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) {
+                                showingSchedule = true
                             }
                         }
+                    } label: {
+                        Text(showingSchedule
+                            ? ui("Full schedule", "Календарь", "Taqvim", "التقويم")
+                            : ui("Prayer times", "Расписание", "Jadval", "مواقيت الصلاة"))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 18)
+                            .frame(height: 42)
+                            .iumrahGlass(in: Capsule(), interactive: true, tint: Color.black.opacity(0.20), chrome: true)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(state.place.id == holyCity.rawValue ? .isSelected : [])
+                Spacer()
+                roundAction("ellipsis", label: ui("More", "Ещё", "Yana", "المزيد")) { showingOptions = true }
             }
         }
-        .padding(4)
-        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 19, style: .continuous))
     }
 
-    private var nextPrayerHero: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            let next = IumrahPrayerCalculator.upcoming(now: context.date, place: state.place,
-                method: state.method, hanafi: state.hanafi)
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    Label(tr("NEXT PRAYER", "СЛЕДУЮЩИЙ НАМАЗ", "KEYINGI NAMOZ", "КЕЙИНГИ НАМОЗ"), systemImage: "sparkle")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .tracking(1)
-                    Spacer()
-                    Text(state.wallpaper.title(settings.language))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(.white.opacity(0.14), in: Capsule())
-                }
-                .foregroundStyle(Color.white.opacity(0.84))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(next.map { prayerTitle($0.kind) } ?? "—")
-                        .font(.system(size: 28, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.white)
-                    Text(next.map { timeText($0.date) } ?? "--:--")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.78))
-                }
-                Spacer(minLength: 0)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(next.map { countdown($0.date, since: context.date) } ?? "--:--:--")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .minimumScaleFactor(0.68)
-                        .lineLimit(1)
-                        .foregroundStyle(Color.white)
-                        .contentTransition(.numericText())
-                    Text(tr("until the next prayer", "до следующего намаза", "keyingi namozgacha", "кейинги намозгача"))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.72))
-                }
-            }
-            .padding(25)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 290)
-            .background {
-                ZStack {
-                    Image(state.wallpaper.assetName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .overlay {
-                            LinearGradient(colors: [Color.black.opacity(0.42), Color.black.opacity(0.18), Color.black.opacity(0.48)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        }
-                    Circle()
-                        .fill(Color.orange.opacity(0.22))
-                        .frame(width: 240, height: 240)
-                        .blur(radius: 48)
-                        .offset(x: 125, y: -115)
-                    Circle()
-                        .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
-                        .frame(width: 220, height: 220)
-                        .offset(x: 148, y: 80)
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-            .shadow(color: Color.black.opacity(0.08), radius: 20, y: 10)
-            .accessibilityElement(children: .combine)
+    private func roundAction(_ symbol: String, label: String, perform: @escaping () -> Void) -> some View {
+        Button(action: perform) {
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 43, height: 43)
+                .iumrahGlass(in: Circle(), interactive: true, tint: Color.black.opacity(0.20), chrome: true)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private var scheduleSheet: some View {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 19) {
+                    dateSelector
+                    scheduleCard
+                    additionalPrayers
+                    Text(ui("Times are calculated for the chosen location and method. Local mosque times may differ.",
+                        "Время рассчитано по выбранным координатам и методу. В местной мечети оно может отличаться.",
+                        "Vaqtlar tanlangan joylashuv bo‘yicha hisoblangan. Mahalliy masjid vaqti farq qilishi mumkin.",
+                        "تُحسب المواقيت حسب الموقع وطريقة الحساب المحددين، وقد تختلف عن أوقات المسجد المحلي."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(20)
+            }
+            .navigationTitle(ui("Prayer times", "Время молитв", "Namoz vaqtlari", "مواقيت الصلاة"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(ui("Done", "Готово", "Tayyor", "تم")) { showingDailySchedule = false }
+                }
+            }
+            .background(Color.iumrahPageBackground)
+        }
+        .environment(\.colorScheme, .light)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     private var dateSelector: some View {
         HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(tr("Daily schedule", "Расписание на день", "Kunlik jadval", "Кунлик жадвал"))
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+            VStack(alignment: .leading, spacing: 5) {
+                Text(ui("Daily schedule", "Расписание на день", "Kunlik jadval", "الجدول اليومي"))
+                    .font(.system(size: 19, weight: .bold, design: .rounded))
                 Text(dateLabel(chosenDate))
-                    .font(.subheadline)
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
-            Button { moveDate(-1) } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 15, weight: .bold))
-                    .frame(width: 38, height: 38)
-            }
-            .accessibilityLabel("Previous day")
-            Button { chosenDate = Date() } label: {
-                Text(tr("Today", "Сегодня", "Bugun", "Бугун"))
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .frame(height: 38)
-            }
-            .disabled(isToday)
-            Button { moveDate(1) } label: {
-                Image(systemName: "chevron.forward")
-                    .font(.system(size: 15, weight: .bold))
-                    .frame(width: 38, height: 38)
-            }
-            .accessibilityLabel("Next day")
+            Spacer()
+            Button { moveDate(-1) } label: { Image(systemName: "chevron.backward") }
+            Button { chosenDate = Date() } label: { Image(systemName: "calendar") }
+                .disabled(isToday)
+            Button { moveDate(1) } label: { Image(systemName: "chevron.forward") }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
+        .font(.system(size: 15, weight: .semibold))
     }
 
-    private var dailySchedule: some View {
+    private var scheduleCard: some View {
         VStack(spacing: 0) {
             ForEach([IumrahPrayerKind.fajr, .sunrise, .dhuhr, .asr, .maghrib, .isha]) { kind in
                 if let time = schedule.date(for: kind) {
-                    Button { editingPrayer = kind } label: {
-                        HStack(spacing: 14) {
+                    Button {
+                        IumrahHaptics.selection()
+                        editingPrayer = kind
+                    } label: {
+                        HStack(spacing: 12) {
                             Image(systemName: kind.symbol)
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(iconTint(kind))
-                                .frame(width: 46, height: 46)
-                                .background(iconTint(kind).opacity(0.09), in: RoundedRectangle(cornerRadius: 15))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(prayerTitle(kind))
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary)
-                                Text(kind == .sunrise ? tr("Not a prayer · sunrise time", "Не намаз · время восхода", "Namoz emas · quyosh chiqishi", "Намоз эмас · қуёш чиқиши") : tr("Tap to configure reminder", "Нажмите для напоминания", "Eslatma sozlash uchun bosing", "Эслатма созлаш учун босинг"))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                .font(.system(size: 16))
+                                .frame(width: 32)
+                                .foregroundStyle(Color.teal)
+                            Text(prayerTitle(kind))
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            Spacer()
+                            if state.preference(for: kind).enabled {
+                                Image(systemName: "bell.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.green)
                             }
-                            Spacer(minLength: 10)
-                            VStack(alignment: .trailing, spacing: 4) {
-                                Text(timeText(time))
-                                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.primary)
-                                if state.preference(for: kind).enabled {
-                                    Image(systemName: "bell.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.orange)
-                                } else {
-                                    Image(systemName: "chevron.forward")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(.tertiary)
-                                }
-                            }
+                            Text(timeText(time))
+                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .environment(\.layoutDirection, .leftToRight)
                         }
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 77)
+                        .foregroundStyle(.primary)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    if kind != .isha {
-                        Divider().padding(.leading, 78)
-                    }
+                    if kind != .isha { Divider().padding(.leading, 50) }
                 }
             }
         }
-        .background(Color.iumrahCardBackground.opacity(0.96), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
-    private var extraPrayers: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(tr("Additional prayers", "Дополнительные молитвы", "Qo‘shimcha namozlar", "Қўшимча намозлар"))
-                .font(.system(size: 21, weight: .bold, design: .rounded))
+    private var additionalPrayers: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(ui("Additional prayers", "Дополнительные молитвы", "Qo‘shimcha namozlar", "صلوات إضافية"))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
             ForEach([IumrahPrayerKind.duha, .tahajjud]) { kind in
-                if let date = schedule.date(for: kind) {
+                if let time = schedule.date(for: kind) {
                     Button { editingPrayer = kind } label: {
-                        HStack(spacing: 13) {
-                            Image(systemName: kind.symbol)
-                                .font(.system(size: 23))
-                                .foregroundStyle(iconTint(kind))
-                                .frame(width: 45)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(prayerTitle(kind))
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                Text(kind == .duha ? tr("Starts after sunrise", "Начинается после восхода", "Quyosh chiqqandan keyin", "Қуёш чиққандан кейин") :
-                                    tr("Last third of the night", "Последняя треть ночи", "Tunning oxirgi uchdan biri", "Туннинг охирги учдан бири"))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                        HStack {
+                            Label(prayerTitle(kind), systemImage: kind.symbol)
                             Spacer()
-                            Text(timeText(date))
-                                .font(.headline.monospacedDigit())
-                                .foregroundStyle(.primary)
+                            Text(timeText(time))
+                                .monospacedDigit()
+                                .environment(\.layoutDirection, .leftToRight)
                             Image(systemName: "chevron.forward")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.tertiary)
+                                .font(.caption)
                         }
-                        .padding(16)
-                        .background(Color.iumrahCardBackground.opacity(0.96), in: RoundedRectangle(cornerRadius: 21))
+                        .font(.subheadline.weight(.medium))
+                        .padding(15)
+                        .foregroundStyle(.primary)
+                        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 17))
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
-    }
-
-    private var calculationFootnote: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "photo")
-                Text(state.wallpaper.title(settings.language))
-                Text("·")
-                Text(state.method.title + " · " + (state.hanafi ? "Hanafi Asr" : "Standard Asr"))
-            }
-            .font(.caption.weight(.medium))
-            Text(tr("Calculated offline for the selected coordinates and time zone. Local mosque timetables may vary; verify during travel. Alerts require iOS notification permission.",
-                "Расчёт офлайн по координатам и часовому поясу. Расписание местной мечети может отличаться; проверяйте во время поездки. Для напоминаний нужно разрешение iOS.",
-                "Vaqtlar koordinata va vaqt mintaqasi bo‘yicha oflayn hisoblanadi. Mahalliy masjid jadvali farq qilishi mumkin. Eslatmalar uchun iOS ruxsati kerak.",
-                "Вақтлар координата ва вақт минтақаси бўйича офлайн ҳисобланади. Маҳаллий масжид жадвали фарқ қилиши мумкин. Эслатмалар учун iOS рухсати керак."))
-                .font(.caption)
-        }
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 3)
-    }
-
-    private func glassCircleButton(icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundStyle(.primary)
-                .frame(width: 46, height: 46)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-        .buttonStyle(.plain)
     }
 
     private func moveDate(_ offset: Int) {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = state.place.timeZone
-        if let moved = calendar.date(byAdding: .day, value: offset, to: chosenDate) { chosenDate = moved }
+        if let value = calendar.date(byAdding: .day, value: offset, to: chosenDate) {
+            chosenDate = value
+            IumrahHaptics.selection()
+        }
     }
-    private func refreshNotifications() {
-        Task { _ = await IumrahPrayerNotifications.synchronize(state: state) }
+
+    private func dateLabel(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: localeIdentifier)
+        formatter.timeZone = state.place.timeZone
+        formatter.dateStyle = .long
+        return formatter.string(from: date)
     }
+
+    private func hijriDateLabel(_ date: Date) -> String {
+        var calendar = Calendar(identifier: .islamicUmmAlQura)
+        calendar.timeZone = state.place.timeZone
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: localeIdentifier)
+        formatter.timeZone = state.place.timeZone
+        formatter.dateFormat = "d MMMM yyyy"
+        return formatter.string(from: date)
+    }
+
+    private var localeIdentifier: String {
+        switch settings.language.rawValue.lowercased() {
+        case "arabic", "ar": return "ar_SA"
+        case "russian", "ru": return "ru_RU"
+        case "uzbek", "uz": return "uz_UZ"
+        case "uzbekcyrillic", "uz-cyrl": return "uz_UZ@cyrillic"
+        case "turkish", "tr": return "tr_TR"
+        case "indonesian", "id": return "id_ID"
+        case "malay", "ms": return "ms_MY"
+        default: return "en_US"
+        }
+    }
+
     private func countdown(_ date: Date, since now: Date) -> String {
         let seconds = max(0, Int(date.timeIntervalSince(now)))
         return String(format: "%02d:%02d:%02d", seconds / 3600, (seconds / 60) % 60, seconds % 60)
     }
     private func timeText(_ date: Date) -> String { schedule.displayTime(date) }
-    private func dateLabel(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: settings.language == .russian ? "ru_RU" : settings.language == .english ? "en_US" : "uz_UZ")
-        formatter.timeZone = state.place.timeZone
-        formatter.dateFormat = "d MMMM yyyy"
-        return formatter.string(from: date)
+    private func refreshNotifications() {
+        Task { _ = await IumrahPrayerNotifications.synchronize(state: state) }
     }
-    private func iconTint(_ kind: IumrahPrayerKind) -> Color {
-        switch kind {
-        case .fajr, .tahajjud: return .indigo
-        case .sunrise, .duha: return .orange
-        case .dhuhr: return .yellow
-        case .asr: return .teal
-        case .maghrib: return .pink
-        case .isha: return .purple
-        }
-    }
+
     private func prayerTitle(_ kind: IumrahPrayerKind) -> String {
         switch kind {
-        case .fajr: return tr("Fajr", "Фаджр", "Bomdod", "Бомдод")
-        case .sunrise: return tr("Sunrise", "Восход", "Quyosh chiqishi", "Қуёш чиқиши")
-        case .dhuhr: return tr("Dhuhr", "Зухр", "Peshin", "Пешин")
-        case .asr: return tr("Asr", "Аср", "Asr", "Аср")
-        case .maghrib: return tr("Maghrib", "Магриб", "Shom", "Шом")
-        case .isha: return tr("Isha", "Иша", "Xufton", "Хуфтон")
-        case .duha: return tr("Duha", "Духа", "Zuho", "Зуҳо")
-        case .tahajjud: return tr("Tahajjud", "Тахаджуд", "Tahajjud", "Таҳажжуд")
+        case .fajr: return ui("Fajr", "Фаджр", "Bomdod", "الفجر")
+        case .sunrise: return ui("Sunrise", "Восход", "Quyosh chiqishi", "الشروق")
+        case .dhuhr: return ui("Dhuhr", "Зухр", "Peshin", "الظهر")
+        case .asr: return ui("Asr", "Аср", "Asr", "العصر")
+        case .maghrib: return ui("Maghrib", "Магриб", "Shom", "المغرب")
+        case .isha: return ui("Isha", "Иша", "Xufton", "العشاء")
+        case .duha: return ui("Duha", "Духа", "Zuho", "الضحى")
+        case .tahajjud: return ui("Tahajjud", "Тахаджуд", "Tahajjud", "التهجد")
         }
     }
-    private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
-        prayerText(settings.language, en, ru, uz, cyrl)
+
+    private func ui(_ en: String, _ ru: String, _ uz: String, _ ar: String) -> String {
+        // The raw language identifier avoids introducing an exhaustive enum
+        // switch dependency: this page compiles both before and after the
+        // global Arabic Language enum update is installed.
+        switch settings.language.rawValue {
+        case "ar": return ar
+        case "ru": return ru
+        case "uz": return uz
+        case "uz-cyrl": return IumrahPrayerImmersiveTranslations.cyrillic[en] ?? uz
+        case "tr": return IumrahPrayerImmersiveTranslations.turkish[en] ?? en
+        case "id": return IumrahPrayerImmersiveTranslations.indonesian[en] ?? en
+        case "ms": return IumrahPrayerImmersiveTranslations.malay[en] ?? en
+        default: return en
+        }
     }
+}
+
+private enum IumrahPrayerImmersiveTranslations {
+    static let cyrillic: [String: String] = [
+        "Settings": "Созламалар", "Prayer notifications": "Намоз эслатмалари", "City and location": "Шаҳар ва жойлашув",
+        "Calculation method": "Ҳисоблаш усули", "Wallpaper": "Фон расми", "Close": "Ёпиш", "Makkah": "Макка", "Madinah": "Мадина",
+        "Next prayer": "Кейинги намоз", "Time until next prayer": "Кейинги намозгача", "Qibla": "Қибла",
+        "Allow location for Qibla direction": "Қибла учун жойлашувга рухсат беринг",
+        "Turn your phone toward the Qibla": "Телефонни Қиблага қаратинг", "Show prayer schedule": "Намоз жадвалини кўриш",
+        "Prayer times": "Намоз вақтлари", "More": "Яна", "Done": "Тайёр", "Daily schedule": "Кунлик жадвал",
+        "Additional prayers": "Қўшимча намозлар", "Fajr": "Бомдод", "Sunrise": "Қуёш чиқиши", "Dhuhr": "Пешин",
+        "Asr": "Аср", "Maghrib": "Шом", "Isha": "Хуфтон", "Duha": "Зуҳо", "Tahajjud": "Таҳажжуд",
+        "Times are calculated for the chosen location and method. Local mosque times may differ.": "Вақтлар танланган жойлашув ва усулга кўра ҳисобланади. Маҳаллий масжид вақтлари фарқ қилиши мумкин."
+    ]
+    static let turkish: [String: String] = [
+        "Settings": "Ayarlar", "Prayer notifications": "Namaz bildirimleri", "City and location": "Şehir ve konum",
+        "Calculation method": "Hesaplama yöntemi", "Wallpaper": "Duvar kağıdı", "Close": "Kapat", "Makkah": "Mekke", "Madinah": "Medine",
+        "Next prayer": "Sonraki namaz", "Time until next prayer": "Sonraki namaza kalan süre", "Qibla": "Kıble",
+        "Allow location for Qibla direction": "Kıble için konuma izin verin", "Turn your phone toward the Qibla": "Telefonunuzu kıbleye çevirin",
+        "Show prayer schedule": "Namaz vakitlerini göster", "Prayer times": "Namaz vakitleri", "More": "Diğer",
+        "Done": "Bitti", "Daily schedule": "Günlük vakitler", "Additional prayers": "Diğer namazlar",
+        "Fajr": "Sabah", "Sunrise": "Güneş", "Dhuhr": "Öğle", "Asr": "İkindi", "Maghrib": "Akşam", "Isha": "Yatsı", "Duha": "Kuşluk", "Tahajjud": "Teheccüd",
+        "Times are calculated for the chosen location and method. Local mosque times may differ.": "Vakitler seçilen konum ve hesaplama yöntemine göredir. Yerel cami vakitleri farklı olabilir."
+    ]
+    static let indonesian: [String: String] = [
+        "Settings": "Pengaturan", "Prayer notifications": "Notifikasi salat", "City and location": "Kota dan lokasi",
+        "Calculation method": "Metode perhitungan", "Wallpaper": "Latar belakang", "Close": "Tutup", "Makkah": "Makkah", "Madinah": "Madinah",
+        "Next prayer": "Salat berikutnya", "Time until next prayer": "Waktu menuju salat berikutnya", "Qibla": "Kiblat",
+        "Allow location for Qibla direction": "Izinkan lokasi untuk arah kiblat", "Turn your phone toward the Qibla": "Arahkan ponsel ke kiblat",
+        "Show prayer schedule": "Lihat jadwal salat", "Prayer times": "Jadwal salat", "More": "Lainnya",
+        "Done": "Selesai", "Daily schedule": "Jadwal harian", "Additional prayers": "Salat tambahan",
+        "Fajr": "Subuh", "Sunrise": "Terbit", "Dhuhr": "Zuhur", "Asr": "Asar", "Maghrib": "Magrib", "Isha": "Isya", "Duha": "Duha", "Tahajjud": "Tahajud",
+        "Times are calculated for the chosen location and method. Local mosque times may differ.": "Waktu dihitung sesuai lokasi dan metode yang dipilih. Jadwal masjid setempat dapat berbeda."
+    ]
+    static let malay: [String: String] = [
+        "Settings": "Tetapan", "Prayer notifications": "Pemberitahuan solat", "City and location": "Bandar dan lokasi",
+        "Calculation method": "Kaedah pengiraan", "Wallpaper": "Latar belakang", "Close": "Tutup", "Makkah": "Makkah", "Madinah": "Madinah",
+        "Next prayer": "Solat seterusnya", "Time until next prayer": "Masa ke solat seterusnya", "Qibla": "Kiblat",
+        "Allow location for Qibla direction": "Benarkan lokasi untuk arah kiblat", "Turn your phone toward the Qibla": "Halakan telefon ke kiblat",
+        "Show prayer schedule": "Lihat waktu solat", "Prayer times": "Waktu solat", "More": "Lagi",
+        "Done": "Selesai", "Daily schedule": "Jadual harian", "Additional prayers": "Solat tambahan",
+        "Fajr": "Subuh", "Sunrise": "Syuruk", "Dhuhr": "Zohor", "Asr": "Asar", "Maghrib": "Maghrib", "Isha": "Isyak", "Duha": "Duha", "Tahajjud": "Tahajud",
+        "Times are calculated for the chosen location and method. Local mosque times may differ.": "Waktu dikira mengikut lokasi dan kaedah dipilih. Jadual masjid setempat mungkin berbeza."
+    ]
+}
+
+
+// Qibla is based on the DEVICE'S position and magnetic/true heading, never
+// silently on an independently selected timetable city. Location permission is
+// requested only when the user opens the compass.
+@MainActor
+private final class IumrahPrayerQiblaHeading: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
+    @Published private var heading: Double?
+    @Published private var currentCoordinate: CLLocationCoordinate2D?
+    private let manager = CLLocationManager()
+    private var active = false
+
+    override init() {
+        super.init()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager.headingFilter = 3
+    }
+
+    var relativeQiblaBearing: Double? {
+        guard let heading, let coordinate = currentCoordinate else { return nil }
+        let kaabaLatitude = 21.4225 * Double.pi / 180
+        let longitudeDelta = (39.8262 - coordinate.longitude) * Double.pi / 180
+        let latitude = coordinate.latitude * Double.pi / 180
+        let east = sin(longitudeDelta) * cos(kaabaLatitude)
+        let north = cos(latitude) * sin(kaabaLatitude) - sin(latitude) * cos(kaabaLatitude) * cos(longitudeDelta)
+        let bearing = atan2(east, north) * 180 / Double.pi
+        return (bearing - heading + 360).truncatingRemainder(dividingBy: 360)
+    }
+
+    func activate() {
+        active = true
+        switch manager.authorizationStatus {
+        case .notDetermined: manager.requestWhenInUseAuthorization()
+        case .authorizedAlways, .authorizedWhenInUse: start()
+        default: break
+        }
+    }
+    func deactivate() {
+        active = false
+        manager.stopUpdatingHeading()
+        manager.stopUpdatingLocation()
+    }
+    private func start() {
+        guard active else { return }
+        manager.startUpdatingLocation()
+        if CLLocationManager.headingAvailable() { manager.startUpdatingHeading() }
+    }
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager.authorizationStatus == .authorizedAlways || manager.authorizationStatus == .authorizedWhenInUse { start() }
+    }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        if let coordinate = locations.last?.coordinate, CLLocationCoordinate2DIsValid(coordinate) {
+            currentCoordinate = coordinate
+            manager.stopUpdatingLocation()
+        }
+    }
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+    }
+    func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool { true }
 }
 
 private struct IumrahPrayerWallpaperSheet: View {

@@ -87,11 +87,9 @@ struct HomeDashboardView: View {
                 }
                 .environmentObject(settings)
             }
-            .navigationDestination(isPresented: $showPrayerTimes) {
+            .fullScreenCover(isPresented: $showPrayerTimes) {
                 IumrahPrayerTimesView()
                     .environmentObject(settings)
-                    .toolbar(.visible, for: .navigationBar)
-                    .toolbar(.hidden, for: .tabBar)
             }
             .navigationDestination(isPresented: $showZiyarats) {
                 ZiyaratJourneyView()

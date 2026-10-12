@@ -36,7 +36,7 @@ final class IumrahPrayerState: ObservableObject {
         place = (restored?.isValid == true) ? restored! : IumrahPrayerPlace.presets[0]
         method = previous?.method ?? .ummAlQura
         hanafi = previous?.hanafi ?? false
-        wallpaper = previous?.wallpaper ?? .kaabaCorner
+        wallpaper = previous?.wallpaper ?? .seaPrayer
         notifications = previous?.notifications ?? [:]
     }
 

@@ -780,6 +780,8 @@ struct HomeStorefrontFlightOptionCard: View {
                     .foregroundStyle(.secondary)
                 }
 
+                Spacer(minLength: 2)
+
                 HStack(spacing: 8) {
                     Label(generatedStampText, systemImage: "seal.fill")
                         .font(.caption2.weight(.semibold))
@@ -798,8 +800,11 @@ struct HomeStorefrontFlightOptionCard: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(16)
+            .frame(height: 280, alignment: .topLeading)
         }
+        .frame(height: 398, alignment: .top)
         .background(Color.iumrahCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {

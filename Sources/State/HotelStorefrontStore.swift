@@ -1,6 +1,14 @@
 import Foundation
 import SwiftUI
 
+struct HotelPackagePricePoint: Identifiable, Hashable {
+    let id: String                  // YYYY-MM-DD
+    let date: Date
+    let pricePerPersonUSD: Decimal
+    let isEstimated: Bool
+    let packageID: String
+}
+
 @MainActor
 final class HotelStorefrontStore: ObservableObject {
     @Published private(set) var makkahHotels: [HotelSummary] = []
@@ -37,6 +45,35 @@ final class HotelStorefrontStore: ObservableObject {
     }
 
     var allHotels: [HotelSummary] { makkahHotels + madinahHotels }
+
+    /// Published USD Hotel First package prices by outbound date. Only complete,
+    /// ready, server-generated packages are eligible. Keep the server's estimate
+    /// flag visible to the customer instead of silently discarding all quotes.
+    /// Missing dates are never inferred from nightly hotel rates or airline fares.
+    var hotelPackagePriceCalendar: [HotelPackagePricePoint] {
+        var cheapest: [String: HotelPackagePricePoint] = [:]
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = Calendar(identifier: .gregorian).startOfDay(for: Date())
+        for (hotelID, group) in hotelServerPackages {
+            guard isValidHotelFirstGroup(group, hotelID: hotelID) else { continue }
+            for item in group {
+                guard item.status.lowercased() == "ready",
+                      item.currency.uppercased() == "USD",
+                      let price = item.pricePerPerson, price > 0 else { continue }
+                let dateText = String(item.startDate.prefix(10))
+                guard let date = formatter.date(from: dateText),
+                      date >= today.addingTimeInterval(-86_400) else { continue }
+                let value = HotelPackagePricePoint(id: dateText, date: date, pricePerPersonUSD: price, isEstimated: item.isEstimated, packageID: item.id)
+                if let previous = cheapest[dateText], previous.pricePerPersonUSD <= price { continue }
+                cheapest[dateText] = value
+            }
+        }
+        return cheapest.values.sorted { $0.id < $1.id }
+    }
 
     func automaticTier(for hotel: HotelSummary) -> PackageTier {
         switch hotel.stars ?? 3 {

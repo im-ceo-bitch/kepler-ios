@@ -13,20 +13,25 @@ struct HotelsHomeView: View {
     @State private var autoOpenConfiguratorHotelID: String?
     @State private var autoOpenConfiguratorDeepLink: HotelConfiguratorDeepLink?
     @State private var carePresented = false
+    @State private var hotelPriceGraphPresented = false
     @State private var packageShareArtifacts: IumrahPackageShareArtifacts?
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 22) {
-                IumrahRootPageTitle(title: pageTitle)
+        VStack(spacing: 0) {
+            IumrahRootPageTitle(title: pageTitle)
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
 
-                if board != .flights {
-                    AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
-                }
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 22) {
+                    if board != .flights {
+                        AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
+                    }
 
-                Picker(L10n.text("hotel_storefront_section", settings.language), selection: $board) {
+                    Picker(L10n.text("hotel_storefront_section", settings.language), selection: $board) {
                     Text(L10n.text("tab_hotels", settings.language)).tag(HotelsShowcaseBoard.hotels)
                     Text(L10n.text("hotel_storefront_flights", settings.language)).tag(HotelsShowcaseBoard.flights)
                     Text(L10n.text("hotel_storefront_weekend", settings.language)).tag(HotelsShowcaseBoard.sundayClub)
@@ -44,20 +49,35 @@ struct HotelsHomeView: View {
                 }
 
             }
-            // Preserve the original storefront spacing and the 204pt hotel cards.
-            // The iOS floating tab bar covers more of the scroll viewport than a
-            // classic bar: reserve scroll clearance without moving any card.
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
-            .padding(.bottom, board == .hotels ? 112 : 42)
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.top, 6)
+                .padding(.bottom, board == .hotels ? 30 : 96)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .refreshable {
+                await storefront.updateDepartureAirport(journey.trip.originCode)
+                await storefront.refresh()
+            }
         }
         .background(Color.iumrahPageBackground)
-        // With the navigation bar hidden, iOS can render scrolled section titles
-        // behind the system status bar. Clip the scroll content to the safe-area
-        // viewport, keeping all hotel card geometry and original side insets.
-        .clipped()
-        .safeAreaInset(edge: .bottom, spacing: 2) {
-            if board == .flights {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if board == .hotels {
+                Button {
+                    IumrahHaptics.selection()
+                    hotelPriceGraphPresented = true
+                } label: {
+                    Label(hotelPriceGraphTitle, systemImage: "chart.bar.xaxis")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 22)
+                        .frame(height: 54)
+                        .background(Color.blue, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("hotels.openPriceGraph")
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 8)
+            } else if board == .flights {
                 IumrahPackageAssemblyBar(
                     language: settings.language,
                     selections: journey.stagedUmrahFlights,
@@ -75,10 +95,6 @@ struct HotelsHomeView: View {
                 .padding(.horizontal, IumrahDesign.pagePadding)
                 .padding(.bottom, 2)
             }
-        }
-        .refreshable {
-            await storefront.updateDepartureAirport(journey.trip.originCode)
-            await storefront.refresh()
         }
         .task(id: journey.trip.originCode.uppercased()) {
             await storefront.prepareIfNeeded()
@@ -111,6 +127,11 @@ struct HotelsHomeView: View {
         .navigationDestination(item: $selectedFlightPackage) { preview in
             StorefrontUmrahPackageDetailView(preview: preview)
         }
+        .sheet(isPresented: $hotelPriceGraphPresented) {
+            HotelPackagePriceGraphSheet()
+                .environmentObject(settings)
+                .environmentObject(storefront)
+        }
         .sheet(isPresented: $carePresented) {
             HotelCareContactSheet()
                 .environmentObject(settings)
@@ -132,6 +153,19 @@ struct HotelsHomeView: View {
         guard let requested = chrome.requestedHotelsBoard else { return }
         board = requested
         chrome.requestedHotelsBoard = nil
+    }
+
+    private var hotelPriceGraphTitle: String {
+        switch settings.language {
+        case .russian: return "График цен"
+        case .english: return "Price chart"
+        case .uzbek: return "Narx grafigi"
+        case .uzbekCyrillic: return "Нарх графиги"
+        case .turkish: return "Fiyat grafiği"
+        case .indonesian: return "Grafik harga"
+        case .malay: return "Carta harga"
+        case .arabic: return "مخطط الأسعار"
+        }
     }
 
     private var pageTitle: String {

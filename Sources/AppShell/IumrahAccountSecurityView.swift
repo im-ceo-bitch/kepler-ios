@@ -871,6 +871,7 @@ struct IumrahAccountSecurityView: View {
         switch settings.language {
         case .russian: locale = Locale(identifier: "ru_RU")
         case .turkish: locale = Locale(identifier: "tr_TR")
+        case .arabic: locale = Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: locale = Locale(identifier: "en_US")
         case .uzbek: locale = Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: locale = Locale(identifier: "uz_Cyrl_UZ")
@@ -890,6 +891,7 @@ struct IumrahAccountSecurityView: View {
         switch settings.language {
         case .russian: relative.locale = Locale(identifier: "ru_RU")
         case .turkish: relative.locale = Locale(identifier: "tr_TR")
+        case .arabic: relative.locale = Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: relative.locale = Locale(identifier: "en_US")
         case .uzbek: relative.locale = Locale(identifier: "uz-Latn")
         case .uzbekCyrillic: relative.locale = Locale(identifier: "uz-Cyrl")
@@ -901,6 +903,7 @@ struct IumrahAccountSecurityView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -1083,6 +1086,7 @@ enum IumrahAccountSecurityCopy {
         switch language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

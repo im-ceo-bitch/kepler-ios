@@ -75,7 +75,7 @@ struct IumrahBookingCelebrationView: View {
                                 HStack(spacing: 10) {
                                     Text(openBookingTitle)
                                     Spacer(minLength: 8)
-                                    Image(systemName: "arrow.right")
+                                    Image(systemName: "arrow.forward")
                                 }
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundStyle(.black)
@@ -219,6 +219,7 @@ struct IumrahBookingCelebrationView: View {
         switch settings.language {
         case .russian: return "Ваша Umrah создана"
         case .turkish: return TurkishLocalization.phrase("Your Umrah is created")
+        case .arabic: return ArabicLocalization.phrase("Your Umrah is created")
         case .indonesian, .malay, .english: return "Your Umrah is created"
         case .uzbek: return "Umrangiz yaratildi"
         case .uzbekCyrillic: return "Умрангиз яратилди"
@@ -231,6 +232,8 @@ struct IumrahBookingCelebrationView: View {
             return "Бронирование создано и передано на проверку наличия. Вам ничего не нужно делать прямо сейчас."
         case .turkish:
             return "Rezervasyonunuz oluşturuldu ve müsaitlik onayına gönderildi. Şu anda başka bir işlem yapmanız gerekmiyor."
+        case .arabic:
+            return "تم إنشاء حجزك وإرساله للتحقق من التوفر. لا يلزمك اتخاذ أي إجراء الآن."
         case .indonesian, .malay, .english:
             return "Your booking has been created and sent for availability confirmation. Nothing else is required from you right now."
         case .uzbek:
@@ -244,6 +247,7 @@ struct IumrahBookingCelebrationView: View {
         switch settings.language {
         case .russian: return "ПРОВЕРКА НАЛИЧИЯ"
         case .turkish: return TurkishLocalization.phrase("AVAILABILITY CHECK")
+        case .arabic: return ArabicLocalization.phrase("AVAILABILITY CHECK")
         case .indonesian, .malay, .english: return "AVAILABILITY CHECK"
         case .uzbek: return "MAVJUDLIK TEKSHIRUVI"
         case .uzbekCyrillic: return "МАВЖУДЛИК ТЕКШИРУВИ"
@@ -256,6 +260,8 @@ struct IumrahBookingCelebrationView: View {
             return "После проверки наличия статус изменится автоматически. Можно закрыть приложение — iumrah обновит бронь и уведомит Вас."
         case .turkish:
             return "Müsaitlik kontrolünün ardından durum otomatik güncellenir. Uygulamayı kapatabilirsiniz; iumrah rezervasyonu güncelleyip size bildirim gönderir."
+        case .arabic:
+            return "بعد التحقق من التوفر ستتحدث حالة الحجز تلقائيًا. يمكنك إغلاق التطبيق؛ سيحدّث iumrah حجزك ويرسل إليك إشعارًا."
         case .indonesian, .malay, .english:
             return "After availability is checked, the status will update automatically. You can close the app — iumrah will update the booking and notify you."
         case .uzbek:
@@ -269,6 +275,7 @@ struct IumrahBookingCelebrationView: View {
         switch settings.language {
         case .russian: return "Открыть бронирование"
         case .turkish: return TurkishLocalization.phrase("Open booking")
+        case .arabic: return ArabicLocalization.phrase("Open booking")
         case .indonesian, .malay, .english: return "Open booking"
         case .uzbek: return "Bronni ochish"
         case .uzbekCyrillic: return "Бронни очиш"
@@ -279,6 +286,7 @@ struct IumrahBookingCelebrationView: View {
         switch settings.language {
         case .russian: return "На главную"
         case .turkish: return TurkishLocalization.phrase("Home")
+        case .arabic: return ArabicLocalization.phrase("Home")
         case .indonesian, .malay, .english: return "Home"
         case .uzbek: return "Asosiy sahifa"
         case .uzbekCyrillic: return "Асосий саҳифа"

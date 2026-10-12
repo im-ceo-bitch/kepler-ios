@@ -244,7 +244,7 @@ struct CareContactInfoView: View {
                 Spacer(minLength: 2)
 
                 if !appearance.founderConnected {
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.secondary)
                 }
@@ -517,6 +517,7 @@ struct CareContactInfoView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz

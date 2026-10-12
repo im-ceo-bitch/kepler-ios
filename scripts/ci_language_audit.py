@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-LANGUAGES = {"russian", "english", "uzbek", "uzbekCyrillic", "turkish", "indonesian", "malay"}
+LANGUAGES = {"russian", "english", "uzbek", "uzbekCyrillic", "turkish", "indonesian", "malay", "arabic"}
 LANG_PATTERN = r"(?:russian|english|uzbekCyrillic|uzbek|turkish|indonesian|malay)"
 CASE_TUPLE = re.compile(
     r"\(\s*(\.[a-zA-Z_]\w*(?:\([^)]*\))?|\"[^\"]*\"|_|\w+)\s*,\s*"
@@ -69,11 +69,12 @@ def check_files(root: Path):
         issues.extend(problems)
     # Ensure the app-wide language entry points exist before a new language is enabled.
     definitions = {
-      "Sources/AppShell/AppSettingsStore.swift": ["case turkish = \"tr\"", "case indonesian = \"id\"", "case malay = \"ms\"", 'case .malay: return "ms_MY"'],
-      "Sources/Core/AppLocalization.swift": ["language == .turkish", "language == .indonesian", "language == .malay", "MalayLocalization.key("],
+      "Sources/AppShell/AppSettingsStore.swift": ["case turkish = \"tr\"", "case indonesian = \"id\"", "case malay = \"ms\"", 'case .malay: return "ms_MY"', 'case arabic = "ar"', 'case .arabic: return "ar_SA"'],
+      "Sources/Core/AppLocalization.swift": ["language == .turkish", "language == .indonesian", "language == .malay", "MalayLocalization.key(", "language == .arabic", "ArabicLocalization.key("],
       "Sources/Core/TurkishLocalization.swift": ["static func key(", "static func phrase("],
       "Sources/Core/IndonesianLocalization.swift": ["static func key(", "static func phrase("],
       "Sources/Core/MalayLocalization.swift": ["static func key(", "static func phrase("],
+      "Sources/Core/ArabicLocalization.swift": ["static func key(", "static func phrase("],
     }
     for rel, markers in definitions.items():
         path = root / rel
@@ -88,31 +89,38 @@ def check_files(root: Path):
     # positions. Translators may reorder arguments only with %2$d / %1$@.
     app_copy = (root / "Sources/Core/AppLocalization.swift").read_text("utf8")
     turkish_copy = (root / "Sources/Core/TurkishLocalization.swift").read_text("utf8")
+    arabic_copy = (root / "Sources/Core/ArabicLocalization.swift").read_text("utf8")
     try:
         english = app_copy.split('"en": [', 1)[1].split('"ru": [', 1)[0]
         keyed = turkish_copy.split('private static let byKey', 1)[1].split('private static let byPhrase', 1)[0]
+        ar_keyed = arabic_copy.split('private static let byKey', 1)[1].split('private static let byPhrase', 1)[0]
     except IndexError:
         issues.append("Cannot extract the English/Turkish format-key dictionaries")
         return total, issues
     key_values = re.compile(r'"((?:\\.|[^"\\])*)"\s*:\s*"((?:\\.|[^"\\])*)"')
     english_values = dict(key_values.findall(english))
     turkish_values = dict(key_values.findall(keyed))
+    arabic_values = dict(key_values.findall(ar_keyed))
+    for key in english_values:
+        if key not in arabic_values:
+            issues.append(f"Arabic translation missing key: {key}")
     placeholders = re.compile(r'%(?:(\d+)\$)?[-+ #0]*(?:\d+)?(?:\.\d+)?(?:hh|h|ll|l|z|t|j)?([@diufFeEgGxXoscCp])')
     def argument_signature(fmt):
         return sorted((int(pos) if pos else idx + 1, kind)
                       for idx, (pos, kind) in enumerate(placeholders.findall(fmt)))
-    for key, target in turkish_values.items():
-        source = english_values.get(key)
-        if source is not None and argument_signature(source) != argument_signature(target):
-            issues.append(f"Turkish placeholder types/order mismatch: {key}")
+    for label, localized in (("Turkish", turkish_values), ("Arabic", arabic_values)):
+        for key, target in localized.items():
+            source = english_values.get(key)
+            if source is not None and argument_signature(source) != argument_signature(target):
+                issues.append(f"{label} placeholder types/order mismatch: {key}")
     return total, issues
 
 if __name__ == "__main__":
     if "--self-test" in sys.argv:
         stage = """switch (self, language) {
           case (.checkingProvider(let name), .russian): return "r"
-          case (.checkingProvider(let name), .english), (.checkingProvider(let name), .turkish), (.checkingProvider(let name), .indonesian), (.checkingProvider(let name), .uzbek), (.checkingProvider(let name), .uzbekCyrillic): return "x"
-          case (.starting, .russian), (.starting, .english), (.starting, .turkish), (.starting, .indonesian), (.starting, .malay), (.starting, .uzbek), (.starting, .uzbekCyrillic): return "y"
+          case (.checkingProvider(let name), .english), (.checkingProvider(let name), .arabic), (.checkingProvider(let name), .turkish), (.checkingProvider(let name), .indonesian), (.checkingProvider(let name), .uzbek), (.checkingProvider(let name), .uzbekCyrillic): return "x"
+          case (.starting, .russian), (.starting, .english), (.starting, .arabic), (.starting, .turkish), (.starting, .indonesian), (.starting, .malay), (.starting, .uzbek), (.starting, .uzbekCyrillic): return "y"
         }"""
         count, defects = tuple_switch_issues(stage, "self-test.swift")
         assert count == 1 and len(defects) == 1 and '.checkingProvider missing malay' in defects[0], defects
@@ -123,4 +131,4 @@ if __name__ == "__main__":
         for p in problems:
             print("LANGUAGE AUDIT ERROR:", p)
         sys.exit(1)
-    print(f"LANGUAGE AUDIT PASS: {count} tuple switches verified; TR, ID and MS registration checked")
+    print(f"LANGUAGE AUDIT PASS: {count} tuple switches verified; TR, ID, MS and AR registration checked")

@@ -27,6 +27,7 @@ enum IumrahHolyCity: String, CaseIterable, Identifiable, Codable {
             switch language {
             case .russian: return "Мекка"
             case .turkish: return TurkishLocalization.phrase("Makkah")
+            case .arabic: return ArabicLocalization.phrase("Makkah")
             case .indonesian, .malay, .english: return "Makkah"
             case .uzbek: return "Makka"
             case .uzbekCyrillic: return "Макка"
@@ -35,6 +36,7 @@ enum IumrahHolyCity: String, CaseIterable, Identifiable, Codable {
             switch language {
             case .russian: return "Медина"
             case .turkish: return TurkishLocalization.phrase("Madinah")
+            case .arabic: return ArabicLocalization.phrase("Madinah")
             case .indonesian, .malay, .english: return "Madinah"
             case .uzbek: return "Madina"
             case .uzbekCyrillic: return "Мадина"
@@ -182,6 +184,7 @@ struct JourneyTravelInfoView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -330,6 +333,7 @@ private struct PrayerTimesCard: View {
         switch settings.language {
         case .russian: return "Времена появятся после подключения к сети"
         case .turkish: return TurkishLocalization.phrase("Prayer times appear when online")
+        case .arabic: return ArabicLocalization.phrase("Prayer times appear when online")
         case .indonesian, .malay, .english: return "Prayer times appear when online"
         case .uzbek: return "Namoz vaqtlari internet bo‘lganda chiqadi"
         case .uzbekCyrillic: return "Намоз вақтлари интернет бўлганда чиқади"
@@ -340,6 +344,7 @@ private struct PrayerTimesCard: View {
         switch settings.language {
         case .russian: return "ВРЕМЕНА МОЛИТВ"
         case .turkish: return TurkishLocalization.phrase("PRAYER TIMES")
+        case .arabic: return ArabicLocalization.phrase("PRAYER TIMES")
         case .indonesian, .malay, .english: return "PRAYER TIMES"
         case .uzbek: return "NAMOZ VAQTLARI"
         case .uzbekCyrillic: return "НАМОЗ ВАҚТЛАРИ"
@@ -350,6 +355,7 @@ private struct PrayerTimesCard: View {
         switch settings.language {
         case .russian: return "Umm al-Qura · время Саудии"
         case .turkish: return TurkishLocalization.phrase("Umm al-Qura · Saudi time")
+        case .arabic: return ArabicLocalization.phrase("Umm al-Qura · Saudi time")
         case .indonesian, .malay, .english: return "Umm al-Qura · Saudi time"
         case .uzbek: return "Umm al-Qura · Saudiya vaqti"
         case .uzbekCyrillic: return "Umm al-Qura · Саудия вақти"
@@ -360,6 +366,7 @@ private struct PrayerTimesCard: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -475,6 +482,7 @@ private struct WeatherForecastCard: View {
         switch settings.language {
         case .russian: return "ПОГОДА · 7 ДНЕЙ"
         case .turkish: return TurkishLocalization.phrase("WEATHER · 7 DAYS")
+        case .arabic: return ArabicLocalization.phrase("WEATHER · 7 DAYS")
         case .indonesian, .malay, .english: return "WEATHER · 7 DAYS"
         case .uzbek: return "OB-HAVO · 7 KUN"
         case .uzbekCyrillic: return "ОБ-ҲАВО · 7 КУН"
@@ -487,6 +495,7 @@ private struct WeatherForecastCard: View {
         switch settings.language {
         case .russian: return "Прогноз появится при подключении к сети"
         case .turkish: return TurkishLocalization.phrase("Forecast appears when online")
+        case .arabic: return ArabicLocalization.phrase("Forecast appears when online")
         case .indonesian, .malay, .english: return "Forecast appears when online"
         case .uzbek: return "Prognoz internet bo‘lganda chiqadi"
         case .uzbekCyrillic: return "Прогноз интернет бўлганда чиқади"
@@ -574,6 +583,7 @@ private struct DualWorldClockCard: View {
         switch settings.language {
         case .russian: return "МИРОВОЕ ВРЕМЯ"
         case .turkish: return TurkishLocalization.phrase("WORLD CLOCK")
+        case .arabic: return ArabicLocalization.phrase("WORLD CLOCK")
         case .indonesian, .malay, .english: return "WORLD CLOCK"
         case .uzbek: return "DUNYO VAQTI"
         case .uzbekCyrillic: return "ДУНЁ ВАҚТИ"
@@ -588,6 +598,7 @@ private struct DualWorldClockCard: View {
             switch settings.language {
             case .russian: return "Одинаковое время"
             case .turkish: return TurkishLocalization.phrase("Same time")
+            case .arabic: return ArabicLocalization.phrase("Same time")
             case .indonesian, .malay, .english: return "Same time"
             case .uzbek: return "Vaqt bir xil"
             case .uzbekCyrillic: return "Вақт бир хил"
@@ -601,6 +612,7 @@ private struct DualWorldClockCard: View {
         switch settings.language {
         case .russian: return "Ваш город \(delta) относительно Саудии"
         case .turkish: return TurkishLocalization.phrase("Your city \(delta) vs Saudi Arabia")
+        case .arabic: return ArabicLocalization.phrase("Your city \(delta) vs Saudi Arabia")
         case .indonesian, .malay, .english: return "Your city \(delta) vs Saudi Arabia"
         case .uzbek: return "Shahringiz Saudiya vaqtiga nisbatan \(delta)"
         case .uzbekCyrillic: return "Шаҳрингиз Саудия вақтига нисбатан \(delta)"
@@ -882,6 +894,7 @@ struct IumrahWeatherSnapshot: Codable, Hashable {
         switch language {
         case .russian: return "обновлено \(formatter.string(from: fetchedAt))"
         case .turkish: return TurkishLocalization.phrase("updated \(formatter.string(from: fetchedAt))")
+        case .arabic: return ArabicLocalization.phrase("updated \(formatter.string(from: fetchedAt))")
         case .indonesian, .malay, .english: return "updated \(formatter.string(from: fetchedAt))"
         case .uzbek: return "yangilandi \(formatter.string(from: fetchedAt))"
         case .uzbekCyrillic: return "янгиланди \(formatter.string(from: fetchedAt))"
@@ -903,6 +916,7 @@ struct IumrahWeatherDay: Identifiable, Codable, Hashable {
             switch language {
             case .russian: return "Сег."
             case .turkish: return TurkishLocalization.phrase("Today")
+            case .arabic: return ArabicLocalization.phrase("Today")
             case .indonesian, .malay, .english: return "Today"
             case .uzbek: return "Bugun"
             case .uzbekCyrillic: return "Бугун"
@@ -913,6 +927,7 @@ struct IumrahWeatherDay: Identifiable, Codable, Hashable {
         switch language {
         case .russian: formatter.locale = Locale(identifier: "ru_RU")
         case .turkish: formatter.locale = Locale(identifier: "tr_TR")
+        case .arabic: formatter.locale = Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: formatter.locale = Locale(identifier: "en_US")
         case .uzbek: formatter.locale = Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: formatter.locale = Locale(identifier: "uz_Cyrl_UZ")
@@ -981,18 +996,25 @@ enum IumrahWeatherCondition: String, Codable, Hashable {
         case (.thunder, .russian): return "Гроза"
         case (.snow, .russian): return "Снег"
         case (.clear, .turkish): return TurkishLocalization.phrase("Clear")
+        case (.clear, .arabic): return ArabicLocalization.phrase("Clear")
         case (.clear, .indonesian), (.clear, .malay), (.clear, .english): return "Clear"
         case (.partlyCloudy, .turkish): return TurkishLocalization.phrase("Partly cloudy")
+        case (.partlyCloudy, .arabic): return ArabicLocalization.phrase("Partly cloudy")
         case (.partlyCloudy, .indonesian), (.partlyCloudy, .malay), (.partlyCloudy, .english): return "Partly cloudy"
         case (.cloudy, .turkish): return TurkishLocalization.phrase("Cloudy")
+        case (.cloudy, .arabic): return ArabicLocalization.phrase("Cloudy")
         case (.cloudy, .indonesian), (.cloudy, .malay), (.cloudy, .english): return "Cloudy"
         case (.fog, .turkish): return TurkishLocalization.phrase("Fog")
+        case (.fog, .arabic): return ArabicLocalization.phrase("Fog")
         case (.fog, .indonesian), (.fog, .malay), (.fog, .english): return "Fog"
         case (.rain, .turkish), (.showers, .turkish): return TurkishLocalization.phrase("Rain")
+        case (.rain, .arabic), (.showers, .arabic): return ArabicLocalization.phrase("Rain")
         case (.rain, .indonesian), (.rain, .malay), (.rain, .english), (.showers, .indonesian), (.showers, .malay), (.showers, .english): return "Rain"
         case (.thunder, .turkish): return TurkishLocalization.phrase("Thunderstorm")
+        case (.thunder, .arabic): return ArabicLocalization.phrase("Thunderstorm")
         case (.thunder, .indonesian), (.thunder, .malay), (.thunder, .english): return "Thunderstorm"
         case (.snow, .turkish): return TurkishLocalization.phrase("Snow")
+        case (.snow, .arabic): return ArabicLocalization.phrase("Snow")
         case (.snow, .indonesian), (.snow, .malay), (.snow, .english): return "Snow"
         case (.clear, .uzbek), (.clear, .uzbekCyrillic): return "Ochiq"
         case (.partlyCloudy, .uzbek), (.partlyCloudy, .uzbekCyrillic): return "Qisman bulutli"
@@ -1162,6 +1184,7 @@ struct JourneyTravelInfoScreen: View {
         case .turkish: return "Hava ve saat"
         case .indonesian: return "Cuaca dan waktu"
         case .malay: return "Cuaca dan waktu"
+        case .arabic: return ArabicLocalization.phrase("Weather & time")
         case .english: return "Weather & time"
         }
     }
@@ -1174,6 +1197,7 @@ struct JourneyTravelInfoScreen: View {
         case .turkish: return "Mekke ve Medine · hava, namaz ve saat"
         case .indonesian: return "Makkah dan Madinah · cuaca, salat, waktu"
         case .malay: return "Makkah dan Madinah · cuaca, solat, waktu"
+        case .arabic: return ArabicLocalization.phrase("Makkah and Madinah · forecast, prayer and clocks")
         case .english: return "Makkah and Madinah · forecast, prayer and clocks"
         }
     }

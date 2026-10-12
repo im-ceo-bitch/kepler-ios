@@ -137,7 +137,7 @@ struct SidebarDrawerView: View {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -168,18 +168,25 @@ struct SidebarDrawerView: View {
         case (.russian, .insidePackage): return "В СОСТАВЕ ПАКЕТА"
         case (.russian, .footer): return "Independent Umrah · iumrah"
         case (.turkish, .subtitle): return TurkishLocalization.phrase("Your Umrah in one place")
+        case (.arabic, .subtitle): return ArabicLocalization.phrase("Your Umrah in one place")
         case (.indonesian, .subtitle), (.malay, .subtitle), (.english, .subtitle): return "Your Umrah in one place"
         case (.turkish, .home): return TurkishLocalization.phrase("Home")
+        case (.arabic, .home): return ArabicLocalization.phrase("Home")
         case (.indonesian, .home), (.malay, .home), (.english, .home): return "Home"
         case (.turkish, .bookings): return TurkishLocalization.phrase("Trips")
+        case (.arabic, .bookings): return ArabicLocalization.phrase("Trips")
         case (.indonesian, .bookings), (.malay, .bookings), (.english, .bookings): return "Trips"
         case (.turkish, .account): return TurkishLocalization.phrase("Account")
+        case (.arabic, .account): return ArabicLocalization.phrase("Account")
         case (.indonesian, .account), (.malay, .account), (.english, .account): return "Account"
         case (.turkish, .esimBody): return TurkishLocalization.phrase("Activation and data balance directly in the app.")
+        case (.arabic, .esimBody): return ArabicLocalization.phrase("Activation and data balance directly in the app.")
         case (.indonesian, .esimBody), (.malay, .esimBody), (.english, .esimBody): return "Activation and data balance directly in the app."
         case (.turkish, .insidePackage): return TurkishLocalization.phrase("INCLUDED WITH PACKAGE")
+        case (.arabic, .insidePackage): return ArabicLocalization.phrase("INCLUDED WITH PACKAGE")
         case (.indonesian, .insidePackage), (.malay, .insidePackage), (.english, .insidePackage): return "INCLUDED WITH PACKAGE"
         case (.turkish, .footer): return TurkishLocalization.phrase("Independent Umrah · iumrah")
+        case (.arabic, .footer): return ArabicLocalization.phrase("Independent Umrah · iumrah")
         case (.indonesian, .footer), (.malay, .footer), (.english, .footer): return "Independent Umrah · iumrah"
         case (.uzbek, .subtitle): return "Umrangiz — bir joyda"
         case (.uzbek, .home): return "Bosh sahifa"

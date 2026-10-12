@@ -28,6 +28,7 @@ final class AppSettingsStore: ObservableObject {
     enum Language: String, CaseIterable, Identifiable {
         case russian = "ru"
         case english = "en"
+        case arabic = "ar"
         case turkish = "tr"
         case indonesian = "id"
         case malay = "ms"
@@ -35,10 +36,12 @@ final class AppSettingsStore: ObservableObject {
         case uzbekCyrillic = "uz-cyrl"
 
         var id: String { rawValue }
+        var isRightToLeft: Bool { self == .arabic }
 
         var title: String {
             switch self {
             case .russian: return L10n.text("language_russian", self)
+            case .arabic: return "العربية"
             case .english: return L10n.text("language_english", self)
             case .turkish: return L10n.text("language_turkish", self)
             case .indonesian: return "Bahasa Indonesia"
@@ -51,6 +54,7 @@ final class AppSettingsStore: ObservableObject {
         var localeIdentifier: String {
             switch self {
             case .russian: return "ru_RU"
+            case .arabic: return "ar_SA"
             case .english: return "en_US"
             case .turkish: return "tr_TR"
             case .indonesian: return "id_ID"

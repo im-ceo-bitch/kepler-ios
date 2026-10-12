@@ -37,7 +37,7 @@ struct IumrahInvoiceShareCard: View {
                     Image(systemName: "square.and.arrow.down")
                     Text(localizedAction)
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                 }
                 .font(.subheadline.weight(.semibold))
             }
@@ -70,6 +70,7 @@ struct IumrahInvoiceShareCard: View {
         switch settings.language {
         case .russian: return "Инвойс бронирования"
         case .turkish: return TurkishLocalization.phrase("Booking invoice")
+        case .arabic: return ArabicLocalization.phrase("Booking invoice")
         case .indonesian, .malay, .english: return "Booking invoice"
         case .uzbek: return "Bron invoice"
         case .uzbekCyrillic: return "Брон invoice"
@@ -80,6 +81,7 @@ struct IumrahInvoiceShareCard: View {
         switch settings.language {
         case .russian: return "Формируется из сохранённых данных этой поездки и доступен для сохранения в PDF."
         case .turkish: return TurkishLocalization.phrase("Generated from the saved booking snapshot and available to save as a PDF.")
+        case .arabic: return ArabicLocalization.phrase("Generated from the saved booking snapshot and available to save as a PDF.")
         case .indonesian, .malay, .english: return "Generated from the saved booking snapshot and available to save as a PDF."
         case .uzbek: return "Saqlangan bron ma’lumotlaridan yaratiladi va PDF sifatida saqlanishi mumkin."
         case .uzbekCyrillic: return "Сақланган брон маълумотларидан яратилади ва PDF сифатида сақланиши мумкин."
@@ -90,6 +92,7 @@ struct IumrahInvoiceShareCard: View {
         switch settings.language {
         case .russian: return "Сохранить инвойс PDF"
         case .turkish: return TurkishLocalization.phrase("Save invoice PDF")
+        case .arabic: return ArabicLocalization.phrase("Save invoice PDF")
         case .indonesian, .malay, .english: return "Save invoice PDF"
         case .uzbek: return "Invoice PDF saqlash"
         case .uzbekCyrillic: return "Invoice PDF сақлаш"
@@ -100,6 +103,7 @@ struct IumrahInvoiceShareCard: View {
         switch settings.language {
         case .russian: return "Не удалось сформировать PDF. Попробуйте ещё раз."
         case .turkish: return TurkishLocalization.phrase("Could not create the PDF. Please try again.")
+        case .arabic: return ArabicLocalization.phrase("Could not create the PDF. Please try again.")
         case .indonesian, .malay, .english: return "Could not create the PDF. Please try again."
         case .uzbek: return "PDF yaratilmadi. Qayta urinib ko‘ring."
         case .uzbekCyrillic: return "PDF яратилмади. Қайта уриниб кўринг."
@@ -206,6 +210,7 @@ enum IumrahInvoiceRenderer {
         switch language {
         case .russian: return "Инвойс бронирования"
         case .turkish: return TurkishLocalization.phrase("Booking Invoice")
+        case .arabic: return ArabicLocalization.phrase("Booking Invoice")
         case .indonesian, .malay, .english: return "Booking Invoice"
         case .uzbek: return "Bron Invoice"
         case .uzbekCyrillic: return "Брон Invoice"
@@ -249,6 +254,7 @@ enum IumrahInvoiceRenderer {
         switch language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -493,6 +499,7 @@ struct IumrahPaidReceiptCard: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -715,6 +722,7 @@ enum IumrahPaidReceiptRenderer {
         switch language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy

@@ -50,7 +50,7 @@ struct TawafReadingPage: View {
 
                 HStack {
                     UmrahSideStepButton(
-                        systemName: "chevron.left",
+                        systemName: "chevron.backward",
                         accessibilityLabel: UmrahFlowCopy.previous(store.guideLanguage),
                         action: previousStep
                     )

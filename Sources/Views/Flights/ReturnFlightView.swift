@@ -49,6 +49,7 @@ struct ReturnFlightView: View {
         switch settings.language {
         case .russian: return "Поиск завершён без рейса, который прошёл все проверки iumrah."
         case .turkish: return TurkishLocalization.phrase("Search completed without a flight that passed all iumrah checks.")
+        case .arabic: return ArabicLocalization.phrase("Search completed without a flight that passed all iumrah checks.")
         case .indonesian, .malay, .english: return "Search completed without a flight that passed all iumrah checks."
         case .uzbek: return "Qidiruv iumrah tekshiruvlaridan o‘tgan reyssiz yakunlandi."
         case .uzbekCyrillic: return "Қидирув iumrah текширувларидан ўтган рейссиз якунланди."
@@ -142,7 +143,7 @@ struct ReturnFlightView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(L10n.text("flight_details_cta", settings.language))
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption.weight(.bold))
                     }
                     .font(.subheadline.weight(.semibold))
@@ -187,6 +188,7 @@ struct ReturnFlightView: View {
         switch settings.language {
         case .russian: return "Найдено билетов обратно: \(offers.count)"
         case .turkish: return TurkishLocalization.phrase("Return tickets found: \(offers.count)")
+        case .arabic: return ArabicLocalization.phrase("Return tickets found: \(offers.count)")
         case .indonesian, .malay, .english: return "Return tickets found: \(offers.count)"
         case .uzbek: return "Qaytish chiptalari topildi: \(offers.count)"
         case .uzbekCyrillic: return "Қайтиш чипталари топилди: \(offers.count)"
@@ -240,7 +242,7 @@ struct ReturnFlightView: View {
             HStack(spacing: 10) {
                 Text(continueToTransferTitle)
                 Spacer(minLength: 12)
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.forward")
                     .font(.system(size: 16, weight: .bold))
             }
             .padding(.horizontal, 20)
@@ -253,6 +255,7 @@ struct ReturnFlightView: View {
         switch settings.language {
         case .russian: return "Выбрать билет и продолжить к трансферу"
         case .turkish: return TurkishLocalization.phrase("Select ticket and continue to transfer")
+        case .arabic: return ArabicLocalization.phrase("Select ticket and continue to transfer")
         case .indonesian, .malay, .english: return "Select ticket and continue to transfer"
         case .uzbek: return "Chiptani tanlash va transferga o‘tish"
         case .uzbekCyrillic: return "Чиптани танлаш ва трансферга ўтиш"
@@ -439,6 +442,7 @@ struct ReturnFlightView: View {
         switch settings.language {
         case .russian: return selected ? "Ваша дата · есть подтверждённый рейс" : "На эту дату найден подтверждённый рейс"
         case .turkish: return selected ? "Seçtiğiniz tarih · doğrulanmış uçuş mevcut" : "Bu tarihte doğrulanmış uçuş mevcut"
+        case .arabic: return selected ? "تاريخك · رحلة مؤكدة متاحة" : "تتوفر رحلة مؤكدة في هذا التاريخ"
         case .indonesian, .malay, .english: return selected ? "Your date · verified flight available" : "A verified flight is available on this date"
         case .uzbek: return selected ? "Siz tanlagan sana · tasdiqlangan reys bor" : "Bu sanada tasdiqlangan reys topildi"
         case .uzbekCyrillic: return selected ? "Сиз танлаган сана · тасдиқланган рейс бор" : "Бу санада тасдиқланган рейс топилди"
@@ -453,6 +457,9 @@ struct ReturnFlightView: View {
         case .turkish:
             if offset == 0 { return "Seçtiğiniz tarih" }
             return offset < 0 ? "\(abs(offset)) gün önce" : "\(offset) gün sonra"
+        case .arabic:
+            if offset == 0 { return "التاريخ المختار" }
+            return offset < 0 ? "قبل التاريخ المختار" : "بعد التاريخ المختار"
         case .indonesian, .malay, .english:
             if offset == 0 { return "Your selected date" }
             return offset < 0 ? "\(abs(offset)) day(s) earlier" : "\(offset) day(s) later"
@@ -471,6 +478,8 @@ struct ReturnFlightView: View {
             return offset == 0 ? "Сначала показываем варианты на выбранный день" : "Дополнительные варианты рядом с вашей датой"
         case .turkish:
             return offset == 0 ? "Seçtiğiniz tarihteki seçenekler" : "Seçtiğiniz tarihe yakın diğer seçenekler"
+        case .arabic:
+            return offset == 0 ? "الخيارات في التاريخ المختار" : "خيارات إضافية قريبة من تاريخك"
         case .indonesian, .malay, .english:
             return offset == 0 ? "Options on the date you selected" : "More options close to your selected date"
         case .uzbek:

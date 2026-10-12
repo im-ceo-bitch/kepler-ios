@@ -575,6 +575,7 @@ struct AccountNotificationsView: View {
     private var locale: Locale {
         switch settings.language {
         case .turkish: return Locale(identifier: "tr_TR")
+        case .arabic: return Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: return Locale(identifier: "en_US")
         case .russian: return Locale(identifier: "ru_RU")
         case .uzbek: return Locale(identifier: "uz_UZ")
@@ -586,6 +587,7 @@ struct AccountNotificationsView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

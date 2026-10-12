@@ -528,7 +528,7 @@ struct IumrahUserDataView: View {
                          : tr("Change", "Изменить", "O‘zgartirish", "Ўзгартириш"))
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.primary)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.tertiary)
                 }
@@ -587,7 +587,7 @@ struct IumrahUserDataView: View {
                     .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -889,6 +889,7 @@ struct IumrahUserDataView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz

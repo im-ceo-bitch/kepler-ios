@@ -113,7 +113,7 @@ struct UmrahAdvisorHomeCard: View {
                         .font(.system(size: 13, weight: .bold))
                     Text(copy.button)
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                         .font(.system(size: 12, weight: .bold))
                 }
                 .foregroundStyle(.black)
@@ -158,6 +158,8 @@ struct UmrahAdvisorHomeCard: View {
                 "10 dil",
                 "Umre için sesli rehber"
             )
+        case .arabic:
+            return ("ابدأ العمرة", "يرافقك الدليل الصوتي في الطواف والسعي بين الصفا والمروة حتى إتمام العمرة.", "ابدأ", "10 لغات", "دليل صوتي للعمرة")
         case .indonesian, .malay, .english:
             return (
                 "Start Umrah",

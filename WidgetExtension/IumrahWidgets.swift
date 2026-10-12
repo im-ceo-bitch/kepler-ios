@@ -45,6 +45,7 @@ private struct IumrahActiveTripWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IumrahWidgetProvider()) { entry in
             IumrahActiveTripWidgetView(entry: entry)
+                .environment(\.layoutDirection, IumrahWidgetL10n.isArabic ? .rightToLeft : .leftToRight)
                 .containerBackground(for: .widget) { Color.black }
         }
         .configurationDisplayName(IumrahWidgetL10n.activeTripWidgetName)
@@ -60,6 +61,7 @@ private struct IumrahBookingStatusWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IumrahWidgetProvider()) { entry in
             IumrahBookingStatusWidgetView(entry: entry)
+                .environment(\.layoutDirection, IumrahWidgetL10n.isArabic ? .rightToLeft : .leftToRight)
                 .containerBackground(for: .widget) { IumrahWidgetPalette.surface }
         }
         .configurationDisplayName(IumrahWidgetL10n.bookingWidgetName)
@@ -75,6 +77,7 @@ private struct IumrahPlannedUmrahWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IumrahWidgetProvider()) { entry in
             IumrahPlannedUmrahWidgetView(entry: entry)
+                .environment(\.layoutDirection, IumrahWidgetL10n.isArabic ? .rightToLeft : .leftToRight)
                 .containerBackground(for: .widget) { Color.black }
         }
         .configurationDisplayName(IumrahWidgetL10n.plannedWidgetName)
@@ -90,6 +93,7 @@ private struct IumrahIdentityWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IumrahWidgetProvider()) { entry in
             IumrahIdentityWidgetView(entry: entry)
+                .environment(\.layoutDirection, IumrahWidgetL10n.isArabic ? .rightToLeft : .leftToRight)
                 .containerBackground(for: .widget) { Color.black }
         }
         .configurationDisplayName("iumrah ID")
@@ -105,6 +109,7 @@ private struct IumrahCountdownWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: IumrahWidgetProvider()) { entry in
             IumrahCountdownWidgetView(entry: entry)
+                .environment(\.layoutDirection, IumrahWidgetL10n.isArabic ? .rightToLeft : .leftToRight)
                 .containerBackground(for: .widget) { Color.clear }
         }
         .configurationDisplayName(IumrahWidgetL10n.countdownWidgetName)
@@ -254,6 +259,8 @@ private struct IumrahActiveTripWidgetView: View {
         .font(routeFont(size))
         .foregroundStyle(.white)
         .lineLimit(1)
+        // IATA origin → destination is chronological even in the Arabic widget.
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     private func routeFont(_ size: RouteSize) -> Font {
@@ -863,7 +870,7 @@ private enum IumrahWidgetPalette {
 // MARK: - Localisation
 
 private enum IumrahWidgetL10n {
-    private enum Language { case ru, en, uz, uzCyrl, tr, id }
+    private enum Language { case ru, en, uz, uzCyrl, tr, id, ar }
 
     private static var language: Language {
         // The selected language is shared by the main app in the widget snapshot.
@@ -875,6 +882,7 @@ private enum IumrahWidgetL10n {
         if code.hasPrefix("ru") { return .ru }
         if code.hasPrefix("tr") { return .tr }
         if code.hasPrefix("id") { return .id }
+        if code.hasPrefix("ar") { return .ar }
         return .en
     }
 
@@ -930,6 +938,7 @@ private enum IumrahWidgetL10n {
         case .uzCyrl: formatter.locale = Locale(identifier: "uz_Cyrl_UZ")
         case .tr: formatter.locale = Locale(identifier: "tr_TR")
         case .id: formatter.locale = Locale(identifier: "id_ID")
+        case .ar: formatter.locale = Locale(identifier: "ar_SA")
         }
         formatter.setLocalizedDateFormatFromTemplate(abbreviated ? "dMMM" : "dMMMM")
         return formatter.string(from: value)
@@ -953,8 +962,57 @@ private enum IumrahWidgetL10n {
         case .uzCyrl: return cyrl
         case .tr: return tr
         case .id: return id
+        case .ar: return arabicCopy[en] ?? en
         }
     }
+
+    static var isArabic: Bool {
+        if case .ar = language { return true }
+        return false
+    }
+
+    private static let arabicCopy: [String: String] = [
+        "Booking": "الحجز",
+        "Booking confirmed": "الحجز مؤكد",
+        "Cancelled": "ملغاة",
+        "Checking availability": "جارٍ التحقق من التوفر",
+        "Choose dates and reminders": "اختر التواريخ والتذكيرات",
+        "Compact countdown for the Lock Screen.": "عد تنازلي مختصر لشاشة القفل.",
+        "Completed": "مكتملة",
+        "Countdown to your planned trip.": "العد التنازلي لرحلتك المخططة.",
+        "Current booking status and next step.": "حالة الحجز الحالية والخطوة التالية.",
+        "Departure": "المغادرة",
+        "No active booking": "لا يوجد حجز نشط",
+        "No active trip": "لا توجد رحلة نشطة",
+        "Open iumrah to start": "افتح iumrah للبدء",
+        "Open the booking to add details and pay.": "افتح الحجز لإضافة بياناتك وإتمام الدفع.",
+        "Plan your Umrah": "خطط لعمرتك",
+        "Quick access to your iumrah ID and QR.": "وصول سريع إلى هويتك في iumrah ورمز QR.",
+        "Ready to travel": "جاهز للسفر",
+        "Reminders off": "التذكيرات متوقفة",
+        "Reminders on": "التذكيرات مفعلة",
+        "Route, dates and status of the active Umrah.": "مسار العمرة وتواريخها وحالة الرحلة النشطة.",
+        "Scan to open ID": "امسح الرمز لفتح هويتك",
+        "Sign in to iumrah": "سجّل الدخول إلى iumrah",
+        "The team is confirming availability for your package.": "يتحقق الفريق الآن من توفر باقتك.",
+        "Travelers": "المسافرون",
+        "Trip status": "حالة الرحلة",
+        "Until Umrah": "حتى العمرة",
+        "Upcoming Umrah": "العمرة القادمة",
+        "Waiting for payment": "بانتظار الدفع",
+        "You are traveling": "أنت في رحلتك",
+        "Your Umrah": "عمرتك",
+        "Your booking is confirmed. Documents are being prepared.": "تم تأكيد حجزك، وتُجهّز مستنداتك.",
+        "Your documents are ready — review the trip details.": "مستنداتك جاهزة؛ راجع تفاصيل الرحلة.",
+        "Your trip details are available in iumrah.": "تفاصيل رحلتك متاحة في iumrah.",
+        "d": "ي",
+        "days": "أيام",
+        "days until Umrah": "أيام حتى العمرة",
+        "iumrah — status": "iumrah — الحالة",
+        "iumrah — trip": "iumrah — رحلة",
+        "next Umrah": "العمرة التالية",
+        "until trip": "حتى الرحلة",
+    ]
 }
 
 private func daysUntil(_ date: Date?) -> Int {

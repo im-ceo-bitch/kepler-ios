@@ -496,6 +496,10 @@ struct BookingItineraryCalendarView: View {
             if hours > 0 && mins > 0 { return "~ \(hours) sa. \(mins) dk." }
             if hours > 0 { return "~ \(hours) sa." }
             return "~ \(mins) dk."
+        case .arabic:
+            if hours > 0 && mins > 0 { return "≈ \(hours) س \(mins) د" }
+            if hours > 0 { return "≈ \(hours) س" }
+            return "≈ \(mins) د"
         case .indonesian, .malay, .english:
             if hours > 0 && mins > 0 { return "~ \(hours)h \(mins)m" }
             if hours > 0 { return "~ \(hours)h" }
@@ -546,12 +550,16 @@ struct BookingItineraryCalendarView: View {
 
         case (.active, .turkish): return TurkishLocalization.phrase("Now")
 
+        case (.active, .arabic): return ArabicLocalization.phrase("Now")
         case (.active, .indonesian), (.active, .malay), (.active, .english): return "Now"
         case (.upcoming, .turkish): return TurkishLocalization.phrase("Next")
+        case (.upcoming, .arabic): return ArabicLocalization.phrase("Next")
         case (.upcoming, .indonesian), (.upcoming, .malay), (.upcoming, .english): return "Next"
         case (.completed, .turkish): return TurkishLocalization.phrase("Done")
+        case (.completed, .arabic): return ArabicLocalization.phrase("Done")
         case (.completed, .indonesian), (.completed, .malay), (.completed, .english): return "Done"
         case (.neutral, .turkish): return TurkishLocalization.phrase("")
+        case (.neutral, .arabic): return ArabicLocalization.phrase("")
         case (.neutral, .indonesian), (.neutral, .malay), (.neutral, .english): return ""
 
         case (.active, .uzbek): return "Hozir"
@@ -635,6 +643,7 @@ struct BookingItineraryCalendarView: View {
             switch settings.language {
             case .russian: return "\(minutes) мин"
             case .turkish: return TurkishLocalization.phrase("\(minutes) min")
+            case .arabic: return ArabicLocalization.phrase("\(minutes) min")
             case .indonesian, .malay, .english: return "\(minutes) min"
             case .uzbek: return "\(minutes) daq"
             case .uzbekCyrillic: return "\(minutes) дақ"
@@ -670,6 +679,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -702,6 +712,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "Расписание поездки"
         case .turkish: return TurkishLocalization.phrase("Trip schedule")
+        case .arabic: return ArabicLocalization.phrase("Trip schedule")
         case .indonesian, .malay, .english: return "Trip schedule"
         case .uzbek: return "Safar jadvali"
         case .uzbekCyrillic: return "Сафар жадвали"
@@ -712,6 +723,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "По времени — прилёт, контроль, трансферы, отели, Умра и вылет"
         case .turkish: return TurkishLocalization.phrase("Timed arrival, controls, transfers, hotels, Umrah and departure")
+        case .arabic: return ArabicLocalization.phrase("Timed arrival, controls, transfers, hotels, Umrah and departure")
         case .indonesian, .malay, .english: return "Timed arrival, controls, transfers, hotels, Umrah and departure"
         case .uzbek: return "Vaqt bo‘yicha parvoz, nazorat, transfer, mehmonxona, Umra va jo‘nab ketish"
         case .uzbekCyrillic: return "Вақт бўйича парвоз, назорат, трансфер, меҳмонхона, Умра ва жўнаб кетиш"
@@ -722,6 +734,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "Полностью"
         case .turkish: return TurkishLocalization.phrase("Full")
+        case .arabic: return ArabicLocalization.phrase("Full")
         case .indonesian, .malay, .english: return "Full"
         case .uzbek: return "To‘liq"
         case .uzbekCyrillic: return "Тўлиқ"
@@ -732,6 +745,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "Текущий день раскрыт по времени и подсвечивает активный этап поездки."
         case .turkish: return TurkishLocalization.phrase("Today is expanded by time and highlights the current journey stage.")
+        case .arabic: return ArabicLocalization.phrase("Today is expanded by time and highlights the current journey stage.")
         case .indonesian, .malay, .english: return "Today is expanded by time and highlights the current journey stage."
         case .uzbek: return "Bugungi kun vaqt bo‘yicha ochilgan va joriy bosqichni ko‘rsatadi."
         case .uzbekCyrillic: return "Бугунги кун вақт бўйича очилган ва жорий босқични кўрсатади."
@@ -742,6 +756,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "Для прошлых и предстоящих дней события показаны как запланированная цепочка."
         case .turkish: return TurkishLocalization.phrase("Past and upcoming days are shown as a planned chain of events.")
+        case .arabic: return ArabicLocalization.phrase("Past and upcoming days are shown as a planned chain of events.")
         case .indonesian, .malay, .english: return "Past and upcoming days are shown as a planned chain of events."
         case .uzbek: return "O‘tgan va kelgusi kunlar rejalashtirilgan zanjir sifatida ko‘rsatiladi."
         case .uzbekCyrillic: return "Ўтган ва келгуси кунлар режалаштирилган занжир сифатида кўрсатилади."
@@ -752,6 +767,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "Сейчас"
         case .turkish: return TurkishLocalization.phrase("Now")
+        case .arabic: return ArabicLocalization.phrase("Now")
         case .indonesian, .malay, .english: return "Now"
         case .uzbek: return "Hozir"
         case .uzbekCyrillic: return "Ҳозир"
@@ -762,6 +778,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "Загружаем расписание…"
         case .turkish: return TurkishLocalization.phrase("Loading schedule…")
+        case .arabic: return ArabicLocalization.phrase("Loading schedule…")
         case .indonesian, .malay, .english: return "Loading schedule…"
         case .uzbek: return "Jadval yuklanmoqda…"
         case .uzbekCyrillic: return "Жадвал юкланмоқда…"
@@ -772,6 +789,7 @@ struct BookingItineraryCalendarView: View {
         switch settings.language {
         case .russian: return "На этот день пока нет запланированных событий."
         case .turkish: return TurkishLocalization.phrase("No scheduled events for this day yet.")
+        case .arabic: return ArabicLocalization.phrase("No scheduled events for this day yet.")
         case .indonesian, .malay, .english: return "No scheduled events for this day yet."
         case .uzbek: return "Bu kun uchun hali rejalashtirilgan tadbir yo‘q."
         case .uzbekCyrillic: return "Бу кун учун ҳали режалаштирилган тадбир йўқ."

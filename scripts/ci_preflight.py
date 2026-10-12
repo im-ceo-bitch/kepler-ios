@@ -45,13 +45,21 @@ if compiler:
     result = subprocess.run([compiler, "-frontend", "-parse", *map(str, swift_files)],
                             text=True, capture_output=True, check=False)
     check(result.returncode == 0, "Swift parse failed:\n" + result.stderr[-8000:])
+    # This is a real Swift type check for the standalone Arabic catalog. It
+    # catches mistakes that parser-only checks cannot catch, without SwiftUI.
+    arabic_catalog = repo("Sources/Core/ArabicLocalization.swift")
+    if arabic_catalog.exists():
+        checked = subprocess.run([compiler, "-typecheck", str(arabic_catalog)],
+                                 text=True, capture_output=True, check=False)
+        check(checked.returncode == 0,
+              "ArabicLocalization type check failed:\n" + checked.stderr[-8000:])
 
 settings = content(repo("Sources/AppShell/AppSettingsStore.swift"))
 enum = re.search(r"\benum\s+Language\s*:\s*String\s*,[^\{]*\{(.*?)\n\s*var id:", settings, re.S)
 check(bool(enum), "AppSettingsStore.Language enum is missing")
 expected = {
     "russian": "ru", "english": "en", "turkish": "tr", "indonesian": "id",
-    "malay": "ms", "uzbek": "uz", "uzbekCyrillic": "uz-cyrl",
+    "malay": "ms", "arabic": "ar", "uzbek": "uz", "uzbekCyrillic": "uz-cyrl",
 }
 if enum:
     cases = re.findall(r"\bcase\s+(\w+)\s*=\s*\"([^\"]+)\"", enum.group(1))
@@ -61,8 +69,11 @@ if enum:
         check(found.get(name) == code, f"Missing/mismatched Language.{name} = {code}")
     check(len(set(found.values())) == len(found), "Duplicate Language raw values")
     check('case .malay: return "ms_MY"' in settings, "Missing Malay locale ms_MY")
+    check('case .arabic: return "ar_SA"' in settings, "Missing Arabic locale ar_SA")
+    check("var isRightToLeft: Bool { self == .arabic }" in settings, "Arabic RTL flag missing")
+    check("settings.language.isRightToLeft ? .rightToLeft : .leftToRight" in content(repo("Sources/Views/RootView.swift")), "Root-level RTL direction not connected")
 
-for type_name in ("TurkishLocalization", "IndonesianLocalization", "MalayLocalization"):
+for type_name in ("TurkishLocalization", "IndonesianLocalization", "MalayLocalization", "ArabicLocalization"):
     file = repo(f"Sources/Core/{type_name}.swift")
     check(file.is_file(), f"Missing implementation {file.relative_to(ROOT)}")
     if file.is_file():
@@ -71,6 +82,7 @@ for type_name in ("TurkishLocalization", "IndonesianLocalization", "MalayLocaliz
 for name in ("Sources/AppShell/IumrahLanguageSelectionSheet.swift",
              "Sources/Umrah Flow/Components/UmrahLanguagesSheet.swift"):
     check(".malay" in content(repo(name)), f"Malay not connected to {name}")
+    check(".arabic" in content(repo(name)), f"Arabic not connected to {name}")
 
 # Detect newly added languages that would create nonexhaustive Swift switches.
 # A guardrail only; compiler semantic exhaustiveness remains the authority.
@@ -92,8 +104,10 @@ for file in swift_files:
         if re.search(r"\bcase\b[^\n]*\.indonesian\b", block) and re.search(r"\bcase\b[^\n]*\.english\b", block):
             check_count += 1
             if not re.search(r"\bcase\b[^\n]*\.malay\b", block) and not re.search(r"\b(?:default|@unknown default)\s*:", block):
-                missing_switches.append(f"{file.relative_to(ROOT)}:{source.count(chr(10), 0, match.start())+1}")
-check(not missing_switches, "Language switches missing Malay:\n" + "\n".join(missing_switches[:40]))
+                missing_switches.append(f"{file.relative_to(ROOT)}:{source.count(chr(10), 0, match.start())+1}: Malay")
+            if not re.search(r"\bcase\b[^\n]*\.arabic\b", block) and not re.search(r"\b(?:default|@unknown default)\s*:", block):
+                missing_switches.append(f"{file.relative_to(ROOT)}:{source.count(chr(10), 0, match.start())+1}: Arabic")
+check(not missing_switches, "Language switches missing new language:\n" + "\n".join(missing_switches[:40]))
 
 for p in (repo("Resources/Info.plist"), repo("WidgetExtension/Info.plist"),
           repo("Resources/iUmra.entitlements"), repo("WidgetExtension/iUmraWidgets.entitlements")):
@@ -110,7 +124,7 @@ for p in (repo("Resources/Info.plist"), repo("WidgetExtension/Info.plist"),
 project = content(repo("project.yml"))
 for bundle_id in ("com.iumrah.app", "com.iumrah.app.widgets"):
     check(f"PRODUCT_BUNDLE_IDENTIFIER: {bundle_id}" in project, f"Missing bundle ID {bundle_id}")
-for locale in ("en", "ru", "uz", "uz-Cyrl", "tr", "id", "ms"):
+for locale in ("en", "ru", "uz", "uz-Cyrl", "tr", "id", "ms", "ar"):
     check(repo(f"Resources/{locale}.lproj").is_dir(), f"Missing localization Resources/{locale}.lproj")
 
 png_header = b"\x89PNG\r\n\x1a\n"

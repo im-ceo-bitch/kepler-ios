@@ -312,13 +312,14 @@ export type BookingItineraryEvent = {
 
 type BookingPayload = Record<string, any>;
 
-type Language = "ru" | "en" | "uz" | "uz-Cyrl" | "tr" | "id";
+type Language = "ru" | "en" | "uz" | "uz-Cyrl" | "tr" | "id" | "ar";
 
 function normalizeLanguage(value: string | null): Language {
   const v = String(value ?? "ru").trim();
   if (v.toLowerCase().split(/[-_]/)[0] === "en") return "en";
   if (v.toLowerCase().split(/[-_]/)[0] === "tr") return "tr";
   if (v.toLowerCase().split(/[-_]/)[0] === "id") return "id";
+  if (v.toLowerCase().split(/[-_]/)[0] === "ar") return "ar";
   if (/^uz[-_]cyrl/i.test(v)) return "uz-Cyrl";
   if (v.toLowerCase().split(/[-_]/)[0] === "uz") return "uz";
   return "ru";
@@ -356,6 +357,29 @@ const COPY = {
   },
   tr: {
     arrival: "Suudi Arabistan’a varış", airportExit: "Pasaport kontrolü ve bagaj teslimi", transferHotel: "Otele transfer", checkIn: "Otele giriş", rest: "Yolculuk sonrası dinlenme", umrah: "Umre", umrahBody: "İhram · tavaf · sa’y", madinahZiyarat: "Medine ziyaretleri", madinahBody: "Mescid-i Nebevî ﷺ ve ziyaret yerleri", makkahZiyarat: "Mekke ziyaretleri", makkahBody: "Mekke’nin tarihî yerleri", intercityMakkah: "Mekke’ye transfer", intercityMadinah: "Medine’ye transfer", checkout: "Otelden çıkış", airportTransfer: "Havalimanına transfer", flightHome: "Dönüş uçuşu", haramain: "Haremeyn · otel → istasyon → otel", road: "Şehirler arası transfer", makkah: "Mekke", madinah: "Medine", jeddah: "Cidde",
+  },
+  ar: {
+    arrival: "الوصول إلى المملكة العربية السعودية",
+    airportExit: "الجوازات واستلام الأمتعة",
+    transferHotel: "الانتقال إلى الفندق",
+    checkIn: "تسجيل الوصول إلى الفندق",
+    rest: "الراحة بعد السفر",
+    umrah: "العمرة",
+    umrahBody: "الإحرام · الطواف · السعي",
+    madinahZiyarat: "زيارة معالم المدينة المنورة",
+    madinahBody: "المسجد النبوي ﷺ والمعالم التاريخية",
+    makkahZiyarat: "زيارة معالم مكة المكرمة",
+    makkahBody: "المعالم التاريخية في مكة المكرمة",
+    intercityMakkah: "الانتقال إلى مكة المكرمة",
+    intercityMadinah: "الانتقال إلى المدينة المنورة",
+    checkout: "تسجيل المغادرة من الفندق",
+    airportTransfer: "الانتقال إلى المطار",
+    flightHome: "رحلة العودة",
+    haramain: "قطار الحرمين · الفندق ← المحطة ← الفندق",
+    road: "التنقل بين المدن",
+    makkah: "مكة المكرمة",
+    madinah: "المدينة المنورة",
+    jeddah: "جدة",
   },
   id: {
     arrival: "Tiba di Arab Saudi", airportExit: "Pemeriksaan imigrasi dan pengambilan bagasi", transferHotel: "Transfer ke hotel", checkIn: "Check-in hotel", rest: "Istirahat setelah perjalanan", umrah: "Umrah", umrahBody: "Ihram · tawaf · sa’i", madinahZiyarat: "Ziarah di Madinah", madinahBody: "Masjid Nabawi ﷺ dan tempat ziarah", makkahZiyarat: "Ziarah di Makkah", makkahBody: "Tempat bersejarah di Makkah", intercityMakkah: "Perjalanan ke Makkah", intercityMadinah: "Perjalanan ke Madinah", checkout: "Check-out hotel", airportTransfer: "Transfer ke bandara", flightHome: "Penerbangan pulang", haramain: "Haramain · hotel → stasiun → hotel", road: "Transfer antarkota", makkah: "Makkah", madinah: "Madinah", jeddah: "Jeddah",

@@ -169,6 +169,7 @@ struct IumrahTelegramConnectCard: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz
@@ -257,7 +258,7 @@ struct IumrahTelegramEntryCard: View {
                             Image(systemName: "paperplane.fill")
                             Text(cta)
                             Spacer(minLength: 8)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 12, weight: .bold))
                         }
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -289,7 +290,7 @@ struct IumrahTelegramEntryCard: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 6)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.tertiary)
                 }
@@ -304,6 +305,7 @@ struct IumrahTelegramEntryCard: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ uzCy: String) -> String {
         switch language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz
@@ -468,6 +470,7 @@ struct IumrahTelegramIntegrationView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz

@@ -48,6 +48,7 @@ enum UmrahGuideLanguage: String, CaseIterable, Identifiable, Hashable {
         switch appLanguage {
         case .russian: return .russian
         case .english: return .english
+        case .arabic: return .arabic
         case .turkish: return .turkish
         case .indonesian: return .indonesian
         case .malay: return .malay
@@ -188,6 +189,13 @@ struct UmrahLanguagesSheet: View {
                 "Выберите язык голосового гида перед началом Умры.",
                 "Начать Умру",
                 "Закрыть"
+            )
+        case .arabic:
+            return (
+                "لغة دليل العمرة",
+                "اختر لغة الدليل الصوتي.",
+                "ابدأ العمرة",
+                "إغلاق"
             )
         case .indonesian, .malay, .english:
             return (

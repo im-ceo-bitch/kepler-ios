@@ -330,7 +330,7 @@ struct IumrahGuideTransferView: View {
                          ? tr("Choose face photo", "Выбрать фотографию", "Yuz rasmini tanlash", "Юз расмини танлаш")
                          : tr("Choose another photo", "Выбрать другое фото", "Boshqa rasm tanlash", "Бошқа расм танлаш"))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                 }
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 15)
@@ -428,7 +428,7 @@ struct IumrahGuideTransferView: View {
                     Image(systemName: "bubble.left.and.bubble.right.fill")
                     Text(tr("Care chat", "Чат iumrah Care", "iumrah Care chat", "iumrah Care чат"))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.bold))
                 }
                 .font(.subheadline.weight(.semibold))
@@ -666,6 +666,7 @@ struct IumrahGuideTransferView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

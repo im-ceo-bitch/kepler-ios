@@ -147,6 +147,9 @@ final class FlightFavoritesStore: ObservableObject {
         case .turkish:
             content.title = newPrice < oldPrice ? "Uçuş fiyatı düştü" : "Uçuş fiyatı değişti"
             content.body = "\(route): \(old) → \(new). Güncel fiyatı kontrol etmek için iumrah'ı açın."
+        case .arabic:
+            content.title = newPrice < oldPrice ? "انخفض سعر التذكرة" : "تغيّر سعر التذكرة"
+            content.body = "\(route): \(old) ← \(new). افتح iumrah للتحقق من السعر الحالي."
         case .indonesian, .malay, .english:
             content.title = newPrice < oldPrice ? "Flight price dropped" : "Flight price changed"
             content.body = "\(route): \(old) → \(new). Open iumrah to check the current fare."

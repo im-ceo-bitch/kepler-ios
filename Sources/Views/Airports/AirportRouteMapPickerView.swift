@@ -154,7 +154,7 @@ struct AirportRouteMapPickerView: View {
                     mode = .departure
                 }
 
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.forward")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.secondary)
 
@@ -445,6 +445,7 @@ struct AirportRouteMapPickerView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy

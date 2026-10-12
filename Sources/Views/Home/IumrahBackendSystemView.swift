@@ -38,20 +38,28 @@ private enum IumrahBackendModule: String, CaseIterable, Identifiable {
 
         case (.turkish, .flights): return TurkishLocalization.phrase("Flights")
 
+        case (.arabic, .flights): return ArabicLocalization.phrase("Flights")
         case (.indonesian, .flights), (.malay, .flights), (.english, .flights): return "Flights"
         case (.turkish, .hotels): return TurkishLocalization.phrase("Hotels")
+        case (.arabic, .hotels): return ArabicLocalization.phrase("Hotels")
         case (.indonesian, .hotels), (.malay, .hotels), (.english, .hotels): return "Hotels"
         case (.turkish, .transfer): return TurkishLocalization.phrase("Transfer")
+        case (.arabic, .transfer): return ArabicLocalization.phrase("Transfer")
         case (.indonesian, .transfer), (.malay, .transfer), (.english, .transfer): return "Transfer"
         case (.turkish, .guide): return TurkishLocalization.phrase("Guide")
+        case (.arabic, .guide): return ArabicLocalization.phrase("Guide")
         case (.indonesian, .guide), (.malay, .guide), (.english, .guide): return "Guide"
         case (.turkish, .esim): return TurkishLocalization.phrase("eSIM")
+        case (.arabic, .esim): return ArabicLocalization.phrase("eSIM")
         case (.indonesian, .esim), (.malay, .esim), (.english, .esim): return "eSIM"
         case (.turkish, .orders): return TurkishLocalization.phrase("Orders")
+        case (.arabic, .orders): return ArabicLocalization.phrase("Orders")
         case (.indonesian, .orders), (.malay, .orders), (.english, .orders): return "Orders"
         case (.turkish, .payment): return TurkishLocalization.phrase("Payment")
+        case (.arabic, .payment): return ArabicLocalization.phrase("Payment")
         case (.indonesian, .payment), (.malay, .payment), (.english, .payment): return "Payment"
         case (.turkish, .pricing): return TurkishLocalization.phrase("Pricing")
+        case (.arabic, .pricing): return ArabicLocalization.phrase("Pricing")
         case (.indonesian, .pricing), (.malay, .pricing), (.english, .pricing): return "Pricing"
 
         case (.uzbek, .flights): return "Aviachiptalar"
@@ -138,7 +146,27 @@ private enum IumrahBackendCopy {
             case .finalTitle: return "Sekiz ayrı sipariş değil. Tek bir iumrah rezervasyonu."
             case .finalBody: return "Sistem, karmaşık altyapıyı arka planda yönetir ve umre yolcusuna yalnızca yolculuğu için gerekenleri gösterir."
             }
-        case .indonesian, .malay, .english:
+        case .arabic:
+            switch key {
+            case .homeEyebrow: return ArabicLocalization.phrase("iumrah Configurator")
+            case .homeTitle: return ArabicLocalization.phrase("Your whole trip, one system")
+            case .homeBody: return ArabicLocalization.phrase("Flights, hotels, transfer, guide, eSIM, pricing and payment work as one booking.")
+            case .homeCTA: return ArabicLocalization.phrase("See how iumrah works")
+            case .pageEyebrow: return ArabicLocalization.phrase("ONE JOURNEY INFRASTRUCTURE")
+            case .pageTitle: return ArabicLocalization.phrase("One booking. One payment. One journey.")
+            case .pageBody: return ArabicLocalization.phrase("Instead of separate tabs, orders and confirmations, iumrah connects every trip component to one Booking ID and one flow.")
+            case .oneBooking: return ArabicLocalization.phrase("1 booking")
+            case .onePayment: return ArabicLocalization.phrase("1 payment")
+            case .oneJourney: return ArabicLocalization.phrase("1 journey")
+            case .oneBookingBody: return ArabicLocalization.phrase("Every component is tied to one Booking ID.")
+            case .onePaymentBody: return ArabicLocalization.phrase("The pilgrim pays for the trip as one package.")
+            case .oneJourneyBody: return ArabicLocalization.phrase("Statuses and services live in one itinerary.")
+            case .underHood: return ArabicLocalization.phrase("What happens under the hood")
+            case .underHoodBody: return ArabicLocalization.phrase("iumrah Configurator connects providers and internal services, normalizes orders, calculates the package and returns one clear result to the client app.")
+            case .finalTitle: return ArabicLocalization.phrase("Not eight separate orders. One iumrah Booking.")
+            case .finalBody: return ArabicLocalization.phrase("The system hides infrastructure complexity and leaves the pilgrim with only what matters for the journey.")
+            }
+case .indonesian, .malay, .english:
             switch key {
             case .homeEyebrow: return "iumrah Configurator"
             case .homeTitle: return "Your whole trip, one system"
@@ -246,7 +274,7 @@ struct IumrahBackendSystemHomeCard: View {
 
                     HStack(spacing: 7) {
                         Text(IumrahBackendCopy.text(.homeCTA, settings.language))
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption.weight(.bold))
                     }
                     .font(.system(size: 14, weight: .semibold, design: .rounded))

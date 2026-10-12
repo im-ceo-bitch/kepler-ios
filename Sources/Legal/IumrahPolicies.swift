@@ -13,16 +13,19 @@ enum IumrahPolicyKind: String, Identifiable, Hashable {
         switch (self, language) {
         case (.privacy, .russian): return "Политика конфиденциальности"
         case (.privacy, .turkish): return TurkishLocalization.phrase("Privacy Policy")
+        case (.privacy, .arabic): return ArabicLocalization.phrase("Privacy Policy")
         case (.privacy, .indonesian), (.privacy, .malay), (.privacy, .english): return "Privacy Policy"
         case (.privacy, .uzbek): return "Maxfiylik siyosati"
         case (.privacy, .uzbekCyrillic): return "Махфийлик сиёсати"
         case (.refund, .russian): return "Политика возврата"
         case (.refund, .turkish): return TurkishLocalization.phrase("Refund Policy")
+        case (.refund, .arabic): return ArabicLocalization.phrase("Refund Policy")
         case (.refund, .indonesian), (.refund, .malay), (.refund, .english): return "Refund Policy"
         case (.refund, .uzbek): return "Qaytarish siyosati"
         case (.refund, .uzbekCyrillic): return "Қайтариш сиёсати"
         case (.paymentSecurity, .russian): return "Безопасность оплаты"
         case (.paymentSecurity, .turkish): return TurkishLocalization.phrase("Payment Security")
+        case (.paymentSecurity, .arabic): return ArabicLocalization.phrase("Payment Security")
         case (.paymentSecurity, .indonesian), (.paymentSecurity, .malay), (.paymentSecurity, .english): return "Payment Security"
         case (.paymentSecurity, .uzbek): return "To‘lov xavfsizligi"
         case (.paymentSecurity, .uzbekCyrillic): return "Тўлов хавфсизлиги"
@@ -79,26 +82,31 @@ enum IumrahRefundComponent: String, Identifiable, Hashable {
         switch (self, language) {
         case (.package, .russian): return "Возврат по Umrah-пакету"
         case (.package, .turkish): return TurkishLocalization.phrase("Umrah package refunds")
+        case (.package, .arabic): return ArabicLocalization.phrase("Umrah package refunds")
         case (.package, .indonesian), (.package, .malay), (.package, .english): return "Umrah package refunds"
         case (.package, .uzbek): return "Umra paketi qaytarilishi"
         case (.package, .uzbekCyrillic): return "Умра пакети қайтарилиши"
         case (.flight, .russian): return "Авиабилет"
         case (.flight, .turkish): return TurkishLocalization.phrase("Flight")
+        case (.flight, .arabic): return ArabicLocalization.phrase("Flight")
         case (.flight, .indonesian), (.flight, .malay), (.flight, .english): return "Flight"
         case (.flight, .uzbek): return "Aviachipta"
         case (.flight, .uzbekCyrillic): return "Авиачипта"
         case (.hotel, .russian): return "Отель"
         case (.hotel, .turkish): return TurkishLocalization.phrase("Hotel")
+        case (.hotel, .arabic): return ArabicLocalization.phrase("Hotel")
         case (.hotel, .indonesian), (.hotel, .malay), (.hotel, .english): return "Hotel"
         case (.hotel, .uzbek): return "Mehmonxona"
         case (.hotel, .uzbekCyrillic): return "Меҳмонхона"
         case (.transfer, .russian): return "Трансфер"
         case (.transfer, .turkish): return TurkishLocalization.phrase("Transfer")
+        case (.transfer, .arabic): return ArabicLocalization.phrase("Transfer")
         case (.transfer, .indonesian), (.transfer, .malay), (.transfer, .english): return "Transfer"
         case (.transfer, .uzbek): return "Transfer"
         case (.transfer, .uzbekCyrillic): return "Трансфер"
         case (.services, .russian): return "Сервисы iumrah"
         case (.services, .turkish): return TurkishLocalization.phrase("iumrah services")
+        case (.services, .arabic): return ArabicLocalization.phrase("iumrah services")
         case (.services, .indonesian), (.services, .malay), (.services, .english): return "iumrah services"
         case (.services, .uzbek): return "iumrah xizmatlari"
         case (.services, .uzbekCyrillic): return "iumrah хизматлари"
@@ -180,6 +188,7 @@ private func localized(_ language: AppSettingsStore.Language, ru: String, en: St
     switch language {
     case .russian: return ru
     case .turkish: return TurkishLocalization.phrase(en)
+    case .arabic: return ArabicLocalization.phrase(en)
     case .indonesian, .malay, .english: return en
     case .uzbek: return uz
     case .uzbekCyrillic: return uzCy
@@ -454,7 +463,7 @@ struct IumrahRefundPolicyCard: View {
                         .lineLimit(compact ? 2 : nil)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -537,7 +546,7 @@ struct IumrahManualPaymentNotice: View {
                     HStack {
                         Text(localized(settings.language, ru: "Как защищена ручная оплата", en: "How manual payment is protected", uz: "Qo‘lda to‘lov qanday himoyalanadi", uzCy: "Қўлда тўлов қандай ҳимояланади"))
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                     }
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.primary)

@@ -1124,6 +1124,7 @@ struct IumrahFlightDiscoveryView: View {
         let count = adults + children + infants
         switch settings.language {
         case .russian: return "\(count), эконом"
+        case .arabic: return ArabicLocalization.phrase("\(count), economy")
         case .indonesian, .malay, .english: return "\(count), economy"
         case .turkish: return "\(count), ekonomi"
         case .uzbek: return "\(count), ekonom"
@@ -1554,7 +1555,7 @@ struct IumrahFlightDiscoveryView: View {
             case "NMA": return "Наманган"
             default: return reference.city
             }
-        case .indonesian, .malay, .english: return reference.city
+        case .arabic, .indonesian, .malay, .english: return reference.city
         case .turkish:
             switch code.uppercased() {
             case "TAS": return "Taşkent"
@@ -1614,6 +1615,7 @@ struct IumrahFlightDiscoveryView: View {
     private var locale: Locale {
         switch settings.language {
         case .russian: return Locale(identifier: "ru_RU")
+        case .arabic: return Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: return Locale(identifier: "en_US")
         case .turkish: return Locale(identifier: "tr_TR")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
@@ -1643,6 +1645,7 @@ struct IumrahFlightDiscoveryView: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -1810,6 +1813,7 @@ private struct IumrahRecommendedFlightCard: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
+        case .arabic: return Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: return Locale(identifier: "en_US")
         case .turkish: return Locale(identifier: "tr_TR")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
@@ -1820,6 +1824,7 @@ private struct IumrahRecommendedFlightCard: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -1945,7 +1950,7 @@ private struct FlightDiscoveryTicketCard: View {
                     Spacer()
                     Text(tr("Подробнее", "Details", "Batafsil", "Батафсил"))
                         .font(.caption.weight(.bold))
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption2.weight(.bold))
                 }
                 .font(.caption)
@@ -2064,6 +2069,7 @@ private struct FlightDiscoveryTicketCard: View {
         let m = minutes % 60
         switch language {
         case .russian: return m == 0 ? "\(h) ч" : "\(h) ч \(m) мин"
+        case .arabic: return m == 0 ? "\(h) س" : "\(h) س \(m) د"
         case .indonesian, .malay, .english: return m == 0 ? "\(h)h" : "\(h)h \(m)m"
         case .turkish: return m == 0 ? "\(h) sa" : "\(h) sa \(m) dk"
         case .uzbek: return m == 0 ? "\(h) soat" : "\(h) soat \(m) daq"
@@ -2077,6 +2083,7 @@ private struct FlightDiscoveryTicketCard: View {
         }
         switch language {
         case .russian: return transfers == 0 ? "Прямой" : "\(transfers) перес."
+        case .arabic: return transfers == 0 ? "مباشر" : "\(transfers) توقفات"
         case .indonesian, .malay, .english: return transfers == 0 ? "Non-stop" : "\(transfers) stop(s)"
         case .turkish: return transfers == 0 ? "Aktarmasız" : "\(transfers) aktarma"
         case .uzbek: return transfers == 0 ? "To‘g‘ridan-to‘g‘ri" : "\(transfers) almashish"
@@ -2124,6 +2131,7 @@ private struct FlightDiscoveryTicketCard: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
+        case .arabic: return Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: return Locale(identifier: "en_US")
         case .turkish: return Locale(identifier: "tr_TR")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
@@ -2142,6 +2150,7 @@ private struct FlightDiscoveryTicketCard: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -2281,6 +2290,7 @@ private struct FlightDiscoveryPassengersSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -2352,6 +2362,7 @@ private struct FlightDiscoveryFiltersSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -2429,6 +2440,7 @@ private struct FlightDiscoveryAirlinesSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -2477,7 +2489,7 @@ private struct FlightDiscoveryFavoritesSheet: View {
                                                 .foregroundStyle(.green)
                                         }
                                         Spacer()
-                                        Image(systemName: "chevron.right")
+                                        Image(systemName: "chevron.forward")
                                             .font(.caption.weight(.bold))
                                             .foregroundStyle(.tertiary)
                                     }
@@ -2517,6 +2529,7 @@ private struct FlightDiscoveryFavoritesSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -2590,7 +2603,7 @@ private struct FlightDiscoveryCalendarSheet: View {
             }
             Spacer()
             if tripType == .roundTrip {
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.forward")
                     .foregroundStyle(.secondary)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 3) {
@@ -2654,6 +2667,7 @@ private struct FlightDiscoveryCalendarSheet: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
+        case .arabic: return Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: return Locale(identifier: "en_US")
         case .turkish: return Locale(identifier: "tr_TR")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
@@ -2664,6 +2678,7 @@ private struct FlightDiscoveryCalendarSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -2755,6 +2770,7 @@ private struct FlightDiscoveryMonthGrid: View {
         let base: [String]
         switch language {
         case .russian: base = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
+        case .arabic: base = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
         case .indonesian, .malay, .english: base = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
         case .turkish: base = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"]
         case .uzbek: base = ["Ya", "Du", "Se", "Ch", "Pa", "Ju", "Sh"]
@@ -2773,6 +2789,7 @@ private struct FlightDiscoveryMonthGrid: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
+        case .arabic: return Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: return Locale(identifier: "en_US")
         case .turkish: return Locale(identifier: "tr_TR")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
@@ -2896,7 +2913,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: { Image(systemName: "chevron.left") }
+                    Button { dismiss() } label: { Image(systemName: "chevron.backward") }
                 }
             }
             .task {
@@ -3039,6 +3056,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz
@@ -3941,6 +3959,7 @@ private struct FlightDiscoveryOfferDetailView: View {
         }
         switch language {
         case .russian: return transfers == 0 ? "Прямой рейс" : "\(transfers) пересадка"
+        case .arabic: return transfers == 0 ? "مباشر" : "\(transfers) توقفات"
         case .indonesian, .malay, .english: return transfers == 0 ? "Non-stop" : "\(transfers) stop(s)"
         case .turkish: return transfers == 0 ? "Aktarmasız" : "\(transfers) aktarma"
         case .uzbek: return transfers == 0 ? "To‘g‘ridan-to‘g‘ri" : "\(transfers) almashish"
@@ -3954,6 +3973,7 @@ private struct FlightDiscoveryOfferDetailView: View {
         let m = minutes % 60
         switch language {
         case .russian: return m == 0 ? "\(h) ч" : "\(h) ч \(m) мин"
+        case .arabic: return m == 0 ? "\(h) س" : "\(h) س \(m) د"
         case .indonesian, .malay, .english: return m == 0 ? "\(h)h" : "\(h)h \(m)m"
         case .turkish: return m == 0 ? "\(h) sa" : "\(h) sa \(m) dk"
         case .uzbek: return m == 0 ? "\(h) soat" : "\(h) soat \(m) daq"
@@ -4030,6 +4050,7 @@ private struct FlightDiscoveryOfferDetailView: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
+        case .arabic: return Locale(identifier: "ar_SA")
         case .indonesian, .malay, .english: return Locale(identifier: "en_US")
         case .turkish: return Locale(identifier: "tr_TR")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
@@ -4048,6 +4069,7 @@ private struct FlightDiscoveryOfferDetailView: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .turkish: return en
         case .uzbek: return uz

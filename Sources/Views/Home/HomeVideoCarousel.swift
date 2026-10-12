@@ -150,6 +150,7 @@ struct HomeVideoCarousel: View {
         case .russian: return "Почувствовать"
         case .indonesian: return IndonesianLocalization.phrase("Experience")
         case .turkish: return TurkishLocalization.phrase("Experience")
+        case .arabic: return ArabicLocalization.phrase("Experience")
         case .english, .malay: return "Experience"
         case .uzbek: return "His etish"
         case .uzbekCyrillic: return "Ҳис этиш"

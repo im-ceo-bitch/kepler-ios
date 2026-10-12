@@ -274,6 +274,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("Ready packages")
         case .malay: return MalayLocalization.phrase("Ready packages")
         case .turkish: return TurkishLocalization.phrase("Ready packages")
+        case .arabic: return ArabicLocalization.phrase("Ready packages")
         case .english: return "Ready packages"
         case .uzbek: return "Tayyor paketlar"
         case .uzbekCyrillic: return "Тайёр пакетлар"
@@ -286,6 +287,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("FLIGHT FIRST")
         case .malay: return MalayLocalization.phrase("FLIGHT FIRST")
         case .turkish: return TurkishLocalization.phrase("FLIGHT FIRST")
+        case .arabic: return ArabicLocalization.phrase("FLIGHT FIRST")
         case .english: return "FLIGHT FIRST"
         case .uzbek: return "FLIGHT FIRST"
         case .uzbekCyrillic: return "FLIGHT FIRST"
@@ -298,6 +300,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
         case .malay: return MalayLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
         case .turkish: return TurkishLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
+        case .arabic: return ArabicLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
         case .english: return "Only fully assembled iumrah packages with flights, hotels and services."
         case .uzbek: return "Faqat reyslar, mehmonxonalar va xizmatlar bilan to‘liq yig‘ilgan iumrah paketlari."
         case .uzbekCyrillic: return "Фақат рейслар, меҳмонхоналар ва хизматлар билан тўлиқ йиғилган iumrah пакетлари."
@@ -310,6 +313,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("Refreshing ready packages…")
         case .malay: return MalayLocalization.phrase("Refreshing ready packages…")
         case .turkish: return TurkishLocalization.phrase("Refreshing ready packages…")
+        case .arabic: return ArabicLocalization.phrase("Refreshing ready packages…")
         case .english: return "Refreshing ready packages…"
         case .uzbek: return "Tayyor paketlar yangilanmoqda…"
         case .uzbekCyrillic: return "Тайёр пакетлар янгиланмоқда…"
@@ -384,6 +388,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("Coming soon")
         case .malay: return MalayLocalization.phrase("Coming soon")
         case .turkish: return TurkishLocalization.phrase("Coming soon")
+        case .arabic: return ArabicLocalization.phrase("Coming soon")
         case .english: return "Coming soon"
         case .uzbek: return "Tez orada"
         case .uzbekCyrillic: return "Тез орада"
@@ -396,6 +401,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("Umrah for the weekend")
         case .malay: return MalayLocalization.phrase("Umrah for the weekend")
         case .turkish: return TurkishLocalization.phrase("Umrah for the weekend")
+        case .arabic: return ArabicLocalization.phrase("Umrah for the weekend")
         case .english: return "Umrah for the weekend"
         case .uzbek: return "Dam olish kunlari uchun Umra"
         case .uzbekCyrillic: return "Дам олиш кунлари учун Умра"
@@ -408,6 +414,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
         case .malay: return MalayLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
         case .turkish: return TurkishLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
+        case .arabic: return ArabicLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
         case .english: return "Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared."
         case .uzbek: return "Tez orada bu yerda Sunday Umrah Club tayyor paketlari paydo bo‘ladi — dam olish kunlariga mos, sanalari va yo‘nalishi oldindan tuzilgan qisqa safarlar."
         case .uzbekCyrillic: return "Тез орада бу ерда Sunday Umrah Club тайёр пакетлари пайдо бўлади — дам олиш кунларига мос, саналари ва йўналиши олдиндан тузилган қисқа сафарлар."
@@ -440,6 +447,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
         case .malay: return MalayLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
         case .turkish: return TurkishLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
+        case .arabic: return ArabicLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
         case .english: return "The package could not be prepared for sharing. Refresh pricing and try again."
         case .uzbek: return "Paketni ulashish uchun tayyorlab bo‘lmadi. Narxlarni yangilang va qayta urinib ko‘ring."
         case .uzbekCyrillic: return "Пакетни улашиш учун тайёрлаб бўлмади. Нархларни янгиланг ва қайта уриниб кўринг."
@@ -452,6 +460,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("Could not share")
         case .malay: return MalayLocalization.phrase("Could not share")
         case .turkish: return TurkishLocalization.phrase("Could not share")
+        case .arabic: return ArabicLocalization.phrase("Could not share")
         case .english: return "Could not share"
         case .uzbek: return "Ulashib bo‘lmadi"
         case .uzbekCyrillic: return "Улашиб бўлмади"
@@ -464,6 +473,7 @@ struct HotelsHomeView: View {
         case .indonesian: return IndonesianLocalization.phrase("OK")
         case .malay: return MalayLocalization.phrase("OK")
         case .turkish: return TurkishLocalization.phrase("OK")
+        case .arabic: return ArabicLocalization.phrase("OK")
         case .english: return "OK"
         case .uzbek: return "Tushunarli"
         case .uzbekCyrillic: return "Тушунарли"
@@ -738,6 +748,7 @@ private struct IumrahPackageAssemblyBar: View {
         case .indonesian: f.locale = Locale(identifier: "id_ID")
         case .malay: f.locale = Locale(identifier: "ms_MY")
         case .turkish: f.locale = Locale(identifier: "tr_TR")
+        case .arabic: f.locale = Locale(identifier: "ar_SA")
         case .english: f.locale = Locale(identifier: "en_US")
         case .uzbek: f.locale = Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: f.locale = Locale(identifier: "uz_Cyrl_UZ")
@@ -752,6 +763,7 @@ private struct IumrahPackageAssemblyBar: View {
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .malay: return MalayLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
@@ -817,6 +829,7 @@ private struct IumrahFriendsShowcaseCard: View {
         case .indonesian: return IndonesianLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
         case .malay: return MalayLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
         case .turkish: return TurkishLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
+        case .arabic: return ArabicLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
         case .english: return "Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers."
         case .uzbek: return "Do‘stlar yoki yaqinlaringizni yig‘ing va 1 dan 16 kishigacha bo‘lgan guruh uchun Umra paketining umumiy narxini darhol ko‘ring."
         case .uzbekCyrillic: return "Дўстлар ёки яқинларингизни йиғинг ва 1 дан 16 кишигача бўлган гуруҳ учун Умра пакетининг умумий нархини дарҳол кўринг."
@@ -829,6 +842,7 @@ private struct IumrahFriendsShowcaseCard: View {
         case .indonesian: return IndonesianLocalization.phrase("1–16 travelers")
         case .malay: return MalayLocalization.phrase("1–16 travelers")
         case .turkish: return TurkishLocalization.phrase("1–16 travelers")
+        case .arabic: return ArabicLocalization.phrase("1–16 travelers")
         case .english: return "1–16 travelers"
         case .uzbek: return "1–16 kishi"
         case .uzbekCyrillic: return "1–16 киши"
@@ -841,6 +855,7 @@ private struct IumrahFriendsShowcaseCard: View {
         case .indonesian: return IndonesianLocalization.phrase("Calculate")
         case .malay: return MalayLocalization.phrase("Calculate")
         case .turkish: return TurkishLocalization.phrase("Calculate")
+        case .arabic: return ArabicLocalization.phrase("Calculate")
         case .english: return "Calculate"
         case .uzbek: return "Hisoblash"
         case .uzbekCyrillic: return "Ҳисоблаш"
@@ -1058,7 +1073,7 @@ private struct IumrahFriendsCalculatorCard: View {
                     Text(includedSubtitle).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .foregroundStyle(.secondary)
             }
             .padding(17)
@@ -1174,6 +1189,7 @@ private struct IumrahFriendsCalculatorCard: View {
         case .indonesian: return IndonesianLocalization.phrase("\(formatted) / person")
         case .malay: return MalayLocalization.phrase("\(formatted) / person")
         case .turkish: return TurkishLocalization.phrase("\(formatted) / person")
+        case .arabic: return ArabicLocalization.phrase("\(formatted) / person")
         case .english: return "\(formatted) / person"
         case .uzbek: return "\(formatted) / kishi"
         case .uzbekCyrillic: return "\(formatted) / киши"
@@ -1186,6 +1202,7 @@ private struct IumrahFriendsCalculatorCard: View {
         case .indonesian: return IndonesianLocalization.phrase("Published direct flights · \(days) days")
         case .malay: return MalayLocalization.phrase("Published direct flights · \(days) days")
         case .turkish: return TurkishLocalization.phrase("Published direct flights · \(days) days")
+        case .arabic: return ArabicLocalization.phrase("Published direct flights · \(days) days")
         case .english: return "Published direct flights · \(days) days"
         case .uzbek: return "E’lon qilingan to‘g‘ridan-to‘g‘ri reyslar · \(days) kun"
         case .uzbekCyrillic: return "Эълон қилинган тўғридан-тўғри рейслар · \(days) кун"
@@ -1216,6 +1233,7 @@ private struct IumrahFriendsCalculatorCard: View {
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .malay: return MalayLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -1285,6 +1303,7 @@ private struct IumrahFriendsIncludedSheet: View {
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .malay: return MalayLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -1406,7 +1425,7 @@ struct HotelStorefrontCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.68)
                         Spacer(minLength: 2)
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
@@ -1534,7 +1553,7 @@ private struct StorefrontFlightOptionCard: View {
 
                     Spacer(minLength: 4)
                     if packagePreview != nil {
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
@@ -1673,6 +1692,7 @@ private struct StorefrontFlightOptionCard: View {
         case .indonesian: return IndonesianLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
         case .malay: return MalayLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
         case .turkish: return TurkishLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
+        case .arabic: return ArabicLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
         case .english: return "\(route) · \(preview.durationDays) days · \(packageScopeText(preview))"
         case .uzbek: return "\(route) · \(preview.durationDays) kun · \(packageScopeText(preview))"
         case .uzbekCyrillic: return "\(route) · \(preview.durationDays) кун · \(packageScopeText(preview))"
@@ -1689,6 +1709,7 @@ private struct StorefrontFlightOptionCard: View {
         case (.makkahComfortShort, .indonesian), (.hotelFirstMakkah, .indonesian): return IndonesianLocalization.phrase("Makkah only")
         case (.makkahComfortShort, .malay), (.hotelFirstMakkah, .malay): return MalayLocalization.phrase("Makkah only")
         case (.makkahComfortShort, .turkish), (.hotelFirstMakkah, .turkish): return TurkishLocalization.phrase("Makkah only")
+        case (.makkahComfortShort, .arabic), (.hotelFirstMakkah, .arabic): return ArabicLocalization.phrase("Makkah only")
         case (.makkahComfortShort, .english), (.hotelFirstMakkah, .english): return "Makkah only"
         case (.makkahComfortShort, .uzbek), (.hotelFirstMakkah, .uzbek): return "Faqat Makka"
         case (.makkahComfortShort, .uzbekCyrillic), (.hotelFirstMakkah, .uzbekCyrillic): return "Фақат Макка"
@@ -1696,6 +1717,7 @@ private struct StorefrontFlightOptionCard: View {
         case (.makkahMadinahStandard, .indonesian): return IndonesianLocalization.phrase("Makkah + Madinah")
         case (.makkahMadinahStandard, .malay): return MalayLocalization.phrase("Makkah + Madinah")
         case (.makkahMadinahStandard, .turkish): return TurkishLocalization.phrase("Makkah + Madinah")
+        case (.makkahMadinahStandard, .arabic): return ArabicLocalization.phrase("Makkah + Madinah")
         case (.makkahMadinahStandard, .english): return "Makkah + Madinah"
         case (.makkahMadinahStandard, .uzbek): return "Makka + Madina"
         case (.makkahMadinahStandard, .uzbekCyrillic): return "Макка + Мадина"
@@ -1708,6 +1730,7 @@ private struct StorefrontFlightOptionCard: View {
         case .indonesian: return packagePreview == nil ? "iumrah Flights Scanner" : "Dibuat oleh iumrah Configurator"
         case .malay: return packagePreview == nil ? "iumrah Flights Scanner" : "Dibuat oleh iumrah Configurator"
         case .turkish: return packagePreview == nil ? "iumrah Flights Scanner" : "iumrah Configurator tarafından oluşturuldu"
+        case .arabic: return packagePreview == nil ? "ماسح رحلات iumrah" : "أُنشئت بواسطة مُكوّن iumrah"
         case .english: return packagePreview == nil ? "iumrah Flights Scanner" : "Generated by iumrah Configurator"
         case .uzbek: return packagePreview == nil ? "iumrah Flights Scanner" : "iumrah Configurator yaratdi"
         case .uzbekCyrillic: return packagePreview == nil ? "iumrah Flights Scanner" : "iumrah Configurator яратди"
@@ -1720,6 +1743,7 @@ private struct StorefrontFlightOptionCard: View {
         case .indonesian: return IndonesianLocalization.phrase("package · 1 person")
         case .malay: return MalayLocalization.phrase("package · 1 person")
         case .turkish: return TurkishLocalization.phrase("package · 1 person")
+        case .arabic: return ArabicLocalization.phrase("package · 1 person")
         case .english: return "package · 1 person"
         case .uzbek: return "paket · 1 kishi"
         case .uzbekCyrillic: return "пакет · 1 киши"
@@ -1732,6 +1756,7 @@ private struct StorefrontFlightOptionCard: View {
         case .indonesian: return IndonesianLocalization.phrase("Calculating package")
         case .malay: return MalayLocalization.phrase("Calculating package")
         case .turkish: return TurkishLocalization.phrase("Calculating package")
+        case .arabic: return ArabicLocalization.phrase("Calculating package")
         case .english: return "Calculating package"
         case .uzbek: return "Paket hisoblanmoqda"
         case .uzbekCyrillic: return "Пакет ҳисобланмоқда"
@@ -1744,6 +1769,7 @@ private struct StorefrontFlightOptionCard: View {
         case .indonesian: return IndonesianLocalization.phrase("no 2–15 day pair")
         case .malay: return MalayLocalization.phrase("no 2–15 day pair")
         case .turkish: return TurkishLocalization.phrase("no 2–15 day pair")
+        case .arabic: return ArabicLocalization.phrase("no 2–15 day pair")
         case .english: return "no 2–15 day pair"
         case .uzbek: return "2–15 kunlik juftlik yo‘q"
         case .uzbekCyrillic: return "2–15 кунлик жуфтлик йўқ"
@@ -2184,7 +2210,7 @@ struct StorefrontUmrahPackageDetailView: View {
                         Text(addMadinahTitle)
                             .font(.headline)
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption.weight(.bold))
                     }
                 }
@@ -2346,7 +2372,7 @@ struct StorefrontUmrahPackageDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -2477,14 +2503,17 @@ struct StorefrontUmrahPackageDetailView: View {
         case (.indonesian, .breakfast): return IndonesianLocalization.phrase("Breakfast")
         case (.malay, .breakfast): return MalayLocalization.phrase("Breakfast")
         case (.turkish, .breakfast): return TurkishLocalization.phrase("Breakfast")
+        case (.arabic, .breakfast): return ArabicLocalization.phrase("Breakfast")
         case (.english, .breakfast): return "Breakfast"
         case (.indonesian, .lunch): return IndonesianLocalization.phrase("Lunch")
         case (.malay, .lunch): return MalayLocalization.phrase("Lunch")
         case (.turkish, .lunch): return TurkishLocalization.phrase("Lunch")
+        case (.arabic, .lunch): return ArabicLocalization.phrase("Lunch")
         case (.english, .lunch): return "Lunch"
         case (.indonesian, .dinner): return IndonesianLocalization.phrase("Dinner")
         case (.malay, .dinner): return MalayLocalization.phrase("Dinner")
         case (.turkish, .dinner): return TurkishLocalization.phrase("Dinner")
+        case (.arabic, .dinner): return ArabicLocalization.phrase("Dinner")
         case (.english, .dinner): return "Dinner"
         case (.uzbek, .breakfast): return "Nonushta"
         case (.uzbek, .lunch): return "Tushlik"
@@ -2674,7 +2703,7 @@ struct StorefrontUmrahPackageDetailView: View {
                 }
                 Spacer(minLength: 8)
                 if !isSubmitting {
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .frame(maxWidth: .infinity)
@@ -3552,6 +3581,7 @@ struct StorefrontUmrahPackageDetailView: View {
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .malay: return MalayLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -3841,6 +3871,7 @@ private struct PackageFlightPickerSheet: View {
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .malay: return MalayLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -3929,6 +3960,7 @@ private struct PackageFlightChoiceCard: View {
         case .indonesian: return IndonesianLocalization.phrase("direct")
         case .malay: return MalayLocalization.phrase("direct")
         case .turkish: return TurkishLocalization.phrase("direct")
+        case .arabic: return ArabicLocalization.phrase("direct")
         case .english: return "direct"
         case .uzbek: return "to‘g‘ri"
         case .uzbekCyrillic: return "тўғри"
@@ -4077,6 +4109,7 @@ private struct PackageFlightLegDetailCard: View {
         case .indonesian: return leg.stops == 0 ? "Langsung" : "\(leg.stops) transit"
         case .malay: return leg.stops == 0 ? "Terus" : "\(leg.stops) transit"
         case .turkish: return leg.stops == 0 ? "direkt" : "\(leg.stops) aktarma"
+        case .arabic: return leg.stops == 0 ? "مباشر" : "\(leg.stops) توقفات"
         case .english: return leg.stops == 0 ? "direct" : "\(leg.stops) stops"
         case .uzbek: return leg.stops == 0 ? "to‘g‘ridan-to‘g‘ri" : "\(leg.stops) ulanish"
         case .uzbekCyrillic: return leg.stops == 0 ? "тўғридан-тўғри" : "\(leg.stops) уланиш"
@@ -4097,6 +4130,7 @@ private struct PackageFlightLegDetailCard: View {
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .malay: return MalayLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -4163,7 +4197,7 @@ private struct PackageHotelDetailCard: View {
                                 .font(.caption.weight(.semibold))
                                 .lineLimit(1)
                             Spacer(minLength: 4)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
@@ -4192,6 +4226,7 @@ private struct PackageHotelDetailCard: View {
         case .indonesian: return IndonesianLocalization.phrase("\(hotel.nights) nights")
         case .malay: return MalayLocalization.phrase("\(hotel.nights) nights")
         case .turkish: return TurkishLocalization.phrase("\(hotel.nights) nights")
+        case .arabic: return ArabicLocalization.phrase("\(hotel.nights) nights")
         case .english: return "\(hotel.nights) nights"
         case .uzbek: return "\(hotel.nights) tun"
         case .uzbekCyrillic: return "\(hotel.nights) тун"
@@ -4220,7 +4255,7 @@ private struct PackagePurchaseTrustCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -4241,6 +4276,7 @@ private struct PackagePurchaseTrustCard: View {
         case .indonesian: return IndonesianLocalization.phrase("Booking trust and confirmation")
         case .malay: return MalayLocalization.phrase("Booking trust and confirmation")
         case .turkish: return TurkishLocalization.phrase("Booking trust and confirmation")
+        case .arabic: return ArabicLocalization.phrase("Booking trust and confirmation")
         case .english: return "Booking trust and confirmation"
         case .uzbek: return "Bron ishonchi va tasdig‘i"
         case .uzbekCyrillic: return "Брон ишончи ва тасдиғи"
@@ -4253,6 +4289,7 @@ private struct PackagePurchaseTrustCard: View {
         case .indonesian: return IndonesianLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
         case .malay: return MalayLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
         case .turkish: return TurkishLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
+        case .arabic: return ArabicLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
         case .english: return "Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services"
         case .uzbek: return "Asoschi bilan bevosita aloqa · invoice va chek · mehmonxona hamda iumrah Services uchun iumrah javobgarligi"
         case .uzbekCyrillic: return "Асосчи билан бевосита алоқа · invoice ва чек · меҳмонхона ҳамда iumrah Services учун iumrah жавобгарлиги"
@@ -4546,7 +4583,7 @@ private struct StorefrontPackageInformationSheet: View {
                     HStack {
                         Label(tr("Открыть политику возврата", "Open refund policy", "Qaytarish siyosatini ochish", "Қайтариш сиёсатини очиш"), systemImage: "arrow.uturn.backward.circle.fill")
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -4632,6 +4669,7 @@ private struct StorefrontPackageInformationSheet: View {
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .malay: return MalayLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy

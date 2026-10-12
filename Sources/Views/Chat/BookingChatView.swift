@@ -399,7 +399,7 @@ struct BookingChatView: View {
                             Text("iumrah Care")
                                 .font(.system(size: 14, weight: .semibold))
                                 .lineLimit(1)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.system(size: 7.5, weight: .bold))
                         }
                         Text(tr("Support", "Поддержка", "Yordam", "Ёрдам"))
@@ -968,6 +968,7 @@ struct BookingChatView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz

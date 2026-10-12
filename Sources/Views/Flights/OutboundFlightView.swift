@@ -67,6 +67,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "Поиск завершён без рейса, который прошёл все проверки iumrah."
         case .turkish: return TurkishLocalization.phrase("Search completed without a flight that passed all iumrah checks.")
+        case .arabic: return ArabicLocalization.phrase("Search completed without a flight that passed all iumrah checks.")
         case .indonesian, .malay, .english: return "Search completed without a flight that passed all iumrah checks."
         case .uzbek: return "Qidiruv iumrah tekshiruvlaridan o‘tgan reyssiz yakunlandi."
         case .uzbekCyrillic: return "Қидирув iumrah текширувларидан ўтган рейссиз якунланди."
@@ -182,7 +183,7 @@ struct OutboundFlightView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Text(L10n.text("flight_details_cta", settings.language))
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption.weight(.bold))
                     }
                     .font(.subheadline.weight(.semibold))
@@ -292,6 +293,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "Показано \(visibleOffers.count) из \(offers.count) найденных билетов"
         case .turkish: return TurkishLocalization.phrase("Showing \(visibleOffers.count) of \(offers.count) tickets found")
+        case .arabic: return ArabicLocalization.phrase("Showing \(visibleOffers.count) of \(offers.count) tickets found")
         case .indonesian, .malay, .english: return "Showing \(visibleOffers.count) of \(offers.count) tickets found"
         case .uzbek: return "Topilgan \(offers.count) chiptadan \(visibleOffers.count) tasi ko‘rsatilmoqda"
         case .uzbekCyrillic: return "Топилган \(offers.count) чиптадан \(visibleOffers.count) таси кўрсатилмоқда"
@@ -339,7 +341,7 @@ struct OutboundFlightView: View {
             HStack(spacing: 10) {
                 Text(continuePackageTitle)
                 Spacer(minLength: 12)
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.forward")
                     .font(.system(size: 16, weight: .bold))
             }
             .padding(.horizontal, 20)
@@ -489,6 +491,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return journey.trip.isRoundTripFlight ? "Выберите перелёт туда" : "Выберите перелёт"
         case .turkish: return journey.trip.isRoundTripFlight ? "Gidiş uçuşunuzu seçin" : "Uçuşunuzu seçin"
+        case .arabic: return journey.trip.isRoundTripFlight ? "اختر رحلة الذهاب" : "اختر الرحلة"
         case .indonesian, .malay, .english: return journey.trip.isRoundTripFlight ? "Choose your outbound flight" : "Choose your flight"
         case .uzbek: return journey.trip.isRoundTripFlight ? "Borish reysini tanlang" : "Reysni tanlang"
         case .uzbekCyrillic: return journey.trip.isRoundTripFlight ? "Бориш рейсини танланг" : "Рейсни танланг"
@@ -500,6 +503,7 @@ struct OutboundFlightView: View {
             switch settings.language {
             case .russian: return "Выбрать билет туда"
             case .turkish: return TurkishLocalization.phrase("Select outbound ticket")
+            case .arabic: return ArabicLocalization.phrase("Select outbound ticket")
             case .indonesian, .malay, .english: return "Select outbound ticket"
             case .uzbek: return "Borish chiptasini tanlash"
             case .uzbekCyrillic: return "Бориш чиптасини танлаш"
@@ -508,6 +512,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "Выбрать билет и продолжить к трансферу"
         case .turkish: return TurkishLocalization.phrase("Select ticket and continue to transfer")
+        case .arabic: return ArabicLocalization.phrase("Select ticket and continue to transfer")
         case .indonesian, .malay, .english: return "Select ticket and continue to transfer"
         case .uzbek: return "Chiptani tanlash va transferga o‘tish"
         case .uzbekCyrillic: return "Чиптани танлаш ва трансферга ўтиш"
@@ -518,6 +523,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "Сортировка"
         case .turkish: return TurkishLocalization.phrase("Sort")
+        case .arabic: return ArabicLocalization.phrase("Sort")
         case .indonesian, .malay, .english: return "Sort"
         case .uzbek: return "Saralash"
         case .uzbekCyrillic: return "Саралаш"
@@ -528,14 +534,17 @@ struct OutboundFlightView: View {
         switch (value, settings.language) {
         case (.recommended, .russian): return "Рекомендуемые"
         case (.recommended, .turkish): return TurkishLocalization.phrase("Recommended")
+        case (.recommended, .arabic): return ArabicLocalization.phrase("Recommended")
         case (.recommended, .indonesian), (.recommended, .malay), (.recommended, .english): return "Recommended"
         case (.recommended, .uzbek), (.recommended, .uzbekCyrillic): return "Tavsiya"
         case (.cheapest, .russian): return "Самые дешёвые"
         case (.cheapest, .turkish): return TurkishLocalization.phrase("Cheapest")
+        case (.cheapest, .arabic): return ArabicLocalization.phrase("Cheapest")
         case (.cheapest, .indonesian), (.cheapest, .malay), (.cheapest, .english): return "Cheapest"
         case (.cheapest, .uzbek), (.cheapest, .uzbekCyrillic): return "Eng arzon"
         case (.fastest, .russian): return "Самые быстрые"
         case (.fastest, .turkish): return TurkishLocalization.phrase("Fastest")
+        case (.fastest, .arabic): return ArabicLocalization.phrase("Fastest")
         case (.fastest, .indonesian), (.fastest, .malay), (.fastest, .english): return "Fastest"
         case (.fastest, .uzbek), (.fastest, .uzbekCyrillic): return "Eng tez"
         }
@@ -545,6 +554,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "Пересадки"
         case .turkish: return TurkishLocalization.phrase("Stops")
+        case .arabic: return ArabicLocalization.phrase("Stops")
         case .indonesian, .malay, .english: return "Stops"
         case .uzbek: return "To‘xtashlar"
         case .uzbekCyrillic: return "Тўхташлар"
@@ -555,21 +565,25 @@ struct OutboundFlightView: View {
         switch (value, settings.language) {
         case (.all, .russian): return "Все билеты"
         case (.all, .turkish): return TurkishLocalization.phrase("All tickets")
+        case (.all, .arabic): return ArabicLocalization.phrase("All tickets")
         case (.all, .indonesian), (.all, .malay), (.all, .english): return "All tickets"
         case (.all, .uzbek): return "Barcha chiptalar"
         case (.all, .uzbekCyrillic): return "Барча чипталар"
         case (.nonstop, .russian): return "Прямые"
         case (.nonstop, .turkish): return TurkishLocalization.phrase("Nonstop")
+        case (.nonstop, .arabic): return ArabicLocalization.phrase("Nonstop")
         case (.nonstop, .indonesian), (.nonstop, .malay), (.nonstop, .english): return "Nonstop"
         case (.nonstop, .uzbek): return "To‘g‘ridan-to‘g‘ri"
         case (.nonstop, .uzbekCyrillic): return "Тўғридан-тўғри"
         case (.oneStop, .russian): return "1 пересадка"
         case (.oneStop, .turkish): return TurkishLocalization.phrase("1 stop")
+        case (.oneStop, .arabic): return ArabicLocalization.phrase("1 stop")
         case (.oneStop, .indonesian), (.oneStop, .malay), (.oneStop, .english): return "1 stop"
         case (.oneStop, .uzbek): return "1 ta ulanish"
         case (.oneStop, .uzbekCyrillic): return "1 та уланиш"
         case (.multipleStops, .russian): return "2+ пересадки"
         case (.multipleStops, .turkish): return TurkishLocalization.phrase("2+ stops")
+        case (.multipleStops, .arabic): return ArabicLocalization.phrase("2+ stops")
         case (.multipleStops, .indonesian), (.multipleStops, .malay), (.multipleStops, .english): return "2+ stops"
         case (.multipleStops, .uzbek): return "2+ ulanish"
         case (.multipleStops, .uzbekCyrillic): return "2+ уланиш"
@@ -580,6 +594,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "Авиакомпании"
         case .turkish: return TurkishLocalization.phrase("Airlines")
+        case .arabic: return ArabicLocalization.phrase("Airlines")
         case .indonesian, .malay, .english: return "Airlines"
         case .uzbek: return "Aviakompaniyalar"
         case .uzbekCyrillic: return "Авиакомпаниялар"
@@ -590,6 +605,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "Все"
         case .turkish: return TurkishLocalization.phrase("All")
+        case .arabic: return ArabicLocalization.phrase("All")
         case .indonesian, .malay, .english: return "All"
         case .uzbek, .uzbekCyrillic: return "Barchasi"
         }
@@ -599,6 +615,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return "По выбранным фильтрам вариантов нет. Сбросьте фильтр — все найденные варианты останутся в списке."
         case .turkish: return TurkishLocalization.phrase("No matches for these filters. Clear a filter; every discovered option remains available.")
+        case .arabic: return ArabicLocalization.phrase("No matches for these filters. Clear a filter; every discovered option remains available.")
         case .indonesian, .malay, .english: return "No matches for these filters. Clear a filter; every discovered option remains available."
         case .uzbek: return "Tanlangan filtrlarda variant yo‘q. Filtrni olib tashlang — barcha topilgan variantlar saqlanadi."
         case .uzbekCyrillic: return "Танланган фильтрларда вариант йўқ. Фильтрни олиб ташланг — барча топилган вариантлар сақланади."
@@ -707,6 +724,7 @@ struct OutboundFlightView: View {
         switch settings.language {
         case .russian: return selected ? "Ваша дата · есть подтверждённый рейс" : "На эту дату найден подтверждённый рейс"
         case .turkish: return selected ? "Seçtiğiniz tarih · doğrulanmış uçuş mevcut" : "Bu tarihte doğrulanmış uçuş mevcut"
+        case .arabic: return selected ? "تاريخك · رحلة مؤكدة متاحة" : "تتوفر رحلة مؤكدة في هذا التاريخ"
         case .indonesian, .malay, .english: return selected ? "Your date · verified flight available" : "A verified flight is available on this date"
         case .uzbek: return selected ? "Siz tanlagan sana · tasdiqlangan reys bor" : "Bu sanada tasdiqlangan reys topildi"
         case .uzbekCyrillic: return selected ? "Сиз танлаган сана · тасдиқланган рейс бор" : "Бу санада тасдиқланган рейс топилди"
@@ -721,6 +739,9 @@ struct OutboundFlightView: View {
         case .turkish:
             if offset == 0 { return "Seçtiğiniz tarih" }
             return offset < 0 ? "\(abs(offset)) gün önce" : "\(offset) gün sonra"
+        case .arabic:
+            if offset == 0 { return "التاريخ المختار" }
+            return offset < 0 ? "قبل التاريخ المختار" : "بعد التاريخ المختار"
         case .indonesian, .malay, .english:
             if offset == 0 { return "Your selected date" }
             return offset < 0 ? "\(abs(offset)) day(s) earlier" : "\(offset) day(s) later"
@@ -739,6 +760,8 @@ struct OutboundFlightView: View {
             return offset == 0 ? "Сначала показываем варианты на выбранный день" : "Нашли дополнительные варианты и хорошие цены рядом с вашей датой"
         case .turkish:
             return offset == 0 ? "Seçtiğiniz tarihteki seçenekler" : "Tarihinize yakın daha avantajlı seçenekler ve fiyatlar"
+        case .arabic:
+            return offset == 0 ? "الخيارات في التاريخ المختار" : "أسعار وخيارات أخرى قريبة من تاريخك"
         case .indonesian, .malay, .english:
             return offset == 0 ? "Options on the date you selected" : "More useful options and prices close to your date"
         case .uzbek:

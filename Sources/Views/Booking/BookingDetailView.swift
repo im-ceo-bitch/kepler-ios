@@ -194,7 +194,7 @@ struct BookingDetailView: View {
                         IumrahHaptics.soft()
                         dismiss()
                     } label: {
-                        Image(systemName: "chevron.left")
+                        Image(systemName: "chevron.backward")
                             .font(.system(size: 18, weight: .semibold))
                             .frame(width: 40, height: 40)
                             .contentShape(Circle())
@@ -205,7 +205,7 @@ struct BookingDetailView: View {
                         IumrahHaptics.soft()
                         dismiss()
                     } label: {
-                        Image(systemName: "chevron.left")
+                        Image(systemName: "chevron.backward")
                             .font(.system(size: 17, weight: .bold))
                             .frame(width: 44, height: 44)
                             .iumrahGlass(in: Circle(), interactive: true)
@@ -295,6 +295,7 @@ struct BookingDetailView: View {
         case .russian: return ru
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english, .malay: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
@@ -370,7 +371,7 @@ struct BookingDetailView: View {
 
                         Spacer(minLength: 8)
 
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.tertiary)
                     }
@@ -409,7 +410,7 @@ struct BookingDetailView: View {
 
                         Spacer(minLength: 8)
 
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(Color.white.opacity(0.88))
                     }
@@ -433,7 +434,7 @@ struct BookingDetailView: View {
                         Label(tripDocumentsTitle, systemImage: "doc.text.fill")
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.forward").font(.caption.bold()).foregroundStyle(.tertiary)
                     }
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
@@ -585,6 +586,7 @@ struct BookingDetailView: View {
         case .russian: return ru
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english, .malay: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCyr
@@ -628,6 +630,7 @@ struct BookingDetailView: View {
         case .russian: return "Подтвердить личность"
         case .indonesian: return IndonesianLocalization.phrase("Confirm identity")
         case .turkish: return TurkishLocalization.phrase("Confirm identity")
+        case .arabic: return ArabicLocalization.phrase("Confirm identity")
         case .english, .malay: return "Confirm identity"
         case .uzbek: return "Shaxsni tasdiqlash"
         case .uzbekCyrillic: return "Шахсни тасдиқлаш"
@@ -639,6 +642,7 @@ struct BookingDetailView: View {
         case .russian: return "Проверка безопасности"
         case .indonesian: return IndonesianLocalization.phrase("Security verification")
         case .turkish: return TurkishLocalization.phrase("Security verification")
+        case .arabic: return ArabicLocalization.phrase("Security verification")
         case .english, .malay: return "Security verification"
         case .uzbek: return "Xavfsizlik tekshiruvi"
         case .uzbekCyrillic: return "Хавфсизлик текшируви"
@@ -650,6 +654,7 @@ struct BookingDetailView: View {
         case .russian: return "Личность подтверждена"
         case .indonesian: return IndonesianLocalization.phrase("Identity confirmed")
         case .turkish: return TurkishLocalization.phrase("Identity confirmed")
+        case .arabic: return ArabicLocalization.phrase("Identity confirmed")
         case .english, .malay: return "Identity confirmed"
         case .uzbek: return "Shaxs tasdiqlandi"
         case .uzbekCyrillic: return "Шахс тасдиқланди"
@@ -664,6 +669,7 @@ struct BookingDetailView: View {
             case .russian: return "Исправить данные iUmrah Security"
             case .indonesian: return IndonesianLocalization.phrase("Correct iUmrah Security details")
             case .turkish: return TurkishLocalization.phrase("Correct iUmrah Security details")
+            case .arabic: return ArabicLocalization.phrase("Correct iUmrah Security details")
             case .english, .malay: return "Correct iUmrah Security details"
             case .uzbek: return "iUmrah Security ma’lumotlarini tuzatish"
             case .uzbekCyrillic: return "iUmrah Security маълумотларини тузатиш"
@@ -684,6 +690,7 @@ struct BookingDetailView: View {
         case .russian: return "iUmrah Security · защищённое бронирование"
         case .indonesian: return IndonesianLocalization.phrase("iUmrah Security · protected booking")
         case .turkish: return TurkishLocalization.phrase("iUmrah Security · protected booking")
+        case .arabic: return ArabicLocalization.phrase("iUmrah Security · protected booking")
         case .english, .malay: return "iUmrah Security · protected booking"
         case .uzbek: return "iUmrah Security · himoyalangan bron"
         case .uzbekCyrillic: return "iUmrah Security · ҳимояланган брон"
@@ -706,6 +713,7 @@ struct BookingDetailView: View {
         case .russian: return "Заполнить данные и оплатить"
         case .indonesian: return IndonesianLocalization.phrase("Complete details and pay")
         case .turkish: return TurkishLocalization.phrase("Complete details and pay")
+        case .arabic: return ArabicLocalization.phrase("Complete details and pay")
         case .english, .malay: return "Complete details and pay"
         case .uzbek: return "Ma’lumotlarni to‘ldirish va to‘lash"
         case .uzbekCyrillic: return "Маълумотларни тўлдириш ва тўлаш"
@@ -717,6 +725,7 @@ struct BookingDetailView: View {
         case .russian: return "iumrah ID · анкеты · реквизиты · чек"
         case .indonesian: return IndonesianLocalization.phrase("iumrah ID · pilgrim forms · payment · receipt")
         case .turkish: return TurkishLocalization.phrase("iumrah ID · pilgrim forms · payment · receipt")
+        case .arabic: return ArabicLocalization.phrase("iumrah ID · pilgrim forms · payment · receipt")
         case .english, .malay: return "iumrah ID · pilgrim forms · payment · receipt"
         case .uzbek: return "iumrah ID · anketalar · to‘lov · chek"
         case .uzbekCyrillic: return "iumrah ID · анкеталар · тўлов · чек"
@@ -728,6 +737,7 @@ struct BookingDetailView: View {
         case .russian: return "Данные и документы поездки"
         case .indonesian: return IndonesianLocalization.phrase("Trip details and documents")
         case .turkish: return TurkishLocalization.phrase("Trip details and documents")
+        case .arabic: return ArabicLocalization.phrase("Trip details and documents")
         case .english, .malay: return "Trip details and documents"
         case .uzbek: return "Safar ma’lumotlari va hujjatlar"
         case .uzbekCyrillic: return "Сафар маълумотлари ва ҳужжатлар"
@@ -1029,6 +1039,7 @@ struct BookingDetailView: View {
         case .russian: return "Интернет для поездки в Саудовской Аравии. После подготовки бронирования активация появится прямо в приложении."
         case .indonesian: return IndonesianLocalization.phrase("Connectivity for your trip in Saudi Arabia. Activation appears in the app once the booking is prepared.")
         case .turkish: return TurkishLocalization.phrase("Connectivity for your trip in Saudi Arabia. Activation appears in the app once the booking is prepared.")
+        case .arabic: return ArabicLocalization.phrase("Connectivity for your trip in Saudi Arabia. Activation appears in the app once the booking is prepared.")
         case .english, .malay: return "Connectivity for your trip in Saudi Arabia. Activation appears in the app once the booking is prepared."
         case .uzbek: return "Saudiya Arabistonidagi safaringiz uchun internet. Bron tayyor bo‘lgach, faollashtirish ilovada paydo bo‘ladi."
         case .uzbekCyrillic: return "Саудия Арабистонидаги сафарингиз учун интернет. Брон тайёр бўлгач, фаоллаштириш иловада пайдо бўлади."
@@ -1040,6 +1051,7 @@ struct BookingDetailView: View {
         case .russian: return "Включить eSIM в поездку"
         case .indonesian: return IndonesianLocalization.phrase("Include eSIM in this trip")
         case .turkish: return TurkishLocalization.phrase("Include eSIM in this trip")
+        case .arabic: return ArabicLocalization.phrase("Include eSIM in this trip")
         case .english, .malay: return "Include eSIM in this trip"
         case .uzbek: return "eSIM’ni safarga qo‘shish"
         case .uzbekCyrillic: return "eSIM’ни сафарга қўшиш"
@@ -1051,6 +1063,7 @@ struct BookingDetailView: View {
         case .russian: return esimIncluded ? "Включена в пакет" : "Будет исключена после подтверждения"
         case .indonesian: return esimIncluded ? "Termasuk dalam paket Anda" : "Akan dihapus setelah konfirmasi"
         case .turkish: return esimIncluded ? "Paketinize dahil" : "Onay sonrasında kaldırılacak"
+        case .arabic: return esimIncluded ? "مشمول في باقتك" : "ستُزال بعد التأكيد"
         case .english, .malay: return esimIncluded ? "Included in your package" : "Will be removed after confirmation"
         case .uzbek: return esimIncluded ? "Paketga kiritilgan" : "Tasdiqdan keyin olib tashlanadi"
         case .uzbekCyrillic: return esimIncluded ? "Пакетга киритилган" : "Тасдиқдан кейин олиб ташланади"
@@ -1062,6 +1075,7 @@ struct BookingDetailView: View {
         case .russian: return "После сохранения изменения потребуется отправить запрос на подтверждение — так же, как при изменении зияратов."
         case .indonesian: return IndonesianLocalization.phrase("After saving, this change must be submitted for confirmation just like a ziyarat change.")
         case .turkish: return TurkishLocalization.phrase("After saving, this change must be submitted for confirmation just like a ziyarat change.")
+        case .arabic: return ArabicLocalization.phrase("After saving, this change must be submitted for confirmation just like a ziyarat change.")
         case .english, .malay: return "After saving, this change must be submitted for confirmation just like a ziyarat change."
         case .uzbek: return "Saqlagandan keyin bu o‘zgarish ziyoratdagi kabi tasdiqlash uchun yuboriladi."
         case .uzbekCyrillic: return "Сақлагандан кейин бу ўзгариш зиёратдаги каби тасдиқлаш учун юборилади."
@@ -1192,7 +1206,7 @@ struct BookingDetailView: View {
                         Image(systemName: "message.fill")
                         Text(localized("Открыть чат iumrah", "Open iumrah chat", "iumrah chatini ochish", "iumrah чатини очиш"))
                         Spacer()
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
@@ -1251,6 +1265,7 @@ struct BookingDetailView: View {
         case .russian: return "iumrah Care проверит баланс вашей поездки"
         case .indonesian: return IndonesianLocalization.phrase("iumrah Care will review your journey balance")
         case .turkish: return TurkishLocalization.phrase("iumrah Care will review your journey balance")
+        case .arabic: return ArabicLocalization.phrase("iumrah Care will review your journey balance")
         case .english, .malay: return "iumrah Care will review your journey balance"
         case .uzbek: return "iumrah Care safaringiz muvozanatini tekshiradi"
         case .uzbekCyrillic: return "iumrah Care сафарингиз мувозанатини текширади"
@@ -1262,6 +1277,7 @@ struct BookingDetailView: View {
         case .russian: return "Цена этой поездки выше обычного ориентира. До окончательного оформления мы дополнительно проверим более удобные рейсы, распределение ночей и сопоставимые отели, чтобы стабилизировать поездку без потери качества."
         case .indonesian: return IndonesianLocalization.phrase("This trip is above our usual reference range. Before final ticketing we will review more convenient flights, night allocation and comparable hotels to stabilize the journey without compromising quality.")
         case .turkish: return TurkishLocalization.phrase("This trip is above our usual reference range. Before final ticketing we will review more convenient flights, night allocation and comparable hotels to stabilize the journey without compromising quality.")
+        case .arabic: return ArabicLocalization.phrase("This trip is above our usual reference range. Before final ticketing we will review more convenient flights, night allocation and comparable hotels to stabilize the journey without compromising quality.")
         case .english, .malay: return "This trip is above our usual reference range. Before final ticketing we will review more convenient flights, night allocation and comparable hotels to stabilize the journey without compromising quality."
         case .uzbek: return "Bu safar odatiy mo‘ljaldan yuqoriroq. Yakuniy rasmiylashtirishdan oldin qulayroq reyslar, tunlar taqsimoti va mos mehmonxonalar yana tekshiriladi."
         case .uzbekCyrillic: return "Бу сафар одатий мўлжалдан юқорироқ. Якуний расмийлаштиришдан олдин қулайроқ рейслар, тунлар тақсимоти ва мос меҳмонхоналар яна текширилади."

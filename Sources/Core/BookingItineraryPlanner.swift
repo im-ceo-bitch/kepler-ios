@@ -240,10 +240,13 @@ enum BookingItineraryPlanner {
         case (.madinah, .russian): return "Медина"
         case (.jeddah, .russian): return "Джидда"
         case (.makkah, .turkish): return TurkishLocalization.phrase("Makkah")
+        case (.makkah, .arabic): return ArabicLocalization.phrase("Makkah")
         case (.makkah, .indonesian), (.makkah, .malay), (.makkah, .english): return "Makkah"
         case (.madinah, .turkish): return TurkishLocalization.phrase("Madinah")
+        case (.madinah, .arabic): return ArabicLocalization.phrase("Madinah")
         case (.madinah, .indonesian), (.madinah, .malay), (.madinah, .english): return "Madinah"
         case (.jeddah, .turkish): return TurkishLocalization.phrase("Jeddah")
+        case (.jeddah, .arabic): return ArabicLocalization.phrase("Jeddah")
         case (.jeddah, .indonesian), (.jeddah, .malay), (.jeddah, .english): return "Jeddah"
         case (.makkah, .uzbek): return "Makka"
         case (.madinah, .uzbek): return "Madina"
@@ -278,40 +281,58 @@ enum BookingItineraryPlanner {
 
         case (.arrival, .turkish): return TurkishLocalization.phrase("Arrival and welcome")
 
+        case (.arrival, .arabic): return ArabicLocalization.phrase("Arrival and welcome")
         case (.arrival, .indonesian), (.arrival, .malay), (.arrival, .english): return "Arrival and welcome"
         case (.arrivalBody, .turkish): return TurkishLocalization.phrase("Airport welcome and the start of your journey")
+        case (.arrivalBody, .arabic): return ArabicLocalization.phrase("Airport welcome and the start of your journey")
         case (.arrivalBody, .indonesian), (.arrivalBody, .malay), (.arrivalBody, .english): return "Airport welcome and the start of your journey"
         case (.hotelCheckIn, .turkish): return TurkishLocalization.phrase("Hotel check-in")
+        case (.hotelCheckIn, .arabic): return ArabicLocalization.phrase("Hotel check-in")
         case (.hotelCheckIn, .indonesian), (.hotelCheckIn, .malay), (.hotelCheckIn, .english): return "Hotel check-in"
         case (.madinahZiyarat, .turkish): return TurkishLocalization.phrase("Madinah ziyarat")
+        case (.madinahZiyarat, .arabic): return ArabicLocalization.phrase("Madinah ziyarat")
         case (.madinahZiyarat, .indonesian), (.madinahZiyarat, .malay), (.madinahZiyarat, .english): return "Madinah ziyarat"
         case (.madinahZiyaratBody, .turkish): return TurkishLocalization.phrase("The Prophet’s Mosque ﷺ, Quba Mosque, Uhud and historic sites · guide and transfer")
+        case (.madinahZiyaratBody, .arabic): return ArabicLocalization.phrase("The Prophet’s Mosque ﷺ, Quba Mosque, Uhud and historic sites · guide and transfer")
         case (.madinahZiyaratBody, .indonesian), (.madinahZiyaratBody, .malay), (.madinahZiyaratBody, .english): return "The Prophet’s Mosque ﷺ, Quba Mosque, Uhud and historic sites · guide and transfer"
         case (.makkahZiyarat, .turkish): return TurkishLocalization.phrase("Makkah ziyarat")
+        case (.makkahZiyarat, .arabic): return ArabicLocalization.phrase("Makkah ziyarat")
         case (.makkahZiyarat, .indonesian), (.makkahZiyarat, .malay), (.makkahZiyarat, .english): return "Makkah ziyarat"
         case (.makkahZiyaratBody, .turkish): return TurkishLocalization.phrase("Important sites in Makkah · guide and transfer")
+        case (.makkahZiyaratBody, .arabic): return ArabicLocalization.phrase("Important sites in Makkah · guide and transfer")
         case (.makkahZiyaratBody, .indonesian), (.makkahZiyaratBody, .malay), (.makkahZiyaratBody, .english): return "Important sites in Makkah · guide and transfer"
         case (.toMakkah, .turkish): return TurkishLocalization.phrase("Transfer to Makkah")
+        case (.toMakkah, .arabic): return ArabicLocalization.phrase("Transfer to Makkah")
         case (.toMakkah, .indonesian), (.toMakkah, .malay), (.toMakkah, .english): return "Transfer to Makkah"
         case (.toMadinah, .turkish): return TurkishLocalization.phrase("Transfer to Madinah")
+        case (.toMadinah, .arabic): return ArabicLocalization.phrase("Transfer to Madinah")
         case (.toMadinah, .indonesian), (.toMadinah, .malay), (.toMadinah, .english): return "Transfer to Madinah"
         case (.intercityBody, .turkish): return TurkishLocalization.phrase("Intercity transfer between your hotels")
+        case (.intercityBody, .arabic): return ArabicLocalization.phrase("Intercity transfer between your hotels")
         case (.intercityBody, .indonesian), (.intercityBody, .malay), (.intercityBody, .english): return "Intercity transfer between your hotels"
         case (.haramainBody, .turkish): return TurkishLocalization.phrase("Intercity journey on Haramain")
+        case (.haramainBody, .arabic): return ArabicLocalization.phrase("Intercity journey on Haramain")
         case (.haramainBody, .indonesian), (.haramainBody, .malay), (.haramainBody, .english): return "Intercity journey on Haramain"
         case (.umrah, .turkish): return TurkishLocalization.phrase("Umrah")
+        case (.umrah, .arabic): return ArabicLocalization.phrase("Umrah")
         case (.umrah, .indonesian), (.umrah, .malay), (.umrah, .english): return "Umrah"
         case (.umrahBody, .turkish): return TurkishLocalization.phrase("Ihram, tawaf, sa’i and completion of Umrah · iumrah guidance")
+        case (.umrahBody, .arabic): return ArabicLocalization.phrase("Ihram, tawaf, sa’i and completion of Umrah · iumrah guidance")
         case (.umrahBody, .indonesian), (.umrahBody, .malay), (.umrahBody, .english): return "Ihram, tawaf, sa’i and completion of Umrah · iumrah guidance"
         case (.freeDay, .turkish): return TurkishLocalization.phrase("Free day")
+        case (.freeDay, .arabic): return ArabicLocalization.phrase("Free day")
         case (.freeDay, .indonesian), (.freeDay, .malay), (.freeDay, .english): return "Free day"
         case (.freeDayBody, .turkish): return TurkishLocalization.phrase("Time for rest, worship and your own plans")
+        case (.freeDayBody, .arabic): return ArabicLocalization.phrase("Time for rest, worship and your own plans")
         case (.freeDayBody, .indonesian), (.freeDayBody, .malay), (.freeDayBody, .english): return "Time for rest, worship and your own plans"
         case (.airportTransfer, .turkish): return TurkishLocalization.phrase("Airport transfer")
+        case (.airportTransfer, .arabic): return ArabicLocalization.phrase("Airport transfer")
         case (.airportTransfer, .indonesian), (.airportTransfer, .malay), (.airportTransfer, .english): return "Airport transfer"
         case (.airportTransferBody, .turkish): return TurkishLocalization.phrase("Hotel departure, transfer for your flight and iumrah guidance")
+        case (.airportTransferBody, .arabic): return ArabicLocalization.phrase("Hotel departure, transfer for your flight and iumrah guidance")
         case (.airportTransferBody, .indonesian), (.airportTransferBody, .malay), (.airportTransferBody, .english): return "Hotel departure, transfer for your flight and iumrah guidance"
         case (.flightHome, .turkish): return TurkishLocalization.phrase("Flight home")
+        case (.flightHome, .arabic): return ArabicLocalization.phrase("Flight home")
         case (.flightHome, .indonesian), (.flightHome, .malay), (.flightHome, .english): return "Flight home"
 
         case (.arrival, .uzbek): return "Kelish va kutib olish"

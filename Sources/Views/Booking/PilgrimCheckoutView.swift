@@ -326,7 +326,7 @@ struct PilgrimCheckoutView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.tertiary)
+                    Image(systemName: "chevron.forward").font(.caption.weight(.bold)).foregroundStyle(.tertiary)
                 }
                 .padding(16)
                 .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -845,7 +845,7 @@ struct PilgrimCheckoutView: View {
                 HStack {
                     if isSubmittingAccount { ProgressView().tint(.white) }
                     Text(tr("Sign in and link booking", "Войти и привязать бронь", "Kirish va bronni ulash", "Кириш ва бронни улаш"))
-                    Spacer(); Image(systemName: "arrow.right")
+                    Spacer(); Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1009,7 +1009,7 @@ struct PilgrimCheckoutView: View {
                                 .foregroundStyle(traveler.hasPassport ? Color.green : Color.secondary)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
@@ -1959,7 +1959,7 @@ struct PilgrimCheckoutView: View {
         return String(repeating: "0", count: 8 - digits.count) + digits
     }
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
-        switch settings.language { case .russian: return ru; case .indonesian, .malay, .english: return en; case .turkish: return TurkishLocalization.phrase(en); case .uzbek: return uz; case .uzbekCyrillic: return cyrl }
+        switch settings.language { case .russian: return ru; case .arabic: return ArabicLocalization.phrase(en); case .indonesian, .malay, .english: return en; case .turkish: return TurkishLocalization.phrase(en); case .uzbek: return uz; case .uzbekCyrillic: return cyrl }
     }
 }
 
@@ -2037,7 +2037,7 @@ private struct TravelerFormEditorSheet: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer(minLength: 8)
-                                Image(systemName: "chevron.right")
+                                Image(systemName: "chevron.forward")
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(.tertiary)
                             }
@@ -2428,7 +2428,7 @@ private struct TravelerFormEditorSheet: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -2546,6 +2546,7 @@ private struct TravelerFormEditorSheet: View {
         switch language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -2660,6 +2661,7 @@ private struct CountryPickerSheet: View {
         switch language {
         case .russian: return "Поиск страны"
         case .turkish: return TurkishLocalization.phrase("Search country")
+        case .arabic: return ArabicLocalization.phrase("Search country")
         case .indonesian, .malay, .english: return "Search country"
         case .uzbek: return "Davlatni qidirish"
         case .uzbekCyrillic: return "Давлатни қидириш"
@@ -2670,6 +2672,7 @@ private struct CountryPickerSheet: View {
         switch language {
         case .russian: return "Закрыть"
         case .turkish: return TurkishLocalization.phrase("Close")
+        case .arabic: return ArabicLocalization.phrase("Close")
         case .indonesian, .malay, .english: return "Close"
         case .uzbek: return "Yopish"
         case .uzbekCyrillic: return "Ёпиш"

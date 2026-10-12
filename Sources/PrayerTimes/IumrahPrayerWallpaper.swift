@@ -73,6 +73,7 @@ func prayerText(
     _ cyrl: String
 ) -> String {
     switch language {
+    case .arabic: return ArabicLocalization.phrase(en)
     case .indonesian, .malay, .english: return en
     case .russian: return ru
     case .uzbek: return uz

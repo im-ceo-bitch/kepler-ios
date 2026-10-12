@@ -249,7 +249,7 @@ struct IumrahPrayerTimesView: View {
             }
             Spacer(minLength: 8)
             Button { moveDate(-1) } label: {
-                Image(systemName: "chevron.left")
+                Image(systemName: "chevron.backward")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 38, height: 38)
             }
@@ -262,7 +262,7 @@ struct IumrahPrayerTimesView: View {
             }
             .disabled(isToday)
             Button { moveDate(1) } label: {
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 38, height: 38)
             }
@@ -301,7 +301,7 @@ struct IumrahPrayerTimesView: View {
                                         .font(.system(size: 12))
                                         .foregroundStyle(.orange)
                                 } else {
-                                    Image(systemName: "chevron.right")
+                                    Image(systemName: "chevron.forward")
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(.tertiary)
                                 }
@@ -346,7 +346,7 @@ struct IumrahPrayerTimesView: View {
                             Text(timeText(date))
                                 .font(.headline.monospacedDigit())
                                 .foregroundStyle(.primary)
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }

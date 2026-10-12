@@ -247,7 +247,7 @@ struct UmrahVoiceStepScreen: View {
         HStack {
             if showsPrevious, let onPrevious {
                 UmrahSideStepButton(
-                    systemName: "chevron.left",
+                    systemName: "chevron.backward",
                     accessibilityLabel: UmrahFlowCopy.previous(store.guideLanguage),
                     action: onPrevious
                 )

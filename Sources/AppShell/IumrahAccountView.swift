@@ -652,7 +652,7 @@ struct IumrahAccountView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 16)
@@ -694,7 +694,7 @@ struct IumrahAccountView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.tertiary)
                         .frame(width: 34, height: 34)
@@ -760,7 +760,7 @@ struct IumrahAccountView: View {
                             Text(tr("Open all trips", "Открыть все поездки", "Barcha safarlarni ochish", "Барча сафарларни очиш"))
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
-                            Image(systemName: "arrow.right")
+                            Image(systemName: "arrow.forward")
                                 .font(.caption.weight(.bold))
                         }
                         .padding(.horizontal, 14)
@@ -816,7 +816,7 @@ struct IumrahAccountView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white.opacity(0.52))
             }
@@ -886,7 +886,7 @@ struct IumrahAccountView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.tertiary)
                 }
@@ -1417,7 +1417,7 @@ struct IumrahAccountView: View {
                     Image(systemName: "person.crop.circle.fill")
                     Text(tr("Sign in to iumrah", "Войти в iumrah", "iumrah ga kirish", "iumrah га кириш"))
                     Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1443,7 +1443,7 @@ struct IumrahAccountView: View {
                     Image(systemName: "person.crop.circle.fill")
                     Text(tr("Sign in to iumrah", "Войти в iumrah", "iumrah ga kirish", "iumrah га кириш"))
                     Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1494,7 +1494,7 @@ struct IumrahAccountView: View {
                          ? tr("Send SMS code", "Отправить SMS-код", "SMS kodni yuborish", "SMS кодни юбориш")
                          : tr("Confirm and sign in", "Подтвердить и войти", "Tasdiqlab kirish", "Тасдиқлаб кириш"))
                     Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1641,7 +1641,7 @@ struct IumrahAccountView: View {
                          ? tr("Send SMS code", "Отправить SMS-код", "SMS kodni yuborish", "SMS кодни юбориш")
                          : tr("Create iumrah account", "Создать аккаунт iumrah", "iumrah akkauntini yaratish", "iumrah аккаунтини яратиш"))
                     Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1666,7 +1666,7 @@ struct IumrahAccountView: View {
                 HStack {
                     Text(tr("Open booking activation", "Открыть активацию брони", "Bron faollashtirishini ochish", "Брон фаоллаштиришини очиш"))
                     Spacer()
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1817,7 +1817,7 @@ struct IumrahAccountView: View {
                     }
                 }
                 Spacer(minLength: 10)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -1906,7 +1906,7 @@ struct IumrahAccountView: View {
                     .lineLimit(2)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
+            Image(systemName: "chevron.forward")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
@@ -1958,7 +1958,7 @@ struct IumrahAccountView: View {
             }
             Spacer(minLength: 8)
             if showsChevron {
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -2776,6 +2776,7 @@ struct IumrahAccountView: View {
         case .russian: return ru
         case .indonesian: return IndonesianLocalization.phrase(en)
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english, .malay: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

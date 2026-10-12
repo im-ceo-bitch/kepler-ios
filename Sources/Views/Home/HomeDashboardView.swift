@@ -389,7 +389,7 @@ struct HomeDashboardView: View {
                 }
 
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.white.opacity(0.72))
             }
@@ -452,7 +452,7 @@ struct HomeDashboardView: View {
 
                     HStack(spacing: 6) {
                         Text(ziyaratsHomeCTA)
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
@@ -480,6 +480,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Священные и исторические места Мекки и Медины — в одном маршруте. Доступ к iumrah Ziyarats включён в iumrah Services вашего пакета."
         case .turkish: return TurkishLocalization.phrase("Sacred and historic places across Makkah and Madinah in one journey. Access to iumrah Ziyarats is included with your package’s iumrah Services.")
+        case .arabic: return ArabicLocalization.phrase("Sacred and historic places across Makkah and Madinah in one journey. Access to iumrah Ziyarats is included with your package’s iumrah Services.")
         case .indonesian, .malay, .english: return "Sacred and historic places across Makkah and Madinah in one journey. Access to iumrah Ziyarats is included with your package’s iumrah Services."
         case .uzbek: return "Makka va Madinadagi muqaddas hamda tarixiy joylar — bitta yo‘nalishda. iumrah Ziyarats sizning paketingizdagi iumrah Services tarkibiga kiradi."
         case .uzbekCyrillic: return "Макка ва Мадинадаги муқаддас ҳамда тарихий жойлар — битта йўналишда. iumrah Ziyarats сизнинг пакетингиздаги iumrah Services таркибига киради."
@@ -490,6 +491,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Открыть Ziyarats"
         case .turkish: return TurkishLocalization.phrase("Open Ziyarats")
+        case .arabic: return ArabicLocalization.phrase("Open Ziyarats")
         case .indonesian, .malay, .english: return "Open Ziyarats"
         case .uzbek: return "Ziyarats’ni ochish"
         case .uzbekCyrillic: return "Ziyarats’ни очиш"
@@ -621,6 +623,7 @@ struct HomeDashboardView: View {
         case .turkish: return "Hac yolculuğu araçları"
         case .indonesian: return "Panduan perjalanan"
         case .malay: return "Panduan perjalanan"
+        case .arabic: return ArabicLocalization.phrase("Pilgrim essentials")
         case .english: return "Pilgrim essentials"
         }
     }
@@ -633,6 +636,7 @@ struct HomeDashboardView: View {
         case .turkish: return "Hava durumu"
         case .indonesian: return "Cuaca"
         case .malay: return "Cuaca"
+        case .arabic: return ArabicLocalization.phrase("Weather")
         case .english: return "Weather"
         }
     }
@@ -640,6 +644,7 @@ struct HomeDashboardView: View {
     private var prayerEntryTitle: String {
         switch settings.language {
         case .russian: return "Время молитв"
+        case .arabic: return ArabicLocalization.phrase("Prayer Times")
         case .english: return "Prayer Times"
         case .uzbek: return "Namoz vaqtlari"
         case .uzbekCyrillic: return "Намоз вақтлари"
@@ -652,6 +657,7 @@ struct HomeDashboardView: View {
     private var prayerEntrySubtitle: String {
         switch settings.language {
         case .russian: return "Мекка и Медина · Расписание"
+        case .arabic: return ArabicLocalization.phrase("Makkah & Madinah · Daily schedule")
         case .english: return "Makkah & Madinah · Daily schedule"
         case .uzbek: return "Makka va Madina · Kunlik jadval"
         case .uzbekCyrillic: return "Макка ва Мадина · Кунлик жадвал"
@@ -683,7 +689,7 @@ struct HomeDashboardView: View {
                         .lineLimit(2)
                 }
                 Spacer(minLength: 2)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
@@ -798,7 +804,7 @@ struct HomeDashboardView: View {
                     HStack {
                         Text(allPackagesCTA)
                         Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
@@ -915,7 +921,7 @@ struct HomeDashboardView: View {
                     HStack {
                         Text(hotelFirstAllCTA)
                         Spacer()
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.subheadline.weight(.bold))
                 }
@@ -962,6 +968,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Пакеты с выбранным отелем"
         case .turkish: return TurkishLocalization.phrase("Packages by hotel")
+        case .arabic: return ArabicLocalization.phrase("Packages by hotel")
         case .indonesian, .malay, .english: return "Packages by hotel"
         case .uzbek: return "Mehmonxona bo‘yicha paketlar"
         case .uzbekCyrillic: return "Меҳмонхона бўйича пакетлар"
@@ -972,6 +979,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Выберите отель — даты, перелёт и услуги уже собраны в готовый пакет."
         case .turkish: return TurkishLocalization.phrase("Choose the hotel — dates, flights and services are already assembled into a ready package.")
+        case .arabic: return ArabicLocalization.phrase("Choose the hotel — dates, flights and services are already assembled into a ready package.")
         case .indonesian, .malay, .english: return "Choose the hotel — dates, flights and services are already assembled into a ready package."
         case .uzbek: return "Mehmonxonani tanlang — sanalar, parvoz va xizmatlar tayyor paketga yig‘ilgan."
         case .uzbekCyrillic: return "Меҳмонхонани танланг — саналар, парвоз ва хизматлар тайёр пакетга йиғилган."
@@ -982,6 +990,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Готовим пакеты по отелям…"
         case .turkish: return TurkishLocalization.phrase("Preparing hotel packages…")
+        case .arabic: return ArabicLocalization.phrase("Preparing hotel packages…")
         case .indonesian, .malay, .english: return "Preparing hotel packages…"
         case .uzbek: return "Mehmonxona paketlari tayyorlanmoqda…"
         case .uzbekCyrillic: return "Меҳмонхона пакетлари тайёрланмоқда…"
@@ -992,6 +1001,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Посмотреть все пакеты по отелям"
         case .turkish: return TurkishLocalization.phrase("See all hotel packages")
+        case .arabic: return ArabicLocalization.phrase("See all hotel packages")
         case .indonesian, .malay, .english: return "See all hotel packages"
         case .uzbek: return "Barcha mehmonxona paketlarini ko‘rish"
         case .uzbekCyrillic: return "Барча меҳмонхона пакетларини кўриш"
@@ -1002,6 +1012,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Откройте полный каталог отелей и готовых вариантов поездки."
         case .turkish: return TurkishLocalization.phrase("Open the full hotel catalogue and ready-made journey options.")
+        case .arabic: return ArabicLocalization.phrase("Open the full hotel catalogue and ready-made journey options.")
         case .indonesian, .malay, .english: return "Open the full hotel catalogue and ready-made journey options."
         case .uzbek: return "Mehmonxonalar va tayyor safar variantlarining to‘liq katalogini oching."
         case .uzbekCyrillic: return "Меҳмонхоналар ва тайёр сафар вариантларининг тўлиқ каталогини очинг."
@@ -1012,6 +1023,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Все пакеты"
         case .turkish: return TurkishLocalization.phrase("All packages")
+        case .arabic: return ArabicLocalization.phrase("All packages")
         case .indonesian, .malay, .english: return "All packages"
         case .uzbek: return "Barcha paketlar"
         case .uzbekCyrillic: return "Барча пакетлар"
@@ -1022,6 +1034,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Не удалось подготовить пакет для отправки. Обновите каталог и попробуйте снова."
         case .turkish: return TurkishLocalization.phrase("The package could not be prepared for sharing. Refresh the catalogue and try again.")
+        case .arabic: return ArabicLocalization.phrase("The package could not be prepared for sharing. Refresh the catalogue and try again.")
         case .indonesian, .malay, .english: return "The package could not be prepared for sharing. Refresh the catalogue and try again."
         case .uzbek: return "Paketni ulashish uchun tayyorlab bo‘lmadi. Katalogni yangilang va qayta urinib ko‘ring."
         case .uzbekCyrillic: return "Пакетни улашиш учун тайёрлаб бўлмади. Каталогни янгиланг ва қайта уриниб кўринг."
@@ -1032,6 +1045,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Не удалось поделиться"
         case .turkish: return TurkishLocalization.phrase("Could not share")
+        case .arabic: return ArabicLocalization.phrase("Could not share")
         case .indonesian, .malay, .english: return "Could not share"
         case .uzbek: return "Ulashib bo‘lmadi"
         case .uzbekCyrillic: return "Улашиб бўлмади"
@@ -1042,6 +1056,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Понятно"
         case .turkish: return TurkishLocalization.phrase("OK")
+        case .arabic: return ArabicLocalization.phrase("OK")
         case .indonesian, .malay, .english: return "OK"
         case .uzbek: return "Tushunarli"
         case .uzbekCyrillic: return "Тушунарли"
@@ -1130,7 +1145,7 @@ struct HomeDashboardView: View {
                     HStack(spacing: 10) {
                         Text(careRequestCardCTA)
                         Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -1158,6 +1173,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Готовые пакеты"
         case .turkish: return TurkishLocalization.phrase("Ready-made packages")
+        case .arabic: return ArabicLocalization.phrase("Ready-made packages")
         case .indonesian, .malay, .english: return "Ready-made packages"
         case .uzbek: return "Tayyor paketlar"
         case .uzbekCyrillic: return "Тайёр пакетлар"
@@ -1168,6 +1184,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Актуальные варианты перелёта уже собраны с отелем и сервисами в единую цену пакета."
         case .turkish: return TurkishLocalization.phrase("Current flight options are already combined with hotel and services into one package price.")
+        case .arabic: return ArabicLocalization.phrase("Current flight options are already combined with hotel and services into one package price.")
         case .indonesian, .malay, .english: return "Current flight options are already combined with hotel and services into one package price."
         case .uzbek: return "Amaldagi parvoz variantlari mehmonxona va servislar bilan bitta paket narxiga yig‘ilgan."
         case .uzbekCyrillic: return "Амалдаги парвоз вариантлари меҳмонхона ва сервислар билан битта пакет нархига йиғилган."
@@ -1178,6 +1195,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Подбираем актуальные пакеты"
         case .turkish: return TurkishLocalization.phrase("Loading current packages")
+        case .arabic: return ArabicLocalization.phrase("Loading current packages")
         case .indonesian, .malay, .english: return "Loading current packages"
         case .uzbek: return "Amaldagi paketlar yuklanmoqda"
         case .uzbekCyrillic: return "Амалдаги пакетлар юкланмоқда"
@@ -1188,6 +1206,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Цены и рейсы обновляются из витрины Iumrah."
         case .turkish: return TurkishLocalization.phrase("Prices and flights are refreshing from the Iumrah storefront.")
+        case .arabic: return ArabicLocalization.phrase("Prices and flights are refreshing from the Iumrah storefront.")
         case .indonesian, .malay, .english: return "Prices and flights are refreshing from the Iumrah storefront."
         case .uzbek: return "Narxlar va parvozlar Iumrah vitrinasidan yangilanmoqda."
         case .uzbekCyrillic: return "Нархлар ва парвозлар Iumrah витринасидан янгиланмоқда."
@@ -1198,6 +1217,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Больше вариантов поездки"
         case .turkish: return TurkishLocalization.phrase("More journey options")
+        case .arabic: return ArabicLocalization.phrase("More journey options")
         case .indonesian, .malay, .english: return "More journey options"
         case .uzbek: return "Ko‘proq safar variantlari"
         case .uzbekCyrillic: return "Кўпроқ сафар вариантлари"
@@ -1208,6 +1228,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Откройте полную витрину авиабилетов и готовых пакетов Iumrah."
         case .turkish: return TurkishLocalization.phrase("Open the complete Iumrah flights and ready-package storefront.")
+        case .arabic: return ArabicLocalization.phrase("Open the complete Iumrah flights and ready-package storefront.")
         case .indonesian, .malay, .english: return "Open the complete Iumrah flights and ready-package storefront."
         case .uzbek: return "Iumrah parvozlari va tayyor paketlarining to‘liq vitrinasini oching."
         case .uzbekCyrillic: return "Iumrah парвозлари ва тайёр пакетларининг тўлиқ витринасини очинг."
@@ -1218,6 +1239,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Посмотреть все пакеты"
         case .turkish: return TurkishLocalization.phrase("View all packages")
+        case .arabic: return ArabicLocalization.phrase("View all packages")
         case .indonesian, .malay, .english: return "View all packages"
         case .uzbek: return "Barcha paketlarni ko‘rish"
         case .uzbekCyrillic: return "Барча пакетларни кўриш"
@@ -1228,6 +1250,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Собрать свою Умру"
         case .turkish: return TurkishLocalization.phrase("Build your Umrah")
+        case .arabic: return ArabicLocalization.phrase("Build your Umrah")
         case .indonesian, .malay, .english: return "Build your Umrah"
         case .uzbek: return "Umrangizni tuzing"
         case .uzbekCyrillic: return "Умрангизни тузинг"
@@ -1238,6 +1261,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Соберите пакет сами за несколько минут или передайте подбор Iumrah Care."
         case .turkish: return TurkishLocalization.phrase("Build the package yourself in minutes or let Iumrah Care prepare it for you.")
+        case .arabic: return ArabicLocalization.phrase("Build the package yourself in minutes or let Iumrah Care prepare it for you.")
         case .indonesian, .malay, .english: return "Build the package yourself in minutes or let Iumrah Care prepare it for you."
         case .uzbek: return "Paketni bir necha daqiqada o‘zingiz tuzing yoki tanlovni Iumrah Care’ga topshiring."
         case .uzbekCyrillic: return "Пакетни бир неча дақиқада ўзингиз тузинг ёки танловни Iumrah Care’га топширинг."
@@ -1248,6 +1272,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "ответ ≤ 2 ч"
         case .turkish: return TurkishLocalization.phrase("reply ≤ 2h")
+        case .arabic: return ArabicLocalization.phrase("reply ≤ 2h")
         case .indonesian, .malay, .english: return "reply ≤ 2h"
         case .uzbek: return "javob ≤ 2 soat"
         case .uzbekCyrillic: return "жавоб ≤ 2 соат"
@@ -1258,6 +1283,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Собрать Умру за меня"
         case .turkish: return TurkishLocalization.phrase("Build my Umrah for me")
+        case .arabic: return ArabicLocalization.phrase("Build my Umrah for me")
         case .indonesian, .malay, .english: return "Build my Umrah for me"
         case .uzbek: return "Umramni men uchun tuzing"
         case .uzbekCyrillic: return "Умрамни мен учун тузинг"
@@ -1268,6 +1294,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Укажите месяц или точные даты, бюджет, уровень отеля и главный приоритет. Iumrah Care соберёт персональный вариант."
         case .turkish: return TurkishLocalization.phrase("Choose a month or exact dates, budget, hotel level and your main priority. Iumrah Care will prepare a personal option.")
+        case .arabic: return ArabicLocalization.phrase("Choose a month or exact dates, budget, hotel level and your main priority. Iumrah Care will prepare a personal option.")
         case .indonesian, .malay, .english: return "Choose a month or exact dates, budget, hotel level and your main priority. Iumrah Care will prepare a personal option."
         case .uzbek: return "Oy yoki aniq sanalar, budjet, mehmonxona darajasi va asosiy ustuvorlikni belgilang. Iumrah Care shaxsiy variant tayyorlaydi."
         case .uzbekCyrillic: return "Ой ёки аниқ саналар, бюджет, меҳмонхона даражаси ва асосий устуворликни белгиланг. Iumrah Care шахсий вариант тайёрлайди."
@@ -1278,6 +1305,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Рассказать о поездке"
         case .turkish: return TurkishLocalization.phrase("Tell us about the trip")
+        case .arabic: return ArabicLocalization.phrase("Tell us about the trip")
         case .indonesian, .malay, .english: return "Tell us about the trip"
         case .uzbek: return "Safar haqida aytish"
         case .uzbekCyrillic: return "Сафар ҳақида айтиш"
@@ -1429,6 +1457,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Интеграции"
         case .turkish: return TurkishLocalization.phrase("Integrations")
+        case .arabic: return ArabicLocalization.phrase("Integrations")
         case .indonesian, .malay, .english: return "Integrations"
         case .uzbek: return "Integratsiyalar"
         case .uzbekCyrillic: return "Интеграциялар"
@@ -1439,6 +1468,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Планируйте следующую Umrah, подключайте Telegram и используйте новые возможности iumrah в одном месте."
         case .turkish: return TurkishLocalization.phrase("Plan your next Umrah, connect Telegram and access new iumrah integrations in one place.")
+        case .arabic: return ArabicLocalization.phrase("Plan your next Umrah, connect Telegram and access new iumrah integrations in one place.")
         case .indonesian, .malay, .english: return "Plan your next Umrah, connect Telegram and access new iumrah integrations in one place."
         case .uzbek: return "Keyingi Umrani rejalashtiring, Telegram’ni ulang va yangi iumrah integratsiyalaridan bir joyda foydalaning."
         case .uzbekCyrillic: return "Кейинги Умрани режалаштиринг, Telegram’ни уланг ва янги iumrah интеграцияларидан бир жойда фойдаланинг."
@@ -1449,6 +1479,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "ПЛАНИРОВАНИЕ"
         case .turkish: return TurkishLocalization.phrase("PLANNING")
+        case .arabic: return ArabicLocalization.phrase("PLANNING")
         case .indonesian, .malay, .english: return "PLANNING"
         case .uzbek: return "REJALASHTIRISH"
         case .uzbekCyrillic: return "РЕЖАЛАШТИРИШ"
@@ -1459,6 +1490,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Запланировать Umrah"
         case .turkish: return TurkishLocalization.phrase("Plan your Umrah")
+        case .arabic: return ArabicLocalization.phrase("Plan your Umrah")
         case .indonesian, .malay, .english: return "Plan your Umrah"
         case .uzbek: return "Umrani rejalashtirish"
         case .uzbekCyrillic: return "Умрани режалаштириш"
@@ -1469,6 +1501,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Выберите будущие даты и настройте напоминания за 2 месяца, месяц и последние дни перед поездкой."
         case .turkish: return TurkishLocalization.phrase("Choose future dates and set reminders for two months, one month and the final days before departure.")
+        case .arabic: return ArabicLocalization.phrase("Choose future dates and set reminders for two months, one month and the final days before departure.")
         case .indonesian, .malay, .english: return "Choose future dates and set reminders for two months, one month and the final days before departure."
         case .uzbek: return "Kelajakdagi sanalarni tanlang va safargacha 2 oy, 1 oy hamda so‘nggi kunlar uchun eslatmalarni sozlang."
         case .uzbekCyrillic: return "Келажакдаги саналарни танланг ва сафаргача 2 ой, 1 ой ҳамда сўнгги кунлар учун эслатмаларни созланг."
@@ -1479,6 +1512,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Статус бронирования в Telegram"
         case .turkish: return TurkishLocalization.phrase("Booking status in Telegram")
+        case .arabic: return ArabicLocalization.phrase("Booking status in Telegram")
         case .indonesian, .malay, .english: return "Booking status in Telegram"
         case .uzbek: return "Bron holati Telegram’da"
         case .uzbekCyrillic: return "Брон ҳолати Telegram’да"
@@ -1489,6 +1523,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Получайте изменения статуса, оплаты, подтверждения и документов прямо в Telegram."
         case .turkish: return TurkishLocalization.phrase("Receive status, payment, confirmation and document updates directly in Telegram.")
+        case .arabic: return ArabicLocalization.phrase("Receive status, payment, confirmation and document updates directly in Telegram.")
         case .indonesian, .malay, .english: return "Receive status, payment, confirmation and document updates directly in Telegram."
         case .uzbek: return "Status, to‘lov, tasdiq va hujjat yangilanishlarini to‘g‘ridan-to‘g‘ri Telegram’da oling."
         case .uzbekCyrillic: return "Статус, тўлов, тасдиқ ва ҳужжат янгиланишларини тўғридан-тўғри Telegram’да олинг."
@@ -1499,6 +1534,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "СКОРО"
         case .turkish: return TurkishLocalization.phrase("COMING SOON")
+        case .arabic: return ArabicLocalization.phrase("COMING SOON")
         case .indonesian, .malay, .english: return "COMING SOON"
         case .uzbek: return "TEZ ORADA"
         case .uzbekCyrillic: return "ТЕЗ ОРАДА"
@@ -1509,6 +1545,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Следующая интеграция"
         case .turkish: return TurkishLocalization.phrase("Next integration")
+        case .arabic: return ArabicLocalization.phrase("Next integration")
         case .indonesian, .malay, .english: return "Next integration"
         case .uzbek: return "Keyingi integratsiya"
         case .uzbekCyrillic: return "Кейинги интеграция"
@@ -1519,6 +1556,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Мы готовим ещё один способ связать iumrah с сервисами, которыми Вы пользуетесь каждый день."
         case .turkish: return TurkishLocalization.phrase("We are preparing another way to connect iumrah with the services you use every day.")
+        case .arabic: return ArabicLocalization.phrase("We are preparing another way to connect iumrah with the services you use every day.")
         case .indonesian, .malay, .english: return "We are preparing another way to connect iumrah with the services you use every day."
         case .uzbek: return "iumrah’ni har kuni foydalanadigan servislaringiz bilan bog‘lashning yana bir usulini tayyorlayapmiz."
         case .uzbekCyrillic: return "iumrah’ни ҳар куни фойдаланадиган сервисларингиз билан боғлашнинг яна бир усулини тайёрлаяпмиз."
@@ -1529,6 +1567,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Запланировать"
         case .turkish: return TurkishLocalization.phrase("Plan trip")
+        case .arabic: return ArabicLocalization.phrase("Plan trip")
         case .indonesian, .malay, .english: return "Plan trip"
         case .uzbek: return "Rejalashtirish"
         case .uzbekCyrillic: return "Режалаштириш"
@@ -1539,6 +1578,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Открыть Telegram"
         case .turkish: return TurkishLocalization.phrase("Open Telegram")
+        case .arabic: return ArabicLocalization.phrase("Open Telegram")
         case .indonesian, .malay, .english: return "Open Telegram"
         case .uzbek: return "Telegram’ni ochish"
         case .uzbekCyrillic: return "Telegram’ни очиш"
@@ -1549,6 +1589,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Наши продукты"
         case .turkish: return TurkishLocalization.phrase("Our products")
+        case .arabic: return ArabicLocalization.phrase("Our products")
         case .indonesian, .malay, .english: return "Our products"
         case .uzbek: return "Mahsulotlarimiz"
         case .uzbekCyrillic: return "Маҳсулотларимиз"
@@ -1608,7 +1649,7 @@ struct HomeDashboardView: View {
                     HStack(spacing: 10) {
                         Text(configuratorHeroCTA)
                         Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -1637,6 +1678,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "≈ 5 минут"
         case .turkish: return TurkishLocalization.phrase("≈ 5 min")
+        case .arabic: return ArabicLocalization.phrase("≈ 5 min")
         case .indonesian, .malay, .english: return "≈ 5 min"
         case .uzbek: return "≈ 5 daqiqa"
         case .uzbekCyrillic: return "≈ 5 дақиқа"
@@ -1647,6 +1689,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Соберите свою Умру за 5 минут"
         case .turkish: return TurkishLocalization.phrase("Build your Umrah in 5 minutes")
+        case .arabic: return ArabicLocalization.phrase("Build your Umrah in 5 minutes")
         case .indonesian, .malay, .english: return "Build your Umrah in 5 minutes"
         case .uzbek: return "Umrangizni 5 daqiqada tuzing"
         case .uzbekCyrillic: return "Умрангизни 5 дақиқада тузинг"
@@ -1657,6 +1700,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Персональный пакет для вас, вашей семьи или друзей — без обязательной туристической группы из 30–50 человек. Перелёт, отель, трансфер и Iumrah Services собираются в одну поездку."
         case .turkish: return TurkishLocalization.phrase("A personal package for you, your family or friends — without having to join a 30–50 person tour group. Flights, hotel, transfer and Iumrah Services come together as one journey.")
+        case .arabic: return ArabicLocalization.phrase("A personal package for you, your family or friends — without having to join a 30–50 person tour group. Flights, hotel, transfer and Iumrah Services come together as one journey.")
         case .indonesian, .malay, .english: return "A personal package for you, your family or friends — without having to join a 30–50 person tour group. Flights, hotel, transfer and Iumrah Services come together as one journey."
         case .uzbek: return "Siz, oilangiz yoki do‘stlaringiz uchun shaxsiy paket — 30–50 kishilik majburiy tur guruhisiz. Parvoz, mehmonxona, transfer va Iumrah Services bitta safarga birlashadi."
         case .uzbekCyrillic: return "Сиз, оилангиз ёки дўстларингиз учун шахсий пакет — 30–50 кишилик мажбурий тур гуруҳисиз. Парвоз, меҳмонхона, трансфер ва Iumrah Services битта сафарга бирлашади."
@@ -1667,6 +1711,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Создать мою Умру"
         case .turkish: return TurkishLocalization.phrase("Create my Umrah")
+        case .arabic: return ArabicLocalization.phrase("Create my Umrah")
         case .indonesian, .malay, .english: return "Create my Umrah"
         case .uzbek: return "Umramni yaratish"
         case .uzbekCyrillic: return "Умрамни яратиш"
@@ -1704,7 +1749,7 @@ struct HomeDashboardView: View {
                 }
 
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -1718,6 +1763,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Подарочные карты для близких · $100 на умру и $100 в iUmrah Balance после подтверждения и оплаты."
         case .turkish: return TurkishLocalization.phrase("Gift cards for someone close · $100 toward Umrah and $100 in iUmrah Balance after confirmation and payment.")
+        case .arabic: return ArabicLocalization.phrase("Gift cards for someone close · $100 toward Umrah and $100 in iUmrah Balance after confirmation and payment.")
         case .indonesian, .malay, .english: return "Gift cards for someone close · $100 toward Umrah and $100 in iUmrah Balance after confirmation and payment."
         case .uzbek: return "Yaqinlar uchun Gift Card · Umrah uchun $100 va tasdiqlanib to‘langach $100 iUmrah Balance."
         case .uzbekCyrillic: return "Яқинлар учун Gift Card · Умра учун $100 ва тасдиқланиб тўлангач $100 iUmrah Balance."
@@ -1816,18 +1862,25 @@ struct HomeDashboardView: View {
         case (.russian, .packageOnly): return "В1 версии eSIM доступна только внутри Umra-пакета."
         case (.russian, .details): return "Тарифы и активация"
         case (.turkish, .left): return TurkishLocalization.phrase("left")
+        case (.arabic, .left): return ArabicLocalization.phrase("left")
         case (.indonesian, .left), (.malay, .left), (.english, .left): return "left"
         case (.turkish, .ready): return TurkishLocalization.phrase("Profile ready. Activate the eSIM on your iPhone.")
+        case (.arabic, .ready): return ArabicLocalization.phrase("Profile ready. Activate the eSIM on your iPhone.")
         case (.indonesian, .ready), (.malay, .ready), (.english, .ready): return "Profile ready. Activate the eSIM on your iPhone."
         case (.turkish, .assigned): return TurkishLocalization.phrase("eSIM is linked to your trip.")
+        case (.arabic, .assigned): return ArabicLocalization.phrase("eSIM is linked to your trip.")
         case (.indonesian, .assigned), (.malay, .assigned), (.english, .assigned): return "eSIM is linked to your trip."
         case (.turkish, .activate): return TurkishLocalization.phrase("Activate eSIM")
+        case (.arabic, .activate): return ArabicLocalization.phrase("Activate eSIM")
         case (.indonesian, .activate), (.malay, .activate), (.english, .activate): return "Activate eSIM"
         case (.turkish, .open): return TurkishLocalization.phrase("Open eSIM")
+        case (.arabic, .open): return ArabicLocalization.phrase("Open eSIM")
         case (.indonesian, .open), (.malay, .open), (.english, .open): return "Open eSIM"
         case (.turkish, .packageOnly): return TurkishLocalization.phrase("In V1, eSIM is available only as part of the Umrah package.")
+        case (.arabic, .packageOnly): return ArabicLocalization.phrase("In V1, eSIM is available only as part of the Umrah package.")
         case (.indonesian, .packageOnly), (.malay, .packageOnly), (.english, .packageOnly): return "In V1, eSIM is available only as part of the Umrah package."
         case (.turkish, .details): return TurkishLocalization.phrase("Plans & activation")
+        case (.arabic, .details): return ArabicLocalization.phrase("Plans & activation")
         case (.indonesian, .details), (.malay, .details), (.english, .details): return "Plans & activation"
         case (.uzbek, .left): return "qoldi"
         case (.uzbek, .ready): return "Profil tayyor. eSIM’ni iPhone’da faollashtiring."
@@ -1921,7 +1974,7 @@ struct HomeDashboardView: View {
                         Image(systemName: "phone.fill")
                         Text(homeCareCTA)
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.system(size: 12, weight: .bold))
                     }
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -1986,7 +2039,7 @@ struct HomeDashboardView: View {
                     HStack(spacing: 10) {
                         Text(homeAboutCTA)
                         Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.system(size: 15.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.iumrahPrimaryButtonText)
@@ -2014,6 +2067,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "О проекте iumrah"
         case .turkish: return TurkishLocalization.phrase("About iumrah")
+        case .arabic: return ArabicLocalization.phrase("About iumrah")
         case .indonesian, .malay, .english: return "About iumrah"
         case .uzbek: return "iumrah haqida"
         case .uzbekCyrillic: return "iumrah ҳақида"
@@ -2099,7 +2153,7 @@ struct HomeDashboardView: View {
                     HStack(spacing: 8) {
                         Text(sundayClubProductCTA)
                         Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.system(size: 15.5, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
@@ -2126,6 +2180,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Короткая Умра на выходные: готовые даты, удобный маршрут и минимум времени вне работы."
         case .turkish: return TurkishLocalization.phrase("A weekend-sized Umrah with ready dates, a compact route and less time away from work.")
+        case .arabic: return ArabicLocalization.phrase("A weekend-sized Umrah with ready dates, a compact route and less time away from work.")
         case .indonesian, .malay, .english: return "A weekend-sized Umrah with ready dates, a compact route and less time away from work."
         case .uzbek: return "Dam olish kunlariga mos qisqa Umra: tayyor sanalar, qulay yo‘nalish va ishdan kamroq uzilish."
         case .uzbekCyrillic: return "Дам олиш кунларига мос қисқа Умра: тайёр саналар, қулай йўналиш ва ишдан камроқ узилиш."
@@ -2136,6 +2191,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Открыть Sunday Club"
         case .turkish: return TurkishLocalization.phrase("Open Sunday Club")
+        case .arabic: return ArabicLocalization.phrase("Open Sunday Club")
         case .indonesian, .malay, .english: return "Open Sunday Club"
         case .uzbek: return "Sunday Club’ni ochish"
         case .uzbekCyrillic: return "Sunday Club’ни очиш"
@@ -2222,7 +2278,7 @@ struct HomeDashboardView: View {
                         HStack(spacing: 8) {
                             Text(homeAdvisorProductCTA)
                             Spacer(minLength: 8)
-                            Image(systemName: "arrow.right")
+                            Image(systemName: "arrow.forward")
                                 .font(.system(size: 13, weight: .bold))
                         }
                         .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -2297,7 +2353,7 @@ struct HomeDashboardView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                     Spacer(minLength: 8)
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                         .font(.system(size: 13, weight: .bold))
                 }
                 .font(.system(size: 15.5, weight: .semibold, design: .rounded))
@@ -2326,6 +2382,7 @@ struct HomeDashboardView: View {
             return "Опубликованные рейсы Umrah, подбор направления и перелёта под ваш пакет в одном месте."
         case .turkish:
             return "Paketiniz için yayınlanan umre uçuşları ve rota seçimi tek yerde."
+        case .arabic: return "رحلات العمرة المنشورة واختيار مسار الباقة في مكان واحد."
         case .indonesian, .malay, .english:
             return "Published Umrah flights and route selection for your package in one place."
         case .uzbek:
@@ -2339,6 +2396,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Подобрать перелёт"
         case .turkish: return TurkishLocalization.phrase("Choose flights")
+        case .arabic: return ArabicLocalization.phrase("Choose flights")
         case .indonesian, .malay, .english: return "Choose flights"
         case .uzbek: return "Parvozni tanlash"
         case .uzbekCyrillic: return "Парвозни танлаш"
@@ -2349,6 +2407,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Связаться с Care"
         case .turkish: return TurkishLocalization.phrase("Contact Care")
+        case .arabic: return ArabicLocalization.phrase("Contact Care")
         case .indonesian, .malay, .english: return "Contact Care"
         case .uzbek: return "Care bilan bog‘lanish"
         case .uzbekCyrillic: return "Care билан боғланиш"
@@ -2359,6 +2418,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Голосовой iumrah Advisor"
         case .turkish: return TurkishLocalization.phrase("Voice iumrah Advisor")
+        case .arabic: return ArabicLocalization.phrase("Voice iumrah Advisor")
         case .indonesian, .malay, .english: return "Voice iumrah Advisor"
         case .uzbek: return "Ovozli iumrah Advisor"
         case .uzbekCyrillic: return "Овозли iumrah Advisor"
@@ -2369,6 +2429,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Пошаговый голосовой гид по Умре с поддержкой нескольких языков, чтобы паломник не оставался один во время ритуалов."
         case .turkish: return TurkishLocalization.phrase("A step-by-step voice guide for Umrah in multiple languages, so the pilgrim is not left alone during the rituals.")
+        case .arabic: return ArabicLocalization.phrase("A step-by-step voice guide for Umrah in multiple languages, so the pilgrim is not left alone during the rituals.")
         case .indonesian, .malay, .english: return "A step-by-step voice guide for Umrah in multiple languages, so the pilgrim is not left alone during the rituals."
         case .uzbek: return "Umra marosimlari davomida ziyoratchi yolg‘iz qolmasligi uchun bir nechta tillarda bosqichma-bosqich ovozli gid."
         case .uzbekCyrillic: return "Умра маросимлари давомида зиёратчи ёлғиз қолмаслиги учун бир нечта тилларда босқичма-босқич овозли гид."
@@ -2379,6 +2440,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Открыть Advisor"
         case .turkish: return TurkishLocalization.phrase("Open Advisor")
+        case .arabic: return ArabicLocalization.phrase("Open Advisor")
         case .indonesian, .malay, .english: return "Open Advisor"
         case .uzbek: return "Advisorni ochish"
         case .uzbekCyrillic: return "Advisorни очиш"
@@ -2389,6 +2451,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Открыть страницу проекта"
         case .turkish: return TurkishLocalization.phrase("Open the project page")
+        case .arabic: return ArabicLocalization.phrase("Open the project page")
         case .indonesian, .malay, .english: return "Open the project page"
         case .uzbek: return "Loyiha sahifasini ochish"
         case .uzbekCyrillic: return "Лойиҳа саҳифасини очиш"
@@ -2399,6 +2462,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "3 года опыта"
         case .turkish: return TurkishLocalization.phrase("3 years of experience")
+        case .arabic: return ArabicLocalization.phrase("3 years of experience")
         case .indonesian, .malay, .english: return "3 years of experience"
         case .uzbek: return "3 yillik tajriba"
         case .uzbekCyrillic: return "3 йиллик тажриба"
@@ -2411,6 +2475,7 @@ struct HomeDashboardView: View {
             return "iumrah — проект персональной и независимой Умры: собрать маршрут, отель, трансфер и сопровождение в одном спокойном приложении."
         case .turkish:
             return "iumrah, kişiye özel bağımsız umre platformudur: rotanızı, otelinizi, transferinizi ve desteğinizi tek bir huzurlu uygulamada planlayın."
+        case .arabic: return "iumrah منصة للعمرة المستقلة؛ خطّط للمسار والفندق والتنقلات والدعم في تطبيق واحد."
         case .indonesian, .malay, .english:
             return "iumrah is a personal independent Umrah project: build your route, hotel, transfer and care in one calm application."
         case .uzbek:
@@ -2496,6 +2561,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "Персональная Умра — для вас и ваших близких"
         case .turkish: return TurkishLocalization.phrase("A personal Umrah — for you and the people you choose")
+        case .arabic: return ArabicLocalization.phrase("A personal Umrah — for you and the people you choose")
         case .indonesian, .malay, .english: return "A personal Umrah — for you and the people you choose"
         case .uzbek: return "Shaxsiy Umra — siz va yaqinlaringiz uchun"
         case .uzbekCyrillic: return "Шахсий Умра — сиз ва яқинларингиз учун"
@@ -2506,6 +2572,7 @@ struct HomeDashboardView: View {
         switch settings.language {
         case .russian: return "iumrah не привязывает вас к стандартной группе. Соберите поездку для себя, семьи или друзей и управляйте ею как одной персональной Umrah."
         case .turkish: return TurkishLocalization.phrase("iumrah does not tie you to a standard tour group. Build one personal Umrah for yourself, your family or friends and manage the journey in one place.")
+        case .arabic: return ArabicLocalization.phrase("iumrah does not tie you to a standard tour group. Build one personal Umrah for yourself, your family or friends and manage the journey in one place.")
         case .indonesian, .malay, .english: return "iumrah does not tie you to a standard tour group. Build one personal Umrah for yourself, your family or friends and manage the journey in one place."
         case .uzbek: return "iumrah sizni standart tur guruhiga bog‘lamaydi. O‘zingiz, oilangiz yoki do‘stlaringiz uchun shaxsiy Umra tuzing va safarni bitta joydan boshqaring."
         case .uzbekCyrillic: return "iumrah сизни стандарт тур гуруҳига боғламайди. Ўзингиз, оилангиз ёки дўстларингиз учун шахсий Умра тузинг ва сафарни битта жойдан бошқаринг."
@@ -2530,7 +2597,15 @@ struct HomeDashboardView: View {
                 HomeFAQItem(id: "family", question: "Yalnızca ailem veya arkadaşlarımla seyahat edebilir miyim?", answer: "Evet. Tek kişi, çift, aile veya arkadaş grubu için paket hazırlayabilirsiniz. Yolculuğunuza yalnızca sizin eklediğiniz kişiler katılır."),
                 HomeFAQItem(id: "care", question: "Her şeyi kendim planlamak istemezsem?", answer: "iumrah Care ile iletişime geçin. Kalabalık gruba katılma zorunluluğu olmadan, size özel seyahatin seçimi, kontrolü ve düzenlenmesinde yardımcı oluruz.")
             ]
-        case .indonesian, .malay, .english:
+        case .arabic:
+            return [
+                HomeFAQItem(id: "what", question: ArabicLocalization.phrase("What is iumrah?"), answer: ArabicLocalization.phrase("iumrah is a platform for independent, personal Umrah. It brings flights, hotel, transfer and services into one clear package and then keeps the journey in one app.")),
+                HomeFAQItem(id: "why", question: ArabicLocalization.phrase("Why was iumrah created?"), answer: ArabicLocalization.phrase("So a pilgrim does not have to depend on a large tour group or manage many disconnected bookings. iumrah is built around more control, transparency and care throughout the journey.")),
+                HomeFAQItem(id: "personal", question: ArabicLocalization.phrase("What does ‘personal Umrah’ mean?"), answer: ArabicLocalization.phrase("The journey is built around your dates, budget, hotel level and chosen services. There is no required group of 30–50 strangers — you decide who travels with you.")),
+                HomeFAQItem(id: "family", question: ArabicLocalization.phrase("Can I travel only with family or friends?"), answer: ArabicLocalization.phrase("Yes. Build a package for one person, a couple, family or friends. Your journey contains only the people you choose to add.")),
+                HomeFAQItem(id: "care", question: ArabicLocalization.phrase("What if I do not want to build everything myself?"), answer: ArabicLocalization.phrase("Contact iumrah Care. We can help select, verify and arrange the trip while keeping the personal format without a required large group."))
+            ]
+case .indonesian, .malay, .english:
             return [
                 HomeFAQItem(id: "what", question: "What is iumrah?", answer: "iumrah is a platform for independent, personal Umrah. It brings flights, hotel, transfer and services into one clear package and then keeps the journey in one app."),
                 HomeFAQItem(id: "why", question: "Why was iumrah created?", answer: "So a pilgrim does not have to depend on a large tour group or manage many disconnected bookings. iumrah is built around more control, transparency and care throughout the journey."),

@@ -186,6 +186,7 @@ struct HotelDetailView: View {
         switch settings.language {
         case .russian: return "Не удалось подготовить пакет для отправки. Обновите цены и попробуйте ещё раз."
         case .turkish: return TurkishLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
+        case .arabic: return ArabicLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
         case .indonesian, .malay, .english: return "The package could not be prepared for sharing. Refresh pricing and try again."
         case .uzbek: return "Paketni ulashish uchun tayyorlab bo‘lmadi. Narxlarni yangilang va qayta urinib ko‘ring."
         case .uzbekCyrillic: return "Пакетни улашиш учун тайёрлаб бўлмади. Нархларни янгиланг ва қайта уриниб кўринг."
@@ -196,6 +197,7 @@ struct HotelDetailView: View {
         switch settings.language {
         case .russian: return "Не удалось поделиться"
         case .turkish: return TurkishLocalization.phrase("Could not share")
+        case .arabic: return ArabicLocalization.phrase("Could not share")
         case .indonesian, .malay, .english: return "Could not share"
         case .uzbek: return "Ulashib bo‘lmadi"
         case .uzbekCyrillic: return "Улашиб бўлмади"
@@ -206,6 +208,7 @@ struct HotelDetailView: View {
         switch settings.language {
         case .russian: return "Понятно"
         case .turkish: return TurkishLocalization.phrase("OK")
+        case .arabic: return ArabicLocalization.phrase("OK")
         case .indonesian, .malay, .english: return "OK"
         case .uzbek: return "Tushunarli"
         case .uzbekCyrillic: return "Тушунарли"
@@ -539,7 +542,7 @@ struct HotelDetailView: View {
                     Text(L10n.text("hotel_detail_open_configurator", settings.language))
                         .font(.subheadline.weight(.bold))
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.bold))
                 }
                 .foregroundStyle(.white)
@@ -563,6 +566,7 @@ struct HotelDetailView: View {
         switch settings.language {
         case .russian: return "паломников"
         case .turkish: return TurkishLocalization.phrase("travelers")
+        case .arabic: return ArabicLocalization.phrase("travelers")
         case .indonesian, .malay, .english: return "travelers"
         case .uzbek: return "ziyoratchi"
         case .uzbekCyrillic: return "зиёратчи"
@@ -596,6 +600,7 @@ struct HotelDetailView: View {
         switch settings.language {
         case .russian: return "ДЛИТЕЛЬНОСТЬ"
         case .turkish: return TurkishLocalization.phrase("DURATION")
+        case .arabic: return ArabicLocalization.phrase("DURATION")
         case .indonesian, .malay, .english: return "DURATION"
         case .uzbek: return "DAVOMIYLIGI"
         case .uzbekCyrillic: return "ДАВОМИЙЛИГИ"
@@ -1116,6 +1121,7 @@ struct HotelDetailView: View {
         if normalized.contains("twin") && normalized.contains("city view") {
             switch settings.language {
             case .turkish: return TurkishLocalization.phrase("Twin Room · City View")
+            case .arabic: return ArabicLocalization.phrase("Twin Room · City View")
             case .indonesian, .malay, .english: return "Twin Room · City View"
             case .russian: return "Twin · Вид на город"
             case .uzbek: return "Twin xona · Shahar manzarasi"
@@ -1125,6 +1131,7 @@ struct HotelDetailView: View {
         if normalized.contains("king") && normalized.contains("city view") {
             switch settings.language {
             case .turkish: return TurkishLocalization.phrase("King Room · City View")
+            case .arabic: return ArabicLocalization.phrase("King Room · City View")
             case .indonesian, .malay, .english: return "King Room · City View"
             case .russian: return "King · Вид на город"
             case .uzbek: return "King xona · Shahar manzarasi"
@@ -1134,6 +1141,7 @@ struct HotelDetailView: View {
         if normalized.contains("double") && normalized.contains("city view") {
             switch settings.language {
             case .turkish: return TurkishLocalization.phrase("Double Room · City View")
+            case .arabic: return ArabicLocalization.phrase("Double Room · City View")
             case .indonesian, .malay, .english: return "Double Room · City View"
             case .russian: return "Двухместный · Вид на город"
             case .uzbek: return "Ikki kishilik xona · Shahar manzarasi"

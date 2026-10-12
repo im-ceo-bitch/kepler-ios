@@ -641,7 +641,7 @@ struct TransferSelectionView: View {
                     }
                 }
                 Spacer(minLength: 10)
-                if !isConfirming { Image(systemName: "arrow.right") }
+                if !isConfirming { Image(systemName: "arrow.forward") }
             }
             .frame(maxWidth: .infinity)
         }
@@ -904,6 +904,7 @@ struct TransferSelectionView: View {
         case .russian: return "ru_RU"
         case .indonesian: return "id_ID"
         case .turkish: return TurkishLocalization.phrase("en_US")
+        case .arabic: return "ar_SA"
         case .english: return "en_US"
             case .malay: return "ms_MY"
         case .uzbek: return "uz_Latn_UZ"
@@ -1211,6 +1212,7 @@ private func transferLocalized(
     case .russian: return russian
     case .indonesian: return IndonesianLocalization.phrase(english)
     case .turkish: return TurkishLocalization.phrase(english)
+    case .arabic: return ArabicLocalization.phrase(english)
     case .english, .malay: return english
     case .uzbek: return uzbek
     case .uzbekCyrillic: return uzbekCyrillic

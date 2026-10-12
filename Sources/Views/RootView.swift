@@ -20,6 +20,7 @@ struct RootView: View {
         }
             .preferredColorScheme(settings.appearance.colorScheme)
             .environment(\.locale, Locale(identifier: settings.language.localeIdentifier))
+            .environment(\.layoutDirection, settings.language.isRightToLeft ? .rightToLeft : .leftToRight)
             .environmentObject(settings)
             .environmentObject(chrome)
             .environmentObject(journey)

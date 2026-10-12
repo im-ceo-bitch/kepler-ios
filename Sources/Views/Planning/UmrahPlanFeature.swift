@@ -176,6 +176,8 @@ enum UmrahPlanNotificationScheduler {
             return daysBefore == 1 ? "Umrah уже завтра" : "До Umrah осталось \(daysBefore) дней"
         case .turkish:
             return daysBefore == 1 ? "Umreniz yarın başlıyor" : "Umrenize \(daysBefore) gün kaldı"
+        case .arabic:
+            return daysBefore == 1 ? "تبدأ عمرتك غدًا" : "متبقي \(daysBefore) أيام على عمرتك"
         case .indonesian, .malay, .english:
             return daysBefore == 1 ? "Your Umrah starts tomorrow" : "\(daysBefore) days until your Umrah"
         case .uzbek:
@@ -200,6 +202,12 @@ enum UmrahPlanNotificationScheduler {
             if daysBefore >= 15 { return "Yolculuğunuz yaklaşıyor. Belgeleri, transferleri ve hazırlıklarınızı gözden geçirin." }
             if daysBefore >= 7 { return "Umreniz yaklaştı. Son seyahat ayrıntılarını ve yanınıza alacaklarınızı kontrol edin." }
             return "Umre için son hazırlıklar. Planınızı açıp tarihleri, belgeleri ve rotayı kontrol edin."
+        case .arabic:
+            if daysBefore >= 60 { return "تم حفظ خطتك. ابدأ تجهيز المستندات والتواريخ والميزانية على مهل." }
+            if daysBefore >= 30 { return "تبقّى شهر على رحلتك. تحقق من جواز السفر والرحلة الجوية والفندق في خطة iumrah." }
+            if daysBefore >= 15 { return "رحلتك تقترب. راجع المستندات والتنقلات والاستعدادات." }
+            if daysBefore >= 7 { return "اقترب موعد عمرتك. راجع التفاصيل الأخيرة وأغراض السفر." }
+            return "الاستعدادات الأخيرة للعمرة. افتح خطتك وراجع التواريخ والمستندات والمسار."
         case .indonesian, .malay, .english:
             if daysBefore >= 60 { return "Your plan is saved. Start preparing documents, dates and budget at your own pace." }
             if daysBefore >= 30 { return "One month to go. Check your passport, flight and hotel in your iumrah plan." }
@@ -348,7 +356,7 @@ struct UmrahPlanHomeEntryCard: View {
             HStack(spacing: 8) {
                 Text(PlanCopy.text(language, "Создать план поездки", "Create trip plan", "Safar rejasini yaratish", "Сафар режасини яратиш"))
                 Spacer(minLength: 8)
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.forward")
             }
             .font(.system(size: 16, weight: .bold, design: .rounded))
             .foregroundStyle(.white)
@@ -417,7 +425,7 @@ struct UmrahPlanHomeEntryCard: View {
                     Image(systemName: "bell.badge.fill")
                     Text(PlanCopy.text(language, "Напоминания настроены", "Reminders ready", "Eslatmalar tayyor", "Эслатмалар тайёр"))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                 }
                 .font(.system(size: 14.5, weight: .bold, design: .rounded))
                 .foregroundStyle(.black)
@@ -442,6 +450,7 @@ struct UmrahPlanHomeEntryCard: View {
         switch language {
         case .russian: return days > 0 ? "Через \(days) дн. · \(duration) дн. поездки" : "Поездка начинается сегодня · \(duration) дн."
         case .turkish: return days > 0 ? "\(days) gün sonra · \(duration) günlük seyahat" : "Bugün başlıyor · \(duration) günlük seyahat"
+        case .arabic: return days > 0 ? "بعد \(days) أيام · رحلة مدتها \(duration) أيام" : "تبدأ اليوم · رحلة مدتها \(duration) أيام"
         case .indonesian, .malay, .english: return days > 0 ? "In \(days) days · \(duration)-day trip" : "Starts today · \(duration)-day trip"
         case .uzbek: return days > 0 ? "\(days) kundan keyin · \(duration) kunlik safar" : "Bugun boshlanadi · \(duration) kun"
         case .uzbekCyrillic: return days > 0 ? "\(days) кундан кейин · \(duration) кунлик сафар" : "Бугун бошланади · \(duration) кун"
@@ -546,6 +555,7 @@ struct UmrahPlanReminderCenterView: View {
         switch settings.language {
         case .russian: return day >= 30 ? "\(day / 30) мес." : "\(day) дн."
         case .turkish: return day >= 30 ? "\(day / 30) ay" : "\(day)d"
+        case .arabic: return day >= 30 ? "\(day / 30) شهر" : "\(day) يوم"
         case .indonesian, .malay, .english: return day >= 30 ? "\(day / 30) mo" : "\(day)d"
         case .uzbek: return day >= 30 ? "\(day / 30) oy" : "\(day) kun"
         case .uzbekCyrillic: return day >= 30 ? "\(day / 30) ой" : "\(day) кун"
@@ -759,7 +769,7 @@ struct UmrahPlanHubView: View {
                         Image(systemName: "bell.badge.fill")
                         Text(PlanCopy.text(settings.language, "Настроить напоминания", "Manage reminders", "Eslatmalarni sozlash", "Эслатмаларни созлаш"))
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                     }
                     .font(.system(size: 14.5, weight: .bold, design: .rounded))
                     .foregroundStyle(.black)
@@ -906,6 +916,7 @@ struct UmrahPlanHubView: View {
         switch settings.language {
         case .russian: return days > 0 ? "Начнётся через \(days) дней · \(duration) дней поездки" : "Начинается сегодня · \(duration) дней поездки"
         case .turkish: return days > 0 ? "\(days) gün sonra başlıyor · \(duration) günlük seyahat" : "Bugün başlıyor · \(duration) günlük seyahat"
+        case .arabic: return days > 0 ? "تبدأ بعد \(days) أيام · رحلة \(duration) أيام" : "تبدأ اليوم · رحلة \(duration) أيام"
         case .indonesian, .malay, .english: return days > 0 ? "Starts in \(days) days · \(duration)-day trip" : "Starts today · \(duration)-day trip"
         case .uzbek: return days > 0 ? "\(days) kundan keyin boshlanadi · \(duration) kun" : "Bugun boshlanadi · \(duration) kun"
         case .uzbekCyrillic: return days > 0 ? "\(days) кундан кейин бошланади · \(duration) кун" : "Бугун бошланади · \(duration) кун"
@@ -1492,6 +1503,7 @@ private enum PlanCopy {
         switch language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -1508,6 +1520,10 @@ private enum PlanCopy {
             if days == 60 { return "2 ay önce" }
             if days == 30 { return "1 ay önce" }
             return "\\(days) gün önce"
+        case .arabic:
+            if days == 60 { return "قبل شهرين" }
+            if days == 30 { return "قبل شهر واحد" }
+            return "قبل \(days) أيام"
         case .indonesian, .malay, .english:
             if days == 60 { return "2 months before" }
             if days == 30 { return "1 month before" }

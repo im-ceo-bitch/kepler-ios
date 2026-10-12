@@ -149,7 +149,7 @@ struct IumrahAppearanceView: View {
                                 .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(Color.iumrahCareLight)
                         } else if iconBeingChanged == nil {
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.forward")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
@@ -291,6 +291,7 @@ struct IumrahAppearanceView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz
@@ -371,6 +372,14 @@ private enum AppIconOption: String, CaseIterable, Identifiable {
             case .deepBlue: return "Koyu mavi iumrah uygulama simgesi"
             case .world: return "Dünya haritalı iumrah uygulama simgesi"
             case .makkah: return "Mekke temalı iumrah uygulama simgesi"
+            }
+        case .arabic:
+            switch self {
+            case .blue: return "أيقونة iumrah الزرقاء"
+            case .cyan: return "أيقونة iumrah السماوية"
+            case .deepBlue: return "أيقونة iumrah الزرقاء الداكنة"
+            case .world: return "أيقونة iumrah بخريطة العالم"
+            case .makkah: return "أيقونة iumrah بطابع مكة"
             }
         case .indonesian, .malay, .english:
             switch self {

@@ -436,7 +436,7 @@ struct BookingsHomeView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.tertiary)
                 }
@@ -445,7 +445,7 @@ struct BookingsHomeView: View {
                     Label(localized("Контакты", "Contacts", "Kontaktlar", "Контактлар"), systemImage: "phone.fill")
                     Spacer()
                     Text(localized("Гид и трансфер", "Guide & transfer", "Gid va transfer", "Гид ва трансфер"))
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -661,7 +661,7 @@ struct BookingsHomeView: View {
                     Image(systemName: "location.wave.radiowaves.left.and.right")
                     Text(localized("Отслеживать рейс", "Track flight", "Reysni kuzatish", "Рейсни кузатиш"))
                     Spacer()
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.iumrahPrimaryButtonText)
@@ -1086,7 +1086,7 @@ struct BookingsHomeView: View {
             Text(title)
                 .font(.headline.weight(.semibold))
             Spacer(minLength: 8)
-            Image(systemName: "arrow.right")
+            Image(systemName: "arrow.forward")
                 .font(.system(size: 14, weight: .bold))
         }
         .foregroundStyle(isPrimary ? Color.white : Color.primary)
@@ -1367,7 +1367,7 @@ struct BookingsHomeView: View {
                     HStack {
                         Text(openFullPlanTitle)
                         Spacer()
-                        Image(systemName: "chevron.right")
+                        Image(systemName: "chevron.forward")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
@@ -1524,7 +1524,7 @@ struct BookingsHomeView: View {
             }
 
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
+            Image(systemName: "chevron.forward")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
@@ -1597,7 +1597,7 @@ struct BookingsHomeView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Image(systemName: "chevron.right")
+            Image(systemName: "chevron.forward")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
@@ -1621,7 +1621,7 @@ struct BookingsHomeView: View {
                 Text(explorePackagesTitle)
                     .font(.headline.weight(.semibold))
                 Spacer(minLength: 8)
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.forward")
                     .font(.system(size: 14, weight: .bold))
             }
             .foregroundStyle(.white)
@@ -1796,7 +1796,7 @@ struct BookingsHomeView: View {
                     HStack(spacing: 10) {
                         Text(cta)
                         Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                     .font(.headline)
                     .foregroundStyle(dark ? .black : .white)
@@ -1973,6 +1973,8 @@ struct BookingsHomeView: View {
             return "\(count) паломников"
         case .turkish:
             return count == 1 ? "1 umre yolcusu" : "\(count) umre yolcusu"
+        case .arabic:
+            return count == 1 ? "معتمر واحد" : "\(count) معتمرين"
         case .indonesian, .malay, .english:
             return count == 1 ? "1 pilgrim" : "\(count) pilgrims"
         case .uzbek:
@@ -2093,6 +2095,7 @@ struct BookingsHomeView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy

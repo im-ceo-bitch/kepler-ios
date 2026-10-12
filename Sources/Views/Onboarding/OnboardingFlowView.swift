@@ -915,7 +915,7 @@ private struct OnboardingBuilderMock: View {
                         .font(.system(size: 23, weight: .bold, design: .rounded))
                 }
                 Spacer()
-                Image(systemName: "chevron.right")
+                Image(systemName: "chevron.forward")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Color.secondary.opacity(0.65))
             }

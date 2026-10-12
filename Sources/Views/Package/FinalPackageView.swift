@@ -250,6 +250,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Рассчитываем цену пакета"
         case .turkish: return TurkishLocalization.phrase("Calculating your package price")
+        case .arabic: return ArabicLocalization.phrase("Calculating your package price")
         case .indonesian, .malay, .english: return "Calculating your package price"
         case .uzbek: return "Paket narxi hisoblanmoqda"
         case .uzbekCyrillic: return "Пакет нархи ҳисобланмоқда"
@@ -260,6 +261,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Собираем выбранные перелёты, отели и услуги в одну итоговую цену поездки."
         case .turkish: return TurkishLocalization.phrase("Combining your selected flights, hotels and services into one trip price.")
+        case .arabic: return ArabicLocalization.phrase("Combining your selected flights, hotels and services into one trip price.")
         case .indonesian, .malay, .english: return "Combining your selected flights, hotels and services into one trip price."
         case .uzbek: return "Tanlangan reyslar, mehmonxonalar va xizmatlarni safarning yagona narxiga birlashtiramiz."
         case .uzbekCyrillic: return "Танланган рейслар, меҳмонхоналар ва хизматларни сафарнинг ягона нархига бирлаштирамиз."
@@ -270,6 +272,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Не удалось обновить пакет"
         case .turkish: return TurkishLocalization.phrase("The package could not be refreshed")
+        case .arabic: return ArabicLocalization.phrase("The package could not be refreshed")
         case .indonesian, .malay, .english: return "The package could not be refreshed"
         case .uzbek: return "Paketni yangilab bo‘lmadi"
         case .uzbekCyrillic: return "Пакетни янгилаб бўлмади"
@@ -280,6 +283,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Ваш выбор сохранён. Повторная проверка обновит доступность выбранных отелей и пересчитает поездку без потери маршрута."
         case .turkish: return TurkishLocalization.phrase("Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route.")
+        case .arabic: return ArabicLocalization.phrase("Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route.")
         case .indonesian, .malay, .english: return "Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route."
         case .uzbek: return "Tanlovlaringiz saqlanadi. Qayta tekshirish mehmonxona mavjudligini yangilaydi va yo‘nalishni yo‘qotmasdan safarni qayta hisoblaydi."
         case .uzbekCyrillic: return "Танловларингиз сақланади. Қайта текшириш меҳмонхона мавжудлигини янгилайди ва йўналишни йўқотмасдан сафарни қайта ҳисоблайди."
@@ -294,6 +298,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Изменить отель"
         case .turkish: return TurkishLocalization.phrase("Change hotel")
+        case .arabic: return ArabicLocalization.phrase("Change hotel")
         case .indonesian, .malay, .english: return "Change hotel"
         case .uzbek: return "Mehmonxonani o‘zgartirish"
         case .uzbekCyrillic: return "Меҳмонхонани ўзгартириш"
@@ -304,6 +309,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Повторно проверить пакет"
         case .turkish: return TurkishLocalization.phrase("Recheck package")
+        case .arabic: return ArabicLocalization.phrase("Recheck package")
         case .indonesian, .malay, .english: return "Recheck package"
         case .uzbek: return "Narxni qayta olish"
         case .uzbekCyrillic: return "Нархни қайта олиш"
@@ -331,7 +337,7 @@ struct FinalPackageView: View {
                             .minimumScaleFactor(0.85)
                         Spacer(minLength: 6)
                         if !isSubmitting {
-                            Image(systemName: "arrow.right")
+                            Image(systemName: "arrow.forward")
                                 .font(.system(size: 14, weight: .bold))
                         }
                     }
@@ -358,7 +364,7 @@ struct FinalPackageView: View {
                             .minimumScaleFactor(0.78)
                         Spacer(minLength: 6)
                         if !isApplyingComparison {
-                            Image(systemName: "arrow.right")
+                            Image(systemName: "arrow.forward")
                                 .font(.system(size: 13, weight: .bold))
                         }
                     }
@@ -585,7 +591,7 @@ struct FinalPackageView: View {
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         if !isApplyingComparison {
-                            Image(systemName: "arrow.right")
+                            Image(systemName: "arrow.forward")
                                 .font(.system(size: 12, weight: .bold))
                         }
                     }
@@ -693,6 +699,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Продолжение — внизу страницы"
         case .turkish: return TurkishLocalization.phrase("Continue below on this page")
+        case .arabic: return ArabicLocalization.phrase("Continue below on this page")
         case .indonesian, .malay, .english: return "Continue below on this page"
         case .uzbek: return "Davomi sahifa pastida"
         case .uzbekCyrillic: return "Давоми саҳифа пастида"
@@ -703,6 +710,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Выбор пакета — кнопкой внизу"
         case .turkish: return TurkishLocalization.phrase("Choose this package with the button below")
+        case .arabic: return ArabicLocalization.phrase("Choose this package with the button below")
         case .indonesian, .malay, .english: return "Choose this package with the button below"
         case .uzbek: return "Paketni pastdagi tugma bilan tanlang"
         case .uzbekCyrillic: return "Пакетни пастдаги тугма билан танланг"
@@ -908,7 +916,7 @@ struct FinalPackageView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.tertiary)
                     Text(target)
@@ -1654,8 +1662,10 @@ struct FinalPackageView: View {
         case (.russian, .makkah): return "Мекка"
         case (.russian, .madinah): return "Медина"
         case (.turkish, .makkah): return TurkishLocalization.phrase("Makkah")
+        case (.arabic, .makkah): return ArabicLocalization.phrase("Makkah")
         case (.indonesian, .makkah), (.malay, .makkah), (.english, .makkah): return "Makkah"
         case (.turkish, .madinah): return TurkishLocalization.phrase("Madinah")
+        case (.arabic, .madinah): return ArabicLocalization.phrase("Madinah")
         case (.indonesian, .madinah), (.malay, .madinah), (.english, .madinah): return "Madinah"
         case (.uzbek, .makkah): return "Makka"
         case (.uzbek, .madinah): return "Madina"
@@ -1713,6 +1723,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -1805,6 +1816,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Мы проверим баланс цены и маршрута"
         case .turkish: return TurkishLocalization.phrase("We review the balance between price and itinerary")
+        case .arabic: return ArabicLocalization.phrase("We review the balance between price and itinerary")
         case .indonesian, .malay, .english: return "We review the balance between price and itinerary"
         case .uzbek: return "Narx va yo‘nalish muvozanatini tekshiramiz"
         case .uzbekCyrillic: return "Нарх ва йўналиш мувозанатини текширамиз"
@@ -1815,6 +1827,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Если текущая цена выше ожидаемой или даты гибкие, специалисты iumrah Care дополнительно проверят более удобные прямые рейсы, логичное распределение ночей и отели ближе к ключевым местам — без потери качества поездки."
         case .turkish: return TurkishLocalization.phrase("If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey.")
+        case .arabic: return ArabicLocalization.phrase("If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey.")
         case .indonesian, .malay, .english: return "If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey."
         case .uzbek: return "Agar joriy narx kutilganidan yuqori bo‘lsa yoki sanalaringiz moslashuvchan bo‘lsa, iumrah Care qulayroq to‘g‘ridan-to‘g‘ri reyslar, tunlarning mantiqiy taqsimoti va yaqinroq mehmonxonalarni qo‘shimcha tekshiradi."
         case .uzbekCyrillic: return "Агар жорий нарх кутилганидан юқори бўлса ёки саналарингиз мослашувчан бўлса, iumrah Care қулайроқ тўғридан-тўғри рейслар, тунларнинг мантиқий тақсимоти ва яқинроқ меҳмонхоналарни қўшимча текширади."
@@ -1825,6 +1838,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Как это работает"
         case .turkish: return TurkishLocalization.phrase("How it works")
+        case .arabic: return ArabicLocalization.phrase("How it works")
         case .indonesian, .malay, .english: return "How it works"
         case .uzbek: return "Qanday ishlaydi"
         case .uzbekCyrillic: return "Қандай ишлайди"
@@ -1974,6 +1988,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Выберите актуальный маршрут. Система автоматически свяжет его с вашим Umrah-пакетом."
         case .turkish: return TurkishLocalization.phrase("Select a current itinerary. The system will automatically connect it to your Umrah package.")
+        case .arabic: return ArabicLocalization.phrase("Select a current itinerary. The system will automatically connect it to your Umrah package.")
         case .indonesian, .malay, .english: return "Select a current itinerary. The system will automatically connect it to your Umrah package."
         case .uzbek: return "Joriy yo‘nalishni tanlang. Tizim uni Umra paketingiz bilan avtomatik bog‘laydi."
         case .uzbekCyrillic: return "Жорий йўналишни танланг. Тизим уни Умра пакетингиз билан автоматик боғлайди."
@@ -1984,6 +1999,7 @@ struct FinalPackageView: View {
         switch settings.language {
         case .russian: return "Цена вашего Umrah-пакета"
         case .turkish: return TurkishLocalization.phrase("Your Umrah package price")
+        case .arabic: return ArabicLocalization.phrase("Your Umrah package price")
         case .indonesian, .malay, .english: return "Your Umrah package price"
         case .uzbek: return "Umra paketingiz narxi"
         case .uzbekCyrillic: return "Умра пакетингиз нархи"
@@ -2106,6 +2122,7 @@ private struct FinalPackageInformationSheet: View {
         switch language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy

@@ -21,6 +21,7 @@ struct IumrahLanguageSelectionSheet: View {
     private var availableLanguages: [LanguageOption] {
         [
             LanguageOption(language: .english, flag: "EN", nativeName: "English", subtitle: "Global · Latin"),
+            LanguageOption(language: .arabic, flag: "AR", nativeName: "العربية", subtitle: "العالم العربي · من اليمين إلى اليسار"),
             LanguageOption(language: .russian, flag: "RU", nativeName: "Русский", subtitle: "Россия · Кириллица"),
             LanguageOption(language: .turkish, flag: "TR", nativeName: "Türkçe", subtitle: "Türkiye · Latin"),
             LanguageOption(language: .indonesian, flag: "ID", nativeName: "Bahasa Indonesia", subtitle: "Indonesia · Latin"),
@@ -47,6 +48,7 @@ struct IumrahLanguageSelectionSheet: View {
         .safeAreaInset(edge: .bottom) {
             confirmBar
         }
+        .environment(\.layoutDirection, pendingLanguage.isRightToLeft ? .rightToLeft : .leftToRight)
         .onAppear {
             pendingLanguage = settings.language
         }
@@ -140,7 +142,7 @@ struct IumrahLanguageSelectionSheet: View {
                         .frame(height: 28)
                         .background(Color.primary.opacity(0.055), in: Capsule())
                 } else {
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.tertiary)
                 }
@@ -276,6 +278,8 @@ struct IumrahLanguageSelectionSheet: View {
         switch pendingLanguage {
         case .russian:
             return "Переключить на Русский"
+        case .arabic:
+            return "التغيير إلى العربية"
         case .english:
             return "Change to English"
         case .turkish:
@@ -294,6 +298,7 @@ struct IumrahLanguageSelectionSheet: View {
     private func localized(ru: String, en: String, tr: String, uz: String, uzCy: String) -> String {
         switch pendingLanguage {
         case .russian: return ru
+        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .turkish: return tr
         case .indonesian: return IndonesianLocalization.phrase(en)

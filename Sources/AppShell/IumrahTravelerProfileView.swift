@@ -206,7 +206,7 @@ struct IumrahTravelerProfileView: View {
                          ? (passportReady ? tr("Replace passport photo", "Заменить фото паспорта", "Pasport rasmini almashtirish", "Паспорт расмини алмаштириш") : tr("Choose passport photo", "Выбрать фото паспорта", "Pasport rasmini tanlash", "Паспорт расмини танлаш"))
                          : tr("Choose another photo", "Выбрать другое фото", "Boshqa rasm tanlash", "Бошқа расм танлаш"))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                 }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
@@ -225,7 +225,7 @@ struct IumrahTravelerProfileView: View {
                         Image(systemName: "arrow.up.doc.fill")
                         Text(tr("Attach passport", "Прикрепить паспорт", "Pasportni biriktirish", "Паспортни бириктириш"))
                         Spacer()
-                        Image(systemName: "arrow.right")
+                        Image(systemName: "arrow.forward")
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
@@ -493,6 +493,7 @@ struct IumrahTravelerProfileView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

@@ -734,7 +734,7 @@ struct IumrahSecurityConfirmationView: View {
                          ? tr("Replace passport photo", "Заменить фото паспорта", "Pasport rasmini almashtirish", "Паспорт расмини алмаштириш")
                          : tr("Attach passport photo", "Прикрепить фото паспорта", "Pasport rasmini biriktirish", "Паспорт расмини бириктириш"))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.bold))
                 }
                 .font(.subheadline.weight(.semibold))
@@ -800,7 +800,7 @@ struct IumrahSecurityConfirmationView: View {
                     "Хавфсизлик текширувини бошлаш"
                 ))
                 Spacer()
-                Image(systemName: "arrow.right")
+                Image(systemName: "arrow.forward")
             }
             .font(.headline)
             .padding(.horizontal, 18)
@@ -1354,6 +1354,7 @@ struct IumrahSecurityConfirmationView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ uzCyrl: String) -> String {
         switch settings.language {
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .russian: return ru
         case .uzbek: return uz

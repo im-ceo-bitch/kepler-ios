@@ -1795,6 +1795,11 @@ const ACCOUNT_EMAIL_COPY = {
     verifyLead: "E-posta doğrulama kodunuz:", resetLead: "Şifre sıfırlama kodunuz:",
     warning: "Bu kod 10 dakika geçerlidir. Kodunuzu kimseyle paylaşmayın. Bu kodu siz istemediyseniz e-postayı dikkate almayın.",
   },
+  ar: {
+    verify: "تأكيد البريد الإلكتروني في iumrah", reset: "إعادة تعيين كلمة مرور iumrah",
+    verifyLead: "رمز تأكيد البريد الإلكتروني:", resetLead: "رمز إعادة تعيين كلمة المرور:",
+    warning: "تنتهي صلاحية هذا الرمز بعد 10 دقائق. لا تشاركه مع أي شخص. إذا لم تطلب الرمز، فتجاهل هذه الرسالة.",
+  },
   id: {
     verify: "Verifikasi email iumrah Anda", reset: "Atur ulang kata sandi iumrah Anda",
     verifyLead: "Kode verifikasi email Anda:", resetLead: "Kode pengaturan ulang kata sandi Anda:",
@@ -1808,7 +1813,7 @@ function accountEmailLocale(locale: string): AccountEmailLocale {
   const normalized = String(locale || "en").trim().toLowerCase().replace(/_/g, "-");
   if (normalized.startsWith("uz-cyrl")) return "uz-cyrl";
   const primary = normalized.split("-")[0];
-  return primary === "ru" || primary === "en" || primary === "uz" || primary === "tr" || primary === "id" ? primary : "en";
+  return primary === "ru" || primary === "en" || primary === "uz" || primary === "tr" || primary === "id" || primary === "ar" ? primary : "en";
 }
 
 function emailCopy(code: string, purpose: "verify_email" | "reset_password", locale: string) {
@@ -1819,7 +1824,7 @@ function emailCopy(code: string, purpose: "verify_email" | "reset_password", loc
   return {
     subject: title,
     text: `${lead}\n\n${code}\n\n${warning}`,
-    html: `<!doctype html><html lang="${accountEmailLocale(locale)}"><body style="margin:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#111"><div style="max-width:520px;margin:32px auto;background:#fff;border-radius:28px;padding:32px"><div style="font-size:18px;font-weight:700">iumrah</div><h1 style="font-size:26px;margin:28px 0 12px">${title}</h1><p style="color:#62676d;line-height:1.5">${lead}</p><div style="font-size:36px;font-weight:750;letter-spacing:9px;padding:18px 0">${code}</div><p style="color:#62676d;line-height:1.5">${warning}</p></div></body></html>`,
+    html: `<!doctype html><html lang="${accountEmailLocale(locale)}" dir="${accountEmailLocale(locale) === "ar" ? "rtl" : "ltr"}"><body style="margin:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#111"><div style="max-width:520px;margin:32px auto;background:#fff;border-radius:28px;padding:32px"><div style="font-size:18px;font-weight:700">iumrah</div><h1 style="font-size:26px;margin:28px 0 12px">${title}</h1><p style="color:#62676d;line-height:1.5">${lead}</p><div dir="ltr" style="font-size:36px;font-weight:750;letter-spacing:9px;padding:18px 0">${code}</div><p style="color:#62676d;line-height:1.5">${warning}</p></div></body></html>`,
   };
 }
 

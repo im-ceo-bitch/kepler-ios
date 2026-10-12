@@ -66,6 +66,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Перелёт"
         case .turkish: return TurkishLocalization.phrase("Flight")
+        case .arabic: return ArabicLocalization.phrase("Flight")
         case .indonesian, .malay, .english: return "Flight"
         case .uzbek: return "Parvoz"
         case .uzbekCyrillic: return "Парвоз"
@@ -76,6 +77,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Номер уточняется"
         case .turkish: return TurkishLocalization.phrase("Flight number pending")
+        case .arabic: return ArabicLocalization.phrase("Flight number pending")
         case .indonesian, .malay, .english: return "Flight number pending"
         case .uzbek: return "Reys raqami aniqlanmoqda"
         case .uzbekCyrillic: return "Рейс рақами аниқланмоқда"
@@ -238,6 +240,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Рейс \(number)"
         case .turkish: return TurkishLocalization.phrase("Flight \(number)")
+        case .arabic: return ArabicLocalization.phrase("Flight \(number)")
         case .indonesian, .malay, .english: return "Flight \(number)"
         case .uzbek: return "Reys \(number)"
         case .uzbekCyrillic: return "Рейс \(number)"
@@ -248,6 +251,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Маршрут"
         case .turkish: return TurkishLocalization.phrase("Itinerary")
+        case .arabic: return ArabicLocalization.phrase("Itinerary")
         case .indonesian, .malay, .english: return "Itinerary"
         case .uzbek: return "Yo‘nalish"
         case .uzbekCyrillic: return "Йўналиш"
@@ -258,6 +262,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Пересадка · \(city)"
         case .turkish: return TurkishLocalization.phrase("Connection · \(city)")
+        case .arabic: return ArabicLocalization.phrase("Connection · \(city)")
         case .indonesian, .malay, .english: return "Connection · \(city)"
         case .uzbek: return "Ulanish · \(city)"
         case .uzbekCyrillic: return "Уланиш · \(city)"
@@ -294,6 +299,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Условия перелёта"
         case .turkish: return TurkishLocalization.phrase("Flight conditions")
+        case .arabic: return ArabicLocalization.phrase("Flight conditions")
         case .indonesian, .malay, .english: return "Flight conditions"
         case .uzbek: return "Parvoz shartlari"
         case .uzbekCyrillic: return "Парвоз шартлари"
@@ -304,6 +310,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Выбранный перелёт уже учтён в общей цене пакета. Здесь показаны только детали маршрута."
         case .turkish: return TurkishLocalization.phrase("Your selected flight is already included in the package total. Only itinerary details are shown here.")
+        case .arabic: return ArabicLocalization.phrase("Your selected flight is already included in the package total. Only itinerary details are shown here.")
         case .indonesian, .malay, .english: return "Your selected flight is already included in the package total. Only itinerary details are shown here."
         case .uzbek: return "Tanlangan reys paketning umumiy narxiga kiritilgan. Bu yerda faqat yo‘nalish tafsilotlari ko‘rsatiladi."
         case .uzbekCyrillic: return "Танланган рейс пакетнинг умумий нархига киритилган. Бу ерда фақат йўналиш тафсилотлари кўрсатилади."
@@ -324,6 +331,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return carryOn ? "Ручная кладь" : "Багаж"
         case .turkish: return carryOn ? "Kabin bagajı" : "Kayıtlı bagaj"
+        case .arabic: return carryOn ? "أمتعة يدوية" : "أمتعة مسجلة"
         case .indonesian, .malay, .english: return carryOn ? "Carry-on" : "Checked baggage"
         case .uzbek: return carryOn ? "Qo‘l yuki" : "Bagaj"
         case .uzbekCyrillic: return carryOn ? "Қўл юки" : "Багаж"
@@ -334,6 +342,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Пересадка"
         case .turkish: return TurkishLocalization.phrase("Connection")
+        case .arabic: return ArabicLocalization.phrase("Connection")
         case .indonesian, .malay, .english: return "Connection"
         case .uzbek: return "Ulanish"
         case .uzbekCyrillic: return "Уланиш"
@@ -343,6 +352,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Самостоятельная пересадка"
         case .turkish: return TurkishLocalization.phrase("Self-transfer")
+        case .arabic: return ArabicLocalization.phrase("Self-transfer")
         case .indonesian, .malay, .english: return "Self-transfer"
         case .uzbek: return "Mustaqil transfer"
         case .uzbekCyrillic: return "Мустақил трансфер"
@@ -352,6 +362,7 @@ struct FlightDetailsView: View {
         switch settings.language {
         case .russian: return "Не требуется"
         case .turkish: return TurkishLocalization.phrase("Not required")
+        case .arabic: return ArabicLocalization.phrase("Not required")
         case .indonesian, .malay, .english: return "Not required"
         case .uzbek: return "Talab qilinmaydi"
         case .uzbekCyrillic: return "Талаб қилинмайди"
@@ -377,6 +388,7 @@ struct FlightDetailsView: View {
             switch settings.language {
             case .russian: return "Время по данным источника"
             case .turkish: return TurkishLocalization.phrase("Duration from source")
+            case .arabic: return ArabicLocalization.phrase("Duration from source")
             case .indonesian, .malay, .english: return "Duration from source"
             case .uzbek: return "Vaqt manba ma’lumotida"
             case .uzbekCyrillic: return "Вақт манба маълумотида"

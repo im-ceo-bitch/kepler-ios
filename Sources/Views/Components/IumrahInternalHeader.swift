@@ -113,6 +113,7 @@ private struct GeneratorProgressStrip: View {
         switch settings.language {
         case .russian: return "ТЕКУЩАЯ ЦЕНА"
         case .turkish: return TurkishLocalization.phrase("CURRENT TOTAL")
+        case .arabic: return ArabicLocalization.phrase("CURRENT TOTAL")
         case .indonesian, .malay, .english: return "CURRENT TOTAL"
         case .uzbek: return "JORIY NARX"
         case .uzbekCyrillic: return "ЖОРИЙ НАРХ"
@@ -398,7 +399,7 @@ struct IumrahGeneratorHeader: View {
                 IumrahHaptics.selection()
                 dismiss()
             } label: {
-                Image(systemName: "chevron.left")
+                Image(systemName: "chevron.backward")
                     .font(.system(size: 18, weight: .semibold))
                     .frame(width: 40, height: 40)
                     .contentShape(Circle())
@@ -410,7 +411,7 @@ struct IumrahGeneratorHeader: View {
                 IumrahHaptics.selection()
                 dismiss()
             } label: {
-                Image(systemName: "chevron.left")
+                Image(systemName: "chevron.backward")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(Color.primary)
                     .frame(width: 40, height: 40)
@@ -427,6 +428,7 @@ struct IumrahGeneratorHeader: View {
         switch settings.language {
         case .russian: return "Назад"
         case .turkish: return TurkishLocalization.phrase("Back")
+        case .arabic: return ArabicLocalization.phrase("Back")
         case .indonesian, .malay, .english: return "Back"
         case .uzbek: return "Orqaga"
         case .uzbekCyrillic: return "Орқага"

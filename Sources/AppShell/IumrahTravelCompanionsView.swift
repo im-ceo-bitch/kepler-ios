@@ -224,7 +224,7 @@ struct IumrahTravelCompanionsView: View {
                          ? tr("Review passport", "Проверить паспорт", "Pasportni tekshirish", "Паспортни текшириш")
                          : tr("Attach passport", "Прикрепить паспорт", "Pasportni biriktirish", "Паспортни бириктириш"))
                     Spacer()
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
@@ -333,6 +333,7 @@ struct IumrahTravelCompanionsView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

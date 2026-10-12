@@ -261,7 +261,7 @@ struct IumrahAccountContactSecurityView: View {
                         "Ҳеч бир тасдиқлаш усулига кириш йўқми?"
                     ))
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.forward")
                         .font(.caption.weight(.bold))
                 }
                 .font(.caption.weight(.semibold))
@@ -465,7 +465,7 @@ struct IumrahAccountContactSecurityView: View {
                     Image(systemName: "person.crop.circle.badge.checkmark")
                     Text(tr("Continue with Google", "Продолжить через Google", "Google orqali davom etish", "Google орқали давом этиш"))
                     Spacer(minLength: 8)
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -998,6 +998,7 @@ struct IumrahAccountContactSecurityView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -1056,7 +1057,7 @@ private struct IumrahAccountRecoveryHelpView: View {
                             Image(systemName: "heart.fill")
                             Text(tr("Open iumrah Care", "Открыть iumrah Care", "iumrah Care’ni ochish", "iumrah Care’ни очиш"))
                             Spacer(minLength: 8)
-                            Image(systemName: "arrow.right")
+                            Image(systemName: "arrow.forward")
                         }
                     }
                     .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1118,6 +1119,7 @@ private struct IumrahAccountRecoveryHelpView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -1360,6 +1362,7 @@ struct IumrahTrustedDeviceVerificationView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

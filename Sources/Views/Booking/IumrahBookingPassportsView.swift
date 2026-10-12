@@ -151,7 +151,7 @@ struct IumrahBookingPassportsView: View {
             }
 
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
+            Image(systemName: "chevron.forward")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
@@ -199,6 +199,7 @@ struct IumrahBookingPassportsView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

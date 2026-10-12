@@ -129,7 +129,7 @@ struct IumrahPasswordRecoveryView: View {
                     if isWorking { ProgressView().tint(.white) }
                     Text(tr("Send recovery code", "Отправить код", "Tiklash kodini yuborish", "Тиклаш кодини юбориш"))
                     Spacer()
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -170,7 +170,7 @@ struct IumrahPasswordRecoveryView: View {
                 HStack {
                     Text(tr("Continue", "Продолжить", "Davom etish", "Давом этиш"))
                     Spacer()
-                    Image(systemName: "arrow.right")
+                    Image(systemName: "arrow.forward")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -327,6 +327,7 @@ struct IumrahPasswordRecoveryView: View {
         switch settings.language {
         case .russian: return ru
         case .turkish: return TurkishLocalization.phrase(en)
+        case .arabic: return ArabicLocalization.phrase(en)
         case .indonesian, .malay, .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

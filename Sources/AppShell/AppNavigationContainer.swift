@@ -36,17 +36,11 @@ struct AppNavigationContainer<Content: View>: View {
             Color.iumrahPageBackground
                 .ignoresSafeArea()
 
-            if chrome.isImmersiveMode {
-                // Maps, route guidance and Umrah guidance deliberately receive the
-                // complete canvas. The adaptive shell also hides its sidebar while
-                // this flag is active.
-                navigationStack
-            } else {
-                // Feed/detail screens stay readable on a 14–16" Mac instead of
-                // becoming edge-to-edge phone layouts. Compact iPhone is a no-op.
-                navigationStack
-                    .iumrahAdaptiveReadableWidth()
-            }
+            // CRITICAL: Always retain ONE NavigationStack identity. Previously
+            // setImmersive(true) swapped two branches, dismissing Umrah Flow right
+            // after the language picker and occasionally resetting other routes.
+            navigationStack
+                .iumrahAdaptiveReadableWidth(unconstrained: chrome.isImmersiveMode)
         }
     }
 

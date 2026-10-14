@@ -29,10 +29,7 @@ struct IumrahTelegramConnectCard: View {
                 ZStack {
                     Circle()
                         .fill(telegramBlue.opacity(style == .dark ? 0.22 : 0.12))
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: style == .compact ? 17 : 20, weight: .semibold))
-                        .foregroundStyle(style == .dark ? Color.white : telegramBlue)
-                        .offset(x: -1, y: 1)
+                    IumrahTelegramMark(size: style == .compact ? 31 : 36)
                 }
                 .frame(width: style == .compact ? 42 : 48, height: style == .compact ? 42 : 48)
 
@@ -71,7 +68,7 @@ struct IumrahTelegramConnectCard: View {
                         ProgressView()
                             .tint(.white)
                     } else {
-                        Image(systemName: "paperplane.fill")
+                        IumrahTelegramMark(size: 21)
                     }
                     Text(isLinked ? connectedTitle : (isConnecting ? connectingTitle : connectTitle))
                     Spacer(minLength: 8)
@@ -255,7 +252,7 @@ struct IumrahTelegramEntryCard: View {
                             .foregroundStyle(Color.black.opacity(0.58))
                             .fixedSize(horizontal: false, vertical: true)
                         HStack(spacing: 8) {
-                            Image(systemName: "paperplane.fill")
+                            IumrahTelegramMark(size: 21)
                             Text(cta)
                             Spacer(minLength: 8)
                             Image(systemName: "chevron.forward")

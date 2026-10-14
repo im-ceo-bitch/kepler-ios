@@ -102,10 +102,16 @@ struct CareHomeView: View {
 
     private func quickContactTile(_ icon: String, title: String, tint: Color, enabled: Bool) -> some View {
         VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .medium))
-                .foregroundStyle(enabled ? tint : Color.secondary)
-                .frame(height: 30)
+            Group {
+                if icon == "paperplane.fill" {
+                    IumrahTelegramMark(size: 34)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(enabled ? tint : Color.secondary)
+                }
+            }
+            .frame(height: 30)
             Text(title)
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .lineLimit(1)
@@ -262,10 +268,16 @@ struct CareHomeView: View {
                     .fill(neutralIconBackground)
                     .frame(width: 48, height: 48)
 
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(enabled ? Color.primary : Color.secondary.opacity(0.56))
+                Group {
+                    if icon == "paperplane.fill" {
+                        IumrahTelegramMark(size: 28)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 18, weight: .semibold))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(enabled ? Color.primary : Color.secondary.opacity(0.56))
+                    }
+                }
             }
 
             VStack(spacing: 2) {

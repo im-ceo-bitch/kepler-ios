@@ -136,9 +136,14 @@ struct CareContactInfoView: View {
                 if appearance.hapticsEnabled { IumrahHaptics.selection() }
                 action()
             } label: {
-                Image(systemName: icon)
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(enabled ? Color(uiColor: .systemBlue) : Color.secondary.opacity(0.40))
+                Group {
+                    if icon == "paperplane.fill" { IumrahTelegramMark(size: 33) }
+                    else {
+                        Image(systemName: icon)
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(enabled ? Color(uiColor: .systemBlue) : Color.secondary.opacity(0.40))
+                    }
+                }
                     .frame(width: 48, height: 48)
                     .background(Color(uiColor: .secondarySystemGroupedBackground), in: Circle())
                     .overlay {

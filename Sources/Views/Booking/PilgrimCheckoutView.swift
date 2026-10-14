@@ -2007,8 +2007,7 @@ private struct TravelerFormEditorSheet: View {
                                 : settings.telegram
                             if !telegram.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 HStack(spacing: 10) {
-                                    Image(systemName: "paperplane.fill")
-                                        .foregroundStyle(.secondary)
+                                    IumrahTelegramMark(size: 22)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Telegram")
                                             .font(.caption)

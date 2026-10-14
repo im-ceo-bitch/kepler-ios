@@ -1646,7 +1646,14 @@ struct BookingsHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 IumrahRootPageTitle(
                     title: L10n.text("tab_booking", settings.language),
-                    showsMakkahTime: true
+                    showsMakkahTime: false
+                )
+
+                // Available even before a booking exists: prayer times, weather,
+                // and dual world clocks. The same component serves active trips.
+                JourneyTravelInfoView(
+                    onOpenPrayer: { showBookingPrayers = true },
+                    onOpenWeather: { showBookingWeather = true }
                 )
 
                 bookingEmptyStatusCard

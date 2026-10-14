@@ -164,26 +164,24 @@ struct IumrahAdaptiveLayoutHost<Content: View>: View {
 private struct IumrahAdaptiveReadableWidthModifier: ViewModifier {
     @Environment(\.iumrahAdaptiveLayout) private var layout
     let detail: Bool
+    let unconstrained: Bool
 
-    @ViewBuilder
+    // A single structural branch, including when immersive state toggles.
+    // Keeping NavigationStack mounted preserves its destinations and sheet state.
     func body(content: Content) -> some View {
-        if layout.layoutClass == .compact {
-            content
-        } else {
-            content
-                .frame(
-                    maxWidth: detail ? layout.detailContentMaxWidth : layout.rootContentMaxWidth,
-                    alignment: .topLeading
-                )
-                .frame(maxWidth: .infinity, alignment: .top)
-        }
+        let maxWidth: CGFloat = (layout.layoutClass == .compact || unconstrained)
+            ? .infinity
+            : (detail ? layout.detailContentMaxWidth : layout.rootContentMaxWidth)
+        return content
+            .frame(maxWidth: maxWidth, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .top)
     }
 }
 
 extension View {
     /// Constrains feed-style content to a professional readable width on iPad/Mac
     /// while remaining a no-op for the compact iPhone composition.
-    func iumrahAdaptiveReadableWidth(detail: Bool = false) -> some View {
-        modifier(IumrahAdaptiveReadableWidthModifier(detail: detail))
+    func iumrahAdaptiveReadableWidth(detail: Bool = false, unconstrained: Bool = false) -> some View {
+        modifier(IumrahAdaptiveReadableWidthModifier(detail: detail, unconstrained: unconstrained))
     }
 }

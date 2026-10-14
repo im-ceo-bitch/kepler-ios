@@ -104,8 +104,13 @@ struct AccountNotificationsView: View {
             withAnimation(.snappy(duration: 0.28)) { selectedPage = page }
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: symbol)
-                    .font(.system(size: 12.5, weight: .semibold))
+                Group {
+                    if page == .telegram { IumrahTelegramMark(size: 20) }
+                    else {
+                        Image(systemName: symbol)
+                            .font(.system(size: 12.5, weight: .semibold))
+                    }
+                }
                 Text(title)
                     .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                     .lineLimit(1)
@@ -183,9 +188,7 @@ struct AccountNotificationsView: View {
                 )
             } else {
                 VStack(alignment: .leading, spacing: 12) {
-                    Image(systemName: "paperplane.circle.fill")
-                        .font(.system(size: 42))
-                        .foregroundStyle(Color(red: 0.15, green: 0.64, blue: 0.91))
+                    IumrahTelegramMark(size: 58)
                     Text(tr("No booking to connect yet", "Пока нет бронирования для подключения", "Ulash uchun bron hali yo‘q", "Улаш учун брон ҳали йўқ"))
                         .font(.headline)
                     Text(tr(

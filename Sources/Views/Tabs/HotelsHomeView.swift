@@ -19,30 +19,34 @@ struct HotelsHomeView: View {
     @State private var packageAssemblyExpanded = false
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 22) {
-                IumrahRootPageTitle(title: pageTitle)
-                    .padding(.top, 10)
+        // GeometryReader constrains all hotel sections to the same safe content
+        // width used by the flight feed, including wide hero images and carousels.
+        GeometryReader { viewport in
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 22) {
+                    IumrahRootPageTitle(title: pageTitle)
+                        .padding(.top, 10)
 
-                if board != .flights {
-                    AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
-                }
+                    if board != .flights {
+                        AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
+                    }
 
-                HStack(spacing: 10) {
-                    boardTile(.hotels, icon: "building.2.fill", title: L10n.text("tab_hotels", settings.language))
-                    boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
-                    boardTile(.sundayClub, icon: "sun.max.fill", title: L10n.text("hotel_storefront_weekend", settings.language))
-                }
+                    HStack(spacing: 10) {
+                        boardTile(.hotels, icon: "building.2.fill", title: L10n.text("tab_hotels", settings.language))
+                        boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
+                        boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
+                    }
 
-                switch board {
-                case .hotels: hotelsBoard
-                case .flights: flightsBoard
-                case .sundayClub: sundayClubBoard
+                    switch board {
+                    case .hotels: hotelsBoard
+                    case .flights: flightsBoard
+                    case .sundayClub: sundayClubBoard
+                    }
                 }
+                .frame(width: max(0, viewport.size.width - 2 * IumrahDesign.pagePadding), alignment: .topLeading)
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, 110)
             }
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.bottom, 110)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .refreshable {
             await storefront.updateDepartureAirport(journey.trip.originCode)
@@ -140,6 +144,12 @@ struct HotelsHomeView: View {
 
     private func boardTile(_ target: HotelsShowcaseBoard, icon: String, title: String) -> some View {
         let active = board == target
+        let tint: Color
+        switch target {
+        case .hotels: tint = Color.orange
+        case .flights: tint = Color.blue
+        case .sundayClub: tint = Color.green
+        }
         return Button {
             withAnimation(.snappy(duration: 0.26)) { board = target }
             IumrahHaptics.selection()
@@ -153,16 +163,16 @@ struct HotelsHomeView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .foregroundStyle(active ? Color.iumrahPrimaryButtonText : Color.primary)
+            .foregroundStyle(active ? Color.white : tint)
             .frame(maxWidth: .infinity)
             .frame(height: 94)
             .background {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(active ? Color.iumrahPrimaryButtonBackground : Color.iumrahCardBackground)
+                    .fill(active ? tint : Color.iumrahCardBackground)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(active ? 0 : 0.06), lineWidth: 0.7)
+                    .strokeBorder(tint.opacity(active ? 0 : 0.16), lineWidth: 0.8)
             }
         }
         .buttonStyle(.plain)
@@ -4570,7 +4580,8 @@ private struct StorefrontPackageInformationSheet: View {
 
             Link(destination: URL(string: "https://t.me/saudiclub966")!) {
                 HStack {
-                    Label(tr("Написать Абдулазизу", "Message Abdulaziz", "Abdulazizga yozish", "Абдулазизга ёзиш"), systemImage: "paperplane.fill")
+                    IumrahTelegramMark(size: 23)
+                    Text(tr("Написать Абдулазизу", "Message Abdulaziz", "Abdulazizga yozish", "Абдулазизга ёзиш"))
                     Spacer()
                     Text("Telegram")
                         .font(.caption.weight(.semibold))
@@ -4806,7 +4817,8 @@ struct HotelCareContactSheet: View {
 
     private func contactRow(icon: String, title: String, value: String) -> some View {
         HStack(spacing: 14) {
-            IumrahIconBadge(systemName: icon, role: .care, size: 46, symbolSize: 18, cornerRadius: 15)
+            if icon == "paperplane.fill" { IumrahTelegramMark(size: 42).frame(width: 46, height: 46) }
+            else { IumrahIconBadge(systemName: icon, role: .care, size: 46, symbolSize: 18, cornerRadius: 15) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline).foregroundStyle(.primary)
                 Text(value).font(.subheadline).foregroundStyle(.secondary)

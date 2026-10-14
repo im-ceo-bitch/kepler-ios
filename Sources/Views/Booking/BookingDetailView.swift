@@ -1230,7 +1230,8 @@ struct BookingDetailView: View {
     private func careContactButton(title: String, icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: icon)
+                if icon == "paperplane.fill" { IumrahTelegramMark(size: 22) }
+                else { Image(systemName: icon) }
                 Text(title).lineLimit(1)
                 Spacer(minLength: 0)
             }

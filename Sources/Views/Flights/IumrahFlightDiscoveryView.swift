@@ -61,10 +61,12 @@ struct IumrahFlightDiscoveryView: View {
             if searchMode == .globalSearch {
                 tripTypePicker
                 discoveryActions
-                if hasSearched && rankedOffers.count < 6 && !nearbyCalendarDeals.isEmpty {
+                searchResultsSection
+                // Place flexible dates after every result (even large result sets),
+                // and ahead of any ready-made package content below this component.
+                if hasSearched && !nearbyCalendarDeals.isEmpty {
                     nearbyDealsSection
                 }
-                searchResultsSection
                 if hasSearched && !rankedOffers.isEmpty { dataSourceNote }
             } else {
                 recommendedFlightsSection

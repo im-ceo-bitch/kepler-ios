@@ -466,7 +466,8 @@ struct IumrahGuideTransferView: View {
     private func contactButton(title: String, systemName: String, tint: Color, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: systemName)
+                if systemName == "paperplane.fill" { IumrahTelegramMark(size: 22) }
+                else { Image(systemName: systemName) }
                 Text(title)
                     .lineLimit(1)
                 Spacer(minLength: 0)

@@ -955,7 +955,8 @@ struct IumrahAccountView: View {
 
     private func accountSummaryRow(icon: String, role: IumrahIconRole, title: String, value: String) -> some View {
         HStack(spacing: 12) {
-            IumrahIconBadge(systemName: icon, role: role, size: 38, symbolSize: 14, cornerRadius: 12)
+            if role == .telegram { IumrahTelegramMark(size: 36).frame(width: 38, height: 38) }
+            else { IumrahIconBadge(systemName: icon, role: role, size: 38, symbolSize: 14, cornerRadius: 12) }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption)

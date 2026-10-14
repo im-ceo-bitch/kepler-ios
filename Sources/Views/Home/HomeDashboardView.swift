@@ -64,9 +64,9 @@ struct HomeDashboardView: View {
                 await storefront.updateDepartureAirport(journey.trip.originCode)
             }
             .navigationDestination(isPresented: $showTravelInfo) {
-                JourneyTravelInfoScreen(initialPage: .weather)
+                IumrahWeatherFullScreenView()
                     .environmentObject(settings)
-                    .toolbar(.visible, for: .navigationBar)
+                    .toolbar(.hidden, for: .navigationBar)
                     .toolbar(.hidden, for: .tabBar)
             }
             .navigationDestination(isPresented: $showUmrahFlow) {

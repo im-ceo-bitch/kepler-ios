@@ -255,10 +255,50 @@ export async function publicAviasalesData(url: URL, env: Env): Promise<Response>
         return json({ ok: false, error: payload.error ?? "AVIASALES_DATA_ERROR" }, 502);
       }
 
-      const rows = Object.entries(payload.data ?? {})
-        .map(([date, item], index) => ({ date, ...normalizeOffer(item, index) }))
-        .filter((item) => item.price > 0 && item.departureAt.length > 0)
-        .sort((a, b) => a.date.localeCompare(b.date));
+      // grouped_prices may supply only the YYYY-MM-DD map key and a cached fare.
+      // Do not discard such days merely because flight-level departure_at is
+      // absent: the date and USD price are still valid *calendar observations*.
+      // The iOS client must not promote a date-only observation to a bookable flight.
+      const byDate = new Map<string, ReturnType<typeof normalizeOffer> & { date: string }>();
+      for (const [date, item] of Object.entries(payload.data ?? {})) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        if (!date.startsWith(departure)) continue;
+        const row = normalizeOffer(item, byDate.size);
+        if (!(row.price > 0)) continue;
+        const normalized = { ...row, date, origin: row.origin || origin, destination: row.destination || destination };
+        const existing = byDate.get(date);
+        if (!existing || existing.price > normalized.price) byDate.set(date, normalized);
+      }
+
+      // Supply genuinely observed date-specific Data API fares when grouped_prices
+      // has sparse months. No extrapolation, invented dates or synthetic fares.
+      if (byDate.size < 15) {
+        try {
+          const monthly = new URL("/aviasales/v3/prices_for_dates", API_ORIGIN);
+          monthly.searchParams.set("origin", origin);
+          monthly.searchParams.set("destination", destination);
+          monthly.searchParams.set("departure_at", departure);
+          monthly.searchParams.set("currency", currency);
+          monthly.searchParams.set("sorting", "price");
+          monthly.searchParams.set("unique", "false");
+          monthly.searchParams.set("one_way", "true");
+          monthly.searchParams.set("direct", direct ? "true" : "false");
+          monthly.searchParams.set("limit", "100");
+          const response = await travelpayoutsJSON<PricesEnvelope>(monthly, token);
+          for (const item of response.data ?? []) {
+            const day = String(item.departure_at ?? "").slice(0, 10);
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !day.startsWith(departure)) continue;
+            const normalized = normalizeOffer(item, byDate.size);
+            if (!(normalized.price > 0)) continue;
+            const row = { ...normalized, date: day, origin: normalized.origin || origin, destination: normalized.destination || destination };
+            const existing = byDate.get(day);
+            if (!existing || existing.price > row.price) byDate.set(day, row);
+          }
+        } catch {
+          // A partial upstream outage must not erase a valid grouped_prices month.
+        }
+      }
+      const rows = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 
       return json({
         ok: true,

@@ -19,45 +19,34 @@ struct HotelsHomeView: View {
     @State private var packageAssemblyExpanded = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            IumrahRootPageTitle(title: pageTitle)
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 22) {
+                IumrahRootPageTitle(title: pageTitle)
+                    .padding(.top, 10)
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
-                    if board != .flights {
-                        AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
-                    }
-
-                    Picker(L10n.text("hotel_storefront_section", settings.language), selection: $board) {
-                    Text(L10n.text("tab_hotels", settings.language)).tag(HotelsShowcaseBoard.hotels)
-                    Text(L10n.text("hotel_storefront_flights", settings.language)).tag(HotelsShowcaseBoard.flights)
-                    Text(L10n.text("hotel_storefront_weekend", settings.language)).tag(HotelsShowcaseBoard.sundayClub)
+                if board != .flights {
+                    AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
                 }
-                .pickerStyle(.segmented)
-                .onChange(of: board) { _, _ in IumrahHaptics.selection() }
+
+                HStack(spacing: 10) {
+                    boardTile(.hotels, icon: "building.2.fill", title: L10n.text("tab_hotels", settings.language))
+                    boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
+                    boardTile(.sundayClub, icon: "sun.max.fill", title: L10n.text("hotel_storefront_weekend", settings.language))
+                }
 
                 switch board {
-                case .hotels:
-                    hotelsBoard
-                case .flights:
-                    flightsBoard
-                case .sundayClub:
-                    sundayClubBoard
+                case .hotels: hotelsBoard
+                case .flights: flightsBoard
+                case .sundayClub: sundayClubBoard
                 }
-
             }
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 6)
-                .padding(.bottom, board == .hotels ? 30 : 96)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .refreshable {
-                await storefront.updateDepartureAirport(journey.trip.originCode)
-                await storefront.refresh()
-            }
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.bottom, 110)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .refreshable {
+            await storefront.updateDepartureAirport(journey.trip.originCode)
+            await storefront.refresh()
         }
         .background(Color.iumrahPageBackground)
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -147,6 +136,36 @@ struct HotelsHomeView: View {
         } message: {
             Text(packageShareError ?? "")
         }
+    }
+
+    private func boardTile(_ target: HotelsShowcaseBoard, icon: String, title: String) -> some View {
+        let active = board == target
+        return Button {
+            withAnimation(.snappy(duration: 0.26)) { board = target }
+            IumrahHaptics.selection()
+        } label: {
+            VStack(spacing: 9) {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .semibold))
+                    .frame(height: 27)
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(active ? Color.iumrahPrimaryButtonText : Color.primary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 94)
+            .background {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(active ? Color.iumrahPrimaryButtonBackground : Color.iumrahCardBackground)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(active ? 0 : 0.06), lineWidth: 0.7)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func applyRequestedBoard() {

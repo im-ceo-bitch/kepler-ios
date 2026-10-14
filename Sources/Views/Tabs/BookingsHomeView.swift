@@ -17,6 +17,8 @@ struct BookingsHomeView: View {
 
     @State private var pendingDeleteID: String?
     @State private var deleteError: String?
+    @State private var showBookingPrayers = false
+    @State private var showBookingWeather = false
     @State private var showZiyarats = false
     @State private var showCareRequestBuilder = false
     @State private var bookingPanel: BookingPanel = .booking
@@ -100,6 +102,12 @@ struct BookingsHomeView: View {
                 EmptyView()
             }
         }
+        .fullScreenCover(isPresented: $showBookingPrayers) {
+            IumrahPrayerTimesView().environmentObject(settings)
+        }
+        .sheet(isPresented: $showBookingWeather) {
+            IumrahWeatherFullScreenView().environmentObject(settings)
+        }
         .navigationDestination(isPresented: $showZiyarats) {
             ZiyaratJourneyView()
                 .environmentObject(settings)
@@ -122,7 +130,7 @@ struct BookingsHomeView: View {
                 )
                 .padding(.bottom, 16)
 
-                JourneyTravelInfoView()
+                JourneyTravelInfoView(onOpenPrayer: { showBookingPrayers = true }, onOpenWeather: { showBookingWeather = true })
                     .padding(.bottom, 18)
 
                 bookingPanelPicker

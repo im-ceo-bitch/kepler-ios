@@ -25,6 +25,9 @@ struct CareHomeView: View {
                 IumrahRootPageTitle(title: "iumrah Care")
                     .padding(.bottom, 14)
 
+                careQuickContacts
+                    .padding(.bottom, 24)
+
                 intro
                     .padding(.bottom, 24)
 
@@ -67,6 +70,55 @@ struct CareHomeView: View {
         .task {
             await refreshCare()
         }
+    }
+
+    // Direct support controls are always shown directly beneath the header.
+    // Booking chat remains available only with a valid booking session.
+    private var careQuickContacts: some View {
+        HStack(spacing: 11) {
+            Button(action: openPhone) {
+                quickContactTile("phone.fill", title: tr("Call", "Позвонить", "Qo‘ng‘iroq", "Қўнғироқ"), tint: .green, enabled: !preferredPhone.isEmpty)
+            }
+            .disabled(preferredPhone.isEmpty)
+
+            Button(action: openTelegram) {
+                quickContactTile("paperplane.fill", title: "Telegram", tint: .blue, enabled: telegramURL != nil)
+            }
+            .disabled(telegramURL == nil)
+
+            if let activeSession {
+                NavigationLink {
+                    BookingChatView(bookingID: activeSession.id)
+                } label: {
+                    quickContactTile("bubble.left.and.bubble.right.fill", title: tr("Chat", "Чат", "Chat", "Чат"), tint: .primary, enabled: true)
+                }
+            } else {
+                quickContactTile("bubble.left.and.bubble.right.fill", title: tr("Chat", "Чат", "Chat", "Чат"), tint: .secondary, enabled: false)
+                    .accessibilityAddTraits(.isStaticText)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func quickContactTile(_ icon: String, title: String, tint: Color, enabled: Bool) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(enabled ? tint : Color.secondary)
+                .frame(height: 30)
+            Text(title)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 105)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 25, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                .strokeBorder(tint.opacity(enabled ? 0.22 : 0.06), lineWidth: 1)
+        }
+        .opacity(enabled ? 1 : 0.48)
     }
 
     // MARK: - Intro

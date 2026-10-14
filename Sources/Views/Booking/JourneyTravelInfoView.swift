@@ -114,9 +114,13 @@ struct JourneyTravelInfoView: View {
     @AppStorage("iumrah.booking.travelInfo.city") private var selectedCityRaw = IumrahHolyCity.makkah.rawValue
     @StateObject private var model = JourneyTravelInfoModel()
     @State private var page: JourneyInfoPage = .prayer
+    var onOpenPrayer: (() -> Void)? = nil
+    var onOpenWeather: (() -> Void)? = nil
 
-    init(initialPage: JourneyInfoPage = .prayer) {
+    init(initialPage: JourneyInfoPage = .prayer, onOpenPrayer: (() -> Void)? = nil, onOpenWeather: (() -> Void)? = nil) {
         _page = State(initialValue: initialPage)
+        self.onOpenPrayer = onOpenPrayer
+        self.onOpenWeather = onOpenWeather
     }
 
     private var city: IumrahHolyCity {
@@ -129,8 +133,14 @@ struct JourneyTravelInfoView: View {
 
             TabView(selection: $page) {
                 PrayerTimesCard(city: city, day: model.prayers, isRefreshing: model.isRefreshing)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onOpenPrayer?() }
+                    .accessibilityAddTraits(onOpenPrayer == nil ? [] : .isButton)
                     .tag(JourneyInfoPage.prayer)
                 WeatherForecastCard(city: city, forecast: model.weather, isRefreshing: model.isRefreshing)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onOpenWeather?() }
+                    .accessibilityAddTraits(onOpenWeather == nil ? [] : .isButton)
                     .tag(JourneyInfoPage.weather)
                 DualWorldClockCard(city: city, localCityName: model.localCityName)
                     .tag(JourneyInfoPage.clocks)
@@ -885,6 +895,7 @@ struct IumrahWeatherSnapshot: Codable, Hashable {
     let currentTemperature: Double
     let currentCondition: IumrahWeatherCondition
     let days: [IumrahWeatherDay]
+    let hourly: [IumrahWeatherHour]?
     let fetchedAt: Date
 
     func updatedLabel(language: AppSettingsStore.Language, timeZone: TimeZone) -> String {
@@ -900,6 +911,13 @@ struct IumrahWeatherSnapshot: Codable, Hashable {
         case .uzbekCyrillic: return "янгиланди \(formatter.string(from: fetchedAt))"
         }
     }
+}
+
+struct IumrahWeatherHour: Codable, Hashable, Identifiable {
+    let date: Date
+    let temperature: Double
+    let condition: IumrahWeatherCondition
+    var id: Date { date }
 }
 
 struct IumrahWeatherDay: Identifiable, Codable, Hashable {
@@ -1080,7 +1098,17 @@ private actor IumrahWeatherService {
         let currentTemp = current.data.instant.details.airTemperature
         let currentCondition = IumrahWeatherCondition.fromMET(current.data.next1Hours?.summary.symbolCode ?? current.data.next6Hours?.summary.symbolCode)
         let days = aggregateDays(decoded.properties.timeseries, city: city)
-        return IumrahWeatherSnapshot(city: city, currentTemperature: currentTemp, currentCondition: currentCondition, days: days, fetchedAt: Date())
+        let hours = decoded.properties.timeseries
+            .filter { $0.time >= Date().addingTimeInterval(-3600) }
+            .prefix(24)
+            .map { entry in
+                IumrahWeatherHour(
+                    date: entry.time,
+                    temperature: entry.data.instant.details.airTemperature,
+                    condition: .fromMET(entry.data.next1Hours?.summary.symbolCode ?? entry.data.next6Hours?.summary.symbolCode)
+                )
+            }
+        return IumrahWeatherSnapshot(city: city, currentTemperature: currentTemp, currentCondition: currentCondition, days: days, hourly: hours, fetchedAt: Date())
     }
 
     private func aggregateDays(_ series: [METTimeSeries], city: IumrahHolyCity) -> [IumrahWeatherDay] {
@@ -1199,6 +1227,164 @@ struct JourneyTravelInfoScreen: View {
         case .malay: return "Makkah dan Madinah · cuaca, solat, waktu"
         case .arabic: return ArabicLocalization.phrase("Makkah and Madinah · forecast, prayer and clocks")
         case .english: return "Makkah and Madinah · forecast, prayer and clocks"
+        }
+    }
+}
+
+
+// Full-page, city-specific weather. All observations are received from MET Norway;
+// unknown hours/days are never populated with synthetic temperatures.
+struct IumrahWeatherFullScreenView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: AppSettingsStore
+    @StateObject private var model = JourneyTravelInfoModel()
+    @AppStorage("iumrah.booking.travelInfo.city") private var selectedCityRaw = IumrahHolyCity.makkah.rawValue
+
+    private var city: IumrahHolyCity { IumrahHolyCity(rawValue: selectedCityRaw) ?? .makkah }
+    private var forecast: IumrahWeatherSnapshot? { model.weather }
+
+    var body: some View {
+        ZStack {
+            LinearGradient(colors: [Color(red: 0.035, green: 0.055, blue: 0.16), Color(red: 0.13, green: 0.20, blue: 0.38), Color(red: 0.23, green: 0.35, blue: 0.53)], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 18) {
+                    HStack {
+                        Picker("", selection: $selectedCityRaw) {
+                            ForEach(IumrahHolyCity.allCases) { city in
+                                Text(city.title(settings.language)).tag(city.rawValue)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        Spacer(minLength: 20)
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 17, weight: .bold))
+                                .frame(width: 40, height: 40)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+                        .tint(.white)
+                    }
+                    .padding(.top, 16)
+
+                    VStack(spacing: 8) {
+                        Text(city.title(settings.language))
+                            .font(.system(size: 36, weight: .regular))
+                        if let forecast {
+                            Text("\(Int(forecast.currentTemperature.rounded()))°")
+                                .font(.system(size: 104, weight: .ultraLight, design: .rounded))
+                                .minimumScaleFactor(0.7)
+                            Text(forecast.currentCondition.localized(settings.language))
+                                .font(.title3.weight(.medium))
+                            if let today = forecast.days.first {
+                                Text("\(label("Max", "Макс.")): \(Int(today.high.rounded()))° · \(label("Min", "Мин.")): \(Int(today.low.rounded()))°")
+                                    .font(.headline)
+                            }
+                        } else if model.isRefreshing {
+                            ProgressView().tint(.white).padding(36)
+                        } else {
+                            Text(label("Weather temporarily unavailable", "Прогноз временно недоступен"))
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 28)
+
+                    weatherPanel {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Label(label("Hourly forecast", "Почасовой прогноз"), systemImage: "clock")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.8))
+                            if let hours = forecast?.hourly, !hours.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 23) {
+                                        ForEach(hours) { hour in
+                                            VStack(spacing: 14) {
+                                                Text(hourText(hour.date))
+                                                    .font(.caption.weight(.semibold))
+                                                Image(systemName: hour.condition.symbol)
+                                                    .symbolRenderingMode(.multicolor)
+                                                    .font(.title3)
+                                                Text("\(Int(hour.temperature.rounded()))°")
+                                                    .font(.headline)
+                                            }
+                                            .frame(minWidth: 46)
+                                        }
+                                    }
+                                    .padding(.vertical, 5)
+                                }
+                            } else {
+                                Text(label("No hourly forecast", "Нет почасового прогноза"))
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                        }
+                    }
+
+                    weatherPanel {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(label("Next days", "Прогноз по дням"), systemImage: "calendar")
+                                .font(.subheadline.weight(.semibold))
+                                .padding(.bottom, 14)
+                            if let forecast {
+                                ForEach(forecast.days) { day in
+                                    HStack(spacing: 12) {
+                                        Text(day.dayLabel(language: settings.language, timeZone: city.timeZone))
+                                            .frame(width: 76, alignment: .leading)
+                                        Spacer(minLength: 0)
+                                        Image(systemName: day.condition.symbol)
+                                            .symbolRenderingMode(.multicolor)
+                                            .frame(width: 30)
+                                        Text("\(Int(day.low.rounded()))°")
+                                            .foregroundStyle(.white.opacity(0.68))
+                                        Capsule()
+                                            .fill(LinearGradient(colors: [.blue, .orange], startPoint: .leading, endPoint: .trailing))
+                                            .frame(width: 75, height: 5)
+                                        Text("\(Int(day.high.rounded()))°")
+                                    }
+                                    .font(.subheadline.weight(.medium))
+                                    .padding(.vertical, 9)
+                                    if day.id != forecast.days.last?.id { Divider().overlay(.white.opacity(0.12)) }
+                                }
+                            }
+                        }
+                    }
+                    Text(label("Forecast · MET Norway · Updated from the latest available observations", "Прогноз · MET Norway · По последним доступным данным"))
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.65))
+                        .padding(.bottom, 22)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+            }
+            .refreshable { await model.refresh(city: city, force: true) }
+        }
+        .task(id: city.rawValue) { await model.refresh(city: city) }
+        .preferredColorScheme(.dark)
+    }
+
+    private func weatherPanel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.white.opacity(0.09), lineWidth: 0.7))
+    }
+
+    private func hourText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeZone = city.timeZone
+        formatter.dateFormat = "HH"
+        return formatter.string(from: date)
+    }
+
+    private func label(_ english: String, _ russian: String) -> String {
+        switch settings.language {
+        case .russian: return russian
+        case .arabic: return ArabicLocalization.phrase(english)
+        case .turkish: return TurkishLocalization.phrase(english)
+        case .indonesian: return IndonesianLocalization.phrase(english)
+        case .malay: return MalayLocalization.phrase(english)
+        case .english, .uzbek, .uzbekCyrillic: return english
         }
     }
 }

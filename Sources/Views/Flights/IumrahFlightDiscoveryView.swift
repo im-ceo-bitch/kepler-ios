@@ -49,6 +49,7 @@ struct IumrahFlightDiscoveryView: View {
     @State private var searchProgress = 0.0
     @State private var searchRunID = UUID()
     @State private var recommendedFlights: [CuratedFlightRecommendation] = []
+    @State private var recommendedLeg = 0
     @State private var recommendedLoading = false
     @State private var recommendedError: String?
 
@@ -60,12 +61,11 @@ struct IumrahFlightDiscoveryView: View {
             if searchMode == .globalSearch {
                 tripTypePicker
                 discoveryActions
-                searchResultsSection
-
-                if hasSearched && !rankedOffers.isEmpty {
+                if hasSearched && rankedOffers.count < 6 && !nearbyCalendarDeals.isEmpty {
                     nearbyDealsSection
-                    dataSourceNote
                 }
+                searchResultsSection
+                if hasSearched && !rankedOffers.isEmpty { dataSourceNote }
             } else {
                 recommendedFlightsSection
             }
@@ -105,6 +105,9 @@ struct IumrahFlightDiscoveryView: View {
                 language: settings.language,
                 tripType: calendarTripType,
                 calendarDays: store.calendarDays,
+                origin: originCode,
+                destination: destinationCode.uppercased(),
+                directOnly: directOnly,
                 departureDate: $departureDate,
                 returnDate: $returnDate
             )
@@ -130,6 +133,7 @@ struct IumrahFlightDiscoveryView: View {
                 destination: destinationCode.uppercased(),
                 initialOutboundDays: store.calendarDays,
                 roundTrip: tripType == .roundTrip,
+                passengers: adults + children + infants,
                 departureDate: $departureDate,
                 returnDate: $returnDate
             )
@@ -165,8 +169,14 @@ struct IumrahFlightDiscoveryView: View {
                 currency: store.currency,
                 canBuildUmrah: ["JED", "MED"].contains(offer.destination.uppercased()) || ["JED", "MED"].contains(offer.origin.uppercased()),
                 onCheckPrice: { currentOffer in checkCurrentPrice(for: currentOffer) },
+                onPriceUpdated: { verified in store.updateVerifiedOffer(verified) },
                 onBuildUmrah: { currentOffer in stageDiscoveryFlightForUmrah(currentOffer) }
             )
+        }
+        .onAppear {
+            // TabView may keep this View alive. Refresh real cached API observations
+            // on each subsequent visit, not only when the search parameters change.
+            if seededFromJourney && searchMode == .globalSearch { performGlobalSearch() }
         }
         .onChange(of: destinationAirport) { _, airport in
             if let airport {
@@ -281,19 +291,28 @@ struct IumrahFlightDiscoveryView: View {
                 if recommendedLoading { ProgressView().controlSize(.small) }
             }
 
-            recommendedCarousel(
-                title: tr("Рейсы туда", "Outbound flights", "Borish reyslari", "Бориш рейслари"),
-                subtitle: "\(originCode) → \(destinationCode.uppercased()) · \(shortDate(departureDate))",
-                items: recommendedOutboundFlights,
-                emptyText: tr("Нет опубликованных рейсов туда на выбранный маршрут.", "No published outbound flights for this route.", "Tanlangan yo‘nalish uchun borish reyslari yo‘q.", "Танланган йўналиш учун бориш рейслари йўқ.")
-            )
+            Picker("", selection: $recommendedLeg) {
+                Label(tr("Туда", "Outbound", "Borish", "Бориш"), systemImage: "airplane.departure").tag(0)
+                Label(tr("Обратно", "Return", "Qaytish", "Қайтиш"), systemImage: "airplane.arrival").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: recommendedLeg) { _, _ in IumrahHaptics.selection() }
 
-            recommendedCarousel(
-                title: tr("Обратные рейсы", "Return flights", "Qaytish reyslari", "Қайтиш рейслари"),
-                subtitle: "\(recommendedReturnOriginCode) → \(originCode) · \(shortDate(returnDate))",
-                items: recommendedReturnFlights,
-                emptyText: tr("Нет опубликованных обратных рейсов на выбранный маршрут.", "No published return flights for this route.", "Tanlangan yo‘nalish uchun qaytish reyslari yo‘q.", "Танланган йўналиш учун қайтиш рейслари йўқ.")
-            )
+            if recommendedLeg == 0 {
+                recommendedList(
+                    title: tr("Рейсы туда", "Outbound flights", "Borish reyslari", "Бориш рейслари"),
+                    subtitle: "\(originCode) → \(destinationCode.uppercased()) · \(shortDate(departureDate))",
+                    items: recommendedOutboundFlights,
+                    emptyText: tr("Нет опубликованных рейсов туда на выбранный маршрут.", "No published outbound flights for this route.", "Tanlangan yo‘nalish uchun borish reyslari yo‘q.", "Танланган йўналиш учун бориш рейслари йўқ.")
+                )
+            } else {
+                recommendedList(
+                    title: tr("Обратные рейсы", "Return flights", "Qaytish reyslari", "Қайтиш рейслари"),
+                    subtitle: "\(recommendedReturnOriginCode) → \(originCode) · \(shortDate(returnDate))",
+                    items: recommendedReturnFlights,
+                    emptyText: tr("Нет опубликованных обратных рейсов на выбранный маршрут.", "No published return flights for this route.", "Tanlangan yo‘nalish uchun qaytish reyslari yo‘q.", "Танланган йўналиш учун қайтиш рейслари йўқ.")
+                )
+            }
 
             if let recommendedError, recommendedOutboundFlights.isEmpty && recommendedReturnFlights.isEmpty {
                 Text(recommendedError)
@@ -304,7 +323,7 @@ struct IumrahFlightDiscoveryView: View {
     }
 
     @ViewBuilder
-    private func recommendedCarousel(
+    private func recommendedList(
         title: String,
         subtitle: String,
         items: [CuratedFlightRecommendation],
@@ -332,24 +351,18 @@ struct IumrahFlightDiscoveryView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(items) { recommendation in
-                            IumrahRecommendedFlightCard(
-                                language: settings.language,
-                                recommendation: recommendation,
-                                selected: isRecommendationSelected(recommendation)
-                            ) {
-                                stageRecommendedFlight(recommendation)
-                            }
-                            .frame(width: 318)
+                LazyVStack(spacing: 12) {
+                    ForEach(items) { recommendation in
+                        IumrahRecommendedFlightCard(
+                            language: settings.language,
+                            recommendation: recommendation,
+                            selected: isRecommendationSelected(recommendation)
+                        ) {
+                            stageRecommendedFlight(recommendation)
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                    .scrollTargetLayout()
                 }
-                .scrollTargetBehavior(.viewAligned)
-                .contentMargins(.horizontal, 0, for: .scrollContent)
-                .scrollClipDisabled()
             }
         }
     }
@@ -974,7 +987,7 @@ struct IumrahFlightDiscoveryView: View {
     private var selectedDateUnfilteredOffers: [FlightDiscoveryOffer] {
         let selected = IumrahFlightDiscoveryStore.dayFormatter.string(from: departureDate)
         var rows = store.offers.filter { String($0.departureAt.prefix(10)) == selected }
-        if let fallback = store.calendarDays.first(where: { $0.date == selected })?.offer {
+        if let fallback = store.calendarDays.first(where: { $0.date == selected && $0.departureAt.count >= 16 })?.offer {
             rows.append(fallback)
         }
 
@@ -986,7 +999,7 @@ struct IumrahFlightDiscoveryView: View {
                 offer.airlineCode,
                 offer.flightNumber,
                 offer.departureAt,
-                String(Int(offer.price.rounded()))
+                String(offer.returnAt ?? "")
             ].joined(separator: "|")
             return seen.insert(key).inserted
         }
@@ -1149,7 +1162,8 @@ struct IumrahFlightDiscoveryView: View {
             destination: destinationCode,
             departureDate: departureDate,
             returnDate: tripType == .roundTrip ? returnDate : nil,
-            directOnly: directOnly
+            directOnly: directOnly,
+            forceRefresh: true
         )
     }
 
@@ -2543,6 +2557,10 @@ private struct FlightDiscoveryCalendarSheet: View {
     let language: AppSettingsStore.Language
     let tripType: FlightDiscoveryTripType
     let calendarDays: [FlightDiscoveryCalendarDay]
+    let origin: String
+    let destination: String
+    let directOnly: Bool
+    @State private var extraCalendarDays: [FlightDiscoveryCalendarDay] = []
     @Binding var departureDate: Date
     @Binding var returnDate: Date
 
@@ -2592,6 +2610,22 @@ private struct FlightDiscoveryCalendarSheet: View {
             }
         }
         .presentationDetents([.large])
+        .task(id: "\(origin)-\(destination)-\(directOnly)") {
+            await loadAdditionalMonths()
+        }
+    }
+
+    private func loadAdditionalMonths() async {
+        let api = AviasalesFlightDiscoveryService()
+        for month in months {
+            if Task.isCancelled { return }
+            let key = IumrahFlightDiscoveryStore.monthFormatter.string(from: month)
+            guard let data = try? await api.calendar(origin: origin, destination: destination, month: key, direct: directOnly) else { continue }
+            var byDay: [String: FlightDiscoveryCalendarDay] = [:]
+            for item in calendarDays + extraCalendarDays where item.price > 0 { byDay[item.date] = item }
+            for item in data.days where item.price > 0 { byDay[item.date] = item }
+            extraCalendarDays = byDay.values.sorted { $0.date < $1.date }
+        }
     }
 
     private var selectionSummary: some View {
@@ -2619,12 +2653,15 @@ private struct FlightDiscoveryCalendarSheet: View {
 
     private var months: [Date] {
         let calendar = Calendar.current
-        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: departureDate)) ?? departureDate
-        return [0, 1].compactMap { calendar.date(byAdding: .month, value: $0, to: start) }
+        let today = Date()
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
+        return (0..<6).compactMap { calendar.date(byAdding: .month, value: $0, to: start) }
     }
 
     private var priceMap: [String: Double] {
-        Dictionary(uniqueKeysWithValues: calendarDays.map { ($0.date, $0.price) })
+        var prices: [String: Double] = [:]
+        for item in calendarDays + extraCalendarDays where item.price > 0 { prices[item.date] = item.price }
+        return prices
     }
 
     private func select(_ date: Date) {
@@ -2812,6 +2849,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
     let destination: String
     let initialOutboundDays: [FlightDiscoveryCalendarDay]
     let roundTrip: Bool
+    let passengers: Int
     @Binding var departureDate: Date
     @Binding var returnDate: Date
 
@@ -2819,8 +2857,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
     @State private var outboundDays: [FlightDiscoveryCalendarDay] = []
     @State private var inboundDays: [FlightDiscoveryCalendarDay] = []
     @State private var isLoading = false
-    @State private var selectedGraphLeg = 0 // 0 = outbound, 1 = inbound
-
+    @State private var lastGraphScrollHaptic = Date.distantPast
 
     private let service = AviasalesFlightDiscoveryService()
 
@@ -2831,33 +2868,23 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(origin) → \(destination)")
                             .font(.headline.monospaced().weight(.bold))
-                        Text(tr("1 пассажир · эконом", "1 passenger · economy", "1 yo‘lovchi · ekonom", "1 йўловчи · эконом"))
+                        Text("\(passengers) · " + tr("пасс. · эконом", "passengers · economy", "yo‘lovchi · ekonom", "йўловчи · эконом"))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
 
-                    if roundTrip {
-                        Picker("", selection: $selectedGraphLeg) {
-                            Text(tr("Туда", "Outbound", "Borish", "Бориш") + " · \(origin) → \(destination)").tag(0)
-                            Text(tr("Обратно", "Return", "Qaytish", "Қайтиш") + " · \(destination) → \(origin)").tag(1)
-                        }
-                        .pickerStyle(.segmented)
-                        .accessibilityLabel(tr("Направление", "Flight direction", "Yo‘nalish", "Йўналиш"))
-                    }
-
-                    if selectedGraphLeg == 0 || !roundTrip {
-                        priceSection(
-                            title: tr("Туда · \(origin) → \(destination)", "Outbound · \(origin) → \(destination)", "Borish · \(origin) → \(destination)", "Бориш · \(origin) → \(destination)"),
-                            days: outboundDays,
-                            selectedDate: departureDate,
-                            onSelect: { date in
-                                departureDate = date
-                                if roundTrip, returnDate <= date {
-                                    returnDate = Calendar.current.date(byAdding: .day, value: 7, to: date) ?? date
-                                }
+                    priceSection(
+                        title: tr("Туда · \(origin) → \(destination)", "Outbound · \(origin) → \(destination)", "Borish · \(origin) → \(destination)", "Бориш · \(origin) → \(destination)"),
+                        days: outboundDays,
+                        selectedDate: departureDate,
+                        onSelect: { date in
+                            departureDate = date
+                            if roundTrip, returnDate <= date {
+                                returnDate = Calendar.current.date(byAdding: .day, value: 7, to: date) ?? date
                             }
-                        )
-                    } else {
+                        }
+                    )
+                    if roundTrip {
                         priceSection(
                             title: tr("Обратно · \(destination) → \(origin)", "Return · \(destination) → \(origin)", "Qaytish · \(destination) → \(origin)", "Қайтиш · \(destination) → \(origin)"),
                             days: inboundDays,
@@ -2885,7 +2912,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                     .padding(16)
                     .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .onChange(of: directOnly) { _, _ in
-                        Task { await load() }
+                        IumrahHaptics.selection()
                     }
 
                     Button {
@@ -2903,7 +2930,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                 .padding(20)
             }
             .overlay {
-                if isLoading && (selectedGraphLeg == 0 ? outboundDays.isEmpty : inboundDays.isEmpty) {
+                if isLoading && outboundDays.isEmpty {
                     ProgressView()
                         .allowsHitTesting(false)
                 }
@@ -2916,8 +2943,9 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                     Button { dismiss() } label: { Image(systemName: "chevron.backward") }
                 }
             }
-            .task {
-                outboundDays = initialOutboundDays
+            .task(id: directOnly) {
+                outboundDays = directOnly ? [] : initialOutboundDays
+                inboundDays = []
                 await load()
             }
         }
@@ -2941,76 +2969,71 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                     .foregroundStyle(Color.blue)
             }
 
-            if days.isEmpty {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.iumrahCardBackground)
-                    .frame(height: 148)
-                    .overlay {
-                        VStack(spacing: 8) {
-                            Image(systemName: "chart.bar.xaxis")
-                                .font(.title2)
-                                .foregroundStyle(.secondary)
-                            Text(tr("Нет данных по этим датам", "No fare data for these dates", "Bu sanalar uchun ma’lumot yo‘q", "Бу саналар учун маълумот йўқ"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .bottom, spacing: 7) {
+                    ForEach(graphDates, id: \.self) { date in
+                        graphBar(date, days: days, selectedDate: selectedDate, onSelect: onSelect)
                     }
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .bottom, spacing: 9) {
-                        ForEach(days.sorted(by: { $0.date < $1.date })) { day in
-                            graphBar(day, days: days, selectedDate: selectedDate, onSelect: onSelect)
-                        }
-                    }
-                    .padding(.horizontal, 2)
-                    .frame(height: 174, alignment: .bottom)
                 }
+                .frame(height: 175, alignment: .bottom)
+                .padding(.horizontal, 2)
+                .scrollTargetLayout()
             }
+            .scrollTargetBehavior(.viewAligned)
+            .simultaneousGesture(DragGesture(minimumDistance: 12)
+                .onChanged { value in
+                    guard abs(value.translation.width) > 36 else { return }
+                    let now = Date()
+                    if now.timeIntervalSince(lastGraphScrollHaptic) > 0.20 {
+                        lastGraphScrollHaptic = now
+                        IumrahHaptics.soft()
+                    }
+                }
+            )
         }
     }
 
+    private var graphDates: [Date] {
+        let calendar = Calendar(identifier: .gregorian)
+        let start = calendar.startOfDay(for: Date())
+        return (0..<150).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
     private func graphBar(
-        _ day: FlightDiscoveryCalendarDay,
+        _ date: Date,
         days: [FlightDiscoveryCalendarDay],
         selectedDate: Date,
         onSelect: @escaping (Date) -> Void
     ) -> some View {
-        let prices = days.map(\.price).filter { $0 > 0 }
-        let minPrice = max(prices.min() ?? 1, 1)
-        let maxPrice = max(prices.max() ?? minPrice, minPrice)
-        let spread = max(maxPrice - minPrice, 1)
-        let normalized = (day.price - minPrice) / spread
-        let height = CGFloat(40 + max(0, min(1, normalized)) * 70)
-        let selected = IumrahFlightDiscoveryStore.dayFormatter.string(from: selectedDate) == day.date
-        let cheapest = abs(day.price - minPrice) < 0.5
-        let tint: Color = selected ? .blue : (cheapest ? .green : Color.secondary.opacity(0.24))
-
+        let key = IumrahFlightDiscoveryStore.dayFormatter.string(from: date)
+        let day = days.first { $0.date == key }
+        let validPrices = days.map(\.price).filter { $0 > 0 }
+        let minimum = max(1, validPrices.min() ?? 1)
+        let maximum = max(minimum, validPrices.max() ?? minimum)
+        let price = day?.price ?? 0
+        let normalized = max(0, min(1, (price - minimum) / max(1, maximum - minimum)))
+        let barHeight = CGFloat(price > 0 ? 35 + normalized * 72 : 22)
+        let selected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
+        let cheap = price > 0 && price <= minimum + 0.5
+        let tint: Color = selected ? .blue : cheap ? .green : (price > 0 ? Color.gray.opacity(0.36) : Color.gray.opacity(0.13))
         return Button {
-            if let date = IumrahFlightDiscoveryStore.dayFormatter.date(from: day.date) {
-                onSelect(date)
-                IumrahHaptics.selection()
-            }
+            onSelect(date)
+            IumrahHaptics.soft()
         } label: {
-            VStack(spacing: 6) {
-                if selected || cheapest {
-                    Text("$\(Int(day.price.rounded()))")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(selected ? Color.blue : Color.green)
-                        .lineLimit(1)
-                } else {
-                    Text(" ")
-                        .font(.caption2)
-                }
-
+            VStack(spacing: 5) {
+                Text(price > 0 ? "$\(Int(price.rounded()))" : "?")
+                    .font(.system(size: 10, weight: selected ? .bold : .medium))
+                    .foregroundStyle(selected ? Color.blue : (cheap ? .green : .secondary))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(tint)
-                    .frame(width: 39, height: height)
-
-                Text(dayNumber(day.date))
-                    .font(.caption2.weight(selected ? .bold : .medium))
+                    .frame(width: 37, height: barHeight)
+                Text(String(Calendar.current.component(.day, from: date)))
+                    .font(.caption2.weight(selected ? .bold : .regular))
                     .foregroundStyle(selected ? Color.blue : Color.secondary)
             }
-            .frame(width: 52)
+            .frame(width: 44)
         }
         .buttonStyle(.plain)
     }
@@ -3018,30 +3041,27 @@ private struct FlightDiscoveryPriceGraphSheet: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-
-        let outboundMonth = IumrahFlightDiscoveryStore.monthFormatter.string(from: departureDate)
-        if let result = try? await service.calendar(
-            origin: origin,
-            destination: destination,
-            month: outboundMonth,
-            direct: directOnly
-        ) {
-            outboundDays = result.days
+        let calendar = Calendar(identifier: .gregorian)
+        let first = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) ?? Date()
+        let months = (0..<5).compactMap { calendar.date(byAdding: .month, value: $0, to: first) }
+        var outboundByDate: [String: FlightDiscoveryCalendarDay] = [:]
+        if !directOnly {
+            for item in initialOutboundDays where item.price > 0 { outboundByDate[item.date] = item }
         }
-
-        if roundTrip {
-            let inboundMonth = IumrahFlightDiscoveryStore.monthFormatter.string(from: returnDate)
-            if let result = try? await service.calendar(
-                origin: destination,
-                destination: origin,
-                month: inboundMonth,
-                direct: directOnly
-            ) {
-                inboundDays = result.days
+        var inboundByDate: [String: FlightDiscoveryCalendarDay] = [:]
+        for month in months {
+            if Task.isCancelled { return }
+            let key = IumrahFlightDiscoveryStore.monthFormatter.string(from: month)
+            if let result = try? await service.calendar(origin: origin, destination: destination, month: key, direct: directOnly, forceRefresh: true) {
+                for item in result.days where item.price > 0 { outboundByDate[item.date] = item }
+                outboundDays = outboundByDate.values.sorted { $0.date < $1.date }
             }
-        } else {
-            inboundDays = []
+            if roundTrip, let result = try? await service.calendar(origin: destination, destination: origin, month: key, direct: directOnly, forceRefresh: true) {
+                for item in result.days where item.price > 0 { inboundByDate[item.date] = item }
+                inboundDays = inboundByDate.values.sorted { $0.date < $1.date }
+            }
         }
+        if !roundTrip { inboundDays = [] }
     }
 
     private func dayNumber(_ value: String) -> String {
@@ -3087,6 +3107,7 @@ private struct FlightDiscoveryOfferDetailView: View {
     let currency: String
     let canBuildUmrah: Bool
     let onCheckPrice: (FlightDiscoveryOffer) -> Void
+    let onPriceUpdated: (FlightDiscoveryOffer) -> Void
     let onBuildUmrah: (FlightDiscoveryOffer) -> Void
 
     private var activeOffer: FlightDiscoveryOffer {
@@ -3740,6 +3761,7 @@ private struct FlightDiscoveryOfferDetailView: View {
 
             withAnimation(.easeInOut(duration: 0.25)) {
                 refreshedOffer = current
+                onPriceUpdated(current)
                 livePrice = current.price
                 lastPriceRefreshAt = Date()
                 refreshFeedback = tr(

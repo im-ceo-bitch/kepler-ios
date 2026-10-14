@@ -7,7 +7,7 @@ struct FlightDiscoveryOffer: Codable, Hashable, Identifiable {
     let destination: String
     let originAirport: String
     let destinationAirport: String
-    let price: Double
+    var price: Double
     let airlineCode: String
     let flightNumber: String
     let departureAt: String
@@ -157,7 +157,8 @@ struct AviasalesFlightDiscoveryService {
         destination: String,
         month: String,
         direct: Bool = false,
-        currency: String = "usd"
+        currency: String = "usd",
+        forceRefresh: Bool = false
     ) async throws -> (days: [FlightDiscoveryCalendarDay], currency: String, generatedAt: String?) {
         let response: FlightDiscoveryCalendarEnvelope = try await api.get(
             "/api/package/flights/data",
@@ -167,7 +168,8 @@ struct AviasalesFlightDiscoveryService {
                 URLQueryItem(name: "destination", value: destination.uppercased()),
                 URLQueryItem(name: "departure", value: month),
                 URLQueryItem(name: "currency", value: currency.lowercased()),
-                URLQueryItem(name: "direct", value: direct ? "true" : "false")
+                URLQueryItem(name: "direct", value: direct ? "true" : "false"),
+                URLQueryItem(name: "fresh", value: forceRefresh ? "1" : "0")
             ],
             timeoutInterval: 15
         )
@@ -197,7 +199,8 @@ final class IumrahFlightDiscoveryStore: ObservableObject {
         destination: String,
         departureDate: Date,
         returnDate: Date?,
-        directOnly: Bool
+        directOnly: Bool,
+        forceRefresh: Bool = false
     ) {
         refreshTask?.cancel()
         let origin = origin.uppercased()
@@ -224,7 +227,8 @@ final class IumrahFlightDiscoveryStore: ObservableObject {
                     origin: origin,
                     destination: destination,
                     month: month,
-                    direct: directOnly
+                    direct: directOnly,
+                    forceRefresh: forceRefresh
                 )
                 guard !Task.isCancelled else { return }
                 self.calendarDays = calendar.days
@@ -240,7 +244,8 @@ final class IumrahFlightDiscoveryStore: ObservableObject {
                     departure: departure,
                     returnAt: returnAt,
                     direct: directOnly,
-                    limit: 100
+                    limit: 100,
+                    forceRefresh: forceRefresh
                 ) {
                     collected.append(contentsOf: exact.offers)
                     self.currency = exact.currency
@@ -274,7 +279,7 @@ final class IumrahFlightDiscoveryStore: ObservableObject {
                 // 3) grouped_prices always gives us the cheapest cached row for a day when
                 // one exists. Use it as a final selected-day fallback so the UI never hides
                 // a fare that is already visible in the calendar/price graph.
-                if let fallback = calendar.days.first(where: { $0.date == departure })?.offer {
+                if let fallback = calendar.days.first(where: { $0.date == departure && $0.departureAt.count >= 16 })?.offer {
                     collected.append(fallback)
                 }
 
@@ -307,6 +312,22 @@ final class IumrahFlightDiscoveryStore: ObservableObject {
                 self.isLoading = false
             }
         }
+    }
+
+    func updateVerifiedOffer(_ verified: FlightDiscoveryOffer) {
+        // Only the exact itinerary verified by the details view is updated.
+        // If the original list row came from the calendar fallback, retain the
+        // verified offer as a new row instead of showing the old cached price.
+        var found = false
+        var updated = offers.map { original -> FlightDiscoveryOffer in
+            guard original.monitorKey == verified.monitorKey else { return original }
+            found = true
+            var copy = original
+            copy.price = verified.price
+            return copy
+        }
+        if !found { updated.append(verified) }
+        offers = updated.sorted { $0.price < $1.price }
     }
 
     func clearError() {

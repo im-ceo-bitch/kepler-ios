@@ -13,6 +13,26 @@ struct PrimaryHotelView: View {
     @State private var showTransfer = false
     @State private var isPreparingPublishedPackage = false
     @State private var publishedPackageError: String?
+    @State private var activeHotelCity: HotelSelectionRole = .makkah
+    @State private var starFilter: Int? = nil
+    @State private var isUpdatingPrice = false
+
+    // The server is the source of truth for package totals. Never invent a total
+    // from the catalog hotel's nightly rate or reuse a quote for another selection.
+    private var visibleTotal: String? {
+        guard journey.hasFinalGeneratorQuote, let quote = journey.quote else {
+            return isUpdatingPrice ? priceLoadingText : pricePendingText
+        }
+        let value = NSDecimalNumber(decimal: quote.totalPackagePrice).doubleValue
+        return value.formatted(.currency(code: quote.currency).precision(.fractionLength(0)))
+    }
+
+    private var quoteInputKey: String {
+        [journey.selectedHotel?.id ?? "", journey.selectedMadinahHotel?.id ?? "",
+         journey.trip.packageTier.rawValue, journey.packageFlightPath.rawValue,
+         journey.selectedRoom?.id ?? "", journey.selectedMadinahRoom?.id ?? "",
+         String(journey.trip.travelerCount)].joined(separator: "|")
+    }
 
     var entryMode: PrimaryHotelEntryMode = .standard
 
@@ -27,63 +47,60 @@ struct PrimaryHotelView: View {
 
     var body: some View {
         GeometryReader { viewport in
-            let contentWidth = max(0, viewport.size.width - (IumrahDesign.pagePadding * 2))
+            let contentWidth = max(0, viewport.size.width - IumrahDesign.pagePadding * 2)
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
-                    IumrahGeneratorHeader(stage: .hotel)
+            VStack(spacing: 0) {
+                // Keep one native glass generator header outside the ScrollView.
+                // This preserves the animated stage, live total and back action
+                // while the user scrolls through the hotel catalogue.
+                IumrahGeneratorHeader(stage: .hotel, currentPriceText: visibleTotal)
+                    .frame(width: contentWidth)
+                    .padding(.horizontal, IumrahDesign.pagePadding)
+                    .padding(.top, 9)
+                    .padding(.bottom, 12)
 
-                    heading
-                    if entryMode == .flightFirst {
-                        flightFirstContextCard
-                        flightFirstTierSelector
-                    }
-                    hotelContent
-
-                    if journey.packageFlightPath == .publishedDirect || journey.packageFlightPath == .aviasalesSelected {
-                        Button {
-                            Task { await continuePublishedDirectPackage() }
-                        } label: {
-                            HStack(spacing: 9) {
-                                if isPreparingPublishedPackage { ProgressView().tint(.white) }
-                                Text(publishedContinueTitle)
-                                if !isPreparingPublishedPackage { Image(systemName: "arrow.forward") }
-                            }
-                            .frame(maxWidth: .infinity)
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 21) {
+                        heading
+                        if entryMode == .flightFirst {
+                            flightFirstContextCard
+                            flightFirstTierSelector
                         }
-                        .buttonStyle(IumrahPrimaryButtonStyle())
-                        .disabled(!canContinue || isPreparingPublishedPackage)
-                        .opacity(canContinue && !isPreparingPublishedPackage ? 1 : 0.42)
-                    } else {
-                        NavigationLink {
-                            OutboundFlightView()
-                        } label: {
-                            HStack(spacing: 9) {
-                                Text(FlowCopy.text(.continueToFlights, settings.language))
-                                Image(systemName: "arrow.forward")
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(IumrahPrimaryButtonStyle())
-                        .disabled(!canContinue)
-                        .opacity(canContinue ? 1 : 0.42)
+                        hotelContent
+                        cityAndStarNavigation
+                        availableHotels
                     }
+                    .frame(width: contentWidth, alignment: .leading)
+                    .padding(.horizontal, IumrahDesign.pagePadding)
+                    .padding(.top, 8)
+                    .padding(.bottom, 30)
                 }
-                // A vertical ScrollView does not hard-clamp child intrinsic width.
-                // Own the exact viewport width here so a panoramic hotel photo can
-                // never widen the card or shift the whole hotel step horizontally.
-                .frame(width: contentWidth, alignment: .leading)
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 10)
-                .padding(.bottom, 140) // leave enough scroll reach above the persistent tab bar
+                .frame(width: viewport.size.width)
             }
-            .frame(width: viewport.size.width)
         }
         .background(Color.iumrahPageBackground)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            pinnedContinueButton
+        }
         .iumrahInternalNavigation(progress: .hotel, showsGeneratorAmbient: true)
         .task {
             if journey.hotels.isEmpty { await journey.loadMakkahHotels() }
             if requiresMadinah, journey.madinahHotels.isEmpty { await journey.loadMadinahHotels() }
+        }
+        .task(id: quoteInputKey) {
+            // Debounce rapid city/hotel changes so only the settled choice is
+            // resolved against the live Package Engine.
+            try? await Task.sleep(for: .milliseconds(260))
+            guard !Task.isCancelled else { return }
+            await refreshCurrentPackagePrice()
+        }
+        .onChange(of: requiresMadinah) { _, included in
+            if !included { activeHotelCity = .makkah }
+            starFilter = nil
+        }
+        .onChange(of: activeHotelCity) { _, _ in
+            starFilter = nil
+            IumrahHaptics.selection()
         }
         .navigationDestination(isPresented: $showTransfer) {
             TransferSelectionView()
@@ -95,6 +112,63 @@ struct PrimaryHotelView: View {
             Button("OK", role: .cancel) { publishedPackageError = nil }
         } message: {
             Text(publishedPackageError ?? "")
+        }
+    }
+
+    private var pinnedContinueButton: some View {
+        Group {
+            if journey.packageFlightPath == .publishedDirect || journey.packageFlightPath == .aviasalesSelected {
+                Button {
+                    Task { await continuePublishedDirectPackage() }
+                } label: {
+                    continueLabel(publishedContinueTitle)
+                }
+                .disabled(!canContinue || isPreparingPublishedPackage)
+            } else {
+                NavigationLink {
+                    OutboundFlightView()
+                } label: {
+                    continueLabel(FlowCopy.text(.continueToFlights, settings.language))
+                }
+                .disabled(!canContinue)
+            }
+        }
+        .buttonStyle(IumrahPrimaryButtonStyle())
+        .opacity(canContinue && !isPreparingPublishedPackage ? 1 : 0.46)
+        .padding(.horizontal, IumrahDesign.pagePadding)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(Color.iumrahPageBackground)
+    }
+
+    private func continueLabel(_ text: String) -> some View {
+        HStack(spacing: 10) {
+            if isPreparingPublishedPackage { ProgressView().tint(.white) }
+            Text(text)
+            if !isPreparingPublishedPackage { Image(systemName: "arrow.forward") }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @MainActor
+    private func refreshCurrentPackagePrice() async {
+        // This step precedes flight search in the flexible-dates flow, so a
+        // genuine total cannot exist until the itinerary is selected. In Flight
+        // First the chosen itinerary can be resolved and quoted by the server.
+        guard canContinue else { return }
+        guard journey.packageFlightPath == .publishedDirect ||
+              journey.packageFlightPath == .aviasalesSelected ||
+              journey.selectedOutbound != nil else { return }
+        guard !journey.hasFinalGeneratorQuote else { return }
+        isUpdatingPrice = true
+        defer { isUpdatingPrice = false }
+        switch journey.packageFlightPath {
+        case .publishedDirect:
+            _ = await journey.preparePublishedDirectQuote()
+        case .aviasalesSelected:
+            _ = await journey.prepareAviasalesSelectedQuote()
+        case .flexibleDates, .weekend:
+            await journey.buildQuote()
         }
     }
 
@@ -337,6 +411,184 @@ struct PrimaryHotelView: View {
         }
     }
 
+    // MARK: - Hotel alternatives, directly in step two (no Change Hotel screen)
+
+    private var activeCatalog: [HotelSummary] {
+        activeHotelCity == .makkah ? journey.hotels : journey.madinahHotels
+    }
+
+    private var preferredStars: Int {
+        (activeHotelCity == .makkah ? journey.selectedHotel?.stars : journey.selectedMadinahHotel?.stars)
+            ?? journey.trip.packageTier.primaryHotelStars
+    }
+
+    private var orderedStars: [Int] {
+        var result: [Int] = []
+        for value in [preferredStars, 5, 4, 3, 2, 1] where !result.contains(value) {
+            result.append(value)
+        }
+        return result
+    }
+
+    private var orderedHotels: [HotelSummary] {
+        let ranks = orderedStars
+        return activeCatalog
+            .filter { hotel in
+                guard let stars = hotel.stars, (1...5).contains(stars) else { return false }
+                return starFilter == nil || stars == starFilter
+            }
+            .sorted { lhs, rhs in
+                let left = ranks.firstIndex(of: lhs.stars ?? 0) ?? 99
+                let right = ranks.firstIndex(of: rhs.stars ?? 0) ?? 99
+                if left != right { return left < right }
+                if lhs.price?.isUsableForPackage != rhs.price?.isUsableForPackage {
+                    return lhs.price?.isUsableForPackage == true
+                }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+    }
+
+    private var cityAndStarNavigation: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 9) {
+                cityButton(.makkah)
+                if requiresMadinah { cityButton(.madinah) }
+            }
+            if !activeCatalog.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        starButton(nil)
+                        ForEach(orderedStars.filter { stars in activeCatalog.contains(where: { $0.stars == stars }) }, id: \.self) { stars in
+                            starButton(stars)
+                        }
+                    }
+                }
+                .contentMargins(.horizontal, 1)
+            }
+        }
+        .padding(.top, 8)
+    }
+
+    private func cityButton(_ city: HotelSelectionRole) -> some View {
+        let isActive = activeHotelCity == city
+        return Button {
+            withAnimation(.smooth(duration: 0.26)) { activeHotelCity = city }
+        } label: {
+            Label(city == .makkah ? localizedMakkah : localizedMadinah,
+                  systemImage: city == .makkah ? "mappin.circle.fill" : "building.2.fill")
+                .font(.subheadline.weight(.bold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 47)
+                .foregroundStyle(isActive ? Color.white : Color.primary)
+                .background(isActive ? Color.primary : Color.iumrahCardBackground,
+                            in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    private func starButton(_ stars: Int?) -> some View {
+        let isActive = starFilter == stars
+        return Button {
+            IumrahHaptics.selection()
+            withAnimation(.easeInOut(duration: 0.20)) { starFilter = stars }
+        } label: {
+            Text(stars.map { "\($0) ★" } ?? allHotelsTitle)
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 17)
+                .frame(height: 39)
+                .foregroundStyle(isActive ? Color.white : Color.primary)
+                .background(isActive ? Color.black : Color.iumrahCardBackground, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+    private var availableHotels: some View {
+        LazyVStack(spacing: 12) {
+            if orderedHotels.isEmpty {
+                ContentUnavailableView(emptyHotelsTitle, systemImage: "building.2.crop.circle")
+            } else {
+                ForEach(orderedHotels) { hotel in
+                    alternativeHotelRow(hotel)
+                }
+            }
+        }
+    }
+
+    private func alternativeHotelRow(_ hotel: HotelSummary) -> some View {
+        let selected = (activeHotelCity == .makkah ? journey.selectedHotel?.id : journey.selectedMadinahHotel?.id) == hotel.id
+        return HStack(alignment: .center, spacing: 12) {
+            HotelCachedImage(rawURL: hotel.coverImageURL)
+                .frame(width: 83, height: 91)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(hotel.name)
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(2)
+                Text("\(hotel.stars ?? 0) ★")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                HotelPackageDeltaText(hotel: hotel, city: activeHotelCity, isSelected: selected,
+                                      emptyLabel: pricePendingText)
+                HStack(spacing: 11) {
+                    NavigationLink {
+                        HotelDetailView(hotel: hotel, selectionFlow: true, selectionRole: activeHotelCity)
+                    } label: {
+                        Text(FlowCopy.text(.viewHotel, settings.language))
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+
+                    if !selected {
+                        Button {
+                            IumrahHaptics.selection()
+                            if activeHotelCity == .makkah { journey.chooseHotel(hotel) }
+                            else { journey.chooseMadinahHotel(hotel) }
+                        } label: {
+                            Text(selectHotelTitle)
+                                .font(.caption.weight(.bold))
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Color(red: 0.23, green: 0.72, blue: 0.43))
+                    } else {
+                        Label(selectedHotelTitle, systemImage: "checkmark.circle.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Color(red: 0.23, green: 0.72, blue: 0.43))
+                    }
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+    }
+
+    private var allHotelsTitle: String { stepText("Все", "All", "Barchasi", "Барчаси", "Tümü", "الكل", "Semua", "Semua") }
+    private var emptyHotelsTitle: String { stepText("Нет доступных отелей", "No hotels available", "Mehmonxona topilmadi", "Меҳмонхона топилмади", "Otel bulunamadı", "لا توجد فنادق", "Tidak ada hotel tersedia", "Tiada hotel tersedia") }
+    private var selectHotelTitle: String { stepText("Выбрать", "Select", "Tanlash", "Танлаш", "Seç", "اختيار", "Pilih", "Pilih") }
+    private var selectedHotelTitle: String { stepText("Выбран", "Selected", "Tanlandi", "Танланди", "Seçildi", "تم الاختيار", "Dipilih", "Dipilih") }
+    private var priceLoadingText: String { stepText("Расчёт…", "Calculating…", "Hisoblanmoqda…", "Ҳисобланмоқда…", "Hesaplanıyor…", "جارٍ الحساب…", "Menghitung…", "Mengira…") }
+    private var pricePendingText: String { stepText("После выбора рейса", "After flight selection", "Reys tanlangach", "Рейс танлангач", "Uçuş seçiminden sonra", "بعد اختيار الرحلة", "Setelah memilih penerbangan", "Selepas memilih penerbangan") }
+
+    private func stepText(_ ru: String, _ en: String, _ uz: String, _ cy: String, _ tr: String, _ ar: String, _ id: String, _ ms: String) -> String {
+        switch settings.language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return cy
+        case .turkish: return tr
+        case .arabic: return ar
+        case .english: return en
+        case .indonesian: return id
+        case .malay: return ms
+        }
+    }
+
     private var heading: some View {
         VStack(alignment: .leading, spacing: 9) {
             Text(FlowCopy.text(.hotelStageEyebrow, settings.language))
@@ -437,13 +689,13 @@ struct PrimaryHotelView: View {
                         .font(.caption.weight(.bold))
                         .padding(.horizontal, 10)
                         .frame(height: 30)
-                        .background(Color.iumrahCareLight.opacity(0.16), in: Capsule())
+                        .background(Color(red: 0.28, green: 0.79, blue: 0.49).opacity(0.13), in: Capsule())
 
                     Spacer(minLength: 8)
 
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Color.iumrahCareLight)
+                        .foregroundStyle(Color(red: 0.23, green: 0.72, blue: 0.43))
                 }
 
                 VStack(alignment: .leading, spacing: 7) {
@@ -489,29 +741,14 @@ struct PrimaryHotelView: View {
                     mealPlanCard(role: role)
                 }
 
-                HStack(spacing: 10) {
-                    NavigationLink {
-                        HotelDetailView(hotel: hotel, selectionFlow: true, selectionRole: role)
-                    } label: {
-                        Label(FlowCopy.text(.viewHotel, settings.language), systemImage: "info.circle")
-                            .font(.caption.weight(.bold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(SoftHotelActionButtonStyle())
-
-                    NavigationLink {
-                        HotelSelectionView(role: role)
-                    } label: {
-                        Label(FlowCopy.text(.changeHotel, settings.language), systemImage: "arrow.triangle.2.circlepath")
-                            .font(.caption.weight(.bold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(SoftHotelActionButtonStyle())
+                NavigationLink {
+                    HotelDetailView(hotel: hotel, selectionFlow: true, selectionRole: role)
+                } label: {
+                    Label(FlowCopy.text(.viewHotel, settings.language), systemImage: "info.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(SoftHotelActionButtonStyle())
             }
             .padding(.horizontal, 18)
             .padding(.top, 14)
@@ -585,7 +822,7 @@ struct PrimaryHotelView: View {
 
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.iumrahCareLight)
+                .foregroundStyle(Color(red: 0.23, green: 0.72, blue: 0.43))
                 .accessibilityLabel(mealIncludedText)
         }
         .padding(.horizontal, 14)
@@ -614,7 +851,7 @@ struct PrimaryHotelView: View {
 
             Toggle("", isOn: isOn)
                 .labelsHidden()
-                .tint(Color.iumrahCareLight)
+                .tint(Color(red: 0.23, green: 0.72, blue: 0.43))
                 .accessibilityLabel(mealName(meal))
         }
         .padding(.horizontal, 14)

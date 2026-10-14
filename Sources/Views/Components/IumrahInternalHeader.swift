@@ -121,7 +121,7 @@ private struct GeneratorProgressStrip: View {
     }
 
     private func segmentColor(_ item: TripProgressStage) -> Color {
-        if item.rawValue < stage.rawValue { return Color.iumrahCareLight }
+        if item.rawValue < stage.rawValue { return Color(red: 0.25, green: 0.78, blue: 0.47) }
         if item == stage { return Color.primary }
         return Color.secondary.opacity(0.18)
     }
@@ -449,7 +449,23 @@ private struct GeneratorInteractivePopRestorer: UIViewControllerRepresentable {
     final class Controller: UIViewController {
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+            // The hidden system bar must not disable the standard iOS edge-pop.
+            // Resolve the parent UINavigationController after SwiftUI installs
+            // the hosting controller, then restore the native gesture only on
+            // pushed screens (never on the root of the stack).
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                var candidate: UIViewController? = self
+                while let controller = candidate {
+                    if let navigation = controller as? UINavigationController ?? controller.navigationController {
+                        guard navigation.viewControllers.count > 1 else { return }
+                        navigation.interactivePopGestureRecognizer?.delegate = nil
+                        navigation.interactivePopGestureRecognizer?.isEnabled = true
+                        return
+                    }
+                    candidate = controller.parent
+                }
+            }
         }
     }
 }

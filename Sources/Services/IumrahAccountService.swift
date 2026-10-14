@@ -32,7 +32,6 @@ struct IumrahAccountService {
         bookingToken: String,
         challengeID: String,
         code: String,
-        password: String,
         locale: String
     ) async throws -> IumrahAccountAuthResponse {
         try await api.post(
@@ -41,7 +40,6 @@ struct IumrahAccountService {
                 bookingID: bookingID,
                 challengeID: challengeID,
                 code: code,
-                password: password,
                 device: IumrahAccountDeviceIdentity.current(locale: locale)
             ),
             headers: ["x-booking-token": bookingToken]
@@ -65,7 +63,6 @@ struct IumrahAccountService {
         bookingToken: String,
         challengeID: String,
         code: String,
-        password: String,
         locale: String
     ) async throws -> IumrahAccountAuthResponse {
         try await api.post(
@@ -74,7 +71,6 @@ struct IumrahAccountService {
                 bookingID: bookingID,
                 challengeID: challengeID,
                 code: code,
-                password: password,
                 device: IumrahAccountDeviceIdentity.current(locale: locale)
             ),
             headers: ["x-booking-token": bookingToken]
@@ -124,6 +120,24 @@ struct IumrahAccountService {
         )
     }
 
+    func startEmailLogin(email: String, locale: String) async throws -> IumrahEmailChallengeStartResponse {
+        try await api.post(
+            "/api/package/client/account/login/email/start",
+            body: IumrahEmailLoginStartRequest(email: email, locale: locale)
+        )
+    }
+
+    func confirmEmailLogin(challengeID: String, code: String, locale: String) async throws -> IumrahAccountAuthResponse {
+        try await api.post(
+            "/api/package/client/account/login/email/confirm",
+            body: IumrahEmailLoginConfirmRequest(
+                challengeID: challengeID,
+                code: code,
+                device: IumrahAccountDeviceIdentity.current(locale: locale)
+            )
+        )
+    }
+
     func startPhoneLogin(phone: String, locale: String) async throws -> IumrahPhoneLoginStartResponse {
         try await api.post(
             "/api/package/client/account/login/sms/start",
@@ -163,7 +177,6 @@ struct IumrahAccountService {
     func confirmPhoneRegistration(
         challengeID: String,
         code: String,
-        password: String,
         locale: String
     ) async throws -> IumrahAccountAuthResponse {
         try await api.post(
@@ -171,7 +184,6 @@ struct IumrahAccountService {
             body: IumrahPhoneRegistrationConfirmRequest(
                 challengeID: challengeID,
                 code: code,
-                password: password,
                 device: IumrahAccountDeviceIdentity.current(locale: locale)
             )
         )

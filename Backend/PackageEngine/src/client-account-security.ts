@@ -1171,7 +1171,7 @@ async function confirmBookingEmailActivation(request: Request, env: Env, db: D1L
     request,
     db,
     context,
-    payload?.password,
+    (payload?.password === undefined ? randomToken(48) : payload.password),
     payload?.device,
   );
   await linkVerifiedEmail(db, context.pilgrimID, challenge.email_display, challenge.email_normalized);
@@ -1237,7 +1237,7 @@ async function confirmBookingSMSActivation(request: Request, env: Env, db: D1Lik
     request,
     db,
     context,
-    payload?.password,
+    (payload?.password === undefined ? randomToken(48) : payload.password),
     payload?.device,
   );
   await linkVerifiedPhone(db, context.pilgrimID, challenge.phone_display, challenge.phone_normalized);
@@ -1368,8 +1368,7 @@ async function confirmStandaloneEmailRegistration(request: Request, db: D1Like) 
     lastName?: unknown;
     device?: unknown;
   } | null;
-  if (!validPassword(payload?.password)) throw new RouteError("PASSWORD_TOO_WEAK", 400);
-  const challenge = await verifyEmailChallenge(
+    const challenge = await verifyEmailChallenge(
     db,
     cleanText(payload?.challengeID, 100),
     "verify_email",
@@ -1421,7 +1420,7 @@ async function confirmStandaloneEmailRegistration(request: Request, db: D1Like) 
       db,
       pilgrimID,
       pilgrim,
-      payload?.password,
+      (payload?.password === undefined ? randomToken(48) : payload.password),
       payload?.device,
       "email_account_created",
     );
@@ -1572,8 +1571,7 @@ async function confirmStandalonePhoneRegistration(request: Request, db: D1Like) 
     password?: unknown;
     device?: unknown;
   } | null;
-  if (!validPassword(payload?.password)) throw new RouteError("PASSWORD_TOO_WEAK", 400);
-
+  
   const challengeID = cleanText(payload?.challengeID, 120);
   const hint = await db.prepare(
     `SELECT pilgrim_id FROM iumrah_client_sms_challenges
@@ -1605,7 +1603,7 @@ async function confirmStandalonePhoneRegistration(request: Request, db: D1Like) 
       db,
       pilgrimID,
       pilgrim,
-      payload?.password,
+      (payload?.password === undefined ? randomToken(48) : payload.password),
       payload?.device,
       "phone_account_created",
     );
@@ -1733,6 +1731,68 @@ async function confirmPhoneLogin(request: Request, db: D1Like) {
   return json({
     ok: true,
     account: accountProfile(pilgrim),
+    session: { token: session.token, expiresAt: session.expiresAt },
+  });
+}
+
+// Passwordless email login is allowed ONLY for a previously verified email
+// linked to an activated account. A plain pilgrims.email is not identity proof.
+async function startEmailLogin(request: Request, env: Env, db: D1Like) {
+  const payload = await request.json().catch(() => null) as { email?: unknown; locale?: unknown } | null;
+  const email = normalizeEmail(payload?.email);
+  if (!validEmail(email)) throw new RouteError("EMAIL_INVALID", 400);
+  const owner = await db.prepare(
+    `SELECT e.pilgrim_id,e.email_display FROM iumrah_client_account_emails e
+     INNER JOIN iumrah_accounts a ON a.pilgrim_id=e.pilgrim_id
+     WHERE e.email_normalized=?1 AND e.verified_at IS NOT NULL LIMIT 1`,
+  ).bind(email).first<{ pilgrim_id: number; email_display: string }>();
+  if (!owner) throw new RouteError("EMAIL_ACCOUNT_NOT_FOUND", 404);
+  const challenge = await createEmailChallenge(
+    db, env, request, "verify_email", Number(owner.pilgrim_id),
+    owner.email_display, cleanText(payload?.locale, 24),
+  );
+  await audit(db, Number(owner.pilgrim_id), "email_sign_in_code_sent", null, null);
+  return json({ ok: true, challengeID: challenge.id, expiresAt: challenge.expiresAt });
+}
+
+async function confirmEmailLogin(request: Request, db: D1Like) {
+  const payload = await request.json().catch(() => null) as {
+    challengeID?: unknown; code?: unknown; device?: unknown;
+  } | null;
+  const challengeID = cleanText(payload?.challengeID, 100);
+  // Verify the challenge is bound to an existing verified login identity BEFORE
+  // consuming it. Do not accept unlinked email-change challenges as a login.
+  const hint = await db.prepare(
+    `SELECT c.pilgrim_id,c.email_normalized FROM iumrah_client_email_challenges c
+     INNER JOIN iumrah_client_account_emails e
+       ON e.pilgrim_id=c.pilgrim_id AND e.email_normalized=c.email_normalized
+     INNER JOIN iumrah_accounts a ON a.pilgrim_id=e.pilgrim_id
+     WHERE c.id=?1 AND c.purpose='verify_email' AND e.verified_at IS NOT NULL LIMIT 1`,
+  ).bind(challengeID).first<{ pilgrim_id: number; email_normalized: string }>();
+  const pilgrimID = Number(hint?.pilgrim_id ?? 0);
+  if (!pilgrimID) throw new RouteError("VERIFICATION_CODE_INVALID", 400);
+  const challenge = await verifyEmailChallenge(
+    db, challengeID, "verify_email", cleanText(payload?.code, 12), pilgrimID,
+  );
+  if (challenge.email_normalized !== hint!.email_normalized) throw new RouteError("VERIFICATION_CODE_INVALID", 400);
+  const pilgrim = await accountRow(db, pilgrimID);
+  if (!pilgrim) throw new RouteError("INVALID_CREDENTIALS", 401);
+  const device = parseDevice(payload?.device);
+  const session = await createAccountSession(db, pilgrimID);
+  const auth: AccountAuth = { pilgrimID, tokenHash: session.tokenHash, pilgrim };
+  let sessionID: string;
+  try {
+    sessionID = await bindCurrentSession(db, auth, device, request);
+  } catch (error) {
+    await db.prepare("UPDATE iumrah_account_sessions SET revoked_at=?1 WHERE token_hash=?2")
+      .bind(new Date().toISOString(), session.tokenHash).run();
+    throw error;
+  }
+  await db.prepare("UPDATE iumrah_accounts SET last_login_at=?1 WHERE pilgrim_id=?2")
+    .bind(new Date().toISOString(), pilgrimID).run();
+  await audit(db, pilgrimID, "email_sign_in", sessionID, sessionID);
+  return json({
+    ok: true, account: accountProfile(pilgrim),
     session: { token: session.token, expiresAt: session.expiresAt },
   });
 }
@@ -3132,6 +3192,12 @@ export async function handleClientAccountSecurity(request: Request, env: Env, ur
     }
     if (request.method === "POST" && url.pathname === "/api/package/client/account/register/sms/confirm") {
       return await confirmStandalonePhoneRegistration(request, db);
+    }
+    if (request.method === "POST" && url.pathname === "/api/package/client/account/login/email/start") {
+      return await startEmailLogin(request, env, db);
+    }
+    if (request.method === "POST" && url.pathname === "/api/package/client/account/login/email/confirm") {
+      return await confirmEmailLogin(request, db);
     }
     if (request.method === "POST" && url.pathname === "/api/package/client/account/login/sms/start") {
       return await startPhoneLogin(request, env, db);

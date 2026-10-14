@@ -22,14 +22,12 @@ struct IumrahAccountActivationBridge {
         let bookingID: String
         let challengeID: String
         let code: String
-        let password: String
         let device: IumrahClientDevice
     }
 
     private struct RegistrationEmailConfirmRequest: Encodable {
         let challengeID: String
         let code: String
-        let password: String
         let firstName: String
         let lastName: String
         let device: IumrahClientDevice
@@ -53,7 +51,6 @@ struct IumrahAccountActivationBridge {
         bookingToken: String,
         challengeID: String,
         code: String,
-        password: String,
         locale: String
     ) async throws -> IumrahAccountAuthResponse {
         try await api.post(
@@ -62,7 +59,6 @@ struct IumrahAccountActivationBridge {
                 bookingID: bookingID,
                 challengeID: challengeID,
                 code: code,
-                password: password,
                 device: IumrahAccountDeviceIdentity.current(locale: locale)
             ),
             headers: ["x-booking-token": bookingToken]
@@ -79,7 +75,6 @@ struct IumrahAccountActivationBridge {
     func confirmEmailRegistration(
         challengeID: String,
         code: String,
-        password: String,
         firstName: String,
         lastName: String,
         locale: String
@@ -89,7 +84,6 @@ struct IumrahAccountActivationBridge {
             body: RegistrationEmailConfirmRequest(
                 challengeID: challengeID,
                 code: code,
-                password: password,
                 firstName: firstName,
                 lastName: lastName,
                 device: IumrahAccountDeviceIdentity.current(locale: locale)

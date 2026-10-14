@@ -77,7 +77,6 @@ final class IumrahAccountStore: ObservableObject {
         bookingToken: String,
         challengeID: String,
         code: String,
-        password: String,
         locale: String
     ) async throws -> IumrahAccountProfile {
         let response = try await service.confirmActivationEmail(
@@ -85,7 +84,6 @@ final class IumrahAccountStore: ObservableObject {
             bookingToken: bookingToken,
             challengeID: challengeID,
             code: code,
-            password: password,
             locale: locale
         )
         setSession(response)
@@ -107,7 +105,6 @@ final class IumrahAccountStore: ObservableObject {
         bookingToken: String,
         challengeID: String,
         code: String,
-        password: String,
         locale: String
     ) async throws -> IumrahAccountProfile {
         let response = try await service.confirmActivationSMS(
@@ -115,7 +112,6 @@ final class IumrahAccountStore: ObservableObject {
             bookingToken: bookingToken,
             challengeID: challengeID,
             code: code,
-            password: password,
             locale: locale
         )
         setSession(response)
@@ -125,6 +121,25 @@ final class IumrahAccountStore: ObservableObject {
     @discardableResult
     func login(identifier: String, password: String, locale: String = Locale.current.identifier) async throws -> IumrahAccountProfile {
         let response = try await service.login(identifier: identifier, password: password, locale: locale)
+        setSession(response)
+        _ = try? await service.registerCurrentSession(token: response.session.token, locale: locale)
+        return response.account
+    }
+
+    func startEmailLogin(email: String, locale: String = Locale.current.identifier) async throws -> IumrahEmailChallengeStartResponse {
+        try await service.startEmailLogin(email: email, locale: locale)
+    }
+
+    @discardableResult
+    func confirmEmailLogin(challengeID: String, code: String, locale: String = Locale.current.identifier) async throws -> IumrahAccountProfile {
+        let response = try await service.confirmEmailLogin(challengeID: challengeID, code: code, locale: locale)
+        return await acceptVerifiedSession(response, locale: locale)
+    }
+
+    /// Used only for successful server-side OTP verification (registration and booking activation).
+    /// Persists the SAME issued session instead of attempting a second password login.
+    @discardableResult
+    func acceptVerifiedSession(_ response: IumrahAccountAuthResponse, locale: String) async -> IumrahAccountProfile {
         setSession(response)
         _ = try? await service.registerCurrentSession(token: response.session.token, locale: locale)
         return response.account
@@ -161,13 +176,11 @@ final class IumrahAccountStore: ObservableObject {
     func confirmPhoneRegistration(
         challengeID: String,
         code: String,
-        password: String,
         locale: String = Locale.current.identifier
     ) async throws -> IumrahAccountProfile {
         let response = try await service.confirmPhoneRegistration(
             challengeID: challengeID,
             code: code,
-            password: password,
             locale: locale
         )
         setSession(response)

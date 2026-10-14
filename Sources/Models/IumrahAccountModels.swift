@@ -84,6 +84,17 @@ struct IumrahAccountLoginRequest: Encodable {
     let device: IumrahClientDevice
 }
 
+struct IumrahEmailLoginStartRequest: Encodable {
+    let email: String
+    let locale: String
+}
+
+struct IumrahEmailLoginConfirmRequest: Encodable {
+    let challengeID: String
+    let code: String
+    let device: IumrahClientDevice
+}
+
 struct IumrahPhoneLoginStartRequest: Encodable {
     let phone: String
     let locale: String
@@ -112,7 +123,6 @@ struct IumrahPhoneRegistrationStartRequest: Encodable {
 struct IumrahPhoneRegistrationConfirmRequest: Encodable {
     let challengeID: String
     let code: String
-    let password: String
     let device: IumrahClientDevice
 }
 
@@ -132,7 +142,6 @@ struct IumrahAccountActivationEmailConfirmRequest: Encodable {
     let bookingID: String
     let challengeID: String
     let code: String
-    let password: String
     let device: IumrahClientDevice
 }
 
@@ -146,7 +155,6 @@ struct IumrahAccountActivationSMSConfirmRequest: Encodable {
     let bookingID: String
     let challengeID: String
     let code: String
-    let password: String
     let device: IumrahClientDevice
 }
 

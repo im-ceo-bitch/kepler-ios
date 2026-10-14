@@ -6,7 +6,6 @@ import UIKit
 import AuthenticationServices
 
 private enum IumrahActivationMethod: String, CaseIterable, Identifiable {
-    case iumrahID
     case email
     case sms
 
@@ -14,7 +13,6 @@ private enum IumrahActivationMethod: String, CaseIterable, Identifiable {
 }
 
 private enum IumrahCheckoutLoginMethod: String, CaseIterable, Identifiable {
-    case iumrahID
     case email
     case sms
 
@@ -45,7 +43,7 @@ struct PilgrimCheckoutView: View {
     @State private var checkout: IumrahCheckoutResponse?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var activationMethod: IumrahActivationMethod = .iumrahID
+    @State private var activationMethod: IumrahActivationMethod = .email
     @State private var activationEmail = ""
     @State private var activationEmailChallengeID = ""
     @State private var activationEmailCode = ""
@@ -55,18 +53,14 @@ struct PilgrimCheckoutView: View {
     @State private var appleNonce = ""
     @State private var isAppleSigningIn = false
     @State private var isGoogleSigningIn = false
-    @State private var password = ""
-    @State private var passwordConfirm = ""
-    @State private var isPasswordVisible = false
-    @State private var isPasswordConfirmVisible = false
-    @State private var existingLoginMethod: IumrahCheckoutLoginMethod = .iumrahID
-    @State private var existingLoginID = ""
+    @State private var existingLoginMethod: IumrahCheckoutLoginMethod = .email
     @State private var existingLoginEmail = ""
+    @State private var existingLoginEmailChallengeID = ""
+    @State private var existingLoginEmailCode = ""
+    @State private var existingLoginSMSChallengeID = ""
+    @State private var existingLoginSMSCode = ""
     @State private var existingLoginPhone = "+998"
-    @State private var loginPassword = ""
-    @State private var isLoginPasswordVisible = false
     @State private var showExistingAccountLogin = false
-    @State private var showPasswordRecovery = false
     @State private var screenPrimaryPage: BookingPrimaryPage = .status
     @State private var isSubmittingAccount = false
     @State private var travelerEditor: IumrahTravelerForm?
@@ -130,9 +124,6 @@ struct PilgrimCheckoutView: View {
                         }
                     }
             }
-        }
-        .sheet(isPresented: $showPasswordRecovery) {
-            IumrahPasswordRecoveryView()
         }
         .onChange(of: receiptPhoto) { _, item in
             guard let item else { return }
@@ -418,17 +409,16 @@ struct PilgrimCheckoutView: View {
                 .foregroundStyle(.secondary)
 
             Text(tr(
-                "Create a password and keep it safe. You will use it to sign in to your iumrah account from another device or on the iumrah website.",
-                "Придумайте пароль и сохраните его надёжно. Он будет использоваться для входа в Ваш аккаунт iumrah с другого устройства или на сайте iumrah.",
-                "Parol yarating va uni xavfsiz saqlang. U boshqa qurilmadan yoki iumrah saytida akkauntingizga kirish uchun ishlatiladi.",
-                "Парол яратинг ва уни хавфсиз сақланг. У бошқа қурилмадан ёки iumrah сайтида аккаунтингизга кириш учун ишлатилади."
+                "Confirm your email or phone with a one-time code. You won't need to create a password.",
+                "Подтвердите почту или телефон одноразовым кодом. Создавать пароль не нужно.",
+                "Email yoki telefon raqamingizni bir martalik kod bilan tasdiqlang. Parol talab qilinmaydi.",
+                "Email ёки телефон рақамингизни бир марталик код билан тасдиқланг. Парол талаб қилинмайди."
             ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Picker("", selection: $activationMethod) {
-                Text("iumrah ID").tag(IumrahActivationMethod.iumrahID)
                 Text("Email").tag(IumrahActivationMethod.email)
                 Text("SMS").tag(IumrahActivationMethod.sms)
             }
@@ -441,28 +431,7 @@ struct PilgrimCheckoutView: View {
                 activationSMSCode = ""
             }
 
-            if activationMethod == .iumrahID {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("iumrah ID")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Text(normalizedID(value.iumrahID))
-                        .font(.system(size: 36, weight: .bold, design: .monospaced))
-                        .tracking(3)
-                        .textSelection(.enabled)
-                    Text(tr(
-                        "Your eight-digit iumrah ID is permanent and stays with you for future trips.",
-                        "Ваш восьмизначный iumrah ID постоянный и сохраняется для будущих поездок.",
-                        "Sakkiz xonali iumrah ID doimiy va keyingi safarlarda ham saqlanadi.",
-                        "Саккиз хонали iumrah ID доимий ва кейинги сафарларда ҳам сақланади."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            } else if activationMethod == .email {
+            if activationMethod == .email {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 11) {
                         Image(systemName: "envelope.fill")
@@ -594,35 +563,9 @@ struct PilgrimCheckoutView: View {
                 }
             }
 
-            passwordField(
-                tr("Create password", "Создайте пароль", "Parol yarating", "Парол яратинг"),
-                text: $password,
-                isVisible: $isPasswordVisible,
-                newPassword: true
-            )
-            passwordField(
-                tr("Confirm password", "Подтвердите пароль", "Parolni tasdiqlang", "Паролни тасдиқланг"),
-                text: $passwordConfirm,
-                isVisible: $isPasswordConfirmVisible,
-                newPassword: true
-            )
-
-            VStack(alignment: .leading, spacing: 7) {
-                activationRequirement(
-                    tr("At least 8 characters", "Минимум 8 символов", "Kamida 8 belgi", "Камида 8 белги"),
-                    ready: password.count >= 8
-                )
-                activationRequirement(
-                    tr("Passwords match", "Пароли совпадают", "Parollar mos", "Пароллар мос"),
-                    ready: !passwordConfirm.isEmpty && password == passwordConfirm
-                )
-            }
-
             Button {
                 Task {
                     switch activationMethod {
-                    case .iumrahID:
-                        await activateAccount(value)
                     case .email:
                         if activationEmailChallengeID.isEmpty { await startEmailActivation(value) }
                         else { await confirmEmailActivation(value) }
@@ -716,11 +659,10 @@ struct PilgrimCheckoutView: View {
 
             Button {
                 errorMessage = nil
-                if existingLoginID.isEmpty { existingLoginID = normalizedID(value.iumrahID) }
                 showExistingAccountLogin = true
             } label: {
                 Text(value.accountActive
-                    ? tr("Already created a password? Sign in", "Уже создавали пароль? Войти", "Avval parol yaratganmisiz? Kiring", "Аввал парол яратганмисиз? Киринг")
+                    ? tr("Sign in to your account", "Войти в существующий аккаунт", "Akkauntga kirish", "Аккаунтга кириш")
                     : tr("I already have an iumrah account", "У меня уже есть аккаунт iumrah", "Menda iumrah akkaunti bor", "Менда iumrah аккаунти бор"))
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity)
@@ -744,30 +686,19 @@ struct PilgrimCheckoutView: View {
             .fixedSize(horizontal: false, vertical: true)
 
             Picker("", selection: $existingLoginMethod) {
-                Text("iumrah ID").tag(IumrahCheckoutLoginMethod.iumrahID)
                 Text("Email").tag(IumrahCheckoutLoginMethod.email)
                 Text("SMS").tag(IumrahCheckoutLoginMethod.sms)
             }
             .pickerStyle(.segmented)
-            .onChange(of: existingLoginMethod) { _, _ in errorMessage = nil }
+            .onChange(of: existingLoginMethod) { _, _ in
+                errorMessage = nil
+                existingLoginEmailCode = ""
+                existingLoginEmailChallengeID = ""
+                existingLoginSMSCode = ""
+                existingLoginSMSChallengeID = ""
+            }
 
             switch existingLoginMethod {
-            case .iumrahID:
-                HStack(spacing: 11) {
-                    Image(systemName: "number").foregroundStyle(.secondary).frame(width: 22)
-                    TextField("00000016", text: $existingLoginID)
-                        .keyboardType(.numberPad)
-                        .textContentType(.username)
-                        .font(.body.monospaced())
-                        .onChange(of: existingLoginID) { _, raw in
-                            let digits = String(raw.filter(\.isNumber).prefix(8))
-                            if digits != raw { existingLoginID = digits }
-                        }
-                }
-                .padding(.horizontal, 14)
-                .frame(height: 54)
-                .iumrahGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous), interactive: true)
-
             case .email:
                 HStack(spacing: 11) {
                     Image(systemName: "envelope.fill").foregroundStyle(.secondary).frame(width: 22)
@@ -776,6 +707,7 @@ struct PilgrimCheckoutView: View {
                         .textContentType(.emailAddress)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
+                        .disabled(!existingLoginEmailChallengeID.isEmpty)
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 54)
@@ -788,6 +720,7 @@ struct PilgrimCheckoutView: View {
                         TextField("+998 90 123 45 67", text: $existingLoginPhone)
                             .keyboardType(.phonePad)
                             .textContentType(.telephoneNumber)
+                            .disabled(!existingLoginSMSChallengeID.isEmpty)
                             .onChange(of: existingLoginPhone) { _, raw in
                                 let formatted = activationPhoneInput(raw)
                                 if formatted != raw { existingLoginPhone = formatted }
@@ -801,10 +734,10 @@ struct PilgrimCheckoutView: View {
                         HStack(alignment: .top, spacing: 9) {
                             Image(systemName: "exclamationmark.bubble.fill").foregroundStyle(.orange)
                             Text(tr(
-                                "SMS sign-in is temporarily unavailable for this country. Use Email, iumrah ID, Google or Apple.",
-                                "Вход по SMS для этой страны временно недоступен. Используйте Email, iumrah ID, Google или Apple.",
-                                "Bu davlat uchun SMS orqali kirish vaqtincha mavjud emas. Email, iumrah ID, Google yoki Apple’dan foydalaning.",
-                                "Бу давлат учун SMS орқали кириш вақтинча мавжуд эмас. Email, iumrah ID, Google ёки Apple’дан фойдаланинг."
+                                "SMS sign-in is temporarily unavailable for this country. Use Email, Google or Apple.",
+                                "Вход по SMS для этой страны временно недоступен. Используйте Email, Google или Apple.",
+                                "Bu davlat uchun SMS orqali kirish vaqtincha mavjud emas. Email, Google yoki Apple’dan foydalaning.",
+                                "Бу давлат учун SMS орқали кириш вақтинча мавжуд эмас. Email, Google ёки Apple’дан фойдаланинг."
                             ))
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.orange)
@@ -815,36 +748,55 @@ struct PilgrimCheckoutView: View {
                 }
             }
 
-            passwordField(
-                tr("Password", "Пароль", "Parol", "Парол"),
-                text: $loginPassword,
-                isVisible: $isLoginPasswordVisible,
-                newPassword: false
-            )
+            if existingLoginMethod == .email && !existingLoginEmailChallengeID.isEmpty {
+                HStack(spacing: 11) {
+                    Image(systemName: "number.square.fill").frame(width: 22).foregroundStyle(.secondary)
+                    TextField(tr("6-digit email code", "6-значный код из письма", "Emaildan 6 xonali kod", "Emailдан 6 хонали код"), text: $existingLoginEmailCode)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .onChange(of: existingLoginEmailCode) { _, raw in
+                            let digits = String(raw.filter(\.isNumber).prefix(6))
+                            if digits != raw { existingLoginEmailCode = digits }
+                        }
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 54)
+                .iumrahGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous), interactive: true)
+            }
 
-            HStack {
-                Button {
-                    errorMessage = nil
-                    showExistingAccountLogin = false
-                } label: {
-                    Text(tr("Create an account for this booking", "Создать аккаунт для этой брони", "Bu bron uchun akkaunt yaratish", "Бу брон учун аккаунт яратиш"))
-                        .font(.caption.weight(.semibold))
+            if existingLoginMethod == .sms && !existingLoginSMSChallengeID.isEmpty {
+                HStack(spacing: 11) {
+                    Image(systemName: "number.square.fill").frame(width: 22).foregroundStyle(.secondary)
+                    TextField(tr("6-digit SMS code", "Код SMS из 6 цифр", "6 xonali SMS kodi", "6 хонали SMS коди"), text: $existingLoginSMSCode)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .onChange(of: existingLoginSMSCode) { _, raw in
+                            let digits = String(raw.filter(\.isNumber).prefix(6))
+                            if digits != raw { existingLoginSMSCode = digits }
+                        }
                 }
-                .buttonStyle(.plain)
-                Spacer()
-                Button { showPasswordRecovery = true } label: {
-                    Text(tr("Forgot password?", "Забыли пароль?", "Parolni unutdingizmi?", "Паролни унутдингизми?"))
-                        .font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 14)
+                .frame(height: 54)
+                .iumrahGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous), interactive: true)
             }
 
             Button {
-                Task { await login(value) }
+                errorMessage = nil
+                showExistingAccountLogin = false
+            } label: {
+                Text(tr("Create an account for this booking", "Создать аккаунт для этой брони", "Bu bron uchun akkaunt yaratish", "Бу брон учун аккаунт яратиш"))
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Task { await startOrConfirmExistingLogin(value) }
             } label: {
                 HStack {
                     if isSubmittingAccount { ProgressView().tint(.white) }
-                    Text(tr("Sign in and link booking", "Войти и привязать бронь", "Kirish va bronni ulash", "Кириш ва бронни улаш"))
+                    Text(existingLoginChallengePending
+                        ? tr("Confirm code and sign in", "Подтвердить код и войти", "Kodni tasdiqlab kirish", "Кодни тасдиқлаб кириш")
+                        : tr("Send sign-in code", "Отправить код для входа", "Kirish kodini yuborish", "Кириш кодини юбориш"))
                     Spacer(); Image(systemName: "arrow.forward")
                 }
             }
@@ -874,24 +826,28 @@ struct PilgrimCheckoutView: View {
         .iumrahCard()
     }
 
-    private var existingLoginReady: Bool {
-        guard loginPassword.count >= 8 else { return false }
+    private var existingLoginChallengePending: Bool {
         switch existingLoginMethod {
-        case .iumrahID:
-            return [6, 8].contains(existingLoginID.filter(\.isNumber).count)
+        case .email: return !existingLoginEmailChallengeID.isEmpty
+        case .sms: return !existingLoginSMSChallengeID.isEmpty
+        }
+    }
+
+    private var existingLoginReady: Bool {
+        switch existingLoginMethod {
         case .email:
             let email = existingLoginEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-            return email.contains("@") && email.contains(".")
+            return email.contains("@") && email.contains(".") &&
+                (existingLoginEmailChallengeID.isEmpty || existingLoginEmailCode.count == 6)
         case .sms:
             let phone = activationPhoneInput(existingLoginPhone)
-            return phone.hasPrefix("+998") && phone.count == 13
+            return phone.hasPrefix("+998") && phone.count == 13 &&
+                (existingLoginSMSChallengeID.isEmpty || existingLoginSMSCode.count == 6)
         }
     }
 
     private var activationPrimaryTitle: String {
         switch activationMethod {
-        case .iumrahID:
-            return tr("Activate ID and continue", "Активировать ID и продолжить", "ID ni faollashtirish va davom etish", "ID ни фаоллаштириш ва давом этиш")
         case .email:
             if activationEmailChallengeID.isEmpty {
                 return tr("Send verification code", "Отправить код", "Tasdiqlash kodini yuborish", "Тасдиқлаш кодини юбориш")
@@ -906,10 +862,7 @@ struct PilgrimCheckoutView: View {
     }
 
     private var activationPrimaryReady: Bool {
-        guard password.count >= 8, password == passwordConfirm else { return false }
         switch activationMethod {
-        case .iumrahID:
-            return true
         case .email:
             let email = activationEmail.trimmingCharacters(in: .whitespacesAndNewlines)
             guard email.contains("@"), email.contains(".") else { return false }
@@ -1538,33 +1491,6 @@ struct PilgrimCheckoutView: View {
         }
     }
 
-    private func passwordField(_ title: String, text: Binding<String>, isVisible: Binding<Bool>, newPassword: Bool) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: "lock.fill").foregroundStyle(.secondary).frame(width: 22)
-            Group {
-                if isVisible.wrappedValue {
-                    TextField(title, text: text)
-                        .textContentType(newPassword ? .newPassword : .password)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                } else {
-                    SecureField(title, text: text)
-                        .textContentType(newPassword ? .newPassword : .password)
-                }
-            }
-            Button { isVisible.wrappedValue.toggle() } label: {
-                Image(systemName: isVisible.wrappedValue ? "eye.slash.fill" : "eye.fill")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 30, height: 40)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isVisible.wrappedValue ? tr("Hide password", "Скрыть пароль", "Parolni yashirish", "Паролни яшириш") : tr("Show password", "Показать пароль", "Parolni ko‘rsatish", "Паролни кўрсатиш"))
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 54)
-        .iumrahGlass(in: RoundedRectangle(cornerRadius: 18, style: .continuous), interactive: true)
-    }
-
     private func readinessChip(_ title: String, ready: Bool) -> some View {
         HStack(spacing: 5) {
             Image(systemName: ready ? "checkmark.circle.fill" : "circle")
@@ -1650,30 +1576,6 @@ struct PilgrimCheckoutView: View {
     }
 
     @MainActor
-    private func activateAccount(_ value: IumrahCheckoutResponse) async {
-        guard let session, !session.accessToken.isEmpty else { return }
-        isSubmittingAccount = true
-        errorMessage = nil
-        defer { isSubmittingAccount = false }
-        do {
-            let profile = try await account.activate(
-                bookingID: bookingID,
-                bookingToken: session.accessToken,
-                password: password,
-                locale: settings.language.rawValue
-            )
-            await finishAccountActivation(profile, session: session)
-        } catch APIError.server(_, let message) where message.uppercased().contains("ACCOUNT_ALREADY_ACTIVE") {
-            errorMessage = IumrahAccountSecurityCopy.message(for: APIError.server(409, "ACCOUNT_ALREADY_ACTIVE"), language: settings.language)
-            showExistingAccountLogin = true
-            IumrahHaptics.error()
-        } catch {
-            errorMessage = IumrahAccountSecurityCopy.message(for: error, language: settings.language)
-            IumrahHaptics.error()
-        }
-    }
-
-    @MainActor
     private func startEmailActivation(_ value: IumrahCheckoutResponse) async {
         guard let session, !session.accessToken.isEmpty else { return }
         isSubmittingAccount = true
@@ -1711,7 +1613,6 @@ struct PilgrimCheckoutView: View {
                 bookingToken: session.accessToken,
                 challengeID: activationEmailChallengeID,
                 code: activationEmailCode,
-                password: password,
                 locale: settings.language.rawValue
             )
             await finishAccountActivation(profile, session: session)
@@ -1763,15 +1664,9 @@ struct PilgrimCheckoutView: View {
                 bookingToken: session.accessToken,
                 challengeID: activationSMSChallengeID,
                 code: activationSMSCode,
-                password: password,
                 locale: settings.language.rawValue
             )
-            // Establish the normal Keychain-backed app session via the canonical login path.
-            let profile = try await account.login(
-                identifier: response.account.iumrahID,
-                password: password,
-                locale: settings.language.rawValue
-            )
+            let profile = await account.acceptVerifiedSession(response, locale: settings.language.rawValue)
             await finishAccountActivation(profile, session: session)
         } catch APIError.server(_, let message) where message.uppercased().contains("ACCOUNT_ALREADY_ACTIVE") {
             errorMessage = IumrahAccountSecurityCopy.message(for: APIError.server(409, "ACCOUNT_ALREADY_ACTIVE"), language: settings.language)
@@ -1793,8 +1688,6 @@ struct PilgrimCheckoutView: View {
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)
         }
-        password = ""
-        passwordConfirm = ""
         activationEmailCode = ""
         activationSMSCode = ""
         activationSMSChallengeID = ""
@@ -1803,28 +1696,58 @@ struct PilgrimCheckoutView: View {
     }
 
     @MainActor
-    private func login(_ value: IumrahCheckoutResponse) async {
-        isSubmittingAccount = true; errorMessage = nil
+    private func startOrConfirmExistingLogin(_ value: IumrahCheckoutResponse) async {
+        isSubmittingAccount = true
+        errorMessage = nil
         defer { isSubmittingAccount = false }
         do {
-            let identifier: String
+            let profile: IumrahAccountProfile
             switch existingLoginMethod {
-            case .iumrahID:
-                identifier = normalizedID(existingLoginID)
             case .email:
-                identifier = existingLoginEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if existingLoginEmailChallengeID.isEmpty {
+                    let response = try await account.startEmailLogin(
+                        email: existingLoginEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                        locale: settings.language.rawValue
+                    )
+                    existingLoginEmailChallengeID = response.challengeID
+                    existingLoginEmailCode = ""
+                    IumrahHaptics.success()
+                    return
+                }
+                profile = try await account.confirmEmailLogin(
+                    challengeID: existingLoginEmailChallengeID,
+                    code: existingLoginEmailCode,
+                    locale: settings.language.rawValue
+                )
             case .sms:
-                identifier = activationPhoneInput(existingLoginPhone)
+                if existingLoginSMSChallengeID.isEmpty {
+                    let response = try await account.startPhoneLogin(
+                        phone: activationPhoneInput(existingLoginPhone),
+                        locale: settings.language.rawValue
+                    )
+                    existingLoginSMSChallengeID = response.challengeID
+                    existingLoginSMSCode = ""
+                    IumrahHaptics.success()
+                    return
+                }
+                profile = try await account.confirmPhoneLogin(
+                    challengeID: existingLoginSMSChallengeID,
+                    code: existingLoginSMSCode,
+                    locale: settings.language.rawValue
+                )
             }
-            _ = try await account.login(identifier: identifier, password: loginPassword, locale: settings.language.rawValue)
-            bookings.setAccountToken(account.bearerToken)
             guard let session else { throw APIError.missingBookingToken }
+            bookings.setAccountToken(account.bearerToken)
             let linked = try await account.linkBooking(bookingID: bookingID, bookingToken: session.accessToken)
             bookings.applyCanonicalLink(linked, to: bookingID)
             if let token = account.bearerToken { await bookings.restoreAccountTrips(token: token) }
-            loginPassword = ""
             await loadCheckout(showLoader: false)
             IumrahHaptics.success()
+            _ = profile // Session is already saved in IumrahAccountStore.
+            existingLoginEmailChallengeID = ""
+            existingLoginEmailCode = ""
+            existingLoginSMSChallengeID = ""
+            existingLoginSMSCode = ""
         } catch {
             errorMessage = IumrahAccountSecurityCopy.message(for: error, language: settings.language)
             IumrahHaptics.error()

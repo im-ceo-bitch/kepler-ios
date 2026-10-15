@@ -78,7 +78,10 @@ test("Flights storefront uses the dedicated Aviasales discovery experience and k
 test("panoramic hotel photos are constrained by the card viewport and the meal UI remains intact", () => {
   assert.match(imageCache, /GeometryReader \{ proxy in/);
   assert.match(imageCache, /frame\(width: proxy\.size\.width, height: proxy\.size\.height\)/);
-  assert.match(primary, /let contentWidth = max\(0, viewport\.size\.width - \(IumrahDesign\.pagePadding \* 2\)\)/);
+  // Accept both algebraically identical Swift spellings: with or without the
+  // optional grouping parentheses around horizontal page padding. The contract
+  // is the viewport-constrained card width, not the source's exact typography.
+  assert.match(primary, /let contentWidth\s*=\s*max\(\s*0\s*,\s*viewport\.size\.width\s*-\s*(?:\(\s*IumrahDesign\.pagePadding\s*\*\s*2\s*\)|IumrahDesign\.pagePadding\s*\*\s*2)\s*\)/);
   assert.match(primary, /frame\(width: contentWidth, alignment: \.leading\)/);
   assert.match(primary, /HotelCachedImage\(rawURL: hotel\.coverImageURL\)/);
   assert.match(primary, /mealPlanCard\(role: role\)/);

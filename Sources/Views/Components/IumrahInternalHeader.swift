@@ -71,6 +71,7 @@ private struct GeneratorProgressStrip: View {
     let stage: TripProgressStage
     var labelKey: String? = nil
     var currentPriceText: String? = nil
+    var isPriceLoading: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -87,9 +88,12 @@ private struct GeneratorProgressStrip: View {
                             .font(.system(size: 9, weight: .bold, design: .rounded))
                             .tracking(0.7)
                             .foregroundStyle(.secondary)
-                        Text(currentPriceText)
-                            .font(.callout.monospacedDigit().weight(.bold))
-                            .contentTransition(.numericText())
+                        HStack(spacing: 5) {
+                            if isPriceLoading { ProgressView().controlSize(.mini) }
+                            Text(currentPriceText)
+                                .font(.callout.monospacedDigit().weight(.bold))
+                                .contentTransition(.numericText())
+                        }
                     }
                 } else {
                     Text(L10n.text(labelKey ?? stage.localizationKey, settings.language))
@@ -361,6 +365,7 @@ struct IumrahGeneratorHeader: View {
 
     let stage: TripProgressStage
     var currentPriceText: String? = nil
+    var isPriceLoading: Bool = false
 
     var body: some View {
         IumrahGlassGroup(spacing: 8) {
@@ -376,7 +381,8 @@ struct IumrahGeneratorHeader: View {
 
                 GeneratorProgressStrip(
                     stage: stage,
-                    currentPriceText: currentPriceText
+                    currentPriceText: currentPriceText,
+                    isPriceLoading: isPriceLoading
                 )
                 .padding(.horizontal, 2)
             }

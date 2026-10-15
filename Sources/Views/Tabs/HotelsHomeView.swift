@@ -13,23 +13,22 @@ struct HotelsHomeView: View {
     @State private var autoOpenConfiguratorHotelID: String?
     @State private var autoOpenConfiguratorDeepLink: HotelConfiguratorDeepLink?
     @State private var carePresented = false
-    @State private var hotelPriceGraphPresented = false
     @State private var packageShareArtifacts: IumrahPackageShareArtifacts?
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
 
     var body: some View {
-        // GeometryReader constrains all hotel sections to the same safe content
-        // width used by the flight feed, including wide hero images and carousels.
-        GeometryReader { viewport in
-            ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 22) {
+        // One shared ScrollView and one set of page gutters for Hotels, Flights
+        // and Weekend. Do not size child sections against a nested GeometryReader:
+        // that previously caused the hotel hero/cards to bleed into the edges.
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 22) {
                     IumrahRootPageTitle(title: pageTitle)
                         .padding(.top, 10)
 
-                    if board != .flights {
-                        AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
-                    }
+                    // The departure/location selector stays in the same top
+                    // position regardless of the selected board.
+                    AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
 
                     HStack(spacing: 10) {
                         boardTile(.hotels, icon: "building.2.fill", title: L10n.text("tab_hotels", settings.language))
@@ -42,11 +41,11 @@ struct HotelsHomeView: View {
                     case .flights: flightsBoard
                     case .sundayClub: sundayClubBoard
                     }
-                }
-                .frame(width: max(0, viewport.size.width - 2 * IumrahDesign.pagePadding), alignment: .topLeading)
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.bottom, 110)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.top, 12)
+            .padding(.bottom, 110)
         }
         .refreshable {
             await storefront.updateDepartureAirport(journey.trip.originCode)
@@ -54,23 +53,7 @@ struct HotelsHomeView: View {
         }
         .background(Color.iumrahPageBackground)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if board == .hotels {
-                Button {
-                    IumrahHaptics.selection()
-                    hotelPriceGraphPresented = true
-                } label: {
-                    Label(hotelPriceGraphTitle, systemImage: "chart.bar.xaxis")
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 22)
-                        .frame(height: 54)
-                        .background(Color.blue, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("hotels.openPriceGraph")
-                .frame(maxWidth: .infinity)
-                .padding(.bottom, 8)
-            } else if board == .flights {
+            if board == .flights {
                 IumrahPackageAssemblyBar(
                     language: settings.language,
                     selections: journey.stagedUmrahFlights,
@@ -119,11 +102,6 @@ struct HotelsHomeView: View {
         }
         .navigationDestination(item: $selectedFlightPackage) { preview in
             StorefrontUmrahPackageDetailView(preview: preview)
-        }
-        .sheet(isPresented: $hotelPriceGraphPresented) {
-            HotelPackagePriceGraphSheet()
-                .environmentObject(settings)
-                .environmentObject(storefront)
         }
         .sheet(isPresented: $carePresented) {
             HotelCareContactSheet()
@@ -182,19 +160,6 @@ struct HotelsHomeView: View {
         guard let requested = chrome.requestedHotelsBoard else { return }
         board = requested
         chrome.requestedHotelsBoard = nil
-    }
-
-    private var hotelPriceGraphTitle: String {
-        switch settings.language {
-        case .russian: return "График цен"
-        case .english: return "Price chart"
-        case .uzbek: return "Narx grafigi"
-        case .uzbekCyrillic: return "Нарх графиги"
-        case .turkish: return "Fiyat grafiği"
-        case .indonesian: return "Grafik harga"
-        case .malay: return "Carta harga"
-        case .arabic: return "مخطط الأسعار"
-        }
     }
 
     private var pageTitle: String {
@@ -1383,6 +1348,15 @@ struct HotelStorefrontCard: View {
     let onOpen: () -> Void
     let onFavorite: () -> Void
     let onShare: () -> Void
+    // Optional selection mode reuses the *same card* in the configurator.
+    // Only the bottom price/action area changes; geometry, collage, corners,
+    // and text typography stay identical to the hotel storefront.
+    var selectionRole: HotelSelectionRole? = nil
+    var isSelectedInConfigurator = false
+    var pendingPriceLabel = ""
+    var selectHotelLabel = ""
+    var selectedHotelLabel = ""
+    var onSelectHotel: (() -> Void)? = nil
 
     private let cardHeight: CGFloat = 204
 
@@ -1395,7 +1369,8 @@ struct HotelStorefrontCard: View {
                     HotelStorefrontCollage(images: images, fallback: hotel.coverImageURL)
                         .frame(width: mediaWidth, height: cardHeight)
 
-                    HStack(spacing: 6) {
+                    if selectionRole == nil {
+                        HStack(spacing: 6) {
                         Button(action: onFavorite) {
                             Image(systemName: isFavorite ? "heart.fill" : "heart")
                                 .font(.system(size: 14, weight: .semibold))
@@ -1418,7 +1393,8 @@ struct HotelStorefrontCard: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel(L10n.text("hotel_storefront_share", language))
                     }
-                    .padding(9)
+                        .padding(9)
+                    }
                 }
                 .frame(width: mediaWidth, height: cardHeight)
                 .clipped()
@@ -1450,7 +1426,31 @@ struct HotelStorefrontCard: View {
 
                     Spacer(minLength: 2)
 
-                    if let quote {
+                    if let selectionRole {
+                        HotelPackageDeltaText(
+                            hotel: hotel,
+                            city: selectionRole,
+                            isSelected: isSelectedInConfigurator,
+                            emptyLabel: pendingPriceLabel
+                        )
+                        .font(.headline.monospacedDigit())
+                        Spacer(minLength: 0)
+                        if isSelectedInConfigurator {
+                            Label(selectedHotelLabel, systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(Color(red: 0.18, green: 0.71, blue: 0.40))
+                                .font(.caption.weight(.bold))
+                        } else if let onSelectHotel {
+                            Button(action: onSelectHotel) {
+                                Text(selectHotelLabel)
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(Color(red: 0.18, green: 0.56, blue: 0.32))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 35)
+                                    .background(Color.green.opacity(0.10), in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else if let quote {
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
                             Text(money(quote.packageQuote.pricePerPerson))
                                 .font(.system(size: 25, weight: .bold, design: .rounded))
@@ -1481,16 +1481,18 @@ struct HotelStorefrontCard: View {
                         .frame(minHeight: 38, alignment: .leading)
                     }
 
-                    HStack(spacing: 5) {
-                        Text(L10n.text("hotel_storefront_includes", language))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.68)
-                        Spacer(minLength: 2)
-                        Image(systemName: "chevron.forward")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.tertiary)
+                    if selectionRole == nil {
+                        HStack(spacing: 5) {
+                            Text(L10n.text("hotel_storefront_includes", language))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.68)
+                            Spacer(minLength: 2)
+                            Image(systemName: "chevron.forward")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
                 .padding(.horizontal, 14)

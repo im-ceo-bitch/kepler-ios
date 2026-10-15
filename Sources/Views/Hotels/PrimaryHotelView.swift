@@ -16,12 +16,15 @@ struct PrimaryHotelView: View {
     @State private var activeHotelCity: HotelSelectionRole = .makkah
     @State private var starFilter: Int? = nil
     @State private var isUpdatingPrice = false
+    @State private var hotelForDetails: HotelSummary?
 
     // The server is the source of truth for package totals. Never invent a total
     // from the catalog hotel's nightly rate or reuse a quote for another selection.
     private var visibleTotal: String? {
+        // While a new quote is in flight never display the old food/hotel total.
+        if isUpdatingPrice { return priceLoadingText }
         guard journey.hasFinalGeneratorQuote, let quote = journey.quote else {
-            return isUpdatingPrice ? priceLoadingText : pricePendingText
+            return hasSelectedFlightContext ? priceUnavailableText : pricePendingText
         }
         let value = NSDecimalNumber(decimal: quote.totalPackagePrice).doubleValue
         return value.formatted(.currency(code: quote.currency).precision(.fractionLength(0)))
@@ -31,7 +34,16 @@ struct PrimaryHotelView: View {
         [journey.selectedHotel?.id ?? "", journey.selectedMadinahHotel?.id ?? "",
          journey.trip.packageTier.rawValue, journey.packageFlightPath.rawValue,
          journey.selectedRoom?.id ?? "", journey.selectedMadinahRoom?.id ?? "",
-         String(journey.trip.travelerCount)].joined(separator: "|")
+         String(journey.trip.travelerCount),
+         String(journey.isMealEnabled(.lunch, city: .makkah)),
+         String(journey.isMealEnabled(.dinner, city: .makkah)),
+         String(journey.isMealEnabled(.dinner, city: .madinah))].joined(separator: "|")
+    }
+
+    private var hasSelectedFlightContext: Bool {
+        journey.selectedOutbound != nil ||
+        (journey.packageFlightPath == .publishedDirect && journey.hasCompletePublishedFlightSelection) ||
+        (journey.packageFlightPath == .aviasalesSelected && journey.hasCompleteStagedFlightSelection)
     }
 
     var entryMode: PrimaryHotelEntryMode = .standard
@@ -47,13 +59,13 @@ struct PrimaryHotelView: View {
 
     var body: some View {
         GeometryReader { viewport in
-            let contentWidth = max(0, viewport.size.width - IumrahDesign.pagePadding * 2)
+            let contentWidth = max(0, viewport.size.width - (IumrahDesign.pagePadding * 2))
 
             VStack(spacing: 0) {
                 // Keep one native glass generator header outside the ScrollView.
                 // This preserves the animated stage, live total and back action
                 // while the user scrolls through the hotel catalogue.
-                IumrahGeneratorHeader(stage: .hotel, currentPriceText: visibleTotal)
+                IumrahGeneratorHeader(stage: .hotel, currentPriceText: visibleTotal, isPriceLoading: isUpdatingPrice)
                     .frame(width: contentWidth)
                     .padding(.horizontal, IumrahDesign.pagePadding)
                     .padding(.top, 9)
@@ -88,8 +100,11 @@ struct PrimaryHotelView: View {
             if requiresMadinah, journey.madinahHotels.isEmpty { await journey.loadMadinahHotels() }
         }
         .task(id: quoteInputKey) {
-            // Debounce rapid city/hotel changes so only the settled choice is
-            // resolved against the live Package Engine.
+            // Meal choices are part of the key: the verified flight must not be
+            // selected again just to update a lunch/dinner price.
+            guard hasSelectedFlightContext, canContinue else { return }
+            isUpdatingPrice = true
+            defer { isUpdatingPrice = false }
             try? await Task.sleep(for: .milliseconds(260))
             guard !Task.isCancelled else { return }
             await refreshCurrentPackagePrice()
@@ -104,6 +119,9 @@ struct PrimaryHotelView: View {
         }
         .navigationDestination(isPresented: $showTransfer) {
             TransferSelectionView()
+        }
+        .navigationDestination(item: $hotelForDetails) { hotel in
+            HotelDetailView(hotel: hotel, selectionFlow: true, selectionRole: activeHotelCity)
         }
         .alert(publishedErrorTitle, isPresented: Binding(
             get: { publishedPackageError != nil },
@@ -137,8 +155,9 @@ struct PrimaryHotelView: View {
         .opacity(canContinue && !isPreparingPublishedPackage ? 1 : 0.46)
         .padding(.horizontal, IumrahDesign.pagePadding)
         .padding(.top, 10)
-        .padding(.bottom, 12)
-        .background(Color.iumrahPageBackground)
+        .padding(.bottom, 8)
+        // No opaque safe-area shelf. The button floats over the existing page.
+        .background(Color.clear)
     }
 
     private func continueLabel(_ text: String) -> some View {
@@ -160,8 +179,12 @@ struct PrimaryHotelView: View {
               journey.packageFlightPath == .aviasalesSelected ||
               journey.selectedOutbound != nil else { return }
         guard !journey.hasFinalGeneratorQuote else { return }
-        isUpdatingPrice = true
-        defer { isUpdatingPrice = false }
+        // Resolve a Flight First selection at most once. After that, meal and
+        // hotel changes use buildQuote() on the *same* verified flight pair.
+        if let outbound = journey.selectedOutbound, outbound.isVerifiedForBooking {
+            await journey.buildQuote()
+            return
+        }
         switch journey.packageFlightPath {
         case .publishedDirect:
             _ = await journey.preparePublishedDirectQuote()
@@ -517,56 +540,28 @@ struct PrimaryHotelView: View {
     }
 
     private func alternativeHotelRow(_ hotel: HotelSummary) -> some View {
-        let selected = (activeHotelCity == .makkah ? journey.selectedHotel?.id : journey.selectedMadinahHotel?.id) == hotel.id
-        return HStack(alignment: .center, spacing: 12) {
-            HotelCachedImage(rawURL: hotel.coverImageURL)
-                .frame(width: 83, height: 91)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(hotel.name)
-                    .font(.subheadline.weight(.bold))
-                    .lineLimit(2)
-                Text("\(hotel.stars ?? 0) ★")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-
-                HotelPackageDeltaText(hotel: hotel, city: activeHotelCity, isSelected: selected,
-                                      emptyLabel: pricePendingText)
-                HStack(spacing: 11) {
-                    NavigationLink {
-                        HotelDetailView(hotel: hotel, selectionFlow: true, selectionRole: activeHotelCity)
-                    } label: {
-                        Text(FlowCopy.text(.viewHotel, settings.language))
-                            .font(.caption.weight(.semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-
-                    if !selected {
-                        Button {
-                            IumrahHaptics.selection()
-                            if activeHotelCity == .makkah { journey.chooseHotel(hotel) }
-                            else { journey.chooseMadinahHotel(hotel) }
-                        } label: {
-                            Text(selectHotelTitle)
-                                .font(.caption.weight(.bold))
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(Color(red: 0.23, green: 0.72, blue: 0.43))
-                    } else {
-                        Label(selectedHotelTitle, systemImage: "checkmark.circle.fill")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(Color(red: 0.23, green: 0.72, blue: 0.43))
-                    }
-                }
+        let selected = (activeHotelCity == .makkah
+            ? journey.selectedHotel?.id : journey.selectedMadinahHotel?.id) == hotel.id
+        return HotelStorefrontCard(
+            hotel: hotel,
+            images: [hotel.coverImageURL].compactMap { $0 },
+            quote: nil,
+            language: settings.language,
+            isFavorite: false,
+            onOpen: { hotelForDetails = hotel },
+            onFavorite: {},
+            onShare: {},
+            selectionRole: activeHotelCity,
+            isSelectedInConfigurator: selected,
+            pendingPriceLabel: isUpdatingPrice ? priceLoadingText : pricePendingText,
+            selectHotelLabel: selectHotelTitle,
+            selectedHotelLabel: selectedHotelTitle,
+            onSelectHotel: {
+                IumrahHaptics.selection()
+                if activeHotelCity == .makkah { journey.chooseHotel(hotel) }
+                else { journey.chooseMadinahHotel(hotel) }
             }
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+        )
     }
 
     private var allHotelsTitle: String { stepText("Все", "All", "Barchasi", "Барчаси", "Tümü", "الكل", "Semua", "Semua") }
@@ -575,6 +570,7 @@ struct PrimaryHotelView: View {
     private var selectedHotelTitle: String { stepText("Выбран", "Selected", "Tanlandi", "Танланди", "Seçildi", "تم الاختيار", "Dipilih", "Dipilih") }
     private var priceLoadingText: String { stepText("Расчёт…", "Calculating…", "Hisoblanmoqda…", "Ҳисобланмоқда…", "Hesaplanıyor…", "جارٍ الحساب…", "Menghitung…", "Mengira…") }
     private var pricePendingText: String { stepText("После выбора рейса", "After flight selection", "Reys tanlangach", "Рейс танлангач", "Uçuş seçiminden sonra", "بعد اختيار الرحلة", "Setelah memilih penerbangan", "Selepas memilih penerbangan") }
+    private var priceUnavailableText: String { stepText("Цена уточняется", "Price unavailable", "Narx tekshirilmoqda", "Нарх текширилмоқда", "Fiyat doğrulanıyor", "السعر قيد التحقق", "Harga belum tersedia", "Harga belum tersedia") }
 
     private func stepText(_ ru: String, _ en: String, _ uz: String, _ cy: String, _ tr: String, _ ar: String, _ id: String, _ ms: String) -> String {
         switch settings.language {

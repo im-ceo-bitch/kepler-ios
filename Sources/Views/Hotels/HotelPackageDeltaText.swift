@@ -15,6 +15,7 @@ struct HotelPackageDeltaText: View {
 
     @State private var alternativeQuote: PackageQuote?
     @State private var loading = false
+    @State private var calculationFailed = false
 
     private var referenceQuote: PackageQuote? {
         journey.hasFinalGeneratorQuote ? journey.quote : nil
@@ -39,10 +40,13 @@ struct HotelPackageDeltaText: View {
                 Text("\(candidate.isEstimated || base.isEstimated ? "≈ " : "")\(signed)\(money(amount, currency: candidate.currency))")
                     .foregroundStyle(delta > 0 ? Color.orange : (delta < 0 ? Color.green : Color.secondary))
             } else if loading {
-                ProgressView()
-                    .controlSize(.mini)
+                HStack(spacing: 4) {
+                    ProgressView().controlSize(.mini)
+                    Text(calculatingLabel)
+                }
+                .foregroundStyle(.secondary)
             } else {
-                Text(emptyLabel)
+                Text(calculationFailed ? unavailableLabel : emptyLabel)
                     .foregroundStyle(.secondary)
             }
         }
@@ -55,6 +59,7 @@ struct HotelPackageDeltaText: View {
     @MainActor
     private func loadAlternativeQuote() async {
         alternativeQuote = nil
+        calculationFailed = false
         guard !isSelected, referenceQuote != nil,
               let outbound = journey.selectedOutbound, outbound.isVerifiedForBooking else { return }
         let inbound = journey.selectedInbound
@@ -93,9 +98,35 @@ struct HotelPackageDeltaText: View {
             guard !Task.isCancelled else { return }
             alternativeQuote = preview
         } catch {
-            // Network error or a hotel without a confirmed catalogue rate:
-            // no delta is shown until the server can price that alternative.
+            // Network error / unpriced hotel: never fabricate + or -.
             alternativeQuote = nil
+            calculationFailed = true
+        }
+    }
+
+    private var calculatingLabel: String {
+        switch settings.language {
+        case .russian: return "Считаем…"
+        case .uzbek: return "Hisoblanmoqda…"
+        case .uzbekCyrillic: return "Ҳисобланмоқда…"
+        case .turkish: return "Hesaplanıyor…"
+        case .arabic: return "جارٍ الحساب…"
+        case .indonesian: return "Menghitung…"
+        case .malay: return "Mengira…"
+        case .english: return "Calculating…"
+        }
+    }
+
+    private var unavailableLabel: String {
+        switch settings.language {
+        case .russian: return "Нет подтверждённой цены"
+        case .uzbek: return "Tasdiqlangan narx yo‘q"
+        case .uzbekCyrillic: return "Тасдиқланган нарх йўқ"
+        case .turkish: return "Doğrulanmış fiyat yok"
+        case .arabic: return "السعر غير مؤكد"
+        case .indonesian: return "Harga belum terkonfirmasi"
+        case .malay: return "Harga belum disahkan"
+        case .english: return "Price not confirmed"
         }
     }
 

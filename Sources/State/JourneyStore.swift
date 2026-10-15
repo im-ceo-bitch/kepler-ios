@@ -83,6 +83,9 @@ final class JourneyStore: ObservableObject {
     let flightService: FlightSearchServicing
     let quoteService: PackageQuoteServicing
     private let packageEngine = RemotePackageEngineClient()
+    // Hotel/meal changes can overlap server requests. Only the most recent
+    // configuration may publish its total into the generator.
+    private var packageQuoteRevision: UInt64 = 0
     private var hotelPricePrefetchTask: Task<Void, Never>?
     private var hotelPricePrefetchGeneration = UUID()
     private var inboundFlightPrefetchTask: Task<Void, Never>?
@@ -720,6 +723,7 @@ final class JourneyStore: ObservableObject {
     }
 
     func chooseHotel(_ hotel: HotelSummary) {
+        packageQuoteRevision &+= 1
         if selectedHotel?.id != hotel.id {
             selectedRoom = nil
             selectedRoomCategory = nil
@@ -799,6 +803,7 @@ final class JourneyStore: ObservableObject {
     }
 
     func chooseMadinahHotel(_ hotel: HotelSummary) {
+        packageQuoteRevision &+= 1
         if selectedMadinahHotel?.id != hotel.id {
             selectedMadinahRoom = nil
             selectedMadinahRoomCategory = nil
@@ -840,6 +845,7 @@ final class JourneyStore: ObservableObject {
         var updatedTrip = trip
         updatedTrip.mealSelection = selection
         trip = updatedTrip
+        packageQuoteRevision &+= 1
 
         // Meal changes do not invalidate the already verified hotel rate, but
         // they must invalidate every package total built from the old selection.
@@ -1094,6 +1100,8 @@ final class JourneyStore: ObservableObject {
     }
 
     func buildQuote(forceHotelRefresh: Bool = false) async {
+        let revision = packageQuoteRevision
+        let tripForQuote = trip
         guard let hotel = selectedHotel,
               let outbound = selectedOutbound,
               outbound.isVerifiedForBooking else {
@@ -1150,24 +1158,35 @@ final class JourneyStore: ObservableObject {
                 )
             }
 
-            pricingMakkahRoomID = selectedRoom?.id ?? selectedRoomCategory?.id
-            pricingMadinahRoomID = selectedMadinahRoom?.id ?? selectedMadinahRoomCategory?.id
-            quote = try await packageEngine.packageQuote(
-                trip: trip,
+            let makkahRoom = selectedRoom?.id ?? selectedRoomCategory?.id
+            let madinahRoom = selectedMadinahRoom?.id ?? selectedMadinahRoomCategory?.id
+            let madinahHotel = selectedMadinahHotel?.id
+            let train = haramainTrainSelected
+            let vehicle = selectedTransferVehicle
+            let fareClass = haramainFareClass
+            let tickets = haramainTicketCount
+            guard revision == packageQuoteRevision, !Task.isCancelled else { return }
+            let resolved = try await packageEngine.packageQuote(
+                trip: tripForQuote,
                 pricingOffer: pricingOffer,
                 outboundOffer: outbound,
                 inboundOffer: inbound,
                 makkahHotelID: hotel.id,
-                makkahRoomID: pricingMakkahRoomID,
-                madinahHotelID: selectedMadinahHotel?.id,
-                madinahRoomID: pricingMadinahRoomID,
-                includeHaramainTrain: haramainTrainSelected,
-                transferVehicle: selectedTransferVehicle,
-                haramainFareClass: haramainFareClass,
-                haramainTicketCount: haramainTicketCount
+                makkahRoomID: makkahRoom,
+                madinahHotelID: madinahHotel,
+                madinahRoomID: madinahRoom,
+                includeHaramainTrain: train,
+                transferVehicle: vehicle,
+                haramainFareClass: fareClass,
+                haramainTicketCount: tickets
             )
+            guard revision == packageQuoteRevision, !Task.isCancelled else { return }
+            pricingMakkahRoomID = makkahRoom
+            pricingMadinahRoomID = madinahRoom
+            quote = resolved
             errorMessage = nil
         } catch {
+            guard revision == packageQuoteRevision, !Task.isCancelled else { return }
             quote = nil
             errorMessage = error.localizedDescription
         }

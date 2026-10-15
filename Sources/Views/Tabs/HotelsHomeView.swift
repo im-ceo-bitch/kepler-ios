@@ -5,6 +5,7 @@ struct HotelsHomeView: View {
     @EnvironmentObject private var chrome: AppChromeStore
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var storefront: HotelStorefrontStore
+    @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
 
     @State private var board: HotelsShowcaseBoard = .hotels
     @State private var selectedHotel: HotelSummary?
@@ -17,35 +18,77 @@ struct HotelsHomeView: View {
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
 
+    // Root content uses the same single-viewport ScrollView / LazyVStack
+    // architecture as IumrahFlightsView. The viewport, not an image or a
+    // nested carousel, owns the horizontal proposal. This prevents one
+    // oversized hotel subview from shifting the entire tab off screen.
     var body: some View {
-        // One shared ScrollView and one set of page gutters for Hotels, Flights
-        // and Weekend. Do not size child sections against a nested GeometryReader:
-        // that previously caused the hotel hero/cards to bleed into the edges.
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 22) {
-                    IumrahRootPageTitle(title: pageTitle)
-                        .padding(.top, 10)
+        GeometryReader { viewport in
+            let viewportWidth = max(0, viewport.size.width)
+            let contentWidth = min(viewportWidth, adaptiveLayout.rootContentMaxWidth)
+            let gutter = IumrahDesign.pagePadding
+            let columnWidth = max(0, contentWidth - 2 * gutter)
 
-                    // The departure/location selector stays in the same top
-                    // position regardless of the selected board.
-                    AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 22) {
+                        IumrahRootPageTitle(title: pageTitle)
 
-                    HStack(spacing: 10) {
-                        boardTile(.hotels, icon: "building.2.fill", title: L10n.text("tab_hotels", settings.language))
-                        boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
-                        boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
+                        // Shared airport/location selector, consistent for
+                        // Hotels, Flights and Weekend.
+                        AirportSelectorButton(
+                            airport: $journey.trip.originAirport,
+                            fallbackCode: $journey.trip.origin
+                        )
+
+                        HStack(spacing: 10) {
+                            boardTile(.hotels, icon: "building.2.fill", title: L10n.text("tab_hotels", settings.language))
+                            boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
+                            boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
+                        }
+                        .frame(width: columnWidth)
+
+                        Group {
+                            switch board {
+                            case .hotels: hotelsBoard
+                            case .flights: flightsBoard
+                            case .sundayClub: sundayClubBoard
+                            }
+                        }
+                        .frame(width: columnWidth, alignment: .leading)
                     }
-
-                    switch board {
-                    case .hotels: hotelsBoard
-                    case .flights: flightsBoard
-                    case .sundayClub: sundayClubBoard
-                    }
+                    .frame(width: columnWidth, alignment: .leading)
+                    .padding(.horizontal, gutter)
+                    .padding(.top, 10)
+                    .padding(.bottom, 110)
+                }
+                .frame(width: contentWidth, alignment: .top)
+                .frame(maxWidth: .infinity, alignment: .top)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 12)
-            .padding(.bottom, 110)
+            .frame(width: viewportWidth, height: viewport.size.height)
+        }
+        // The background may reach the screen edges, but readable content
+        // never ignores the iPhone safe area.
+        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if board == .flights {
+                IumrahPackageAssemblyBar(
+                    language: settings.language,
+                    selections: journey.stagedUmrahFlights,
+                    isExpanded: $packageAssemblyExpanded,
+                    onContinue: {
+                        guard journey.hasCompleteStagedFlightSelection else {
+                            IumrahHaptics.error()
+                            return
+                        }
+                        IumrahHaptics.selection()
+                        journey.prepareFlightFirstHotelStage()
+                        chrome.startFlightFirstTrip()
+                    }
+                )
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, 2)
+            }
         }
         .refreshable {
             await storefront.updateDepartureAirport(journey.trip.originCode)
@@ -912,14 +955,19 @@ private struct IumrahFriendsCalculatorCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Image("IumrahFriendsHotelsCover")
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 124)
-                .clipped()
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            // The source artwork is very wide. Giving scaledToFill an
+            // unbounded intrinsic width forced the ancestor ScrollView wider
+            // than the iPhone, shifting every hotel card horizontally.
+            GeometryReader { imageViewport in
+                Image("IumrahFriendsHotelsCover")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: imageViewport.size.width, height: 124)
+                    .clipped()
+            }
+            .frame(height: 124)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {

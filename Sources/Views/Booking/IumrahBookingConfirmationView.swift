@@ -11,10 +11,13 @@ struct IumrahBookingConfirmationView: View {
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var phone = "+998"
+    @State private var email = ""
+    @State private var channel: ContactChannel = .sms
     @State private var verificationCode = ""
     @State private var challengeID: String?
     @State private var verificationProof: String?
     @State private var confirmedPhone: String?
+    @State private var confirmedEmail: String?
     @State private var savedBooking: StoredBookingSession?
     @State private var isWorking = false
     @State private var errorMessage: String?
@@ -25,7 +28,10 @@ struct IumrahBookingConfirmationView: View {
 
     private let verificationService = IumrahBookingContactService()
 
-    private enum IdentityField: Hashable { case firstName, lastName, phone, code }
+    private enum IdentityField: Hashable { case firstName, lastName, phone, email, code }
+    private enum ContactChannel: String, CaseIterable, Identifiable { case sms, email; var id: String { rawValue } }
+    private var normalizedEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+    private var verifiedContact: String { channel == .sms ? normalizedPhone : normalizedEmail }
 
     private var normalizedPhone: String {
         "+" + phone.filter(\.isNumber)
@@ -34,7 +40,9 @@ struct IumrahBookingConfirmationView: View {
     private var canRequestCode: Bool {
         firstName.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 &&
         lastName.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 &&
-        normalizedPhone.range(of: "^\\+998[0-9]{9}$", options: .regularExpression) != nil
+        (channel == .sms
+         ? normalizedPhone.range(of: "^\\+998[0-9]{9}$", options: .regularExpression) != nil
+         : normalizedEmail.range(of: "^[^\\s@]+@[^\\s@.]+(\\.[^\\s@.]+)+$", options: .regularExpression) != nil)
     }
 
     var body: some View {
@@ -74,15 +82,9 @@ struct IumrahBookingConfirmationView: View {
             if lastName.isEmpty { lastName = settings.lastName }
             if phone == "+998", !settings.phone.isEmpty { phone = settings.phone }
         }
-        .onChange(of: phone) { _, _ in
-            if isCodeStep && !isWorking && confirmedPhone == nil {
-                // Changing the destination invalidates any previously requested code.
-                challengeID = nil
-                verificationProof = nil
-                verificationCode = ""
-                isCodeStep = false
-            }
-        }
+        .onChange(of: channel) { _, _ in resetVerification() }
+        .onChange(of: phone) { _, _ in if channel == .sms && !isWorking { resetVerification() } }
+        .onChange(of: email) { _, _ in if channel == .email && !isWorking { resetVerification() } }
     }
 
     private var identityAnimation: some View {
@@ -101,11 +103,11 @@ struct IumrahBookingConfirmationView: View {
         VStack(alignment: .leading, spacing: 7) {
             Text(copy("Подтвердите данные паломника", "Confirm the pilgrim's details", "Ziyoratchi ma’lumotlarini tasdiqlang", "Зиёратчи маълумотларини тасдиқланг", "تأكيد بيانات المعتمر"))
                 .font(.system(size: 25, weight: .bold, design: .rounded))
-            Text(copy("Это только заявка на бронирование, а не регистрация или вход в аккаунт.",
-                      "This is a booking request, not account registration or sign-in.",
-                      "Bu akkauntga kirish yoki ro‘yxatdan o‘tish emas, bron so‘rovidir.",
-                      "Бу аккаунтга кириш ёки рўйхатдан ўтиш эмас, брон сўровидир.",
-                      "هذا طلب حجز فقط، وليس تسجيل حساب أو تسجيل دخول."))
+            Text(copy("Это подтверждение бронирования, а не регистрация и не вход в аккаунт.",
+                      "Confirm your booking without registering or signing in.",
+                      "Bu bronni tasdiqlash — ro‘yxatdan o‘tish yoki akkauntga kirish emas.",
+                      "Бу бронни тасдиқлаш — рўйхатдан ўтиш ёки аккаунтга кириш эмас.",
+                      "هذا لتأكيد الحجز، وليس لتسجيل حساب أو تسجيل الدخول."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -140,7 +142,7 @@ struct IumrahBookingConfirmationView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(copy("Сейчас вы ничего не платите", "No payment is required now", "Hozir hech narsa to‘lamaysiz", "Ҳозир ҳеч нарса тўламайсиз", "لا يلزم الدفع الآن"))
                     .font(.subheadline.weight(.bold))
-                Text(copy("Мы создадим запрос и повторно проверим доступность каждого компонента. Оплата потребуется только после подтверждения наличия.",
+                Text(copy("Мы зарегистрируем бронирование и повторно проверим доступность каждого компонента. Оплата потребуется только после подтверждения наличия.",
                           "We will recheck availability of every component. Payment is requested only after availability is confirmed.",
                           "Har bir xizmat mavjudligi qayta tekshiriladi. To‘lov faqat tasdiqdan keyin so‘raladi.",
                           "Ҳар бир хизмат мавжудлиги қайта текширилади. Тўлов фақат тасдиқдан кейин сўралади.",
@@ -175,11 +177,19 @@ struct IumrahBookingConfirmationView: View {
                 .textInputAutocapitalization(.words)
                 .submitLabel(.next)
                 .focused($activeField, equals: .lastName)
-                .onSubmit { activeField = .phone }
+                .onSubmit { activeField = channel == .sms ? .phone : .email }
                 .bookingInputStyle()
                 .disabled(isCodeStep || firstName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
 
-            fieldLabel("03", copy("Номер телефона", "Phone number", "Telefon raqami", "Телефон рақами", "رقم الهاتف"))
+            fieldLabel("03", copy("Способ подтверждения", "Verification method", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"))
+            Picker(copy("Способ подтверждения", "Verification method", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"), selection: $channel) {
+                Label("SMS", systemImage: "iphone.gen3").tag(ContactChannel.sms)
+                Label("Email", systemImage: "envelope.fill").tag(ContactChannel.email)
+            }
+            .pickerStyle(.segmented)
+            .disabled(isCodeStep)
+            if channel == .sms {
+                fieldLabel("", copy("Номер телефона", "Phone number", "Telefon raqami", "Телефон рақами", "رقم الهاتف"))
             TextField("+998 90 123 45 67", text: $phone)
                 .textContentType(.telephoneNumber)
                 .keyboardType(.phonePad)
@@ -190,12 +200,20 @@ struct IumrahBookingConfirmationView: View {
             Text(copy("SMS-подтверждение доступно для номеров Узбекистана (+998).", "SMS confirmation currently supports Uzbekistan numbers (+998).", "SMS tasdiqlash hozircha O‘zbekiston raqamlari (+998) uchun.", "SMS тасдиқлаш ҳозирча Ўзбекистон рақамлари (+998) учун.", "التحقق عبر الرسائل متاح حاليًا للأرقام الأوزبكية (+998)."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            } else {
+                fieldLabel("", "Email")
+                TextField("name@example.com", text: $email)
+                    .keyboardType(.emailAddress)
+                    .textContentType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused($activeField, equals: .email)
+                    .bookingInputStyle()
+                    .disabled(isCodeStep || lastName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+            }
             if isCodeStep {
                 Button(copy("Изменить данные", "Edit details", "Ma’lumotlarni o‘zgartirish", "Маълумотларни ўзгартириш", "تعديل البيانات")) {
-                    challengeID = nil
-                    verificationCode = ""
-                    isCodeStep = false
-                    errorMessage = nil
+                    resetVerification()
                 }
                 .font(.footnote.weight(.semibold))
             }
@@ -206,9 +224,9 @@ struct IumrahBookingConfirmationView: View {
 
     private var verificationFields: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(copy("Введите код из SMS", "Enter your SMS code", "SMS kodini kiriting", "SMS кодини киритинг", "أدخل رمز الرسالة"), systemImage: "message.fill")
+            Label(channel == .sms ? copy("Введите код из SMS", "Enter your SMS code", "SMS kodini kiriting", "SMS кодини киритинг", "أدخل رمز الرسالة") : copy("Введите код из письма", "Enter your email code", "Email kodini kiriting", "Email кодини киритинг", "أدخل رمز البريد"), systemImage: channel == .sms ? "message.fill" : "envelope.fill")
                 .font(.headline)
-            Text(copy("Шестизначный код отправлен на", "A six-digit code was sent to", "6 xonali kod yuborildi:", "6 хонали код юборилди:", "تم إرسال رمز مكوّن من 6 أرقام إلى") + " \(normalizedPhone)")
+            Text(copy("Шестизначный код отправлен на", "A six-digit code was sent to", "6 xonali kod yuborildi:", "6 хонали код юборилди:", "تم إرسال رمز مكوّن من 6 أرقام إلى") + " \(verifiedContact)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             TextField("000000", text: $verificationCode)
@@ -247,8 +265,10 @@ struct IumrahBookingConfirmationView: View {
                 Text(isWorking
                      ? copy("Проверяем…", "Checking…", "Tekshirilmoqda…", "Текширилмоқда…", "جارٍ التحقق…")
                      : isCodeStep
-                     ? copy("Подтвердить и забронировать", "Confirm and request booking", "Tasdiqlash va bron qilish", "Тасдиқлаш ва брон қилиш", "تأكيد وطلب الحجز")
-                     : copy("Получить SMS-код", "Send SMS code", "SMS kodini olish", "SMS кодини олиш", "إرسال رمز التحقق"))
+                     ? copy("Подтвердить и забронировать", "Confirm booking", "Tasdiqlash va bron qilish", "Тасдиқлаш ва брон қилиш", "تأكيد وطلب الحجز")
+                     : channel == .sms
+                     ? copy("Получить SMS-код", "Send SMS code", "SMS kodini olish", "SMS кодини олиш", "إرسال رمز التحقق")
+                     : copy("Получить код на email", "Send email code", "Emailga kod yuborish", "Emailга код юбориш", "إرسال رمز البريد"))
                 Spacer(minLength: 8)
                 Image(systemName: "arrow.right")
             }
@@ -270,10 +290,13 @@ struct IumrahBookingConfirmationView: View {
         errorMessage = nil
         defer { isWorking = false }
         do {
-            let result = try await verificationService.requestCode(phone: normalizedPhone)
+            let result: BookingContactStartResponse
+            if channel == .sms { result = try await verificationService.requestCode(phone: normalizedPhone) }
+            else { result = try await verificationService.requestEmailCode(email: normalizedEmail, locale: settings.language.rawValue) }
             challengeID = result.challengeID
             verificationProof = nil
             confirmedPhone = nil
+            confirmedEmail = nil
             verificationCode = ""
             isCodeStep = true
             activeField = .code
@@ -294,12 +317,21 @@ struct IumrahBookingConfirmationView: View {
             // Verify before any booking is created. This is a guest contact check,
             // not registration and not the account's SMS login flow.
             if verificationProof == nil {
-                let verification = try await verificationService.confirmCode(challengeID: challengeID, code: verificationCode)
-                guard verification.phone == normalizedPhone else { throw IumrahBookingContactError.invalidPhone }
-                verificationProof = verification.verificationToken
-                confirmedPhone = verification.phone
+                if channel == .sms {
+                    let verification = try await verificationService.confirmCode(challengeID: challengeID, code: verificationCode)
+                    guard verification.phone == normalizedPhone else { throw IumrahBookingContactError.invalidPhone }
+                    verificationProof = verification.verificationToken
+                    confirmedPhone = verification.phone
+                } else {
+                    let verification = try await verificationService.confirmEmailCode(challengeID: challengeID, code: verificationCode)
+                    guard verification.email.lowercased() == normalizedEmail else { throw IumrahBookingContactError.invalidEmail }
+                    verificationProof = verification.verificationToken
+                    confirmedEmail = verification.email
+                }
             }
-            guard let verificationProof, confirmedPhone == normalizedPhone else { throw IumrahBookingContactError.invalidPhone }
+            guard let verificationProof else { throw IumrahBookingContactError.invalidPhone }
+            if channel == .sms && confirmedPhone != normalizedPhone { throw IumrahBookingContactError.invalidPhone }
+            if channel == .email && confirmedEmail?.lowercased() != normalizedEmail { throw IumrahBookingContactError.invalidEmail }
             let profile = BookingPilgrimProfile(
                 firstName: firstName.trimmingCharacters(in: .whitespacesAndNewlines),
                 lastName: lastName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -312,14 +344,23 @@ struct IumrahBookingConfirmationView: View {
                 session = try await createBooking(profile)
                 savedBooking = session // retries never create a duplicate booking
             }
-            try await verificationService.attachVerifiedPhone(
-                verificationToken: verificationProof,
-                bookingID: session.id,
-                bookingToken: session.accessToken
-            )
+            if channel == .sms {
+                try await verificationService.attachVerifiedPhone(
+                    verificationToken: verificationProof,
+                    bookingID: session.id,
+                    bookingToken: session.accessToken
+                )
+            } else {
+                try await verificationService.attachVerifiedEmail(
+                    verificationToken: verificationProof,
+                    bookingID: session.id,
+                    bookingToken: session.accessToken,
+                    locale: settings.language.rawValue
+                )
+            }
             settings.firstName = profile.firstName
             settings.lastName = profile.lastName
-            settings.phone = confirmedPhone ?? ""
+            if let confirmedPhone { settings.phone = confirmedPhone }
             isFinished = true
             IumrahHaptics.success()
             successPulse = false
@@ -327,6 +368,17 @@ struct IumrahBookingConfirmationView: View {
             errorMessage = error.localizedDescription
             IumrahHaptics.error()
         }
+    }
+
+    private func resetVerification() {
+        if isWorking { return }
+        challengeID = nil
+        verificationProof = nil
+        confirmedPhone = nil
+        confirmedEmail = nil
+        verificationCode = ""
+        isCodeStep = false
+        errorMessage = nil
     }
 
     private func completion(_ session: StoredBookingSession) -> some View {
@@ -342,19 +394,42 @@ struct IumrahBookingConfirmationView: View {
                     .symbolEffect(.bounce, value: successPulse)
             }
             .padding(.top, 48)
-            Text(copy("Заявка на бронь создана!", "Booking request created!", "Bron so‘rovi yaratildi!", "Брон сўрови яратилди!", "تم إنشاء طلب الحجز!"))
+            Text(copy("Ваше бронирование Umrah-пакета подтверждено", "Your Umrah package booking is confirmed", "Umra paketingiz bron qilingani tasdiqlandi", "Умра пакетингиз брон қилингани тасдиқланди", "تم تأكيد طلب الحجز"))
                 .font(.system(size: 28, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
-            Text(copy("Мы перепроверяем отель, рейсы и услуги. После подтверждения доступности сообщим, как оплатить бронь. Сейчас платить ничего не нужно.",
-                      "We are rechecking hotels, flights and services. We will provide payment instructions after availability is confirmed. Nothing is due now.",
-                      "Mehmonxona, reyslar va xizmatlar tekshirilmoqda. Mavjudlik tasdiqlangach to‘lov haqida xabar beramiz. Hozir to‘lov yo‘q.",
-                      "Меҳмонхона, рейслар ва хизматлар текширилмоқда. Мавжудлик тасдиқлангач тўлов ҳақида хабар берамиз. Ҳозир тўлов йўқ.",
-                      "نعيد التحقق من توفر الفنادق والرحلات والخدمات. ستصلك تعليمات الدفع بعد تأكيد التوفر، ولا تدفع شيئًا الآن."))
+            Text(copy("Подождите повторной проверки наличия отелей, авиабилетов и остальных услуг: цены могут меняться несколько раз в день. Сейчас вы ничего не оплачиваете. Оплата откроется после подтверждения наличия.",
+                      "We are rechecking all hotels, flights and services; prices may change several times a day. You pay nothing now. Payment will open after availability is reconfirmed.",
+                      "Mehmonxona, reys va xizmatlar qayta tekshirilmoqda: narxlar kun davomida o‘zgarishi mumkin. Hozir to‘lov yo‘q. To‘lov mavjudlik tasdiqlangach ochiladi.",
+                      "Меҳмонхона, рейс ва хизматлар қайта текширилмоқда: нархлар кун давомида ўзгариши мумкин. Ҳозир тўлов йўқ. Тўлов мавжудлик тасдиқлангач очилади.",
+                      "نعيد التحقق من الفنادق والرحلات والخدمات. لا يلزم الدفع الآن حتى يتم تأكيد التوفر."))
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Text(session.displayBookingNumber)
                 .font(.title3.monospacedDigit().weight(.bold))
+            VStack(spacing: 5) {
+                Text(copy("Итого за пакет", "Package total", "Paketning umumiy narxi", "Пакетнинг умумий нархи", "إجمالي الباقة"))
+                    .font(.footnote).foregroundStyle(.secondary)
+                Text(session.booking.totalUsd, format: .currency(code: "USD"))
+                    .font(.largeTitle.bold())
+                Text(copy("На одного человека", "Per person", "Bir kishi uchun", "Бир киши учун", "لكل شخص") + ": " + session.booking.perPilgrimUsd.formatted(.currency(code: "USD")))
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(16)
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
+            Text(channel == .email
+                 ? copy("Получайте статусы бронирования, документы и билеты в приложении и по email. Дополнительно подключите Telegram.",
+                        "Get booking updates, documents and ticket alerts in the app and by email. You can also connect Telegram.",
+                        "Bron holati, hujjatlar va chiptalarni ilova va email orqali oling. Telegramni ham ulang.",
+                        "Брон ҳолати, ҳужжатлар ва чипталарни илова ва email орқали олинг. Telegramни ҳам уланг.",
+                        "تابع حالة الحجز والوثائق والتذاكر في التطبيق وبالبريد الإلكتروني، ويمكنك ربط تيليجرام أيضًا.")
+                 : copy("Получайте уведомления по SMS и в приложении. Для сообщений в Telegram подключите бота.",
+                        "Get SMS and in-app booking alerts. Connect Telegram for additional updates.",
+                        "SMS va ilova orqali xabarlar oling. Qo‘shimcha xabarlar uchun Telegramni ulang.",
+                        "SMS ва илова орқали хабарлар олинг. Қўшимча хабарлар учун Telegramни уланг.",
+                        "تصلك التحديثات عبر الرسائل وفي التطبيق. يمكنك ربط تيليجرام أيضًا."))
+                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
             IumrahTelegramConnectCard(session: session, style: .standard)
             NavigationLink {
                 BookingDetailView(bookingID: session.id)
@@ -397,7 +472,7 @@ struct IumrahBookingConfirmationView: View {
         "A six-digit code was sent to": "Altı haneli kod gönderildi:",
         "Resend code": "Kodu yeniden gönder",
         "Checking…": "Kontrol ediliyor…",
-        "Confirm and request booking": "Onayla ve rezervasyon talep et",
+        "Confirm booking": "Rezervasyonu onayla",
         "Send SMS code": "SMS kodu gönder",
         "Booking request created!": "Rezervasyon talebi oluşturuldu!",
         "We are rechecking hotels, flights and services. We will provide payment instructions after availability is confirmed. Nothing is due now.": "Otel, uçuş ve hizmetlerin müsaitliğini yeniden kontrol ediyoruz. Onaylandıktan sonra ödeme bilgilerini ileteceğiz. Şimdi ödeme yapmanıza gerek yok.",
@@ -422,7 +497,7 @@ struct IumrahBookingConfirmationView: View {
         "A six-digit code was sent to": "Kode enam digit dikirim ke",
         "Resend code": "Kirim ulang kode",
         "Checking…": "Memeriksa…",
-        "Confirm and request booking": "Konfirmasi dan ajukan pemesanan",
+        "Confirm booking": "Konfirmasi pemesanan",
         "Send SMS code": "Kirim kode SMS",
         "Booking request created!": "Permintaan pemesanan berhasil dibuat!",
         "We are rechecking hotels, flights and services. We will provide payment instructions after availability is confirmed. Nothing is due now.": "Kami sedang memeriksa kembali hotel, penerbangan, dan layanan. Instruksi pembayaran akan diberikan setelah ketersediaan dikonfirmasi. Belum ada pembayaran sekarang.",
@@ -447,7 +522,7 @@ struct IumrahBookingConfirmationView: View {
         "A six-digit code was sent to": "Kod enam digit dihantar ke",
         "Resend code": "Hantar semula kod",
         "Checking…": "Menyemak…",
-        "Confirm and request booking": "Sahkan dan mohon tempahan",
+        "Confirm booking": "Sahkan tempahan",
         "Send SMS code": "Hantar kod SMS",
         "Booking request created!": "Permintaan tempahan berjaya dibuat!",
         "We are rechecking hotels, flights and services. We will provide payment instructions after availability is confirmed. Nothing is due now.": "Kami sedang menyemak semula hotel, penerbangan dan perkhidmatan. Arahan bayaran diberikan selepas ketersediaan disahkan. Tiada bayaran diperlukan sekarang.",

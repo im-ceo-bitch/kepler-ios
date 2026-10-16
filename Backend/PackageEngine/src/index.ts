@@ -1,3 +1,6 @@
+import { handleGuestBookingEmail } from "./booking-email-verification";
+import { flushBookingStatusEmails } from "./booking-email";
+import { bookingLogoResponse } from "./booking-email-logo";
 import { requirePackageAdmin } from "./admin-auth";
 import { handleGuestBookingPhone } from "./booking-contact-verification";
 import { applyPilgrimFriendCredit, deleteAdminBooking, deletePilgrimBooking, getPilgrimFriendsSummary, redeemPilgrimFriendGift, updatePilgrimContact, updatePilgrimCustomization, updatePilgrimHotel } from "./booking-control";
@@ -175,6 +178,13 @@ export default {
     }
 
 
+    if (request.method === "GET" && url.pathname === "/api/package/email-brand/logo.png") return bookingLogoResponse();
+    if (url.pathname === "/api/package/booking-contact/email/start" ||
+        url.pathname === "/api/package/booking-contact/email/confirm" ||
+        /^\/api\/package\/booking\/IUM-\d{4}-[A-Z2-9]{7}\/verified-email$/.test(url.pathname)) {
+      return handleGuestBookingEmail(request, env, url);
+    }
+
     if (url.pathname === "/api/package/booking-contact/sms/start" ||
         url.pathname === "/api/package/booking-contact/sms/confirm" ||
         /^\/api\/package\/booking\/IUM-\d{4}-[A-Z2-9]{7}\/verified-phone$/.test(url.pathname)) {
@@ -322,8 +332,9 @@ export default {
     return json({ ok: false, error: "Not found" }, 404);
   },
 
-  async scheduled(_controller: unknown, env: Env): Promise<void> {
+  async scheduled(controller: { cron?: string }, env: Env): Promise<void> {
     if (!env.HOTELS_DB) return;
-    await cleanupExpiredFlightCache(env.HOTELS_DB);
+    if (controller.cron === "17 0 * * *") await cleanupExpiredFlightCache(env.HOTELS_DB);
+    if (controller.cron === "*/5 * * * *") await flushBookingStatusEmails(env);
   },
 };

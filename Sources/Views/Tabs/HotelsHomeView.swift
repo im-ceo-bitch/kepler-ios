@@ -2089,11 +2089,10 @@ struct StorefrontUmrahPackageDetailView: View {
                 preview: preview
             )
         }
-        .sheet(isPresented: $isProfileSheetPresented) {
-            BookingProfileCaptureSheet {
-                Task { await createBooking() }
-            }
-            .environmentObject(settings)
+        .navigationDestination(isPresented: $isProfileSheetPresented) {
+            IumrahBookingConfirmationView(createBooking: { profile in
+                try await createBooking(profile: profile)
+            })
         }
         .sheet(item: $shareArtifacts) { artifacts in
             IumrahPackageActivitySheet(artifacts: artifacts)
@@ -3633,56 +3632,37 @@ struct StorefrontUmrahPackageDetailView: View {
     }
 
     @MainActor
-    private func createBooking() async {
-        guard !isSubmitting,
-              let hotel = journey.selectedHotel,
+    private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
+        guard let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
               let inbound = journey.selectedInbound,
-              let quote = journey.quote else { return }
-
-        if journey.trip.scope == .makkahAndMadinah, journey.selectedMadinahHotel == nil { return }
-
-        isSubmitting = true
-        bookingError = nil
-        defer { isSubmitting = false }
-
-        do {
-            let profile = BookingPilgrimProfile(
-                firstName: settings.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
-                lastName: settings.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
-                telegram: settings.telegram.trimmingCharacters(in: .whitespacesAndNewlines),
-                whatsapp: settings.whatsapp.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-
-            let session = try await bookings.create(
-                trip: journey.trip,
-                hotel: hotel,
-                madinahHotel: journey.selectedMadinahHotel,
-                room: journey.selectedRoom,
-                roomCategory: journey.selectedRoomCategory,
-                madinahRoom: journey.selectedMadinahRoom,
-                madinahRoomCategory: journey.selectedMadinahRoomCategory,
-                intercityTransport: journey.trip.scope == .makkahAndMadinah
-                    ? (journey.haramainTrainSelected ? .haramainTrain : .road)
-                    : nil,
-                transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
-                outbound: outbound,
-                inbound: inbound,
-                quote: quote,
-                language: settings.language,
-                pilgrimProfile: profile
-            )
-
-            if let deviceToken = push.deviceToken {
-                await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
-            }
-            IumrahHaptics.success()
-            createdBookingID = session.id
-        } catch {
-            bookingError = L10n.error(error, settings.language)
-            IumrahHaptics.error()
+              let quote = journey.quote,
+              journey.trip.scope != .makkahAndMadinah || journey.selectedMadinahHotel != nil else {
+            throw BookingStoreError.authoritativeQuoteRequired
         }
+        let session = try await bookings.create(
+            trip: journey.trip,
+            hotel: hotel,
+            madinahHotel: journey.selectedMadinahHotel,
+            room: journey.selectedRoom,
+            roomCategory: journey.selectedRoomCategory,
+            madinahRoom: journey.selectedMadinahRoom,
+            madinahRoomCategory: journey.selectedMadinahRoomCategory,
+            intercityTransport: journey.trip.scope == .makkahAndMadinah
+                ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil,
+            transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
+            outbound: outbound,
+            inbound: inbound,
+            quote: quote,
+            language: settings.language,
+            pilgrimProfile: profile
+        )
+        if let deviceToken = push.deviceToken {
+            await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
+        }
+        return session
     }
+
 
     private func money(_ value: Decimal) -> String {
         String(format: "$%.0f", NSDecimalNumber(decimal: value).doubleValue)

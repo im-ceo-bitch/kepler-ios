@@ -27,13 +27,10 @@ struct BookingCheckoutView: View {
         .navigationDestination(item: $createdSession) { session in
             BookingDetailView(bookingID: session.id)
         }
-        .sheet(isPresented: $showProfileSheet) {
-            BookingProfileCaptureSheet(onContinue: {
-                Task { await submitBooking() }
+        .navigationDestination(isPresented: $showProfileSheet) {
+            IumrahBookingConfirmationView(createBooking: { profile in
+                try await submitBooking(profile: profile)
             })
-            .environmentObject(settings)
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -132,8 +129,7 @@ struct BookingCheckoutView: View {
             }
 
             Button {
-                // Always confirm the pilgrim's first and last name immediately before
-                // creating a trip. Saved values remain prefilled in the sheet.
+                // Open a full screen, passport-name + guest SMS confirmation flow.
                 showProfileSheet = true
             } label: {
                 if isSubmitting {
@@ -157,83 +153,28 @@ struct BookingCheckoutView: View {
     }
 
     @MainActor
-    private func submitBooking() async {
-        guard !isSubmitting,
-              let hotel = journey.selectedHotel,
+    private func submitBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
+        guard let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
-              let quote = journey.quote else { return }
+              let quote = journey.quote else { throw BookingStoreError.authoritativeQuoteRequired }
         let inbound = journey.selectedInbound
-        guard !journey.trip.isRoundTripFlight || inbound != nil else { return }
-
-        isSubmitting = true
-        errorMessage = nil
-        defer { isSubmitting = false }
-
-        do {
-            let profile = BookingPilgrimProfile(
-                firstName: settings.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
-                lastName: settings.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
-                telegram: settings.telegram.trimmingCharacters(in: .whitespacesAndNewlines),
-                whatsapp: settings.whatsapp.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-            let session = try await bookings.create(
-                trip: journey.trip,
-                hotel: hotel,
-                madinahHotel: journey.selectedMadinahHotel,
-                room: journey.selectedRoom,
-                roomCategory: journey.selectedRoomCategory,
-                madinahRoom: journey.selectedMadinahRoom,
-                madinahRoomCategory: journey.selectedMadinahRoomCategory,
-                transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
-                outbound: outbound,
-                inbound: inbound,
-                quote: quote,
-                language: settings.language,
-                pilgrimProfile: profile
-            )
-            createdSession = session
-            IumrahHaptics.success()
-        } catch {
-            errorMessage = L10n.error(error, settings.language)
-            IumrahHaptics.error()
-        }
+        guard !journey.trip.isRoundTripFlight || inbound != nil else { throw BookingStoreError.authoritativeQuoteRequired }
+        return try await bookings.create(
+            trip: journey.trip,
+            hotel: hotel,
+            madinahHotel: journey.selectedMadinahHotel,
+            room: journey.selectedRoom,
+            roomCategory: journey.selectedRoomCategory,
+            madinahRoom: journey.selectedMadinahRoom,
+            madinahRoomCategory: journey.selectedMadinahRoomCategory,
+            transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
+            outbound: outbound,
+            inbound: inbound,
+            quote: quote,
+            language: settings.language,
+            pilgrimProfile: profile
+        )
     }
+
 }
 
-struct BookingProfileCaptureSheet: View {
-    @EnvironmentObject private var settings: AppSettingsStore
-    let onContinue: () -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text(L10n.text("profile_required_body", settings.language))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Section(L10n.text("profile_section", settings.language)) {
-                    TextField(L10n.text("field_first_name", settings.language), text: $settings.firstName)
-                    TextField(L10n.text("field_last_name", settings.language), text: $settings.lastName)
-                    TextField(L10n.text("field_telegram", settings.language), text: $settings.telegram)
-                        .autocapitalization(.none)
-                    TextField(L10n.text("field_whatsapp", settings.language), text: $settings.whatsapp)
-                        .keyboardType(.phonePad)
-                }
-            }
-            .navigationTitle(L10n.text("profile_required_title", settings.language))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.text("save_continue", settings.language)) {
-                        dismiss()
-                        onContinue()
-                    }
-                    .disabled(!settings.hasBookingIdentity)
-                }
-            }
-        }
-    }
-}

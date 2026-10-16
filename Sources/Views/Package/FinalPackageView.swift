@@ -128,11 +128,10 @@ struct FinalPackageView: View {
             }
             await push.refreshAndRegisterIfAllowed()
         }
-        .sheet(isPresented: $isProfileSheetPresented) {
-            BookingProfileCaptureSheet {
-                Task { await createBooking() }
-            }
-            .environmentObject(settings)
+        .navigationDestination(isPresented: $isProfileSheetPresented) {
+            IumrahBookingConfirmationView(createBooking: { profile in
+                try await createBooking(profile: profile)
+            })
         }
         .sheet(isPresented: $showCareExplanation) {
             UmrahCarePackageExplanationView()
@@ -1931,56 +1930,35 @@ struct FinalPackageView: View {
     }
 
     @MainActor
-    private func createBooking() async {
-        guard !isSubmitting,
-              let hotel = journey.selectedHotel,
+    private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
+        guard let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
-              let quote = journey.quote else { return }
-        let inbound = journey.selectedInbound
-        guard outbound.isVerifiedForBooking,
-              (!journey.trip.isRoundTripFlight || inbound?.isVerifiedForBooking == true) else {
-            errorMessage = invalidFlightSelectionMessage
-            IumrahHaptics.error()
-            return
+              let quote = journey.quote,
+              outbound.isVerifiedForBooking,
+              (!journey.trip.isRoundTripFlight || journey.selectedInbound?.isVerifiedForBooking == true),
+              (!needsMadinah || journey.selectedMadinahHotel != nil) else {
+            throw BookingStoreError.authoritativeQuoteRequired
         }
-        if needsMadinah && journey.selectedMadinahHotel == nil { return }
-
-        isSubmitting = true
-        errorMessage = nil
-        defer { isSubmitting = false }
-
-        do {
-            let profile = BookingPilgrimProfile(
-                firstName: settings.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
-                lastName: settings.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
-                telegram: settings.telegram.trimmingCharacters(in: .whitespacesAndNewlines),
-                whatsapp: settings.whatsapp.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-            let session = try await bookings.create(
-                trip: journey.trip,
-                hotel: hotel,
-                madinahHotel: journey.selectedMadinahHotel,
-                room: journey.selectedRoom,
-                roomCategory: journey.selectedRoomCategory,
-                madinahRoom: journey.selectedMadinahRoom,
-                madinahRoomCategory: journey.selectedMadinahRoomCategory,
-                intercityTransport: needsMadinah ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil,
-                transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
-                outbound: outbound,
-                inbound: inbound,
-                quote: quote,
-                language: settings.language,
-                pilgrimProfile: profile
-            )
-            createdSession = session
-            if let deviceToken = push.deviceToken {
-                await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
-            }
-            IumrahHaptics.success()
-        } catch {
-            errorMessage = L10n.error(error, settings.language)
-            IumrahHaptics.error()
+        let session = try await bookings.create(
+            trip: journey.trip,
+            hotel: hotel,
+            madinahHotel: journey.selectedMadinahHotel,
+            room: journey.selectedRoom,
+            roomCategory: journey.selectedRoomCategory,
+            madinahRoom: journey.selectedMadinahRoom,
+            madinahRoomCategory: journey.selectedMadinahRoomCategory,
+            intercityTransport: needsMadinah ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil,
+            transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
+            outbound: outbound,
+            inbound: journey.selectedInbound,
+            quote: quote,
+            language: settings.language,
+            pilgrimProfile: profile
+        )
+        if let deviceToken = push.deviceToken {
+            await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
         }
+        return session
     }
 
 

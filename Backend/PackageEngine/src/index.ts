@@ -1,4 +1,5 @@
 import { requirePackageAdmin } from "./admin-auth";
+import { handleGuestBookingPhone } from "./booking-contact-verification";
 import { applyPilgrimFriendCredit, deleteAdminBooking, deletePilgrimBooking, getPilgrimFriendsSummary, redeemPilgrimFriendGift, updatePilgrimContact, updatePilgrimCustomization, updatePilgrimHotel } from "./booking-control";
 import { countActiveHotelRoomCategories, ensureBookingRoomColumns, ensureHotelRoomCategories, listHotelRoomCategories } from "./room-categories";
 import type { Env } from "./env";
@@ -173,6 +174,12 @@ export default {
       return json({ ok: false, error: "NOT_FOUND" }, 404);
     }
 
+
+    if (url.pathname === "/api/package/booking-contact/sms/start" ||
+        url.pathname === "/api/package/booking-contact/sms/confirm" ||
+        /^\/api\/package\/booking\/IUM-\d{4}-[A-Z2-9]{7}\/verified-phone$/.test(url.pathname)) {
+      return handleGuestBookingPhone(request, env, url);
+    }
 
     const bookingTelegramLinkMatch = url.pathname.match(/^\/api\/package\/booking\/(IUM-\d{4}-[A-Z2-9]{7})\/telegram-link$/);
     if (bookingTelegramLinkMatch) {

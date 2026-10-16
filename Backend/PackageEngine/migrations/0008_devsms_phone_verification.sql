@@ -78,3 +78,25 @@ CREATE INDEX IF NOT EXISTS idx_iumrah_client_sms_challenge_lookup
 ON iumrah_client_sms_challenges(purpose, phone_normalized, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_iumrah_client_sms_challenge_account
 ON iumrah_client_sms_challenges(pilgrim_id, created_at DESC);
+
+-- Guest booking SMS verification is independent of account registration/login.
+-- Additively created on the already-existing deployment migration path.
+CREATE TABLE IF NOT EXISTS iumrah_guest_booking_phone_challenges (
+  id TEXT PRIMARY KEY,
+  phone TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  ip_hash TEXT NOT NULL DEFAULT '',
+  verified_at TEXT,
+  verification_token_hash TEXT UNIQUE,
+  proof_expires_at TEXT,
+  consumed_at TEXT,
+  booking_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_guest_booking_phone_rate
+ON iumrah_guest_booking_phone_challenges(phone,created_at);
+CREATE INDEX IF NOT EXISTS idx_guest_booking_ip_rate
+ON iumrah_guest_booking_phone_challenges(ip_hash,created_at);

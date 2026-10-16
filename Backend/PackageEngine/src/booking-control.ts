@@ -585,6 +585,37 @@ export async function updatePilgrimHotel(request: Request, id: string, env: Book
   }
 }
 
+/** Bind a guest-verified SMS number to the already-created booking, without
+ * creating a login session or claiming ownership of any existing account. */
+export async function attachVerifiedBookingPhone(
+  request: Request, id: string, phone: string, env: BookingControlEnv,
+): Promise<Response> {
+  if (!env.BOOKINGS_DB) return json({ ok: false, error: "BOOKING_DB_NOT_CONFIGURED" }, 503);
+  const booking = await authorizedBooking(request, id, env.BOOKINGS_DB);
+  if (!booking) return json({ ok: false, error: "BOOKING_NOT_FOUND" }, 404);
+  const payload = JSON.parse(booking.payload_json || "{}") as Record<string, unknown>;
+  const profile = payload.pilgrimProfile && typeof payload.pilgrimProfile === "object"
+    ? payload.pilgrimProfile as Record<string, unknown> : {};
+  payload.pilgrimProfile = {
+    ...profile, phone, phoneVerifiedAt: new Date().toISOString(),
+  };
+  await persistBookingPayload(env.BOOKINGS_DB, id, payload, new Date().toISOString());
+  // The trip may have created a provisional (non-account) pilgrim in HOTELS_DB.
+  // Populate an empty contact number for operational SMS notifications, but never
+  // overwrite an established account's existing number or create login credentials.
+  if (env.HOTELS_DB) {
+    const trip = await env.HOTELS_DB.prepare(
+      "SELECT pilgrim_id FROM pilgrim_trips WHERE booking_id=?1 LIMIT 1",
+    ).bind(id).first<{ pilgrim_id: number }>();
+    if (trip?.pilgrim_id) {
+      await env.HOTELS_DB.prepare(
+        `UPDATE pilgrims SET phone=?1 WHERE id=?2 AND (phone IS NULL OR TRIM(phone)='')`,
+      ).bind(phone, trip.pilgrim_id).run();
+    }
+  }
+  return json({ ok: true, verified: true });
+}
+
 export async function updatePilgrimContact(request: Request, id: string, env: BookingControlEnv): Promise<Response> {
   if (!env.BOOKINGS_DB) return json({ error: "BOOKING_DB_NOT_CONFIGURED" }, 503);
 

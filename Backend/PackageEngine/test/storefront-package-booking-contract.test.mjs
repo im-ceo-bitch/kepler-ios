@@ -45,9 +45,10 @@ test("package checkout recalculates from the original generated fare and persist
   assert.match(detail, /\$journey\.trip\.infants/);
   assert.match(detail, /\$journey\.trip\.rooms/);
   assert.match(detail, /await storefront\.checkoutQuote\(/);
-  assert.match(detail, /BookingProfileCaptureSheet/);
+  assert.match(detail, /IumrahBookingConfirmationView/);
+  assert.doesNotMatch(detail, /BookingProfileCaptureSheet/);
   assert.match(detail, /let session = try await bookings\.create\(/);
-  assert.match(detail, /createdBookingID = session\.id/);
+  assert.match(detail, /return session/);
   assert.match(detail, /BookingDetailView\(bookingID: bookingID\)/);
 });
 

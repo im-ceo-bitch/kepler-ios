@@ -948,6 +948,7 @@ private struct IumrahFriendsCalculatorCard: View {
     @State private var isCalculating = false
     @State private var errorText: String?
     @State private var includesPresented = false
+    @State private var calculationToken = UUID()
 
     private var totalTravelers: Int { adults + children }
     private var rooms: Int { min(4, max(1, Int(ceil(Double(max(1, totalTravelers)) / 4.0)))) }
@@ -1117,6 +1118,12 @@ private struct IumrahFriendsCalculatorCard: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
+                if let usedPreview {
+                    Text("\(usedPreview.outbound.origin) → \(usedPreview.outbound.destination) · \(String(usedPreview.outbound.departureAt.prefix(10))) · \(durationText(usedPreview.durationDays))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
             } else {
                 Text(errorText ?? unavailableText)
@@ -1158,80 +1165,150 @@ private struct IumrahFriendsCalculatorCard: View {
         .buttonStyle(.plain)
     }
 
+    // This is only the candidate selection policy. The Package Engine remains
+    // authoritative for the final public price (including all services/fees).
+    // Quotes shown here MUST never be computed by adding published package prices.
     @MainActor
     private func calculate() async {
         guard totalTravelers >= 1 && totalTravelers <= 16 else { return }
+        let token = UUID()
+        calculationToken = token
+        let startingKey = calculationKey
+        let selectedStars = stars
+        let selectedAdults = adults
+        let selectedChildren = children
+        let selectedRooms = rooms
+
         isCalculating = true
         errorText = nil
         quote = nil
-        defer { isCalculating = false }
+        usedPreview = nil
+        usedMakkahHotel = nil
+        usedMadinahHotel = nil
+        defer {
+            if calculationToken == token { isCalculating = false }
+        }
 
-        let direct = storefront.flightPackagePreviews.values
-            .filter { $0.outbound.stops == 0 && $0.inbound.stops == 0 && $0.madinahNights > 0 }
-            .sorted {
-                let l = abs($0.durationDays - 10)
-                let r = abs($1.durationDays - 10)
-                if l != r { return l < r }
-                return $0.outbound.departureAt < $1.outbound.departureAt
-            }
+        // The server publishes departures no earlier than D+3 in Tashkent.
+        // The local cache may still contain older snapshots, so apply the same
+        // boundary to the calculator rather than silently repricing old dates.
+        var tashkentCalendar = Calendar(identifier: .gregorian)
+        tashkentCalendar.timeZone = TimeZone(identifier: "Asia/Tashkent") ?? .current
+        guard let earliestDay = tashkentCalendar.date(byAdding: .day, value: 3, to: tashkentCalendar.startOfDay(for: Date())) else {
+            errorText = unavailableText
+            return
+        }
+        let validPreviews = Dictionary(
+            storefront.flightPackagePreviews.values.map { ($0.packageID, $0) },
+            uniquingKeysWith: { first, _ in first }
+        ).values.filter { preview in
+            guard preview.outbound.stops == 0,
+                  preview.inbound.stops == 0,
+                  preview.madinahNights > 0,
+                  preview.pricePerPerson > 0,
+                  preview.packageQuote.currency.uppercased() == "USD",
+                  let departure = parseISO(preview.outbound.departureAt) else { return false }
+            return tashkentCalendar.startOfDay(for: departure) >= earliestDay
+        }
 
-        guard let preview = direct.first else {
+        // Preserve the traditional week-or-two trip when one is available, but
+        // no longer prioritize an arbitrary ~10-day flight over a cheaper one.
+        let ordinaryTrips = validPreviews.filter { (7...14).contains($0.durationDays) }
+        let availableTrips = ordinaryTrips.isEmpty ? validPreviews : ordinaryTrips
+        let flights = availableTrips.sorted { lhs, rhs in
+            let l = lhs.flightFarePerPersonUSD > 0 ? lhs.flightFarePerPersonUSD : lhs.pricePerPerson
+            let r = rhs.flightFarePerPersonUSD > 0 ? rhs.flightFarePerPersonUSD : rhs.pricePerPerson
+            if l != r { return l < r }
+            if lhs.pricePerPerson != rhs.pricePerPerson { return lhs.pricePerPerson < rhs.pricePerPerson }
+            return lhs.outbound.departureAt < rhs.outbound.departureAt
+        }
+        guard let firstFlight = flights.first else {
             errorText = noDirectFlightText
             return
         }
-        guard let makkah = storefront.makkahHotels.first(where: { ($0.stars ?? 0) == stars }) else {
+
+        // Published Hotel First quotes are used only to rank hotels. Their
+        // package totals describe different trips, so they are NEVER added to
+        // this quote or displayed as a calculation for the chosen flight.
+        let selectedTier = tier(for: selectedStars)
+        func rankedHotels(_ hotels: [HotelSummary]) -> [HotelSummary] {
+            hotels.filter { ($0.stars ?? 0) == selectedStars }.sorted { lhs, rhs in
+                let l = storefront.quote(for: lhs, tier: selectedTier)?.packageQuote.pricePerPerson
+                let r = storefront.quote(for: rhs, tier: selectedTier)?.packageQuote.pricePerPerson
+                if let l, let r, l != r { return l < r }
+                if l != nil && r == nil { return true }
+                if l == nil && r != nil { return false }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+        }
+        let makkahOptions = rankedHotels(storefront.makkahHotels)
+        let madinahOptions = rankedHotels(storefront.madinahHotels)
+        guard let makkah = makkahOptions.first, let madinah = madinahOptions.first else {
             errorText = noHotelText
             return
         }
-        guard let madinah = storefront.madinahHotels.first(where: { ($0.stars ?? 0) == stars }) else {
-            errorText = noHotelText
-            return
+
+        // Compare a bounded number of *server-confirmed* alternatives. This
+        // prevents a large quote storm while avoiding the old first-row rule.
+        var candidates: [(StorefrontFlightPackagePreview, HotelSummary, HotelSummary)] = []
+        for preview in flights.prefix(2) { candidates.append((preview, makkah, madinah)) }
+        if let other = makkahOptions.dropFirst().first { candidates.append((firstFlight, other, madinah)) }
+        if let other = madinahOptions.dropFirst().first { candidates.append((firstFlight, makkah, other)) }
+
+        var best: (PackageQuote, StorefrontFlightPackagePreview, HotelSummary, HotelSummary)?
+        for (preview, makkahOption, madinahOption) in candidates {
+            guard !Task.isCancelled && calculationToken == token && calculationKey == startingKey else { return }
+            guard let departure = parseISO(preview.outbound.departureAt),
+                  let arrival = parseISO(preview.outbound.arrivalAt),
+                  let inbound = parseISO(preview.inbound.departureAt) else { continue }
+
+            var trip = TripDraft()
+            trip.origin = preview.outbound.origin.uppercased()
+            trip.originAirport = nil
+            trip.arrivalAirport = preview.outbound.destination.uppercased() == "MED" ? .madinah : .jeddah
+            trip.departureDate = Calendar.current.startOfDay(for: departure)
+            trip.saudiArrivalDate = Calendar.current.startOfDay(for: arrival)
+            trip.returnDate = Calendar.current.startOfDay(for: inbound)
+            trip.flexibility = .exact
+            trip.adults = selectedAdults
+            trip.children = selectedChildren
+            trip.infants = 0
+            trip.rooms = selectedRooms
+            trip.hotelStars = selectedStars
+            trip.packageTier = selectedTier
+            trip.scope = .makkahAndMadinah
+            trip.flightTripType = .roundTrip
+            trip.mealSelection = .defaultSelection
+
+            guard let candidateQuote = await storefront.checkoutQuote(
+                for: preview,
+                trip: trip,
+                makkahHotel: makkahOption,
+                madinahHotel: madinahOption,
+                makkahRoomID: nil,
+                madinahRoomID: nil,
+                transferVehicle: .carnival,
+                includeHaramainTrain: false,
+                haramainFareClass: .economy,
+                haramainTicketCount: 0
+            ) else { continue }
+            guard !Task.isCancelled && calculationToken == token && calculationKey == startingKey else { return }
+            guard candidateQuote.currency.uppercased() == "USD",
+                  candidateQuote.totalPackagePrice > 0,
+                  candidateQuote.pricePerPerson > 0 else { continue }
+            if let previous = best, previous.0.totalPackagePrice <= candidateQuote.totalPackagePrice { continue }
+            best = (candidateQuote, preview, makkahOption, madinahOption)
         }
-        guard let departure = parseISO(preview.outbound.departureAt),
-              let arrival = parseISO(preview.outbound.arrivalAt),
-              let inbound = parseISO(preview.inbound.departureAt) else {
+
+        guard !Task.isCancelled && calculationToken == token && calculationKey == startingKey else { return }
+        guard let best else {
             errorText = unavailableText
             return
         }
-
-        var trip = TripDraft()
-        trip.origin = preview.outbound.origin.uppercased()
-        trip.originAirport = nil
-        trip.arrivalAirport = preview.outbound.destination.uppercased() == "MED" ? .madinah : .jeddah
-        trip.departureDate = Calendar.current.startOfDay(for: departure)
-        trip.saudiArrivalDate = Calendar.current.startOfDay(for: arrival)
-        trip.returnDate = Calendar.current.startOfDay(for: inbound)
-        trip.flexibility = .exact
-        trip.adults = adults
-        trip.children = children
-        trip.infants = 0
-        trip.rooms = rooms
-        trip.hotelStars = stars
-        trip.packageTier = tier(for: stars)
-        trip.scope = .makkahAndMadinah
-        trip.flightTripType = .roundTrip
-        trip.mealSelection = .defaultSelection
-
-        guard let freshQuote = await storefront.checkoutQuote(
-            for: preview,
-            trip: trip,
-            makkahHotel: makkah,
-            madinahHotel: madinah,
-            makkahRoomID: nil,
-            madinahRoomID: nil,
-            transferVehicle: .carnival,
-            includeHaramainTrain: false,
-            haramainFareClass: .economy,
-            haramainTicketCount: 0
-        ) else {
-            errorText = unavailableText
-            return
-        }
-
-        usedPreview = preview
-        usedMakkahHotel = makkah
-        usedMadinahHotel = madinah
-        quote = freshQuote
+        usedPreview = best.1
+        usedMakkahHotel = best.2
+        usedMadinahHotel = best.3
+        quote = best.0
     }
 
     private func tier(for stars: Int) -> PackageTier {

@@ -7,12 +7,16 @@ const backend = read('Backend/PackageEngine/src/nuitee-hotels.ts');
 const router = read('Backend/PackageEngine/src/index.ts');
 const view = read('Sources/Views/Hotels/NuiteeHotelsCatalogView.swift');
 const home = read('Sources/Views/Tabs/HotelsHomeView.swift');
-const workflow = read('.github/workflows/deploy-package-engine.yml');
+const env = read('Backend/PackageEngine/src/env.ts');
+const service = read('Sources/Services/NuiteeHotelService.swift');
 
 test('Nuitee supplier authorization stays exclusively on server', () => {
   assert.match(backend, /'X-API-Key': key/);
   assert.match(router, /handleNuiteeHotelRequest/);
-  assert.match(workflow, /secrets\.NUITEE_API_KEY/);
+  // Credentials are managed as a Cloudflare Worker Secret, not a GitHub Actions Secret.
+  assert.match(env, /NUITEE_API_KEY\?: string/);
+  assert.match(backend, /env\.NUITEE_API_KEY/);
+  assert.doesNotMatch(service, /NUITEE_API_KEY|X-API-Key|api\.liteapi\.travel/);
   assert.doesNotMatch(view, /NUITEE_API_KEY|X-API-Key|api\.liteapi\.travel/);
 });
 

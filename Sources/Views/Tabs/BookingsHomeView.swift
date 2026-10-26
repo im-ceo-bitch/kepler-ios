@@ -275,6 +275,7 @@ struct BookingsHomeView: View {
             Text(localized("Расписание", "Schedule", "Jadval", "Жадвал")).tag(BookingPanel.schedule)
         }
         .pickerStyle(.segmented)
+        .tint(Color.iumrahSignatureBlack)
         .onChange(of: bookingPanel) { _, _ in IumrahHaptics.selection() }
     }
 

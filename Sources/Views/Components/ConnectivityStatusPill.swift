@@ -165,52 +165,18 @@ struct IumrahAnimatedConnectivityIndicator: View {
     }
 
     private var gradient: Gradient {
-        if !isExpanded || connectivity.status == .checking {
-            // The compact globe in the reference deliberately cycles through the
-            // full spectrum before the state label opens.
-            return Gradient(stops: [
-                .init(color: Color(red: 0.18, green: 0.96, blue: 0.37), location: 0.00),
-                .init(color: Color(red: 0.08, green: 0.90, blue: 0.94), location: 0.14),
-                .init(color: Color(red: 0.20, green: 0.42, blue: 1.00), location: 0.29),
-                .init(color: Color(red: 0.62, green: 0.18, blue: 0.98), location: 0.43),
-                .init(color: Color(red: 1.00, green: 0.12, blue: 0.54), location: 0.57),
-                .init(color: Color(red: 1.00, green: 0.21, blue: 0.16), location: 0.70),
-                .init(color: Color(red: 1.00, green: 0.66, blue: 0.10), location: 0.84),
-                .init(color: Color(red: 0.18, green: 0.96, blue: 0.37), location: 1.00),
-            ])
-        }
-
-        switch connectivity.status {
-        case .offline:
-            return Gradient(stops: [
-                .init(color: Color(red: 1.00, green: 0.08, blue: 0.34), location: 0.00),
-                .init(color: Color(red: 1.00, green: 0.17, blue: 0.56), location: 0.27),
-                .init(color: Color(red: 1.00, green: 0.88, blue: 0.91), location: 0.45),
-                .init(color: Color.black.opacity(0.22), location: 0.61),
-                .init(color: Color(red: 0.96, green: 0.15, blue: 0.48), location: 0.80),
-                .init(color: Color(red: 1.00, green: 0.08, blue: 0.34), location: 1.00),
-            ])
-        case .online:
-            return Gradient(stops: [
-                .init(color: Color(red: 0.08, green: 0.88, blue: 0.93), location: 0.00),
-                .init(color: Color(red: 0.14, green: 0.95, blue: 0.70), location: 0.27),
-                .init(color: Color(red: 0.89, green: 1.00, blue: 0.98), location: 0.45),
-                .init(color: Color.black.opacity(0.20), location: 0.61),
-                .init(color: Color(red: 0.11, green: 0.91, blue: 0.72), location: 0.80),
-                .init(color: Color(red: 0.08, green: 0.88, blue: 0.93), location: 1.00),
-            ])
-        case .checking:
-            return Gradient(colors: [.white.opacity(0.78), .cyan, .mint, .white.opacity(0.78)])
-        }
+        Gradient(stops: [
+            .init(color: .white.opacity(0.55), location: 0.0),
+            .init(color: .white.opacity(0.98), location: 0.20),
+            .init(color: Color(white: 0.40), location: 0.47),
+            .init(color: Color(white: 0.18), location: 0.65),
+            .init(color: .white.opacity(0.86), location: 0.86),
+            .init(color: .white.opacity(0.55), location: 1.0)
+        ])
     }
 
-    private var haloColor: Color {
-        switch connectivity.status {
-        case .online: return Color(red: 0.10, green: 0.92, blue: 0.70)
-        case .offline: return Color(red: 1.00, green: 0.12, blue: 0.42)
-        case .checking: return .cyan
-        }
-    }
+    private var haloColor: Color { .white }
+
 }
 
 /// Compatibility wrapper for any older call sites. New Home headers use the

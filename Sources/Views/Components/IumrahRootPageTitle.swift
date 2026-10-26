@@ -13,6 +13,9 @@ struct IumrahRootPageTitle: View {
     var usesBrandLogo = false
     var brandScale: CGFloat = 1.0
     var showsConnectivityStatus = false
+    /// Hotels uses one shared map surface for the title + segment control.
+    /// Disable the local background in that container only.
+    var drawsSignatureBackground = true
 
     var body: some View {
         Group {
@@ -20,17 +23,100 @@ struct IumrahRootPageTitle: View {
             // Online pill and two circular controls. Keep that row adaptive so
             // the trailing controls can never be pushed past the screen edge on
             // narrower iPhones or larger Dynamic Type sizes.
-            if usesBrandLogo && showsConnectivityStatus {
-                ViewThatFits(in: .horizontal) {
-                    connectedBrandHeader(brandWidth: 132, controlSize: 44, spacing: 8)
-                    connectedBrandHeader(brandWidth: 110, controlSize: 40, spacing: 7)
-                    connectedBrandHeader(brandWidth: 96, controlSize: 38, spacing: 6)
+            if lightStyle {
+                // Immersive photo headers keep their original contrast treatment.
+                if usesBrandLogo && showsConnectivityStatus {
+                    ViewThatFits(in: .horizontal) {
+                        connectedBrandHeader(brandWidth: 132, controlSize: 44, spacing: 8)
+                        connectedBrandHeader(brandWidth: 110, controlSize: 40, spacing: 7)
+                        connectedBrandHeader(brandWidth: 96, controlSize: 38, spacing: 6)
+                    }
+                } else {
+                    standardHeader
                 }
             } else {
-                standardHeader
+                signatureHeader
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // A single monochrome brand signature is repeated in all five primary tabs.
+    // Negative horizontal padding lets the header run edge-to-edge inside each
+    // existing padded scroll column without changing that column's content width.
+    private var signatureHeader: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ViewThatFits(in: .horizontal) {
+                signatureBrandRow(wordmarkWidth: 132, controlSize: 42, spacing: 9)
+                signatureBrandRow(wordmarkWidth: 105, controlSize: 38, spacing: 7)
+                signatureBrandRow(wordmarkWidth: 84, controlSize: 36, spacing: 5)
+            }
+
+            if !showsConnectivityStatus {
+                Text(title)
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .tracking(-0.8)
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.76)
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
+        .padding(.horizontal, IumrahDesign.pagePadding)
+        .padding(.top, 14)
+        .padding(.bottom, showsConnectivityStatus ? 22 : 25)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if drawsSignatureBackground {
+                IumrahWorldDotsHeaderBackground()
+            }
+        }
+        .padding(.horizontal, -IumrahDesign.pagePadding)
+    }
+
+    private func signatureBrandRow(wordmarkWidth: CGFloat, controlSize: CGFloat, spacing: CGFloat) -> some View {
+        HStack(alignment: .center, spacing: spacing) {
+            Image("HeaderWordmarkDark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: wordmarkWidth, height: 42, alignment: .leading)
+                .accessibilityLabel("iumrah Project")
+
+            Spacer(minLength: 0)
+
+            if showsConnectivityStatus {
+                IumrahAnimatedConnectivityIndicator(lightStyle: true)
+                    .layoutPriority(1)
+            }
+
+            signatureControl(icon: clientNotifications.unreadCount > 0 ? "bell.badge.fill" : "bell", size: controlSize, label: notificationAccessibilityLabel) {
+                chrome.openNotifications()
+            }
+            .overlay(alignment: .topTrailing) {
+                if clientNotifications.unreadCount > 0 {
+                    unreadDot.offset(x: 3, y: -4)
+                }
+            }
+
+            if navigationChromeStyle == .drawer {
+                signatureControl(icon: "line.3.horizontal", size: controlSize, label: menuAccessibilityLabel) {
+                    chrome.openSidebar()
+                }
+            }
+        }
+    }
+
+    private func signatureControl(icon: String, size: CGFloat, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(Color.white.opacity(0.105), in: Circle())
+                .overlay { Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.8) }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private var standardHeader: some View {

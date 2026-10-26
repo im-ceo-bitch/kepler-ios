@@ -27,6 +27,7 @@ targets:
           # Compiled explicitly below so the data-sphere shaders are guaranteed
           # to land in the app's default Metal library under XcodeGen.
           - Core/Components/IumrahDataSphereShaders.metal
+          - Core/Components/IumrahWorldDotsShaders.metal
           # Legacy on-device Booking/Expedia hotel scrapers are intentionally
           # outside the production target. Hotel pricing comes from the 48h
           # server catalog cache maintained by iumrah Business.
@@ -38,6 +39,8 @@ targets:
           # Legacy StoreKit/IAP source is intentionally excluded from the app target.
           - Store/IumrahPlusStore.swift
       - path: Sources/Core/Components/IumrahDataSphereShaders.metal
+        buildPhase: sources
+      - path: Sources/Core/Components/IumrahWorldDotsShaders.metal
         buildPhase: sources
       - path: Resources/Assets.xcassets
         buildPhase: resources

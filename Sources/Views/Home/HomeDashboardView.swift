@@ -566,20 +566,20 @@ struct HomeDashboardView: View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 7) {
                 Image(systemName: "sparkles")
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Color.primary)
                 Text(tripToolsTitle)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary)
             }
 
             HStack(spacing: 9) {
-                tripToolButton(title: prayerEntryTitle, symbol: "moon.stars.fill", color: .orange, identifier: "home.openPrayerTimes") {
+                tripToolButton(title: prayerEntryTitle, symbol: "moon.stars.fill", color: .primary, identifier: "home.openPrayerTimes") {
                     showPrayerTimes = true
                 }
-                tripToolButton(title: weatherEntryTitle, symbol: "cloud.sun.fill", color: .blue, identifier: "home.openWeather") {
+                tripToolButton(title: weatherEntryTitle, symbol: "cloud.sun.fill", color: .primary, identifier: "home.openWeather") {
                     showTravelInfo = true
                 }
-                tripToolButton(title: "Umrah Flow", symbol: "waveform", color: .purple, identifier: "home.openUmrahFlow") {
+                tripToolButton(title: "Umrah Flow", symbol: "waveform", color: .primary, identifier: "home.openUmrahFlow") {
                     openGuideLanguages()
                 }
             }

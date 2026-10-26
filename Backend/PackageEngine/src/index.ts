@@ -21,6 +21,7 @@ import { quoteSealingMode } from "./quote-audit";
 import { createCarePackageRequest, listCarePackageRequests, updateCarePackageRequest } from "./care-requests";
 import { createTelegramBookingLink, getTelegramBookingStatus } from "./telegram-bridge";
 import { getBookingItineraryPlan } from "./itinerary-planner";
+import { handleNuiteeHotelRequest, refreshNuiteeHotelCatalog } from "./nuitee-hotels";
 
 function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -131,6 +132,10 @@ export default {
 
     if (url.pathname.startsWith("/api/package/public/id/")) {
       return handlePublicIdentityRequest(request, env, url);
+    }
+
+    if (url.pathname.startsWith("/api/package/nuitee/")) {
+      return handleNuiteeHotelRequest(request, env, url);
     }
 
     if (url.pathname.startsWith("/api/package/client/account/")) {
@@ -333,6 +338,7 @@ export default {
   },
 
   async scheduled(controller: { cron?: string }, env: Env): Promise<void> {
+    if (controller.cron === "0 3 * * *") await refreshNuiteeHotelCatalog(env);
     if (!env.HOTELS_DB) return;
     if (controller.cron === "17 0 * * *") await cleanupExpiredFlightCache(env.HOTELS_DB);
     if (controller.cron === "*/5 * * * *") await flushBookingStatusEmails(env);

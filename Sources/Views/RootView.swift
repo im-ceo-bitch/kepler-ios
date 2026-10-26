@@ -392,10 +392,10 @@ struct RootView: View {
                 .tabItem { Label(settings.language == .indonesian ? "Akun saya" : (settings.language == .turkish ? "Hesabım" : "Account"), systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
-        // Navigation chrome uses one restrained app accent; content icons carry
-        // the richer semantic palette. This keeps the native tab bar adult and legible.
-        .tint(IumrahIconRole.umrah.color)
-        .toolbar((chrome.isImmersiveMode || chrome.isInternalNavigationActive) ? .hidden : .visible, for: .tabBar)
+        // Own monochrome bottom navigation replaces the platform's blue
+        // Liquid Glass tab selection without touching tab view state.
+        .tint(Color.iumrahSignatureBlack)
+        .toolbar(.hidden, for: .tabBar)
     }
 
     @ViewBuilder

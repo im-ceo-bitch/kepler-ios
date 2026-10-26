@@ -77,12 +77,12 @@ struct CareHomeView: View {
     private var careQuickContacts: some View {
         HStack(spacing: 11) {
             Button(action: openPhone) {
-                quickContactTile("phone.fill", title: tr("Call", "Позвонить", "Qo‘ng‘iroq", "Қўнғироқ"), tint: .green, enabled: !preferredPhone.isEmpty)
+                quickContactTile("phone.fill", title: tr("Call", "Позвонить", "Qo‘ng‘iroq", "Қўнғироқ"), tint: .primary, enabled: !preferredPhone.isEmpty)
             }
             .disabled(preferredPhone.isEmpty)
 
             Button(action: openTelegram) {
-                quickContactTile("paperplane.fill", title: "Telegram", tint: .blue, enabled: telegramURL != nil)
+                quickContactTile("paperplane.fill", title: "Telegram", tint: .primary, enabled: telegramURL != nil)
             }
             .disabled(telegramURL == nil)
 
@@ -104,7 +104,9 @@ struct CareHomeView: View {
         VStack(spacing: 12) {
             Group {
                 if icon == "paperplane.fill" {
-                    IumrahTelegramMark(size: 34)
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 25, weight: .medium))
+                        .foregroundStyle(enabled ? Color.primary : Color.secondary)
                 } else {
                     Image(systemName: icon)
                         .font(.system(size: 24, weight: .medium))

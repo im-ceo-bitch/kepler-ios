@@ -32,7 +32,26 @@ struct HotelsHomeView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 22) {
-                        IumrahRootPageTitle(title: pageTitle)
+                        // Signature black header + embedded white/black navigation.
+                        // The departure airport remains a normal content control.
+                        VStack(spacing: 0) {
+                            IumrahRootPageTitle(title: pageTitle, drawsSignatureBackground: false)
+
+                            HStack(spacing: 7) {
+                                boardTile(.hotels, icon: "building.2", title: L10n.text("tab_hotels", settings.language))
+                                boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
+                                boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
+                            }
+                            .padding(.horizontal, gutter)
+                            .padding(.bottom, 19)
+                            .padding(.horizontal, -gutter)
+                        }
+                        // One uninterrupted animated map underneath BOTH the
+                        // wordmark/title and hotel/flight/weekend navigation.
+                        .background {
+                            IumrahWorldDotsHeaderBackground()
+                                .padding(.horizontal, -gutter)
+                        }
 
                         // Shared airport/location selector, consistent for
                         // Hotels, Flights and Weekend.
@@ -40,13 +59,6 @@ struct HotelsHomeView: View {
                             airport: $journey.trip.originAirport,
                             fallbackCode: $journey.trip.origin
                         )
-
-                        HStack(spacing: 10) {
-                            boardTile(.hotels, icon: "building.2.fill", title: L10n.text("tab_hotels", settings.language))
-                            boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
-                            boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
-                        }
-                        .frame(width: columnWidth)
 
                         Group {
                             switch board {
@@ -91,8 +103,10 @@ struct HotelsHomeView: View {
             }
         }
         .refreshable {
-            await storefront.updateDepartureAirport(journey.trip.originCode)
-            await storefront.refresh()
+            if board != .hotels {
+                await storefront.updateDepartureAirport(journey.trip.originCode)
+                await storefront.refresh()
+            }
         }
         .background(Color.iumrahPageBackground)
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -116,8 +130,18 @@ struct HotelsHomeView: View {
             }
         }
         .task(id: journey.trip.originCode.uppercased()) {
+            // The old D1 Hotels storefront is retained for legacy packages
+            // and Flights, but never loaded just for the Nuitee Hotels tab.
+            guard board != .hotels else { return }
             await storefront.prepareIfNeeded()
             await storefront.updateDepartureAirport(journey.trip.originCode)
+        }
+        .onChange(of: board) { _, newBoard in
+            guard newBoard != .hotels else { return }
+            Task {
+                await storefront.prepareIfNeeded()
+                await storefront.updateDepartureAirport(journey.trip.originCode)
+            }
         }
         .onAppear {
             applyRequestedBoard()
@@ -165,38 +189,26 @@ struct HotelsHomeView: View {
 
     private func boardTile(_ target: HotelsShowcaseBoard, icon: String, title: String) -> some View {
         let active = board == target
-        let tint: Color
-        switch target {
-        case .hotels: tint = Color.orange
-        case .flights: tint = Color.blue
-        case .sundayClub: tint = Color.green
-        }
         return Button {
             withAnimation(.snappy(duration: 0.26)) { board = target }
             IumrahHaptics.selection()
         } label: {
-            VStack(spacing: 9) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .semibold))
-                    .frame(height: 27)
+                    .font(.system(size: 13, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11.5, weight: .semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .minimumScaleFactor(0.66)
             }
-            .foregroundStyle(active ? Color.white : tint)
-            .frame(maxWidth: .infinity)
-            .frame(height: 94)
-            .background {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(active ? tint : Color.iumrahCardBackground)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(tint.opacity(active ? 0 : 0.16), lineWidth: 0.8)
-            }
+            .foregroundStyle(active ? Color.iumrahSignatureBlack : Color.white)
+            .frame(maxWidth: .infinity, minHeight: 41)
+            .background(active ? Color.white : Color.clear, in: Capsule())
+            .overlay { Capsule().strokeBorder(Color.white.opacity(active ? 0 : 0.38), lineWidth: 0.9) }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     private func applyRequestedBoard() {
@@ -215,49 +227,12 @@ struct HotelsHomeView: View {
 
     // MARK: - Hotels
 
+    // Nuitee V1 changes only the Hotels tab. Existing Flights and Sunday Club
+    // maintain their original sources and navigation behind the unified header.
     private var hotelsBoard: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            ShowcaseHero(
-                asset: "IumrahHotelsShowcaseHero",
-                title: "iumrah Hotels",
-                description: L10n.text("hotel_storefront_hero_body", settings.language),
-                note: nil
-            )
-
-            IumrahFriendsCalculatorCard()
-                .environmentObject(settings)
-                .environmentObject(storefront)
-
-            hotelCitySection(
-                title: L10n.text("hotels_makkah", settings.language),
-                hotels: storefront.makkahHotels
-            )
-            hotelCitySection(
-                title: L10n.text("hotels_madinah", settings.language),
-                hotels: storefront.madinahHotels
-            )
-
-            if storefront.isLoading && storefront.allHotels.isEmpty {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(L10n.text("hotel_storefront_loading", settings.language))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 92)
-            }
-
-            if let error = storefront.errorMessage, storefront.allHotels.isEmpty {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .iumrahCard()
-            }
-
-            HotelCareShowcaseCard(language: settings.language) {
-                carePresented = true
-            }
-        }
+        NuiteeHotelsCatalogView()
+            .environmentObject(settings)
+            .environmentObject(chrome)
     }
 
     private func hotelCitySection(title: String, hotels: [HotelSummary]) -> some View {

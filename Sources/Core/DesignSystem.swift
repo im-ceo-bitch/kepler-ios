@@ -67,6 +67,9 @@ extension Color {
     static let iumrahPrimaryButtonBackground = Color(uiColor: .iumrahPrimaryButton)
     static let iumrahPrimaryButtonText = Color(uiColor: .iumrahPrimaryButtonText)
     static let iumrahGraphite = Color(red: 0.09, green: 0.10, blue: 0.115)
+    /// Signature surfaces shared by the five root tabs.
+    static let iumrahSignatureBlack = Color(red: 0.035, green: 0.035, blue: 0.035)
+    static let iumrahSignatureMuted = Color(red: 0.94, green: 0.94, blue: 0.95)
     static let iumrahCareDark = Color(uiColor: .iumrahCareDark)
     static let iumrahCareLight = Color(uiColor: .iumrahCareLight)
     static let iumrahPhotoCardBackground = Color(uiColor: .iumrahPhotoCard)

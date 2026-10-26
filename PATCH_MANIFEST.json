@@ -1,0 +1,41 @@
+{
+  "name": "iumrah Nuitee Hotels V1 + monochrome headers + world dots",
+  "version": "2026-10-26-combined-v3-workflow-safe",
+  "base": "kepler-ios-main 4.zip",
+  "integration": {
+    "file": "Sources/Views/Tabs/HotelsHomeView.swift",
+    "resolution": "header+world-dots kept; hotelsBoard replaced with Nuitee; old Hotels storefront network loads gated"
+  },
+  "files": [
+    "Backend/PackageEngine/migrations/0010_nuitee_hotel_cache.sql",
+    "Backend/PackageEngine/src/env.ts",
+    "Backend/PackageEngine/src/index.ts",
+    "Backend/PackageEngine/src/nuitee-hotels.ts",
+    "Backend/PackageEngine/test/nuitee-hotels-v1-contract.test.mjs",
+    "Backend/PackageEngine/wrangler.template.jsonc",
+    "PATCH_MANIFEST.json",
+    "README_COMBINED_RU.md",
+    "Resources/Assets.xcassets/IumrahWorldDots.imageset/Contents.json",
+    "Resources/Assets.xcassets/IumrahWorldDots.imageset/iumrah-world-dots.png",
+    "Sources/AppShell/AppNavigationContainer.swift",
+    "Sources/AppShell/IumrahAccountView.swift",
+    "Sources/AppShell/IumrahStoreTabBar.swift",
+    "Sources/Core/Components/IumrahWorldDotsHeaderBackground.swift",
+    "Sources/Core/Components/IumrahWorldDotsMap.swift",
+    "Sources/Core/Components/IumrahWorldDotsShaders.metal",
+    "Sources/Core/DesignSystem.swift",
+    "Sources/Models/NuiteeHotelModels.swift",
+    "Sources/Services/NuiteeHotelService.swift",
+    "Sources/Views/Components/ConnectivityStatusPill.swift",
+    "Sources/Views/Components/IumrahRootPageTitle.swift",
+    "Sources/Views/Home/HomeDashboardView.swift",
+    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift",
+    "Sources/Views/RootView.swift",
+    "Sources/Views/Tabs/BookingsHomeView.swift",
+    "Sources/Views/Tabs/CareHomeView.swift",
+    "Sources/Views/Tabs/HotelsHomeView.swift",
+    "project.yml"
+  ],
+  "workflowSafe": true,
+  "workflowChange": "No workflow modifications; existing Deploy iumrah Package Engine publishes server code; cache table auto-creates on first Nuitee request."
+}

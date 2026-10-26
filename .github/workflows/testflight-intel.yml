@@ -8,9 +8,14 @@ on:
         required: false
         type: string
         default: ''
+      release_version:
+        description: 'App version (default 2.0.10)'
+        required: true
+        type: string
+        default: '2.0.10'
 
 concurrency:
-  group: iumrah-testflight-intel-${{ github.ref }}
+  group: iumrah-testflight-upload-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -35,6 +40,7 @@ jobs:
       - name: Resolve release version and verify production identity
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASE_VERSION_OVERRIDE: ${{ inputs.release_version }}
         run: |
           set -euo pipefail
 
@@ -69,8 +75,23 @@ jobs:
           p.write_text(text)
           PYCODE
 
-          MARKETING_VERSION=$(python3 -c 'import re; from pathlib import Path; text=Path("project.yml").read_text(); match=re.search(r"(?m)^\s*MARKETING_VERSION:\s*\"?([0-9]+(?:\.[0-9]+){1,2})\"?\s*$", text); print(match.group(1) if match else "")')
-          test -n "$MARKETING_VERSION" || { echo "STOP: MARKETING_VERSION could not be resolved"; exit 1; }
+          PROJECT_MARKETING_VERSION=$(python3 -c 'import re; from pathlib import Path; text=Path("project.yml").read_text(); match=re.search(r"(?m)^\s*MARKETING_VERSION:\s*\"?([0-9]+(?:\.[0-9]+){1,2})\"?\s*$", text); print(match.group(1) if match else "")')
+          test -n "$PROJECT_MARKETING_VERSION" || { echo "STOP: project MARKETING_VERSION could not be resolved"; exit 1; }
+          MARKETING_VERSION="${RELEASE_VERSION_OVERRIDE:-$PROJECT_MARKETING_VERSION}"
+          export MARKETING_VERSION PROJECT_MARKETING_VERSION
+          python3 - <<'VERSION_CHECK'
+          import os
+          def parts(v):
+              nums = v.split('.')
+              if len(nums) not in (2, 3) or not all(n.isdecimal() for n in nums):
+                  raise SystemExit('STOP: invalid release version; expected e.g. 2.0.1')
+              return tuple(map(int, (nums + ['0'])[:3]))
+          current = os.environ['PROJECT_MARKETING_VERSION']
+          chosen = os.environ['MARKETING_VERSION']
+          if parts(chosen) < parts(current):
+              raise SystemExit(f'STOP: selected release version {chosen} is older than project version {current}')
+          print(f'TestFlight release version: {chosen} (project version: {current})')
+          VERSION_CHECK
           echo "MARKETING_VERSION=$MARKETING_VERSION" >> "$GITHUB_ENV"
           grep -F 'PRODUCT_BUNDLE_IDENTIFIER: com.iumrah.app' project.yml >/dev/null || {
             echo "STOP: Bundle ID must be the published App Store ID com.iumrah.app"; exit 1;
@@ -351,14 +372,149 @@ jobs:
           echo "TestFlight is using the previously prepared existing signing profiles."
           echo "This workflow does not create, renew, or revoke Apple certificates or provisioning profiles."
 
+      - name: Prepare App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing GitHub secret: $name"
+              exit 1
+            fi
+          done
+
+          P8_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          JSON_PATH="$RUNNER_TEMP/app-store-connect-api-key.json"
+          printf '%s' "$ASC_API_KEY_P8" > "$P8_PATH"
+          chmod 600 "$P8_PATH"
+
+          ASC_P8_PATH="$P8_PATH" ASC_JSON_PATH="$JSON_PATH" python3 - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+
+          p8 = Path(os.environ["ASC_P8_PATH"]).read_text()
+          payload = {
+              "key_id": os.environ["ASC_KEY_ID"],
+              "issuer_id": os.environ["ASC_ISSUER_ID"],
+              "key": p8,
+              "duration": 1200,
+              "in_house": False,
+          }
+          Path(os.environ["ASC_JSON_PATH"]).write_text(json.dumps(payload))
+          PYCODE
+
+          echo "ASC_API_KEY_PATH=$JSON_PATH" >> "$GITHUB_ENV"
+
+      - name: Resolve safe build number from App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          set +x
+          ruby <<'RUBY'
+          require 'base64'
+          require 'json'
+          require 'net/http'
+          require 'openssl'
+          require 'uri'
+
+          def b64url(data)
+            Base64.urlsafe_encode64(data, padding: false)
+          end
+
+          key = OpenSSL::PKey.read(ENV.fetch('ASC_API_KEY_P8').gsub('\\n', "\n"))
+          now = Time.now.to_i
+          header = { alg: 'ES256', kid: ENV.fetch('ASC_KEY_ID'), typ: 'JWT' }
+          claims = { iss: ENV.fetch('ASC_ISSUER_ID'), iat: now, exp: now + 900, aud: 'appstoreconnect-v1' }
+          unsigned = "#{b64url(JSON.generate(header))}.#{b64url(JSON.generate(claims))}"
+          der = key.sign(OpenSSL::Digest.new('SHA256'), unsigned)
+          parts = OpenSSL::ASN1.decode(der).value
+          signature = parts.map { |item| item.value.to_s(2).rjust(32, "\x00") }.join
+          token = "#{unsigned}.#{b64url(signature)}"
+
+          def fetch_json(url, token)
+            uri = URI(url)
+            raise 'Unexpected API host' unless uri.scheme == 'https' && uri.host == 'api.appstoreconnect.apple.com'
+            attempts = 0
+            loop do
+              response = Net::HTTP.start(uri.host, uri.port, use_ssl: true, open_timeout: 15, read_timeout: 30) do |http|
+                http.get(uri.request_uri, { 'Authorization' => "Bearer #{token}", 'Accept' => 'application/json' })
+              end
+              if [429, 500, 502, 503, 504].include?(response.code.to_i) && attempts < 3
+                attempts += 1
+                sleep(2**attempts)
+                next
+              end
+              raise "App Store Connect API HTTP #{response.code}: #{response.body.to_s[0,300]}" unless response.code.to_i == 200
+              return JSON.parse(response.body)
+            end
+          end
+
+          def pages(url, token)
+            values = []
+            count = 0
+            while url
+              page = fetch_json(url, token)
+              values.concat(page.fetch('data'))
+              count += 1
+              raise 'Too many pages; stopping without guessing build number' if count > 100
+              url = page.fetch('links', {})['next']
+            end
+            values
+          end
+
+          def build_numbers(rows)
+            rows.filter_map do |item|
+              s = item.fetch('attributes', {})['version'].to_s
+              Integer(s) if s.match?(/\A[1-9][0-9]*\z/)
+            end
+          end
+
+          app = fetch_json('https://api.appstoreconnect.apple.com/v1/apps?filter%5BbundleId%5D=com.iumrah.app&limit=1', token).fetch('data').first
+          raise 'Cannot find app com.iumrah.app in App Store Connect' unless app
+          app_id = app.fetch('id')
+          current_version = ENV.fetch('MARKETING_VERSION')
+
+          # Read only the current *marketing version's* existing build numbers.
+          all_versions = pages("https://api.appstoreconnect.apple.com/v1/apps/#{app_id}/preReleaseVersions?limit=200", token)
+          matching = all_versions.select do |v|
+            attr = v.fetch('attributes', {})
+            attr['version'] == current_version && attr['platform'] == 'IOS'
+          end
+          raise 'Unexpected duplicate prerelease version for iOS' if matching.length > 1
+          in_version = matching.empty? ? [] : build_numbers(pages("https://api.appstoreconnect.apple.com/v1/preReleaseVersions/#{matching.first.fetch('id')}/builds?limit=200", token))
+          last_version_build = in_version.max
+
+          # This version begins at 200. For subsequent runs, query App Store Connect
+          # for builds under THIS SAME marketing version, then increment.
+          # A failed upload may reuse the number if App Store Connect did not accept it.
+          if last_version_build
+            proposed = [200, last_version_build + 1].max
+          else
+            proposed = 200
+          end
+
+          # Fail closed: another accidental large build number must never be uploaded.
+          raise "STOP: build number #{proposed} is unexpectedly high; use a NEW marketing version and review numbering" if proposed >= 5_000
+          raise 'STOP: next build number must be positive' if proposed <= 0
+          File.open(ENV.fetch('GITHUB_ENV'), 'a') { |f| f.puts "BUILD_NUMBER=#{proposed}" }
+          puts "Iumrah version #{current_version}: build #{proposed} (previous build in this version: #{last_version_build || 'none'})"
+          RUBY
+
       - name: Archive signed app
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -o pipefail
           mkdir -p build
-          BUILD_NUMBER=$((300000 + GITHUB_RUN_NUMBER))
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          test -n "${BUILD_NUMBER:-}" || { echo "Build number was not resolved"; exit 1; }
           echo "Building Iumrah $MARKETING_VERSION ($BUILD_NUMBER)"
 
           xcodebuild \
@@ -656,44 +812,6 @@ jobs:
 
       - name: Install fastlane
         run: gem install fastlane --no-document
-
-      - name: Prepare App Store Connect API key
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
-        run: |
-          set -euo pipefail
-          set +x
-
-          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
-            if [ -z "${!name:-}" ]; then
-              echo "Missing GitHub secret: $name"
-              exit 1
-            fi
-          done
-
-          P8_PATH="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
-          JSON_PATH="$RUNNER_TEMP/app-store-connect-api-key.json"
-          printf '%s' "$ASC_API_KEY_P8" > "$P8_PATH"
-          chmod 600 "$P8_PATH"
-
-          ASC_P8_PATH="$P8_PATH" ASC_JSON_PATH="$JSON_PATH" python3 - <<'PYCODE'
-          import json, os
-          from pathlib import Path
-
-          p8 = Path(os.environ["ASC_P8_PATH"]).read_text()
-          payload = {
-              "key_id": os.environ["ASC_KEY_ID"],
-              "issuer_id": os.environ["ASC_ISSUER_ID"],
-              "key": p8,
-              "duration": 1200,
-              "in_house": False,
-          }
-          Path(os.environ["ASC_JSON_PATH"]).write_text(json.dumps(payload))
-          PYCODE
-
-          echo "ASC_API_KEY_PATH=$JSON_PATH" >> "$GITHUB_ENV"
 
       - name: Upload IPA to TestFlight
         env:

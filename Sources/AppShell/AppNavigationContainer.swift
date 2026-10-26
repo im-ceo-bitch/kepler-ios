@@ -4,7 +4,6 @@ struct AppNavigationContainer<Content: View>: View {
     @EnvironmentObject private var chrome: AppChromeStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
-    @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
 
     let tab: AppTab?
     let content: Content
@@ -48,14 +47,10 @@ struct AppNavigationContainer<Content: View>: View {
     private var navigationStack: some View {
         NavigationStack {
             content
-                // Install the signature bar on root content, not outside the
-                // NavigationStack: pushed detail screens cover it naturally.
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    if tab != nil && navigationChromeStyle == .drawer &&
-                        !chrome.isImmersiveMode && !chrome.isInternalNavigationActive {
-                        IumrahStoreTabBar(selection: $chrome.currentTab)
-                    }
-                }
+                // Native TabView owns the ONE bottom bar on compact layouts.
+                // Do not insert a custom capsule or hide the system bar here:
+                // that combination caused duplicated navigation on iOS 26.
+                // Detail destinations can still hide the tab bar individually.
                 .toolbar(.hidden, for: .navigationBar)
                 .background(Color.iumrahPageBackground.ignoresSafeArea())
                 .navigationDestination(isPresented: isESIMDestinationActive) {

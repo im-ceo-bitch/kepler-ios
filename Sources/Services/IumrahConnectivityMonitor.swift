@@ -32,17 +32,23 @@ final class IumrahConnectivityMonitor: ObservableObject {
 
     private let pathMonitor = NWPathMonitor()
     private let pathQueue = DispatchQueue(label: "com.iumrah.app.connectivity-path", qos: .utility)
-    private let probeSession: URLSession
-    private var probeTask: Task<Void, Never>?
-
-    init() {
+    // URLSession must outlive any queued network probe. SwiftUI may destroy
+    // and recreate the @StateObject while a Task has been scheduled but has not
+    // called data(for:) yet. Invalidating an instance-owned URLSession in deinit
+    // can then throw an Objective-C exception in taskForClassInfo: (SIGABRT).
+    // A process-lifetime session avoids this race; individual Tasks are still
+    // cancelled when the monitor is released.
+    private static let probeSession: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 4
         configuration.timeoutIntervalForResource = 5
         configuration.waitsForConnectivity = false
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
-        self.probeSession = URLSession(configuration: configuration)
+        return URLSession(configuration: configuration)
+    }()
+    private var probeTask: Task<Void, Never>?
 
+    init() {
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let pathStatus = path.status
             Task { @MainActor [weak self] in
@@ -55,7 +61,6 @@ final class IumrahConnectivityMonitor: ObservableObject {
     deinit {
         probeTask?.cancel()
         pathMonitor.cancel()
-        probeSession.invalidateAndCancel()
     }
 
     @MainActor
@@ -88,8 +93,10 @@ final class IumrahConnectivityMonitor: ObservableObject {
         request.setValue("*/*", forHTTPHeaderField: "Accept")
         request.setValue("iumrah-ios-beta/connectivity", forHTTPHeaderField: "User-Agent")
 
-        let session = probeSession
+        // Recheck cancellation before creating the NSURLSession task.
+        let session = Self.probeSession
         probeTask = Task { [weak self] in
+            guard !Task.isCancelled else { return }
             do {
                 let (_, response) = try await session.data(for: request)
                 guard !Task.isCancelled else { return }

@@ -392,10 +392,10 @@ struct RootView: View {
                 .tabItem { Label(settings.language == .indonesian ? "Akun saya" : (settings.language == .turkish ? "Hesabım" : "Account"), systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
-        // Own monochrome bottom navigation replaces the platform's blue
-        // Liquid Glass tab selection without touching tab view state.
+        // Keep the real iOS TabView bar: iOS 26 provides the native,
+        // interactive Liquid Glass capsule and selection animation.
+        // Only the accent and native UIKit selection indicator are tinted.
         .tint(Color.iumrahSignatureBlack)
-        .toolbar(.hidden, for: .tabBar)
     }
 
     @ViewBuilder

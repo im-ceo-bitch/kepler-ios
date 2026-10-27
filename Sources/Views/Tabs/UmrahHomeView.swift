@@ -24,10 +24,10 @@ struct UmrahHomeView: View {
                 .iumrahMarketingCard()
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
-            .padding(.bottom, 42)
+            .padding(.top, 0)
+            .padding(.bottom, 120)
         }
-        .background(Color.iumrahPageBackground)
+        .iumrahSignatureScrollChrome(title: L10n.text("tab_umrah", settings.language))
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
     }

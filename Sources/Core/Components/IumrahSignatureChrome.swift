@@ -26,6 +26,8 @@ struct IumrahSignatureScrollMarker: View {
 /// The compact chrome stays above scrolled content; it never creates a second tab bar.
 private struct IumrahCompactSignatureHeader: View {
     let title: String
+    @EnvironmentObject private var chrome: AppChromeStore
+    @ObservedObject private var notifications = ClientNotificationCenter.shared
 
     var body: some View {
         HStack(spacing: 10) {
@@ -41,16 +43,30 @@ private struct IumrahCompactSignatureHeader: View {
                 .minimumScaleFactor(0.75)
                 .foregroundStyle(.white)
             Spacer(minLength: 0)
+            Button { chrome.openNotifications() } label: {
+                Image(systemName: notifications.unreadCount > 0 ? "bell.badge.fill" : "bell")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+            }
+            .accessibilityLabel("Notifications")
+            Button { chrome.openSidebar() } label: {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+            }
+            .accessibilityLabel("Menu")
         }
         .padding(.horizontal, IumrahDesign.pagePadding)
         .frame(height: 53)
         .background(Color.iumrahSignatureBlack)
-        .accessibilityElement(children: .combine)
     }
 }
 
 private struct IumrahSignatureScrollChrome: ViewModifier {
     let title: String
+    var pinnedAccessory: AnyView? = nil
     @State private var collapsed = false
 
     func body(content: Content) -> some View {
@@ -67,17 +83,25 @@ private struct IumrahSignatureScrollChrome: ViewModifier {
             }
             .overlay(alignment: .top) {
                 if collapsed {
-                    IumrahCompactSignatureHeader(title: title)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .zIndex(10)
+                    VStack(spacing: 0) {
+                        IumrahCompactSignatureHeader(title: title)
+                        if let pinnedAccessory {
+                            pinnedAccessory
+                                .padding(.horizontal, IumrahDesign.pagePadding)
+                                .padding(.bottom, 10)
+                        }
+                    }
+                    .background(Color.iumrahSignatureBlack)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(10)
                 }
             }
     }
 }
 
 extension View {
-    func iumrahSignatureScrollChrome(title: String) -> some View {
-        modifier(IumrahSignatureScrollChrome(title: title))
+    func iumrahSignatureScrollChrome(title: String, pinnedAccessory: AnyView? = nil) -> some View {
+        modifier(IumrahSignatureScrollChrome(title: title, pinnedAccessory: pinnedAccessory))
     }
 }
 

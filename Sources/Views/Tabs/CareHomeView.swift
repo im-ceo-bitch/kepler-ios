@@ -22,7 +22,15 @@ struct CareHomeView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                IumrahRootPageTitle(title: "iumrah Care")
+                IumrahRootPageTitle(
+                    title: "iumrah Care",
+                    subtitle: tr(
+                        "Personal assistance throughout your Umrah",
+                        "Помощь на каждом этапе умры",
+                        "Umra davomida shaxsiy yordam",
+                        "Умра давомида шахсий ёрдам"
+                    )
+                )
                     .padding(.bottom, 14)
 
                 careQuickContacts

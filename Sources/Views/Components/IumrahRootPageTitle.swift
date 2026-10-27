@@ -8,6 +8,7 @@ struct IumrahRootPageTitle: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
 
     let title: String
+    var subtitle: String? = nil
     var showsMakkahTime = false
     var lightStyle = false
     var usesBrandLogo = false
@@ -54,13 +55,21 @@ struct IumrahRootPageTitle: View {
             }
 
             if !showsConnectivityStatus {
-                Text(title)
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .tracking(-0.8)
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.76)
-                    .accessibilityAddTraits(.isHeader)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .tracking(-0.8)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+                        .accessibilityAddTraits(.isHeader)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.70))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
         }
         .padding(.horizontal, IumrahDesign.pagePadding)

@@ -123,18 +123,11 @@ struct BookingsHomeView: View {
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 0) {
-                IumrahRootPageTitle(
-                    title: L10n.text("tab_booking", settings.language),
-                    showsMakkahTime: false,
-                    usesBrandLogo: true
-                )
-                .padding(.bottom, 16)
+                bookingSignatureHeader
+                    .padding(.bottom, 16)
 
                 JourneyTravelInfoView(onOpenPrayer: { showBookingPrayers = true }, onOpenWeather: { showBookingWeather = true })
                     .padding(.bottom, 18)
-
-                bookingPanelPicker
-                    .padding(.bottom, 12)
 
                 bookingIdentity(session)
                     .padding(.bottom, 18)
@@ -197,7 +190,10 @@ struct BookingsHomeView: View {
             .padding(.bottom, 120)
             .background(Color.iumrahPageBackground)
         }
-        .iumrahSignatureScrollChrome(title: L10n.text("tab_booking", settings.language))
+        .iumrahSignatureScrollChrome(
+            title: L10n.text("tab_booking", settings.language),
+            pinnedAccessory: AnyView(bookingPanelPicker)
+        )
         .animation(.snappy(duration: 0.34), value: session.effectiveStatus)
     }
 
@@ -269,15 +265,57 @@ struct BookingsHomeView: View {
         .background(Color.iumrahRaisedBackground, in: Capsule())
     }
 
-    private var bookingPanelPicker: some View {
-        Picker(localized("Раздел бронирования", "Booking section", "Bron bo‘limi", "Брон бўлими"), selection: $bookingPanel) {
-            Text(localized("Бронирование", "Booking", "Bron", "Брон")).tag(BookingPanel.booking)
-            Text(localized("Статус", "Status", "Holat", "Ҳолат")).tag(BookingPanel.status)
-            Text(localized("Расписание", "Schedule", "Jadval", "Жадвал")).tag(BookingPanel.schedule)
+    private var bookingSignatureHeader: some View {
+        VStack(spacing: 0) {
+            IumrahRootPageTitle(
+                title: L10n.text("tab_booking", settings.language),
+                subtitle: localized("Поездки, статус и расписание", "Trips, status and itinerary", "Safarlar, holat va jadval", "Сафарлар, ҳолат ва жадвал"),
+                showsMakkahTime: false,
+                usesBrandLogo: true,
+                drawsSignatureBackground: false
+            )
+            bookingPanelPicker
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, 21)
         }
-        .pickerStyle(.segmented)
-        .tint(Color.iumrahSignatureBlack)
-        .onChange(of: bookingPanel) { _, _ in IumrahHaptics.selection() }
+        .background {
+            IumrahWorldDotsHeaderBackground()
+                .padding(.horizontal, -IumrahDesign.pagePadding)
+        }
+    }
+
+    private var bookingPanelPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(BookingPanel.allCases) { panel in
+                Button {
+                    guard bookingPanel != panel else { return }
+                    withAnimation(.snappy(duration: 0.28)) { bookingPanel = panel }
+                    IumrahHaptics.selection()
+                } label: {
+                    Text(bookingPanelTitle(panel))
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .foregroundStyle(bookingPanel == panel ? Color.black : Color.white)
+                        .background(bookingPanel == panel ? Color.white : Color.clear, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(bookingPanel == panel ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(Color.white.opacity(0.12), in: Capsule())
+        .overlay { Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8) }
+    }
+
+    private func bookingPanelTitle(_ panel: BookingPanel) -> String {
+        switch panel {
+        case .booking: return localized("Бронирование", "Booking", "Bron", "Брон")
+        case .status: return localized("Статус", "Status", "Holat", "Ҳолат")
+        case .schedule: return localized("Расписание", "Schedule", "Jadval", "Жадвал")
+        }
     }
 
     @ViewBuilder
@@ -1646,38 +1684,58 @@ struct BookingsHomeView: View {
     private var emptyBookingHome: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                IumrahRootPageTitle(
-                    title: L10n.text("tab_booking", settings.language),
-                    showsMakkahTime: false
-                )
+                bookingSignatureHeader
 
-                // Available even before a booking exists: prayer times, weather,
-                // and dual world clocks. The same component serves active trips.
-                JourneyTravelInfoView(
-                    onOpenPrayer: { showBookingPrayers = true },
-                    onOpenWeather: { showBookingWeather = true }
-                )
-
-                bookingEmptyStatusCard
-
-                NavigationLink {
-                    IumrahTelegramIntegrationView()
-                } label: {
-                    IumrahTelegramEntryCard(language: settings.language, large: false)
+                if bookingPanel == .booking {
+                    JourneyTravelInfoView(
+                        onOpenPrayer: { showBookingPrayers = true },
+                        onOpenWeather: { showBookingWeather = true }
+                    )
                 }
-                .buttonStyle(.plain)
 
-                explorePackagesButton
-
-                emptyConfiguratorCard
-                emptyCareCard
+                if bookingPanel == .booking {
+                    bookingEmptyStatusCard
+                    NavigationLink {
+                        IumrahTelegramIntegrationView()
+                    } label: {
+                        IumrahTelegramEntryCard(language: settings.language, large: false)
+                    }
+                    .buttonStyle(.plain)
+                    explorePackagesButton
+                    emptyConfiguratorCard
+                    emptyCareCard
+                } else {
+                    emptyBookingPanelNotice
+                    explorePackagesButton
+                }
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
             .padding(.bottom, 120)
             .background(Color.iumrahPageBackground)
         }
-        .iumrahSignatureScrollChrome(title: L10n.text("tab_booking", settings.language))
+        .iumrahSignatureScrollChrome(
+            title: L10n.text("tab_booking", settings.language),
+            pinnedAccessory: AnyView(bookingPanelPicker)
+        )
+    }
+
+    private var emptyBookingPanelNotice: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: bookingPanel == .status ? "checkmark.circle" : "calendar")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text(bookingPanel == .status
+                ? localized("Пока нет активных бронирований", "No active bookings yet", "Hozircha faol bronlar yo‘q", "Ҳозирча фаол бронлар йўқ")
+                : localized("Пока нет расписания поездки", "No itinerary yet", "Hozircha safar jadvali yo‘q", "Ҳозирча сафар жадвали йўқ"))
+                .font(.system(size: 19, weight: .semibold))
+            Text(localized("После оформления умры информация появится здесь.", "Your trip details will appear here after booking.", "Bron qilingandan so‘ng safar ma’lumotlari shu yerda chiqadi.", "Брон қилингандан сўнг сафар маълумотлари шу ерда чиқади."))
+                .font(.system(size: 14))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(22)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     private var bookingEmptyStatusCard: some View {

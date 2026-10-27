@@ -563,55 +563,14 @@ struct HomeDashboardView: View {
         showGuideLanguages = true
     }
 
+    // One recognizable white tool surface replaces the three large tiles.
+    // The content expands in place; no second modal navigation stack is created.
     private var tripToolsSection: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 7) {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(Color.primary)
-                Text(tripToolsTitle)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-            }
-
-            HStack(spacing: 9) {
-                tripToolButton(title: prayerEntryTitle, symbol: "moon.stars.fill", color: .primary, identifier: "home.openPrayerTimes") {
-                    showPrayerTimes = true
-                }
-                tripToolButton(title: weatherEntryTitle, symbol: "cloud.sun.fill", color: .primary, identifier: "home.openWeather") {
-                    showTravelInfo = true
-                }
-                tripToolButton(title: "Umrah Flow", symbol: "waveform", color: .primary, identifier: "home.openUmrahFlow") {
-                    openGuideLanguages()
-                }
-            }
-        }
-    }
-
-    private func tripToolButton(title: String, symbol: String, color: Color, identifier: String, action: @escaping () -> Void) -> some View {
-        Button {
-            IumrahHaptics.selection()
-            action()
-        } label: {
-            VStack(spacing: 10) {
-                Image(systemName: symbol)
-                    .font(.system(size: 21, weight: .semibold))
-                    .foregroundStyle(color)
-                    .frame(height: 28)
-                Text(title)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.80)
-                    .frame(maxWidth: .infinity)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 98)
-            .padding(.horizontal, 5)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(identifier)
+        IumrahHomePilgrimTools(
+            language: settings.language,
+            onCreateUmrah: { chrome.startNewTrip() },
+            onOpenPrayerSettings: { showPrayerTimes = true }
+        )
     }
 
     private var tripToolsTitle: String {
@@ -2668,4 +2627,380 @@ private extension View {
     func iumrahHomeFlatCard(padding: CGFloat = 18, radius: CGFloat = IumrahDesign.cardRadius) -> some View {
         modifier(IumrahHomeFlatCardModifier(padding: padding, radius: radius))
     }
+}
+
+// MARK: - iumrah home: compact, location-aware expandable tools
+
+/// Shares the existing persisted prayer preferences, location permission path,
+/// and astronomy calculator. Does not pretend a default holy city is the user's
+/// location when permission has not been granted.
+private struct IumrahHomePilgrimTools: View {
+    enum Tool: String, CaseIterable, Identifiable {
+        case prayer, weather, create
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .prayer: return "moon.stars.fill"
+            case .weather: return "cloud.sun.fill"
+            case .create: return "plus.circle.fill"
+            }
+        }
+    }
+
+    let language: AppSettingsStore.Language
+    let onCreateUmrah: () -> Void
+    let onOpenPrayerSettings: () -> Void
+
+    @StateObject private var prayerPreferences = IumrahPrayerState()
+    @StateObject private var location = IumrahPrayerLocation()
+    @State private var expanded: Tool?
+    @State private var localWeather: (temperature: Double, min: Double, max: Double, symbol: String, updated: Date)?
+    @State private var loadingWeather = false
+    @State private var weatherError: String?
+    @State private var cachedWeatherPlace: IumrahPrayerPlace?
+
+    private var displayPlace: IumrahPrayerPlace { location.resolved ?? prayerPreferences.place }
+    private var hasDeviceLocation: Bool { location.resolved != nil }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 5) {
+                ForEach(Tool.allCases) { tool in
+                    Button {
+                        IumrahHaptics.selection()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) {
+                            expanded = expanded == tool ? nil : tool
+                        }
+                        if expanded == .prayer || expanded == .weather {
+                            if location.resolved == nil { location.request() }
+                            else if expanded == .weather { Task { await fetchLocalWeather(for: displayPlace) } }
+                        }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: tool.icon)
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(height: 24)
+                            Text(title(tool))
+                                .font(.system(size: 11.5, weight: .semibold))
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.76)
+                                .multilineTextAlignment(.center)
+                        }
+                        .foregroundStyle(expanded == tool ? Color.white : Color.black)
+                        .frame(maxWidth: .infinity, minHeight: 70)
+                        .padding(.horizontal, 2)
+                        .background(expanded == tool ? Color.black : Color.clear, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("home.tool.\(tool.rawValue)")
+                    .accessibilityValue(expanded == tool ? openedLabel : closedLabel)
+                    .accessibilityHint(expanded == tool ? closeHint : openHint)
+                }
+            }
+            .padding(7)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.065), lineWidth: 1)
+            }
+
+            if let expanded {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Label(title(expanded), systemImage: expanded.icon)
+                            .font(.system(size: 17, weight: .bold))
+                        Spacer(minLength: 0)
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.24)) { self.expanded = nil }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .frame(width: 28, height: 28)
+                                .background(Color.white.opacity(0.13), in: Circle())
+                        }
+                        .accessibilityLabel(closeHint)
+                    }
+                    switch expanded {
+                    case .prayer: prayerDetails
+                    case .weather: weatherDetails
+                    case .create: createDetails
+                    }
+                }
+                .foregroundStyle(.white)
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.iumrahSignatureBlack, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .accessibilityIdentifier("home.tool.expanded")
+            }
+        }
+        .onChange(of: location.resolved) { _, newLocation in
+            guard let newLocation else { return }
+            if expanded == .weather { Task { await fetchLocalWeather(for: newLocation) } }
+        }
+    }
+
+    private var prayerDetails: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            locationRow
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                let schedule = IumrahPrayerCalculator.calculate(
+                    on: context.date,
+                    place: displayPlace,
+                    method: prayerPreferences.method,
+                    hanafi: prayerPreferences.hanafi
+                )
+                VStack(alignment: .leading, spacing: 13) {
+                    if let upcoming = IumrahPrayerCalculator.upcoming(
+                        now: context.date,
+                        place: displayPlace,
+                        method: prayerPreferences.method,
+                        hanafi: prayerPreferences.hanafi
+                    ) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(nextLabel + ": " + name(upcoming.kind))
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.75))
+                            Spacer(minLength: 0)
+                            Text(schedule.displayTime(upcoming.date))
+                                .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+                        }
+                    }
+                    ForEach([IumrahPrayerKind.fajr, .dhuhr, .asr, .maghrib, .isha], id: \.rawValue) { kind in
+                        if let date = schedule.date(for: kind) {
+                            HStack {
+                                Text(name(kind))
+                                Spacer(minLength: 10)
+                                Text(schedule.displayTime(date))
+                                    .font(.system(size: 16, weight: .semibold, design: .rounded).monospacedDigit())
+                            }
+                            .font(.system(size: 15))
+                            .padding(.vertical, 3)
+                        }
+                    }
+                }
+            }
+            Button(action: onOpenPrayerSettings) {
+                Label(fullScheduleLabel, systemImage: "calendar")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.white.opacity(0.78))
+            Text(estimatedTimesLabel)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.white.opacity(0.55))
+        }
+    }
+
+    private var weatherDetails: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            locationRow
+            if let localWeather, hasDeviceLocation {
+                HStack(alignment: .center, spacing: 16) {
+                    Image(systemName: localWeather.symbol)
+                        .font(.system(size: 40, weight: .light))
+                    Text("\(Int(localWeather.temperature.rounded()))°")
+                        .font(.system(size: 44, weight: .bold, design: .rounded))
+                    Spacer()
+                }
+                HStack(spacing: 16) {
+                    Text("\(minLabel) \(Int(localWeather.min.rounded()))°")
+                    Text("\(maxLabel) \(Int(localWeather.max.rounded()))°")
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.72))
+                Text("MET Norway · \(localWeather.updated.formatted(date: .omitted, time: .shortened))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.52))
+            } else if loadingWeather || location.working {
+                ProgressView().tint(.white)
+            } else {
+                Text(weatherError ?? allowLocationLabel)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.72))
+            }
+        }
+    }
+
+    private var locationRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "location.fill")
+                .font(.system(size: 12))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayPlace.name)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(hasDeviceLocation ? yourLocationLabel : selectedPlaceLabel)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.6))
+            }
+            Spacer(minLength: 3)
+            if !hasDeviceLocation {
+                Button {
+                    location.request()
+                } label: {
+                    Text(locateLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.white.opacity(0.13), in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var createDetails: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text(createDescription)
+                .font(.system(size: 14))
+                .foregroundStyle(Color.white.opacity(0.78))
+            Button {
+                IumrahHaptics.selection()
+                onCreateUmrah()
+            } label: {
+                HStack {
+                    Text(title(.create))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.black)
+                .padding(16)
+                .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("home.createUmrah")
+        }
+    }
+
+    /// Live weather by *the user's* coordinates. No Saudi-city fallback posing
+    /// as local weather, and no fabricated conditions on networking failure.
+    @MainActor private func fetchLocalWeather(for place: IumrahPrayerPlace) async {
+        guard place.id == "current" else { return }
+        if cachedWeatherPlace == place, let localWeather,
+           Date().timeIntervalSince(localWeather.updated) < 30 * 60 { return }
+        loadingWeather = true
+        weatherError = nil
+        defer { loadingWeather = false }
+        var url = URLComponents(string: "https://api.met.no/weatherapi/locationforecast/2.0/compact")!
+        url.queryItems = [
+            URLQueryItem(name: "lat", value: String(format: "%.4f", place.latitude)),
+            URLQueryItem(name: "lon", value: String(format: "%.4f", place.longitude))
+        ]
+        guard let endpoint = url.url else { return }
+        var request = URLRequest(url: endpoint)
+        request.timeoutInterval = 12
+        request.setValue("iumrah-iOS/2.0 (https://iumrah.app)", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                  let payload = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let properties = payload["properties"] as? [String: Any],
+                  let periods = properties["timeseries"] as? [[String: Any]],
+                  let first = periods.first,
+                  let firstData = first["data"] as? [String: Any],
+                  let instant = firstData["instant"] as? [String: Any],
+                  let details = instant["details"] as? [String: Any],
+                  let value = details["air_temperature"] as? Double else {
+                throw URLError(.cannotParseResponse)
+            }
+            var temperatures = [Double]()
+            for period in periods.prefix(24) {
+                if let data = period["data"] as? [String: Any],
+                   let instant = data["instant"] as? [String: Any],
+                   let measures = instant["details"] as? [String: Any],
+                   let temp = measures["air_temperature"] as? Double { temperatures.append(temp) }
+            }
+            let summary = firstData["next_1_hours"] as? [String: Any]
+            let metSymbol = (summary?["summary"] as? [String: Any])?["symbol_code"] as? String ?? ""
+            let symbol: String = metSymbol.contains("rain") ? "cloud.rain.fill" :
+                metSymbol.contains("snow") ? "cloud.snow.fill" :
+                metSymbol.contains("cloud") ? "cloud.fill" : "sun.max.fill"
+            guard location.resolved == place else { return }
+            cachedWeatherPlace = place
+            localWeather = (temperature: value, min: temperatures.min() ?? value, max: temperatures.max() ?? value, symbol: symbol, updated: Date())
+        } catch {
+            weatherError = weatherUnavailableLabel
+        }
+    }
+
+    private func text(_ ru: String, _ uz: String, _ uzCyr: String, _ en: String) -> String {
+        switch language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return uzCyr
+        case .arabic: return ArabicLocalization.phrase(en)
+        case .turkish: return TurkishLocalization.phrase(en)
+        case .indonesian: return indonesian(en)
+        case .malay: return malay(en)
+        default: return en
+        }
+    }
+
+    private func indonesian(_ en: String) -> String {
+        let strings: [String: String] = [
+            "Prayer times": "Waktu salat", "Weather": "Cuaca", "Create Umrah": "Buat Umrah",
+            "Expanded": "Terbuka", "Collapsed": "Tertutup", "Expand": "Buka", "Collapse": "Tutup",
+            "Next": "Berikutnya", "Low": "Min.", "High": "Maks.", "Locate": "Temukan lokasi",
+            "Your location": "Lokasi Anda", "Selected city · not your location": "Kota pilihan · bukan lokasi Anda",
+            "Allow location access to see weather near you.": "Izinkan lokasi untuk melihat cuaca setempat.",
+            "Weather is unavailable. Try again later.": "Cuaca tidak tersedia. Coba lagi nanti.",
+            "Full schedule and settings": "Jadwal lengkap dan pengaturan",
+            "Calculated times. Local mosque schedules may differ.": "Waktu perkiraan. Jadwal masjid setempat dapat berbeda.",
+            "Choose dates, hotels and services to build your Umrah in one place.": "Pilih tanggal, hotel, dan layanan untuk menyusun Umrah di satu tempat."
+        ]
+        return strings[en] ?? en
+    }
+
+    private func malay(_ en: String) -> String {
+        let strings: [String: String] = [
+            "Prayer times": "Waktu solat", "Weather": "Cuaca", "Create Umrah": "Bina Umrah",
+            "Expanded": "Terbuka", "Collapsed": "Ditutup", "Expand": "Buka", "Collapse": "Tutup",
+            "Next": "Seterusnya", "Low": "Min.", "High": "Maks.", "Locate": "Cari lokasi",
+            "Your location": "Lokasi anda", "Selected city · not your location": "Bandar pilihan · bukan lokasi anda",
+            "Allow location access to see weather near you.": "Benarkan lokasi untuk melihat cuaca setempat.",
+            "Weather is unavailable. Try again later.": "Cuaca tidak tersedia. Cuba lagi nanti.",
+            "Full schedule and settings": "Jadual penuh dan tetapan",
+            "Calculated times. Local mosque schedules may differ.": "Waktu anggaran. Jadual masjid setempat mungkin berbeza.",
+            "Choose dates, hotels and services to build your Umrah in one place.": "Pilih tarikh, hotel dan perkhidmatan untuk membina Umrah di satu tempat."
+        ]
+        return strings[en] ?? en
+    }
+
+    private func title(_ tool: Tool) -> String {
+        switch tool {
+        case .prayer: return text("Время молитв", "Namoz vaqtlari", "Намоз вақтлари", "Prayer times")
+        case .weather: return text("Погода", "Ob-havo", "Об-ҳаво", "Weather")
+        case .create: return text("Создать умру", "Umra yaratish", "Умра яратиш", "Create Umrah")
+        }
+    }
+
+    private func name(_ kind: IumrahPrayerKind) -> String {
+        switch kind {
+        case .fajr: return text("Фаджр", "Bomdod", "Бомдод", "Fajr")
+        case .dhuhr: return text("Зухр", "Peshin", "Пешин", "Dhuhr")
+        case .asr: return text("Аср", "Asr", "Аср", "Asr")
+        case .maghrib: return text("Магриб", "Shom", "Шом", "Maghrib")
+        case .isha: return text("Иша", "Xufton", "Хуфтон", "Isha")
+        default: return kind.title
+        }
+    }
+
+    private var openedLabel: String { text("Открыто", "Ochiq", "Очиқ", "Expanded") }
+    private var closedLabel: String { text("Свернуто", "Yopiq", "Ёпиқ", "Collapsed") }
+    private var openHint: String { text("Развернуть", "Ochish", "Очиш", "Expand") }
+    private var closeHint: String { text("Свернуть", "Yopish", "Ёпиш", "Collapse") }
+    private var nextLabel: String { text("Следующая", "Keyingi", "Кейинги", "Next") }
+    private var minLabel: String { text("Мин.", "Min.", "Мин.", "Low") }
+    private var maxLabel: String { text("Макс.", "Maks.", "Макс.", "High") }
+    private var locateLabel: String { text("Определить", "Aniqlash", "Аниқлаш", "Locate") }
+    private var yourLocationLabel: String { text("Ваше местоположение", "Sizning joylashuvingiz", "Сизнинг жойлашувингиз", "Your location") }
+    private var selectedPlaceLabel: String { text("Выбранный город · не геопозиция", "Tanlangan shahar · joriy joy emas", "Танланган шаҳар · жорий жой эмас", "Selected city · not your location") }
+    private var allowLocationLabel: String { text("Разрешите доступ к геопозиции, чтобы увидеть погоду рядом с вами.", "Yaqindagi ob-havo uchun joylashuvga ruxsat bering.", "Яқиндаги об-ҳаво учун жойлашувга рухсат беринг.", "Allow location access to see weather near you.") }
+    private var weatherUnavailableLabel: String { text("Не удалось загрузить погоду. Попробуйте позднее.", "Ob-havo yuklanmadi. Keyinroq urinib ko‘ring.", "Об-ҳаво юкланмади. Кейинроқ уриниб кўринг.", "Weather is unavailable. Try again later.") }
+    private var fullScheduleLabel: String { text("Полное расписание и настройки", "To‘liq jadval va sozlamalar", "Тўлиқ жадвал ва созламалар", "Full schedule and settings") }
+    private var estimatedTimesLabel: String { text("Расчётное время. Местное расписание мечети может отличаться.", "Hisoblangan vaqt. Mahalliy masjid jadvali farq qilishi mumkin.", "Ҳисобланган вақт. Маҳаллий масжид жадвали фарқ қилиши мумкин.", "Calculated times. Local mosque schedules may differ.") }
+    private var createDescription: String { text("Выберите даты, гостиницы и услуги — соберите поездку в одном месте.", "Sana, mehmonxona va xizmatlarni tanlab, sayohatni bir joyda yarating.", "Сана, меҳмонхона ва хизматларни танлаб, саёҳатни бир жойда яратинг.", "Choose dates, hotels and services to build your Umrah in one place.") }
 }

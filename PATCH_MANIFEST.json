@@ -1,51 +1,18 @@
 {
-  "package": "iumrah Beta Header & Booking & Home Accordion V3",
+  "name": "iumrah beta Swift compiler hotfix: UmrahVoiceStepScreen argument ordering",
   "date": "2026-10-27",
-  "base": "kepler-ios-main 4 + 20261027 Black Identity Umrah Flow V2 2in1",
+  "base": "Black Identity Umrah Flow V2 + Header Booking Home Accordion V3",
   "files": {
-    "Sources/Core/Components/IumrahSignatureChrome.swift": {
-      "sha256": "876042d6a656a88cb0be971b58a7b3bb7b26e03441cfc4ed5dd0ddd62b1c8762",
-      "bytes": 7355
-    },
-    "Sources/Views/Components/IumrahRootPageTitle.swift": {
-      "sha256": "30ecf8573c5c42cfe96a1b1a3be64b5c2ea5218e0e562ff3550124247929b938",
-      "bytes": 12161
-    },
-    "Sources/Views/Tabs/BookingsHomeView.swift": {
-      "sha256": "d874646fd3d7d2ec8a15d3063686a322dafb658e481918cdb5020f63b9edca7b",
-      "bytes": 120016
-    },
-    "Sources/AppShell/IumrahAccountView.swift": {
-      "sha256": "afd05a9a6fbbfe1ace42c01ef1bc2b11abe416bf270417ba500cfbd9fa1cccef",
-      "bytes": 131077
-    },
-    "Sources/Views/Tabs/CareHomeView.swift": {
-      "sha256": "54529d7c472da5e7c83f827c1fda922fd4dd7defb37c1ce2a99af094a29b8733",
-      "bytes": 27175
-    },
-    "Sources/Views/Tabs/UmrahHomeView.swift": {
-      "sha256": "184eb45d7070a0cf521bb298776c4e80ccfa20c6e179952971799010d0a5b6fd",
-      "bytes": 1327
-    },
-    "Sources/Views/Home/HomeDashboardView.swift": {
-      "sha256": "1c28b4ff06f3e88dbc101a98874a720b32fe109360719e260578844d470b2c7e",
-      "bytes": 156375
+    "Sources/Umrah Flow/Views/UmrahStartView.swift": {
+      "bytes": 2272,
+      "sha256": "a0708ae486ebc4998f21b39ed2bae71ced5b02d774e3e1b254e67c1ea1488567"
     }
   },
-  "checks": {
-    "booking_segments_in_black_header": true,
-    "booking_segments_pinned_when_collapsed": true,
-    "header_retains_buttons": true,
-    "account_subtitle_in_header": true,
-    "home_old_tools_removed": true,
-    "home_new_prayer_weather_create": true,
-    "home_geolocation": true,
-    "home_weather_live": true,
-    "prayer_current_place": true,
-    "home_same_button_collapses": true,
-    "existing_builder_routing": true,
-    "native_liquid_glass_preserved": true,
-    "no_legacy_umrah_flow_tile": true
-  },
-  "scope": "Only iOS UI changes; no GitHub workflows, Cloudflare, Nuitee, TestFlight, Umrah Flow source changes"
+  "note": "Moves recordingKey after counterText. No behaviour change; no workflow or build-number edits.",
+  "verification": {
+    "log_error_matched": true,
+    "all_four_UmrahVoiceStepScreen_invocations_argument_order_checked": true,
+    "swift_parser_all_279_files_passed": true,
+    "full_xcode_build": "Not run: no macOS/Xcode"
+  }
 }

@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct UmrahStartView: View {
     @ObservedObject var flow: UmrahFlowState
@@ -11,11 +12,13 @@ struct UmrahStartView: View {
         UmrahVoiceStepScreen(
             store: store,
             audio: audio,
-            audioKey: "tawaf_start",
+            audioKey: flow.startPhase == 0 ? "tawaf_start" : "start_phase_\(flow.startPhase)",
+            recordingKey: "tawaf_start",
             kicker: store.text("umrah_start_title", fallback: "Start Umrah"),
             title: "",
             text: store.text(phaseKeys[flow.startPhase], fallback: fallbackText),
             counterText: "\(flow.startPhase + 1) / \(phaseKeys.count)",
+            prefersSystemVoice: flow.startPhase != 0 && AVSpeechSynthesisVoice(language: store.guideLanguage.localeIdentifier) != nil,
             showsPrevious: flow.startPhase > 0,
             showsNext: true,
             nextIsDone: flow.startPhase == phaseKeys.count - 1,

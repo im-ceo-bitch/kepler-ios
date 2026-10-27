@@ -68,7 +68,7 @@ struct UmrahRitualModeBar: View {
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(selected ? Color.white : palette.textSecondary)
+            .foregroundStyle(selected ? (colorScheme == .dark ? Color.black : Color.white) : palette.textSecondary)
             .frame(maxWidth: .infinity)
             .frame(height: 38)
             .iumrahGlass(

@@ -22,6 +22,8 @@ final class UmrahFlowState: ObservableObject {
     @Published var startPhase = 0
 
     @Published var tawafRound = 1
+    // A round is counted only after an explicit swipe, never by paging instructions.
+    @Published private(set) var tawafIsComplete = false
     @Published var tawafTextMode = 0
     @Published var tawafMode: RitualMode = .listening
     @Published var tawafReadingStep = 0
@@ -40,23 +42,151 @@ final class UmrahFlowState: ObservableObject {
         self.stage = initialStage
     }
 
+    var tawafCompletedRounds: Int {
+        tawafIsComplete ? 7 : max(0, min(6, tawafRound - 1))
+    }
+
+    var currentTawafRound: Int { min(7, max(1, tawafRound)) }
+
+    /// The route has five guided ritual phases; this is a milestone estimate,
+    /// not a sensor-derived measurement of the pilgrim's physical progress.
+    var routeStageNumber: Int {
+        switch stage {
+        case .inUmrah: return 0
+        case .start: return 1
+        case .tawaf: return 2
+        case .postTawaf: return 3
+        case .safa: return 4
+        case .end, .afterUmrah: return 5
+        }
+    }
+
     var topProgress: Double {
         switch stage {
         case .inUmrah:
             return 0
         case .start:
-            return 0.04 + (Double(startPhase) / 3.0) * 0.06
+            return (Double(startPhase) / 4.0) * 0.20
         case .tawaf:
-            return 0.10 + (Double(tawafRound - 1) / 7.0) * 0.42
+            return 0.20 + (Double(tawafCompletedRounds) / 7.0) * 0.20
         case .postTawaf:
-            return 0.52 + (Double(postTawafStep) / 4.0) * 0.08
+            return 0.40 + (Double(postTawafStep) / 4.0) * 0.20
         case .safa:
-            return 0.60 + (Double(safaRound - 1) / 7.0) * 0.32
+            return 0.60 + (Double(safaRound - 1) / 7.0) * 0.20
         case .end:
-            return 0.94 + (Double(endPhase) / 3.0) * 0.05
+            return 0.80 + (Double(endPhase) / 3.0) * 0.20
         case .afterUmrah:
             return 1
         }
+    }
+
+    // A ritual is long-running: leaving the screen or having iOS terminate the
+    // process must not silently lose Tawaf / Sa'i round counters.
+    // Resumption is opt-in in UmrahFlowRootView, never automatic.
+    private static let checkpointKey = "iumrah.umrahFlow.progress.v2"
+
+    private struct Checkpoint: Codable {
+        let savedAt: Date
+        let stage: Int
+        let startPhase: Int
+        let tawafRound: Int
+        // Optional to retain compatibility with progress.v2 checkpoints.
+        let tawafIsComplete: Bool?
+        let tawafTextMode: Int
+        let tawafMode: String
+        let tawafReadingStep: Int
+        let tawafZikrCount: Int
+        let postTawafStep: Int
+        let safaRound: Int
+        let safaTextMode: Int
+        let safaMode: String
+        let safaReadingStep: Int
+        let endPhase: Int
+    }
+
+    static var hasSavedProgress: Bool {
+        guard let checkpoint = decodedCheckpoint() else { return false }
+        return checkpoint.stage != Stage.afterUmrah.rawValue &&
+            checkpoint.stage != Stage.inUmrah.rawValue
+    }
+
+    private static func decodedCheckpoint() -> Checkpoint? {
+        guard let data = UserDefaults.standard.data(forKey: checkpointKey),
+              let checkpoint = try? JSONDecoder().decode(Checkpoint.self, from: data),
+              Date().timeIntervalSince(checkpoint.savedAt) < 60 * 24 * 60 * 60,
+              checkpoint.savedAt.timeIntervalSinceNow < 60,
+              Stage(rawValue: checkpoint.stage) != nil else { return nil }
+        return checkpoint
+    }
+
+    func saveCheckpoint() {
+        guard stage != .afterUmrah && stage != .inUmrah else {
+            Self.discardCheckpoint()
+            return
+        }
+        let checkpoint = Checkpoint(
+            savedAt: Date(), stage: stage.rawValue, startPhase: startPhase,
+            tawafRound: tawafRound, tawafIsComplete: tawafIsComplete,
+            tawafTextMode: tawafTextMode,
+            tawafMode: tawafMode.rawValue, tawafReadingStep: tawafReadingStep,
+            tawafZikrCount: tawafZikrCount, postTawafStep: postTawafStep,
+            safaRound: safaRound, safaTextMode: safaTextMode,
+            safaMode: safaMode.rawValue, safaReadingStep: safaReadingStep,
+            endPhase: endPhase
+        )
+        guard let data = try? JSONEncoder().encode(checkpoint) else { return }
+        UserDefaults.standard.set(data, forKey: Self.checkpointKey)
+    }
+
+    func restoreCheckpoint() {
+        guard let saved = Self.decodedCheckpoint(), let restoredStage = Stage(rawValue: saved.stage),
+              restoredStage != .afterUmrah, restoredStage != .inUmrah else { return }
+        startPhase = min(3, max(0, saved.startPhase))
+        tawafRound = min(7, max(1, saved.tawafRound))
+        tawafIsComplete = saved.tawafIsComplete ?? (restoredStage.rawValue > Stage.tawaf.rawValue)
+        tawafTextMode = min(2, max(0, saved.tawafTextMode))
+        tawafMode = RitualMode(rawValue: saved.tawafMode) ?? .listening
+        tawafReadingStep = min(6, max(0, saved.tawafReadingStep))
+        tawafZikrCount = min(20, max(0, saved.tawafZikrCount))
+        postTawafStep = min(3, max(0, saved.postTawafStep))
+        safaRound = min(7, max(1, saved.safaRound))
+        safaTextMode = min(2, max(0, saved.safaTextMode))
+        safaMode = RitualMode(rawValue: saved.safaMode) ?? .listening
+        safaReadingStep = min(6, max(0, saved.safaReadingStep))
+        endPhase = min(2, max(0, saved.endPhase))
+        stage = restoredStage
+    }
+
+    static func discardCheckpoint() {
+        UserDefaults.standard.removeObject(forKey: checkpointKey)
+    }
+
+    @discardableResult
+    func completeTawafRound() -> Bool {
+        guard stage == .tawaf, !tawafIsComplete else { return false }
+        if tawafRound < 7 {
+            tawafRound += 1
+        } else {
+            tawafIsComplete = true
+        }
+        tawafTextMode = 0
+        resetTawafReading()
+        saveCheckpoint()
+        return true
+    }
+
+    @discardableResult
+    func undoLastTawafRound() -> Bool {
+        guard stage == .tawaf, tawafCompletedRounds > 0 else { return false }
+        if tawafIsComplete {
+            tawafIsComplete = false
+        } else {
+            tawafRound = max(1, tawafRound - 1)
+        }
+        tawafTextMode = 0
+        resetTawafReading()
+        saveCheckpoint()
+        return true
     }
 
     func resetTawafReading() {
@@ -71,6 +201,7 @@ final class UmrahFlowState: ObservableObject {
     func reset() {
         startPhase = 0
         tawafRound = 1
+        tawafIsComplete = false
         tawafTextMode = 0
         tawafMode = .listening
         resetTawafReading()

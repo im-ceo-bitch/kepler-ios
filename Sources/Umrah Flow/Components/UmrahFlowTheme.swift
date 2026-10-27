@@ -21,23 +21,23 @@ struct UmrahFlowPalette {
         glassTint: .white.opacity(0.055),
         glassStroke: .white.opacity(0.14),
         progressTrack: .white.opacity(0.10),
-        progressStart: Color(red: 0.56, green: 0.30, blue: 1.00),
-        progressEnd: Color(red: 1.00, green: 0.46, blue: 0.10),
-        accent: Color(red: 1.00, green: 0.47, blue: 0.09),
+        progressStart: .white,
+        progressEnd: .white,
+        accent: .white,
         danger: Color(red: 1.00, green: 0.27, blue: 0.23)
     )
 
     static let light = UmrahFlowPalette(
-        background: Color(red: 0.965, green: 0.963, blue: 0.975),
-        backgroundSecondary: Color(red: 0.985, green: 0.982, blue: 0.975),
+        background: Color(red: 0.975, green: 0.975, blue: 0.975),
+        backgroundSecondary: .white,
         textPrimary: Color(red: 0.055, green: 0.058, blue: 0.070),
         textSecondary: Color(red: 0.055, green: 0.058, blue: 0.070).opacity(0.55),
         glassTint: .white.opacity(0.34),
         glassStroke: .black.opacity(0.075),
         progressTrack: .black.opacity(0.075),
-        progressStart: Color(red: 0.52, green: 0.24, blue: 0.96),
-        progressEnd: Color(red: 0.98, green: 0.40, blue: 0.06),
-        accent: Color(red: 0.96, green: 0.38, blue: 0.04),
+        progressStart: .black,
+        progressEnd: .black,
+        accent: .black,
         danger: Color(red: 0.88, green: 0.18, blue: 0.17)
     )
 }
@@ -81,43 +81,18 @@ struct UmrahFlowBackground: View {
                         )
                     )
 
-                    // One restrained violet field moves very slowly through the
-                    // background. It should be felt, not watched.
+                    // Brand-aligned monochrome atmosphere, with subdued movement.
                     RadialGradient(
                         colors: colorScheme == .dark
-                            ? [
-                                Color(red: 0.30, green: 0.10, blue: 0.48).opacity(0.24),
-                                Color(red: 0.18, green: 0.06, blue: 0.30).opacity(0.10),
-                                .clear
-                            ]
-                            : [
-                                Color(red: 0.48, green: 0.30, blue: 0.72).opacity(0.075),
-                                Color(red: 0.48, green: 0.30, blue: 0.72).opacity(0.025),
-                                .clear
-                            ],
+                            ? [Color.white.opacity(0.042), .clear]
+                            : [Color.black.opacity(0.035), .clear],
                         center: UnitPoint(
-                            x: 0.50 + sin(time * 0.052 + 0.8) * 0.17,
-                            y: 0.48 + cos(time * 0.047 + 1.9) * 0.14
+                            x: 0.50 + sin(time * 0.052) * 0.10,
+                            y: 0.50 + cos(time * 0.047) * 0.08
                         ),
                         startRadius: 0,
                         endRadius: radius
                     )
-
-                    if colorScheme == .dark {
-                        RadialGradient(
-                            colors: [
-                                Color.black.opacity(0.34),
-                                Color.black.opacity(0.12),
-                                .clear
-                            ],
-                            center: UnitPoint(
-                                x: 0.40 + cos(time * 0.039 + 2.4) * 0.18,
-                                y: 0.20 + sin(time * 0.043 + 1.2) * 0.10
-                            ),
-                            startRadius: 0,
-                            endRadius: radius * 0.72
-                        )
-                    }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
             }
@@ -128,6 +103,99 @@ struct UmrahFlowBackground: View {
 }
 
 enum UmrahFlowCopy {
+    static let chooseStageLabel = "Umrah stages"
+    static let closeFlowLabel = "Close Umrah Flow"
+
+    static func playVoice(_ language: UmrahGuideLanguage) -> String {
+        switch language {
+        case .russian: return "Слушать аудиогид"
+        case .english: return "Play voice guide"
+        case .uzbek: return "Ovozli gidni tinglash"
+        case .kazakh: return "Аудиогидті тыңдау"
+        case .indonesian: return "Putar panduan suara"
+        case .turkish: return "Sesli rehberi dinle"
+        case .arabic: return "تشغيل الدليل الصوتي"
+        case .malay: return "Mainkan panduan suara"
+        case .bengali: return "ভয়েস গাইড শুনুন"
+        case .french: return "Écouter le guide"
+        }
+    }
+
+    static func systemVoice(_ language: UmrahGuideLanguage) -> String {
+        switch language {
+        case .russian: return "Системное озвучивание"
+        case .english: return "iPhone reading aloud"
+        case .uzbek: return "iPhone ovoz chiqarib o‘qiyapti"
+        case .kazakh: return "iPhone дауыстап оқуда"
+        case .indonesian: return "iPhone sedang membacakan"
+        case .turkish: return "iPhone sesli okuyor"
+        case .arabic: return "يقرأ iPhone بصوت عالٍ"
+        case .malay: return "iPhone sedang membaca"
+        case .bengali: return "iPhone পড়ে শোনাচ্ছে"
+        case .french: return "Lecture vocale iPhone"
+        }
+    }
+
+    static func resumeTitle(_ language: UmrahGuideLanguage) -> String {
+        switch language {
+        case .russian: return "Продолжить Умру?"
+        case .english: return "Continue your Umrah?"
+        case .uzbek: return "Umrani davom ettirasizmi?"
+        case .kazakh: return "Умраны жалғастырасыз ба?"
+        case .indonesian: return "Lanjutkan Umrah?"
+        case .turkish: return "Umreye devam edilsin mi?"
+        case .arabic: return "هل تريد متابعة العمرة؟"
+        case .malay: return "Teruskan Umrah?"
+        case .bengali: return "উমরাহ চালিয়ে যাবেন?"
+        case .french: return "Reprendre votre Omra ?"
+        }
+    }
+
+    static func resumeMessage(_ language: UmrahGuideLanguage) -> String {
+        switch language {
+        case .russian: return "Мы сохранили этап и счётчики обходов."
+        case .english: return "Your stage and round counters were saved."
+        case .uzbek: return "Bosqich va aylanishlar soni saqlangan."
+        case .kazakh: return "Кезеңіңіз бен айналым санағыштары сақталды."
+        case .indonesian: return "Tahap dan hitungan putaran tersimpan."
+        case .turkish: return "Aşamanız ve tur sayaçlarınız kaydedildi."
+        case .arabic: return "تم حفظ المرحلة وعدّاد الأشواط."
+        case .malay: return "Peringkat dan kiraan pusingan anda disimpan."
+        case .bengali: return "পর্যায় ও চক্করের সংখ্যা সংরক্ষিত আছে।"
+        case .french: return "Votre étape et vos compteurs de tours ont été enregistrés."
+        }
+    }
+
+    static func resumeAction(_ language: UmrahGuideLanguage) -> String {
+        switch language {
+        case .russian: return "Продолжить"
+        case .english: return "Continue"
+        case .uzbek: return "Davom etish"
+        case .kazakh: return "Жалғастыру"
+        case .indonesian: return "Lanjutkan"
+        case .turkish: return "Devam et"
+        case .arabic: return "متابعة"
+        case .malay: return "Teruskan"
+        case .bengali: return "চালিয়ে যান"
+        case .french: return "Reprendre"
+        }
+    }
+
+    static func restartAction(_ language: UmrahGuideLanguage) -> String {
+        switch language {
+        case .russian: return "Начать заново"
+        case .english: return "Start over"
+        case .uzbek: return "Qaytadan boshlash"
+        case .kazakh: return "Қайта бастау"
+        case .indonesian: return "Mulai ulang"
+        case .turkish: return "Yeniden başla"
+        case .arabic: return "البدء من جديد"
+        case .malay: return "Mula semula"
+        case .bengali: return "আবার শুরু করুন"
+        case .french: return "Recommencer"
+        }
+    }
+
     static func advisorTitle(_ language: UmrahGuideLanguage) -> String {
         "iumrah Advisor"
     }

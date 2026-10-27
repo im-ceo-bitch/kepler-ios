@@ -30,6 +30,11 @@
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Система просит доступ к геопозиции, чтобы iumrah Configurator собрал Umrah-пакет исходя из вашего текущего местоположения и учёл аэропорт вашего города.</string>
+	<!-- The five root-tab status bars overlay a fixed black signature surface. -->
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

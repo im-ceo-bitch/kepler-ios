@@ -33,8 +33,8 @@ struct AppNavigationContainer<Content: View>: View {
 
     var body: some View {
         ZStack {
-            Color.iumrahPageBackground
-                .ignoresSafeArea()
+            Color.iumrahSignatureBlack
+                .ignoresSafeArea(edges: .top)
 
             // CRITICAL: Always retain ONE NavigationStack identity. Previously
             // setImmersive(true) swapped two branches, dismissing Umrah Flow right
@@ -52,7 +52,7 @@ struct AppNavigationContainer<Content: View>: View {
                 // that combination caused duplicated navigation on iOS 26.
                 // Detail destinations can still hide the tab bar individually.
                 .toolbar(.hidden, for: .navigationBar)
-                .background(Color.iumrahPageBackground.ignoresSafeArea())
+                .background(Color.iumrahPageBackground)
                 .navigationDestination(isPresented: isESIMDestinationActive) {
                     ESIMView()
                         .environmentObject(settings)

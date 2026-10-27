@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct UmrahVoiceStepScreen: View {
     @ObservedObject var store: UmrahFlowStore
@@ -15,6 +16,10 @@ struct UmrahVoiceStepScreen: View {
     var alignment: TextAlignment = .center
     var allowsTextCycling = false
     var onTextTap: (() -> Void)? = nil
+    /// Optional spoken passage when a published clip is unavailable.
+    var spokenText: String? = nil
+    var recordingKey: String? = nil
+    var prefersSystemVoice = false
 
     var showsPrevious = true
     var showsNext = true
@@ -41,7 +46,22 @@ struct UmrahVoiceStepScreen: View {
     }
 
     private var audioAvailable: Bool {
-        store.audioURL(for: audioKey) != nil
+        (prefersSystemVoice ? nil : store.audioURL(for: recordingKey ?? audioKey)) != nil || hasSystemVoice
+    }
+
+    private var hasSystemVoice: Bool {
+        !((spokenText ?? text).trimmingCharacters(in: .whitespacesAndNewlines)).isEmpty &&
+        AVSpeechSynthesisVoice(language: store.guideLanguage.localeIdentifier) != nil
+    }
+
+    private func toggleVoice() {
+        IumrahHaptics.soft()
+        audio.toggle(
+            key: audioKey,
+            url: prefersSystemVoice ? nil : store.audioURL(for: recordingKey ?? audioKey),
+            fallbackSpeechText: spokenText ?? text,
+            language: store.guideLanguage
+        )
     }
 
     var body: some View {
@@ -72,8 +92,7 @@ struct UmrahVoiceStepScreen: View {
                         .frame(height: gradientHeight * 0.72)
                         .onTapGesture {
                             guard audioAvailable else { return }
-                            IumrahHaptics.soft()
-                            audio.toggle(key: audioKey, url: store.audioURL(for: audioKey))
+                            toggleVoice()
                         }
                         .accessibilityLabel(voiceStatus)
                         .accessibilityAddTraits(.isButton)
@@ -89,7 +108,7 @@ struct UmrahVoiceStepScreen: View {
                     Spacer()
                         .frame(height: textBottomClearance)
                 }
-                .padding(.horizontal, 72)
+                .padding(.horizontal, 64)
                 .zIndex(2)
 
                 // Explicit playback control. The old implementation only had an
@@ -97,8 +116,7 @@ struct UmrahVoiceStepScreen: View {
                 VStack(spacing: 0) {
                     Spacer()
                     Button {
-                        IumrahHaptics.soft()
-                        audio.toggle(key: audioKey, url: store.audioURL(for: audioKey))
+                        toggleVoice()
                     } label: {
                         HStack(spacing: 9) {
                             if isCurrentLoading {
@@ -117,13 +135,21 @@ struct UmrahVoiceStepScreen: View {
                         .iumrahGlass(in: Capsule(), interactive: true)
                     }
                     .buttonStyle(.plain)
-                    .disabled(!audioAvailable || isCurrentLoading)
+                    .disabled(!audioAvailable && !isCurrentLoading)
                     .accessibilityIdentifier("umrahFlow.audio.toggle")
                     .padding(.bottom, 18)
-                    if audio.currentKey == audioKey, audio.lastError != nil {
-                        Text(UmrahFlowCopy.audioUnavailable(store.guideLanguage))
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                    if audio.currentKey == audioKey, let error = audio.lastError {
+                        Text(error)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 6)
+                    } else if !audioAvailable {
+                        Text(UmrahFlowCopy.audioUnavailable(store.guideLanguage))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                             .padding(.bottom, 6)
                     }
                 }
@@ -290,9 +316,11 @@ struct UmrahVoiceStepScreen: View {
 
     private var voiceStatus: String {
         if isCurrentLoading { return UmrahFlowCopy.loadingVoice(store.guideLanguage) }
-        if isCurrentPlaying { return UmrahFlowCopy.advisorSpeaking(store.guideLanguage) }
+        if isCurrentPlaying {
+            return audio.isUsingSystemVoice ? UmrahFlowCopy.systemVoice(store.guideLanguage) : UmrahFlowCopy.advisorSpeaking(store.guideLanguage)
+        }
         return audioAvailable
-            ? UmrahFlowCopy.tapToListen(store.guideLanguage)
+            ? UmrahFlowCopy.playVoice(store.guideLanguage)
             : UmrahFlowCopy.audioUnavailable(store.guideLanguage)
     }
 }
@@ -316,7 +344,7 @@ struct UmrahSideStepButton: View {
         } label: {
             Image(systemName: systemName)
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(emphasized ? Color.white : palette.textPrimary)
+                .foregroundStyle(emphasized ? (colorScheme == .dark ? Color.black : Color.white) : palette.textPrimary)
                 .frame(width: 54, height: 54)
                 .iumrahGlass(
                     in: Circle(),

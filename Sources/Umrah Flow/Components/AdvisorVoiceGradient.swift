@@ -26,7 +26,7 @@ struct AdvisorVoiceGradient: View {
 
     var body: some View {
         GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 15.0 : 1.0 / 60.0)) { timeline in
+            TimelineView(.animation(minimumInterval: isSpeaking ? 1.0 / 45.0 : 1.0 / 20.0, paused: reduceMotion)) { timeline in
                 let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
                 let width = proxy.size.width
                 let fullHeight = proxy.size.height
@@ -83,7 +83,7 @@ struct AdvisorVoiceGradient: View {
         let bloomOpacity = 0.58 + 0.40 * energy
 
         ZStack(alignment: .bottom) {
-            // Deep violet anchor at the left edge.
+            // Soft monochrome anchor at the left edge.
             auraBlob(
                 colors: palette.violet,
                 width: width * (0.60 + 0.10 * energy),
@@ -96,7 +96,7 @@ struct AdvisorVoiceGradient: View {
             )
             .scaleEffect(x: breathing, y: 1.02 + 0.05 * energy, anchor: .bottom)
 
-            // Magenta/pink center-left bloom.
+            // Center-left diffusion layer.
             auraBlob(
                 colors: palette.magenta,
                 width: width * (0.72 + 0.16 * energy),
@@ -109,7 +109,7 @@ struct AdvisorVoiceGradient: View {
             )
             .scaleEffect(x: 1.02 + 0.05 * energy, y: breathing, anchor: .bottom)
 
-            // Orange lobe rises higher on the right, matching the reference clip.
+            // Right lobe rises higher for spatial depth.
             auraBlob(
                 colors: palette.orange,
                 width: width * (0.70 + 0.18 * energy),
@@ -122,7 +122,7 @@ struct AdvisorVoiceGradient: View {
             )
             .scaleEffect(x: breathing, y: 1.02 + 0.10 * energy, anchor: .bottom)
 
-            // Soft peach bridge prevents a hard seam between pink and orange.
+            // Bridge prevents a hard seam between soft light fields.
             auraBlob(
                 colors: palette.peach,
                 width: width * (0.58 + 0.14 * energy),
@@ -134,7 +134,7 @@ struct AdvisorVoiceGradient: View {
                 y: height * 0.17 + cos(time * 0.82 + 2.6) * verticalTravel - lift * 0.25
             )
 
-            // Hot white/pink core at the bottom. It grows noticeably with speech.
+            // Focused core responds to the spoken amplitude.
             auraBlob(
                 colors: palette.core,
                 width: width * (0.86 + 0.12 * energy),
@@ -207,84 +207,26 @@ private extension AdvisorVoiceGradient {
         let baseBand: [Color]
         let floorVeil: [Color]
 
+        // One monochrome system for Umrah Flow, including the voice visualizer.
+        // The shape still follows measured audio amplitude for published clips.
         static let dark = Palette(
-            violet: [
-                Color(red: 0.47, green: 0.12, blue: 1.00).opacity(0.95),
-                Color(red: 0.27, green: 0.05, blue: 0.72).opacity(0.58),
-                .clear
-            ],
-            magenta: [
-                Color(red: 1.00, green: 0.31, blue: 0.77).opacity(0.92),
-                Color(red: 0.93, green: 0.17, blue: 0.65).opacity(0.54),
-                .clear
-            ],
-            orange: [
-                Color(red: 1.00, green: 0.48, blue: 0.10).opacity(0.98),
-                Color(red: 1.00, green: 0.28, blue: 0.02).opacity(0.54),
-                .clear
-            ],
-            peach: [
-                Color(red: 1.00, green: 0.70, blue: 0.48).opacity(0.90),
-                Color(red: 1.00, green: 0.45, blue: 0.38).opacity(0.38),
-                .clear
-            ],
-            core: [
-                Color.white.opacity(0.99),
-                Color(red: 1.00, green: 0.78, blue: 0.92).opacity(0.92),
-                Color(red: 1.00, green: 0.66, blue: 0.62).opacity(0.44),
-                .clear
-            ],
-            baseBand: [
-                Color(red: 0.74, green: 0.52, blue: 1.00).opacity(0.90),
-                Color(red: 1.00, green: 0.82, blue: 0.97).opacity(0.99),
-                Color.white,
-                Color(red: 1.00, green: 0.80, blue: 0.66).opacity(0.98)
-            ],
-            floorVeil: [
-                Color(red: 0.49, green: 0.12, blue: 1.00).opacity(0.58),
-                Color(red: 1.00, green: 0.26, blue: 0.73).opacity(0.52),
-                Color(red: 1.00, green: 0.47, blue: 0.07).opacity(0.62)
-            ]
+            violet: [.white.opacity(0.42), .white.opacity(0.15), .clear],
+            magenta: [.white.opacity(0.37), .white.opacity(0.13), .clear],
+            orange: [.white.opacity(0.48), .white.opacity(0.17), .clear],
+            peach: [.white.opacity(0.27), .white.opacity(0.10), .clear],
+            core: [.white.opacity(0.76), .white.opacity(0.34), .clear],
+            baseBand: [.white.opacity(0.25), .white.opacity(0.68), .white.opacity(0.82), .white.opacity(0.25)],
+            floorVeil: [.white.opacity(0.18), .white.opacity(0.24), .white.opacity(0.22)]
         )
 
         static let light = Palette(
-            violet: [
-                Color(red: 0.42, green: 0.14, blue: 0.96).opacity(0.82),
-                Color(red: 0.47, green: 0.28, blue: 0.98).opacity(0.38),
-                .clear
-            ],
-            magenta: [
-                Color(red: 0.92, green: 0.16, blue: 0.64).opacity(0.78),
-                Color(red: 1.00, green: 0.38, blue: 0.76).opacity(0.34),
-                .clear
-            ],
-            orange: [
-                Color(red: 1.00, green: 0.39, blue: 0.03).opacity(0.84),
-                Color(red: 1.00, green: 0.61, blue: 0.24).opacity(0.38),
-                .clear
-            ],
-            peach: [
-                Color(red: 1.00, green: 0.61, blue: 0.34).opacity(0.72),
-                Color(red: 1.00, green: 0.48, blue: 0.55).opacity(0.28),
-                .clear
-            ],
-            core: [
-                Color(red: 1.00, green: 0.84, blue: 0.94).opacity(0.88),
-                Color(red: 1.00, green: 0.66, blue: 0.85).opacity(0.64),
-                Color(red: 1.00, green: 0.70, blue: 0.45).opacity(0.26),
-                .clear
-            ],
-            baseBand: [
-                Color(red: 0.57, green: 0.34, blue: 1.00).opacity(0.80),
-                Color(red: 0.98, green: 0.55, blue: 0.86).opacity(0.88),
-                Color(red: 1.00, green: 0.78, blue: 0.88).opacity(0.92),
-                Color(red: 1.00, green: 0.52, blue: 0.16).opacity(0.84)
-            ],
-            floorVeil: [
-                Color(red: 0.46, green: 0.20, blue: 0.96).opacity(0.38),
-                Color(red: 0.94, green: 0.19, blue: 0.65).opacity(0.34),
-                Color(red: 1.00, green: 0.42, blue: 0.05).opacity(0.42)
-            ]
+            violet: [.black.opacity(0.23), .black.opacity(0.07), .clear],
+            magenta: [.black.opacity(0.19), .black.opacity(0.06), .clear],
+            orange: [.black.opacity(0.25), .black.opacity(0.08), .clear],
+            peach: [.black.opacity(0.17), .black.opacity(0.05), .clear],
+            core: [.white.opacity(0.92), .black.opacity(0.12), .clear],
+            baseBand: [.black.opacity(0.12), .black.opacity(0.34), .black.opacity(0.38), .black.opacity(0.12)],
+            floorVeil: [.black.opacity(0.08), .black.opacity(0.10), .black.opacity(0.09)]
         )
     }
 }

@@ -48,7 +48,7 @@ struct InUmrahView: View {
                     } label: {
                         Label(store.text("home1_btn", fallback: "Start Umrah"), systemImage: "play.fill")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(colorScheme == .dark ? .black : .white)
                             .padding(.horizontal, 22)
                             .frame(height: 54)
                             .iumrahGlass(in: Capsule(), interactive: true, tint: palette.accent.opacity(0.58))

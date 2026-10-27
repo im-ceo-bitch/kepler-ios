@@ -17,6 +17,7 @@ struct HotelsHomeView: View {
     @State private var packageShareArtifacts: IumrahPackageShareArtifacts?
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
+    @State private var hotelRefreshNonce = 0
 
     // Root content uses the same single-viewport ScrollView / LazyVStack
     // architecture as IumrahFlightsView. The viewport, not an image or a
@@ -53,13 +54,6 @@ struct HotelsHomeView: View {
                                 .padding(.horizontal, -gutter)
                         }
 
-                        // Shared airport/location selector, consistent for
-                        // Hotels, Flights and Weekend.
-                        AirportSelectorButton(
-                            airport: $journey.trip.originAirport,
-                            fallbackCode: $journey.trip.origin
-                        )
-
                         Group {
                             switch board {
                             case .hotels: hotelsBoard
@@ -71,17 +65,19 @@ struct HotelsHomeView: View {
                     }
                     .frame(width: columnWidth, alignment: .leading)
                     .padding(.horizontal, gutter)
-                    .padding(.top, 10)
-                    .padding(.bottom, 110)
+                    .padding(.top, 0)
+                    .padding(.bottom, 140)
                 }
                 .frame(width: contentWidth, alignment: .top)
                 .frame(maxWidth: .infinity, alignment: .top)
+                .background(Color.iumrahPageBackground)
             }
             .frame(width: viewportWidth, height: viewport.size.height)
+            .iumrahSignatureScrollChrome(title: pageTitle)
         }
         // The background may reach the screen edges, but readable content
         // never ignores the iPhone safe area.
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if board == .flights {
                 IumrahPackageAssemblyBar(
@@ -103,32 +99,16 @@ struct HotelsHomeView: View {
             }
         }
         .refreshable {
-            if board != .hotels {
+            if board == .hotels {
+                // Refresh the current Nuitee catalog without loading the legacy store.
+                hotelRefreshNonce += 1
+                try? await Task.sleep(for: .milliseconds(500))
+            } else {
                 await storefront.updateDepartureAirport(journey.trip.originCode)
                 await storefront.refresh()
             }
         }
         .background(Color.iumrahPageBackground)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if board == .flights {
-                IumrahPackageAssemblyBar(
-                    language: settings.language,
-                    selections: journey.stagedUmrahFlights,
-                    isExpanded: $packageAssemblyExpanded,
-                    onContinue: {
-                        guard journey.hasCompleteStagedFlightSelection else {
-                            IumrahHaptics.error()
-                            return
-                        }
-                        IumrahHaptics.selection()
-                        journey.prepareFlightFirstHotelStage()
-                        chrome.startFlightFirstTrip()
-                    }
-                )
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.bottom, 2)
-            }
-        }
         .task(id: journey.trip.originCode.uppercased()) {
             // The old D1 Hotels storefront is retained for legacy packages
             // and Flights, but never loaded just for the Nuitee Hotels tab.
@@ -230,7 +210,7 @@ struct HotelsHomeView: View {
     // Nuitee V1 changes only the Hotels tab. Existing Flights and Sunday Club
     // maintain their original sources and navigation behind the unified header.
     private var hotelsBoard: some View {
-        NuiteeHotelsCatalogView()
+        NuiteeHotelsCatalogView(refreshSignal: hotelRefreshNonce)
             .environmentObject(settings)
             .environmentObject(chrome)
     }

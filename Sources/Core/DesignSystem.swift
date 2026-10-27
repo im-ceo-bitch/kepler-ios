@@ -122,43 +122,18 @@ enum IumrahIconRole: Hashable {
 
     var color: Color {
         switch self {
-        case .accent: return Color(uiColor: .systemBlue)
-        case .travel: return Color(uiColor: .systemBlue)
-        case .hotel: return Color(uiColor: .systemIndigo)
-        case .booking: return Color(uiColor: .systemOrange)
-        case .umrah: return Color(uiColor: .systemTeal)
-        case .care: return Color(uiColor: .systemPink)
-        case .profile: return Color(uiColor: .systemCyan)
-        case .phone: return Color(uiColor: .systemGreen)
-        case .mail: return Color(uiColor: .systemBlue)
-        case .message: return Color(uiColor: .systemTeal)
-        case .connectivity: return Color(uiColor: .systemBlue)
-        case .device: return Color(uiColor: .systemBlue)
-        case .gift: return Color(uiColor: .systemPurple)
-        case .search: return Color(uiColor: .systemBlue)
-        case .rating: return Color(uiColor: .systemYellow)
-        case .calendar: return Color(uiColor: .systemOrange)
-        case .location: return Color(uiColor: .systemRed)
-        case .security: return Color(uiColor: .systemGreen)
-        case .notification: return Color(uiColor: .systemRed)
-        case .appearance: return Color(uiColor: .systemPurple)
-        case .language: return Color(uiColor: .systemBlue)
-        case .settings: return Color(uiColor: .systemGray)
-        case .document: return Color(uiColor: .systemCyan)
-        case .payment: return Color(uiColor: .systemGreen)
-        case .waiting: return Color(uiColor: .systemYellow)
-        case .paymentPending: return Color(uiColor: .systemOrange)
-        case .confirmed: return Color(uiColor: .systemGreen)
-        case .ready: return Color(uiColor: .systemTeal)
-        case .inTrip: return Color(uiColor: .systemBlue)
-        case .completed: return Color(uiColor: .systemIndigo)
-        case .telegram: return Color(uiColor: .systemBlue)
-        case .whatsapp: return Color(uiColor: .systemGreen)
-        case .transfer: return Color(uiColor: .systemCyan)
-        case .success: return Color(uiColor: .systemGreen)
-        case .warning: return Color(uiColor: .systemYellow)
+        // Branded controls use monochrome semantic foregrounds rather than
+        // UIKit's random blue/teal/pink asset colors.
+        case .accent, .travel, .hotel, .booking, .umrah, .care, .profile,
+             .phone, .mail, .message, .connectivity, .device, .gift,
+             .search, .rating, .calendar, .location, .security,
+             .notification, .appearance, .language, .settings, .document,
+             .payment, .telegram, .whatsapp, .transfer: return .primary
+        // Real state remains semantically distinct for accessibility.
+        case .success, .confirmed, .ready, .completed: return Color(uiColor: .systemGreen)
+        case .warning, .waiting, .paymentPending: return Color(uiColor: .systemOrange)
         case .destructive: return Color(uiColor: .systemRed)
-        case .neutral: return Color(uiColor: .systemGray)
+        case .inTrip, .neutral: return .secondary
         }
     }
 

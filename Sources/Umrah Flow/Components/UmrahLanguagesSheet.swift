@@ -133,7 +133,7 @@ struct UmrahLanguagesSheet: View {
                     Text(copy.start)
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(colorScheme == .dark ? .black : .white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 56)
                 .iumrahGlass(in: Capsule(), interactive: true, tint: palette.accent.opacity(colorScheme == .dark ? 0.52 : 0.62))
@@ -159,7 +159,7 @@ struct UmrahLanguagesSheet: View {
             HStack(spacing: 9) {
                 Text(language.nativeName)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isSelected ? Color.white : palette.textPrimary)
+                    .foregroundStyle(isSelected ? (colorScheme == .dark ? Color.black : Color.white) : palette.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
 
@@ -167,7 +167,7 @@ struct UmrahLanguagesSheet: View {
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.white : palette.textSecondary.opacity(0.42))
+                    .foregroundStyle(isSelected ? (colorScheme == .dark ? Color.black : Color.white) : palette.textSecondary.opacity(0.42))
             }
             .padding(.horizontal, 14)
             .frame(maxWidth: .infinity)

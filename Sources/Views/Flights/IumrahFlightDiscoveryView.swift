@@ -45,6 +45,7 @@ struct IumrahFlightDiscoveryView: View {
     @State private var selectedOffer: FlightDiscoveryOffer?
     @State private var seededFromJourney = false
     @State private var searchMode: FlightDiscoverySearchMode = .globalSearch
+    @State private var searchExpanded = true
     @State private var hasSearched = false
     @State private var searchProgress = 0.0
     @State private var searchRunID = UUID()
@@ -55,11 +56,39 @@ struct IumrahFlightDiscoveryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            searchModePicker
-            flightSearchConfigurationCard
+            IumrahGraphiteSearchSurface(
+                isExpanded: $searchExpanded,
+                summary: "\(originCode) → \(destinationCode.uppercased())",
+                subtitle: "\(dateChipTitle) · \(passengerChipTitle)"
+            ) {
+                VStack(alignment: .leading, spacing: 14) {
+                    searchModePicker
+                    flightSearchConfigurationCard
+                    if searchMode == .globalSearch {
+                        tripTypePicker
+                    }
+                    Button {
+                        IumrahHaptics.selection()
+                        if searchMode == .globalSearch {
+                            performGlobalSearch()
+                        } else {
+                            Task { await loadRecommendedFlights() }
+                        }
+                        withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                            searchExpanded = false
+                        }
+                    } label: {
+                        Label(tr("Найти рейсы", "Find flights", "Reyslarni topish", "Рейсларни топиш"), systemImage: "magnifyingglass")
+                            .font(.system(size: 16, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.black)
+                }
+            }
 
             if searchMode == .globalSearch {
-                tripTypePicker
                 discoveryActions
                 searchResultsSection
                 // Place flexible dates after every result (even large result sets),
@@ -462,9 +491,9 @@ struct IumrahFlightDiscoveryView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.primary)
                 .frame(width: 34, height: 34)
-                .background(Color.blue.opacity(0.1), in: Circle())
+                .background(Color.black.opacity(0.06), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(eyebrow.uppercased())
                     .font(.caption2.weight(.bold))
@@ -718,9 +747,9 @@ struct IumrahFlightDiscoveryView: View {
             HStack(spacing: 10) {
                 Image(systemName: icon)
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(active ? .white : tint)
+                    .foregroundStyle(active ? Color.white : Color.primary)
                     .frame(width: 36, height: 36)
-                    .background(active ? tint : tint.opacity(0.12), in: Circle())
+                    .background(active ? Color.black : Color.black.opacity(0.07), in: Circle())
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)

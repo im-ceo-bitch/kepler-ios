@@ -27,9 +27,9 @@ struct IumrahRootPageTitle: View {
                 // Immersive photo headers keep their original contrast treatment.
                 if usesBrandLogo && showsConnectivityStatus {
                     ViewThatFits(in: .horizontal) {
-                        connectedBrandHeader(brandWidth: 132, controlSize: 44, spacing: 8)
-                        connectedBrandHeader(brandWidth: 110, controlSize: 40, spacing: 7)
-                        connectedBrandHeader(brandWidth: 96, controlSize: 38, spacing: 6)
+                        connectedBrandHeader(brandWidth: 165, controlSize: 44, spacing: 8)
+                        connectedBrandHeader(brandWidth: 137, controlSize: 40, spacing: 7)
+                        connectedBrandHeader(brandWidth: 120, controlSize: 38, spacing: 6)
                     }
                 } else {
                     standardHeader
@@ -46,10 +46,11 @@ struct IumrahRootPageTitle: View {
     // existing padded scroll column without changing that column's content width.
     private var signatureHeader: some View {
         VStack(alignment: .leading, spacing: 18) {
+            IumrahSignatureScrollMarker()
             ViewThatFits(in: .horizontal) {
-                signatureBrandRow(wordmarkWidth: 132, controlSize: 42, spacing: 9)
-                signatureBrandRow(wordmarkWidth: 105, controlSize: 38, spacing: 7)
-                signatureBrandRow(wordmarkWidth: 84, controlSize: 36, spacing: 5)
+                signatureBrandRow(wordmarkWidth: 165, controlSize: 42, spacing: 9)
+                signatureBrandRow(wordmarkWidth: 131, controlSize: 38, spacing: 7)
+                signatureBrandRow(wordmarkWidth: 105, controlSize: 36, spacing: 5)
             }
 
             if !showsConnectivityStatus {

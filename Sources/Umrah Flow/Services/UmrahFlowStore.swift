@@ -91,13 +91,17 @@ final class UmrahFlowStore: ObservableObject {
     private func loadCache(language: String) {
         if let data = defaults.data(forKey: translationsCacheKey(language)),
            let map = try? JSONDecoder().decode([String: String].self, from: data) {
-            translations.merge(map) { _, cached in cached }
+            // Reviewed app-bundled content wins over an older on-device cache.
+            // The latest Supabase response (when reachable) is applied later.
+            translations.merge(map) { bundled, _ in bundled }
         }
 
         if let data = defaults.data(forKey: audioCacheKey(language)),
            let map = try? JSONDecoder().decode([String: String].self, from: data) {
             for (key, value) in map {
-                if let url = URL(string: value), url.scheme?.lowercased() == "https" {
+                if let url = URL(string: value),
+                   UmrahFlowAudioURLPolicy.isAllowed(url),
+                   audioURLs[key] == nil {
                     audioURLs[key] = url
                 }
             }

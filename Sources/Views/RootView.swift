@@ -370,6 +370,19 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.28), value: hasCompletedOnboarding)
     }
 
+    private var accountTabTitle: String {
+        switch settings.language {
+        case .russian: return "Аккаунт"
+        case .uzbek: return "Akkaunt"
+        case .uzbekCyrillic: return "Аккаунт"
+        case .arabic: return "الحساب"
+        case .turkish: return "Hesabım"
+        case .indonesian: return "Akun saya"
+        case .malay: return "Akaun"
+        case .english: return "Account"
+        }
+    }
+
     private var tabs: some View {
         TabView(selection: $chrome.currentTab) {
             tabScreen(for: .home) { HomeDashboardView() }
@@ -389,7 +402,7 @@ struct RootView: View {
                 .tag(AppTab.care)
 
             tabScreen(for: .account) { IumrahAccountView() }
-                .tabItem { Label(settings.language == .indonesian ? "Akun saya" : (settings.language == .turkish ? "Hesabım" : "Account"), systemImage: "person.crop.circle") }
+                .tabItem { Label(accountTabTitle, systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
         // Keep the real iOS TabView bar: iOS 26 provides the native,

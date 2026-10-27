@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 private enum NuiteeCopy {
     static func text(_ ru: String, _ uz: String, _ en: String, _ lang: AppSettingsStore.Language) -> String {
@@ -54,6 +55,7 @@ private final class NuiteeCatalogModel: ObservableObject {
 }
 
 struct NuiteeHotelsCatalogView: View {
+    let refreshSignal: Int
     @EnvironmentObject private var settings: AppSettingsStore
     @StateObject private var model = NuiteeCatalogModel()
     @State private var city: NuiteeCity = .makkah
@@ -61,6 +63,10 @@ struct NuiteeHotelsCatalogView: View {
     @State private var checkin = Calendar.current.date(byAdding: .day, value: 10, to: Date()) ?? Date()
     @State private var nights = 1
     @State private var adults = 2
+    @State private var draftCheckin = Calendar.current.date(byAdding: .day, value: 10, to: Date()) ?? Date()
+    @State private var draftNights = 1
+    @State private var draftAdults = 2
+    @State private var searchExpanded = true
     @State private var visibleCount = 20
     @State private var opened: NuiteeHotel?
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
@@ -83,34 +89,56 @@ struct NuiteeHotelsCatalogView: View {
             .pickerStyle(.segmented)
             .onChange(of: city) { _, _ in stars = 0; visibleCount = 20 }
 
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(NuiteeCopy.text("Заезд", "Kirish", "Check-in", settings.language))
-                        .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    DatePicker("", selection: $checkin, in: Date()..., displayedComponents: .date)
-                        .labelsHidden()
-                        .datePickerStyle(.compact)
-                }
-                Spacer(minLength: 0)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(NuiteeCopy.text("Ночей", "Tunlar", "Nights", settings.language))
-                        .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    Picker("Nights", selection: $nights) {
-                        ForEach([1, 2, 3, 5, 7, 10, 14], id: \.self) { count in Text("\(count)").tag(count) }
+            IumrahGraphiteSearchSurface(
+                isExpanded: $searchExpanded,
+                summary: city.title(settings.language),
+                subtitle: "\(checkin.formatted(date: .abbreviated, time: .omitted)) · \(nights) "
+                    + NuiteeCopy.text("ночь · ", "tun · ", "night(s) · ", settings.language)
+                    + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language)
+            ) {
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack(spacing: 12) {
+                        Label(NuiteeCopy.text("Даты проживания", "Yashash sanalari", "Stay dates", settings.language), systemImage: "calendar")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        DatePicker("", selection: $draftCheckin, in: Date()..., displayedComponents: .date)
+                            .labelsHidden().datePickerStyle(.compact).tint(.black)
                     }
-                    .tint(.primary)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(NuiteeCopy.text("Гостей", "Mehmon", "Guests", settings.language))
-                        .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    Picker("Guests", selection: $adults) {
-                        ForEach(1...6, id: \.self) { count in Text("\(count)").tag(count) }
+                    Divider()
+                    HStack(spacing: 12) {
+                        Label(NuiteeCopy.text("Ночей", "Tunlar", "Nights", settings.language), systemImage: "moon")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Picker("Nights", selection: $draftNights) {
+                            ForEach([1, 2, 3, 5, 7, 10, 14], id: \.self) { value in
+                                Text("\(value)").tag(value)
+                            }
+                        }
+                        .tint(.black)
                     }
-                    .tint(.primary)
+                    Divider()
+                    Stepper(value: $draftAdults, in: 1...6) {
+                        Label("\(draftAdults) " + NuiteeCopy.text("взрослых", "katta", "adults", settings.language), systemImage: "person.2")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    Button {
+                        checkin = draftCheckin
+                        nights = draftNights
+                        adults = draftAdults
+                        withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                            searchExpanded = false
+                        }
+                        IumrahHaptics.selection()
+                        Task { await reload() }
+                    } label: {
+                        Label(NuiteeCopy.text("Найти отели", "Mehmonxonalarni topish", "Find hotels", settings.language), systemImage: "magnifyingglass")
+                            .font(.system(size: 16, weight: .bold))
+                            .frame(maxWidth: .infinity).frame(height: 54)
+                    }
+                    .buttonStyle(.borderedProminent).tint(.black)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
             }
-            .padding(15)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -193,7 +221,7 @@ struct NuiteeHotelsCatalogView: View {
             }
         }
         .task(id: reloadIdentity) { await reload() }
-        .refreshable { await reload() }
+        .onChange(of: refreshSignal) { _, _ in Task { await reload() } }
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox)
         }
@@ -210,6 +238,7 @@ struct NuiteeHotelsCatalogView: View {
 }
 
 private struct NuiteeHotelListingCard: View {
+    @EnvironmentObject private var settings: AppSettingsStore
     let hotel: NuiteeHotel
     let nights: Int
     let adults: Int
@@ -252,7 +281,7 @@ private struct NuiteeHotelListingCard: View {
                         if hotel.roundedStars > 0 {
                             Text(String(repeating: "★", count: hotel.roundedStars))
                                 .font(.caption.weight(.bold))
-                                .foregroundStyle(.yellow)
+                                .foregroundStyle(Color.primary)
                         }
                         if let rating = hotel.rating { Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary) }
                     }
@@ -263,13 +292,13 @@ private struct NuiteeHotelListingCard: View {
                         Text(NuiteeHotelService.usd(rate.price))
                             .font(.system(size: 26, weight: .bold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.7)
-                        Text("\(nights) н. · 1 номер · \(adults) взр.")
+                        Text("\(nights) " + NuiteeCopy.text("ночь · 1 номер · ", "tun · 1 xona · ", "nights · 1 room · ", settings.language) + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
                     } else {
-                        Text("Цена недоступна").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text(NuiteeCopy.text("Цена недоступна", "Narx mavjud emas", "Rate unavailable", settings.language)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text(sandbox ? "Тестовый тариф" : "Стоимость проживания")
+                        Text(sandbox ? NuiteeCopy.text("Тестовый тариф", "Sinov narxi", "Sandbox rate", settings.language) : NuiteeCopy.text("Стоимость проживания", "Turar joy narxi", "Stay price", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
@@ -346,7 +375,7 @@ struct NuiteeHotelDetailView: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Text(hotel.name).font(.system(size: 30, weight: .bold, design: .rounded))
                     if hotel.roundedStars > 0 {
-                        Text(String(repeating: "★", count: hotel.roundedStars)).foregroundStyle(.yellow)
+                        Text(String(repeating: "★", count: hotel.roundedStars)).foregroundStyle(Color.primary)
                     }
                     if let rating = hotel.rating {
                         Text(String(format: "%.1f / 10", rating)).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
@@ -401,6 +430,11 @@ struct NuiteeHotelDetailView: View {
                     }
                     if let lat = detail.latitude, let lon = detail.longitude, (-90...90).contains(lat), (-180...180).contains(lon) {
                         sectionTitle(NuiteeCopy.text("Расположение", "Joylashuv", "Location", settings.language))
+                        if let mosque = mosqueDistance(latitude: lat, longitude: lon) {
+                            Label(mosque, systemImage: "figure.walk")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
                         Map(initialPosition: .region(MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: lat, longitude: lon), span: MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)))) {
                             Marker(detail.name, coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon))
                         }
@@ -417,6 +451,9 @@ struct NuiteeHotelDetailView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea())
         .navigationTitle(hotel.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.iumrahSignatureBlack, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .toolbar { ToolbarItem(placement: .topBarTrailing) {
             ShareLink(item: hotel.name + " — " + (hotel.address ?? hotel.city)) {
@@ -535,18 +572,44 @@ struct NuiteeHotelDetailView: View {
 
     private func cancellationView(_ rate: NuiteeRoomRate) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(rate.refundable ? "Возвратный тариф — проверьте сроки" : "Невозвратный тариф", systemImage: rate.refundable ? "arrow.uturn.backward.circle" : "exclamationmark.circle")
+            Label(rate.refundable
+                  ? NuiteeCopy.text("Возвратный тариф — проверьте сроки", "Qaytariladigan tarif — muddatlarni tekshiring", "Refundable — check deadline", settings.language)
+                  : NuiteeCopy.text("Невозвратный тариф", "Qaytarilmaydigan tarif", "Non-refundable rate", settings.language), systemImage: rate.refundable ? "arrow.uturn.backward.circle" : "exclamationmark.circle")
                 .font(.subheadline.weight(.semibold))
             if !rate.cancellationDescription.isEmpty { Text(rate.cancellationDescription).font(.footnote) }
             ForEach(Array(rate.cancellationDeadlines.enumerated()), id: \.offset) { entry in
-                Text("Срок отмены: \(entry.element.until)" + (entry.element.amount.map { " · штраф " + NuiteeHotelService.usd($0) } ?? ""))
+                Text(NuiteeCopy.text("Срок отмены: ", "Bekor qilish muddati: ", "Cancel by: ", settings.language)
+                     + entry.element.until
+                     + (entry.element.amount.map {
+                        NuiteeCopy.text(" · штраф ", " · jarima ", " · penalty ", settings.language)
+                        + NuiteeHotelService.usd($0)
+                       } ?? ""))
                     .font(.caption).foregroundStyle(.secondary)
             }
             if !rate.chargeOnArrival.isEmpty {
-                Text("Некоторые налоги/сборы оплачиваются отдельно в отеле.")
+                Text(NuiteeCopy.text("Некоторые налоги/сборы оплачиваются отдельно в отеле.", "Baʼzi soliqlar va yig‘imlar mehmonxonada alohida to‘lanadi.", "Some taxes and fees are paid at the hotel.", settings.language))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+
+    // Coordinates provide an approximate straight-line distance, never a walking ETA.
+    private func mosqueDistance(latitude: Double, longitude: Double) -> String? {
+        let cityKey = hotel.city.lowercased()
+        let makkah = cityKey.contains("makk") || cityKey.contains("mecc") || cityKey.contains("مكة")
+        let madinah = cityKey.contains("madin") || cityKey.contains("medin") || cityKey.contains("المدينة")
+        guard makkah || madinah else { return nil }
+        let mosque = makkah
+            ? CLLocation(latitude: 21.4225, longitude: 39.8262)
+            : CLLocation(latitude: 24.4672, longitude: 39.6111)
+        let kms = CLLocation(latitude: latitude, longitude: longitude).distance(from: mosque) / 1000
+        guard kms.isFinite else { return nil }
+        let name = makkah
+            ? NuiteeCopy.text("Харама", "Masjidul Harom", "Masjid al-Haram", settings.language)
+            : NuiteeCopy.text("Мечети Пророка", "Masjidun Nabaviy", "Prophet's Mosque", settings.language)
+        let prefix = NuiteeCopy.text("По прямой до", "To‘g‘ri masofa:", "Straight-line to", settings.language)
+        return "\(prefix) \(name): \(String(format: "%.1f", kms)) "
+            + NuiteeCopy.text("км", "km", "km", settings.language)
     }
 
     private var cancellationAndPrivacy: some View {

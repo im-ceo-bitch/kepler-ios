@@ -3,105 +3,96 @@ import SwiftUI
 struct UmrahFlowHeader: View {
     let title: String
     let progress: Double
-    let advisorTitle: String
-    let advisorSubtitle: String
-    let advisorStatus: String?
+    let stageNumber: Int
+    let language: UmrahGuideLanguage
+    let onClose: () -> Void
     let onOpenNavigator: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
-
-    private var palette: UmrahFlowPalette {
-        colorScheme == .dark ? .dark : .light
-    }
+    // Inner ritual navigation has the same anchored monochrome identity as the
+    // five root headers. Only the content below it responds to light/dark mode.
+    private var primary: Color { .white }
+    private var secondary: Color { .white.opacity(0.58) }
+    private var normalized: Double { max(0, min(1, progress)) }
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                Image("UmrahFlowLogo")
-                    .resizable()
-                    .scaledToFit()
-                    // Kept at the requested +30% size versus the original 112 pt mark.
-                    .frame(width: 146, height: 52, alignment: .leading)
-                    .accessibilityLabel("iumrah Project")
+                Button(action: onClose) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(primary)
+                        .frame(width: 44, height: 44)
+                        .background(primary.opacity(0.055), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(UmrahFlowCopy.closeFlowLabel)
 
-                Spacer(minLength: 10)
-
-                UmrahGlassIconButton(
-                    systemName: "chevron.backward",
-                    foreground: palette.textPrimary,
-                    accessibilityLabel: "Umrah navigation",
-                    action: onOpenNavigator
-                )
+                Spacer(minLength: 4)
+                HStack(spacing: 7) {
+                    Image("HeaderWordmarkDark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 94, height: 30)
+                        .accessibilityLabel("iumrah Project")
+                    Text("FLOW")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .tracking(1.1)
+                        .foregroundStyle(secondary)
+                }
+                Spacer(minLength: 4)
+                Button(action: onOpenNavigator) {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(primary)
+                        .frame(width: 44, height: 44)
+                        .background(primary.opacity(0.055), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(UmrahFlowCopy.chooseStageLabel)
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(advisorTitle)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .tracking(-0.15)
-                    .foregroundStyle(palette.textPrimary)
-                    .lineLimit(1)
-
-                Text(advisorSubtitle)
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(palette.textSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                Spacer(minLength: 2)
+            HStack(alignment: .bottom, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(UmrahTawafCopy.routeStage(language, current: stageNumber))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(secondary)
+                    Text(title)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                Spacer(minLength: 12)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("\(Int((normalized * 100).rounded()))%")
+                        .font(.system(size: 23, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(primary)
+                    Text(UmrahTawafCopy.routeProgress(language))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(secondary)
+                }
             }
 
             GeometryReader { proxy in
-                let normalized = max(0, min(progress, 1))
-                let width = proxy.size.width * CGFloat(normalized)
-
                 ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(palette.progressTrack)
-
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [palette.progressStart, palette.progressEnd],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: max(normalized > 0 ? 16 : 0, width))
-                        .shadow(
-                            color: palette.progressEnd.opacity(colorScheme == .dark ? 0.22 : 0.12),
-                            radius: 8
-                        )
-                        .animation(.smooth(duration: 0.42, extraBounce: 0), value: normalized)
+                    Capsule().fill(primary.opacity(0.10))
+                    Capsule().fill(primary)
+                        .frame(width: proxy.size.width * normalized)
+                        .animation(.easeInOut(duration: 0.28), value: normalized)
                 }
             }
             .frame(height: 5)
-
-            HStack(spacing: 10) {
-                Text(title)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(palette.textSecondary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                if let advisorStatus, !advisorStatus.isEmpty {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(palette.accent)
-                            .frame(width: 5, height: 5)
-
-                        Text(advisorStatus)
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundStyle(palette.textSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                            .transition(.opacity)
-                    }
-                }
-            }
+            .accessibilityLabel(UmrahTawafCopy.routeProgress(language))
+            .accessibilityValue("\(Int((normalized * 100).rounded()))%")
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 4)
-        .padding(.bottom, 6)
+        .padding(.horizontal, 20)
+        .padding(.top, 5)
+        .padding(.bottom, 15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            IumrahWorldDotsHeaderBackground(mapOpacity: 0.425, waveSpeed: 0.56, waveIntensity: 0.78)
+                .ignoresSafeArea(edges: .top)
+        }
     }
 }

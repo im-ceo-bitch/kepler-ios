@@ -38,32 +38,32 @@ struct TawafReadingPage: View {
                             .tracking(1.25)
                             .foregroundStyle(palette.textSecondary)
                         Spacer()
-                        Text("\(flow.tawafRound) / 7  ·  \(flow.tawafReadingStep + 1) / 7")
+                        Text("\(UmrahTawafCopy.round(store.guideLanguage)) \(flow.tawafRound)/7 · \(UmrahTawafCopy.page(store.guideLanguage)) \(flow.tawafReadingStep + 1)/7")
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(palette.textSecondary)
                     }
-                    .padding(.horizontal, 72)
+                    .padding(.horizontal, 20)
                     .padding(.top, 8)
 
                     readingPager
-                }
 
-                HStack {
-                    UmrahSideStepButton(
+                    HStack {
+                        UmrahSideStepButton(
                         systemName: "chevron.backward",
                         accessibilityLabel: UmrahFlowCopy.previous(store.guideLanguage),
                         action: previousStep
                     )
-                    Spacer()
-                    UmrahSideStepButton(
+                        Spacer()
+                        UmrahSideStepButton(
                         systemName: isLastStep ? "checkmark" : "chevron.right",
                         emphasized: true,
                         accessibilityLabel: isLastStep ? UmrahFlowCopy.done(store.guideLanguage) : UmrahFlowCopy.next(store.guideLanguage),
                         action: nextStep
-                    )
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
                 }
-                .padding(.horizontal, 14)
-                .offset(y: -8)
             }
         }
         .onChange(of: pageID) { _, newValue in
@@ -83,17 +83,16 @@ struct TawafReadingPage: View {
     }
 
     private var readingPager: some View {
-        ScrollView(.vertical) {
-            LazyVStack(spacing: 0) {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
                 ForEach(steps.indices, id: \.self) { index in
                     readingStep(steps[index], index: index)
-                        .containerRelativeFrame(.vertical)
+                        .containerRelativeFrame(.horizontal)
                         .id(index)
                 }
             }
             .scrollTargetLayout()
         }
-        .contentMargins(.horizontal, 72, for: .scrollContent)
         .scrollIndicators(.hidden)
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $pageID)
@@ -143,8 +142,9 @@ struct TawafReadingPage: View {
                 }
             }
             .frame(maxWidth: 620)
-            .frame(maxWidth: .infinity, minHeight: 330, alignment: .center)
-            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, minHeight: 260, alignment: .center)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 20)
         }
         .scrollIndicators(.hidden)
     }
@@ -220,10 +220,6 @@ struct TawafReadingPage: View {
             withAnimation(.smooth(duration: 0.34, extraBounce: 0)) {
                 pageID = flow.tawafReadingStep - 1
             }
-        } else if flow.tawafRound > 1 {
-            withAnimation(.smooth(duration: 0.34, extraBounce: 0)) {
-                flow.tawafRound -= 1
-            }
         } else {
             withAnimation(.smooth(duration: 0.30, extraBounce: 0)) {
                 flow.tawafMode = .listening
@@ -237,20 +233,12 @@ struct TawafReadingPage: View {
                 pageID = flow.tawafReadingStep + 1
             }
         } else {
-            completeRound()
-        }
-    }
-
-    private func completeRound() {
-        flow.resetTawafReading()
-        pageID = 0
-        if flow.tawafRound < 7 {
-            withAnimation(.smooth(duration: 0.38, extraBounce: 0)) {
-                flow.tawafRound += 1
-            }
-        } else {
-            withAnimation(.smooth(duration: 0.42, extraBounce: 0)) {
-                flow.stage = .postTawaf
+            // Reading page 7 is only the end of the instruction set. The
+            // actual round is completed using the dedicated swipe control.
+            flow.resetTawafReading()
+            pageID = 0
+            withAnimation(.smooth(duration: 0.30, extraBounce: 0)) {
+                flow.tawafMode = .listening
             }
         }
     }

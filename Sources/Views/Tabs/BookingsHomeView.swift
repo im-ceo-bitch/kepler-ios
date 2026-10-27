@@ -193,10 +193,11 @@ struct BookingsHomeView: View {
                 .padding(.top, 28)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
-            .padding(.bottom, 44)
+            .padding(.top, 0)
+            .padding(.bottom, 120)
+            .background(Color.iumrahPageBackground)
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .iumrahSignatureScrollChrome(title: L10n.text("tab_booking", settings.language))
         .animation(.snappy(duration: 0.34), value: session.effectiveStatus)
     }
 
@@ -1672,10 +1673,11 @@ struct BookingsHomeView: View {
                 emptyCareCard
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
-            .padding(.bottom, 42)
+            .padding(.top, 0)
+            .padding(.bottom, 120)
+            .background(Color.iumrahPageBackground)
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .iumrahSignatureScrollChrome(title: L10n.text("tab_booking", settings.language))
     }
 
     private var bookingEmptyStatusCard: some View {

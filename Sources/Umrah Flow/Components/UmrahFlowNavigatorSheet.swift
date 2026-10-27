@@ -68,7 +68,7 @@ struct UmrahFlowNavigatorSheet: View {
                 } label: {
                     Text(store.text("navigate_button", fallback: "Go"))
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(colorScheme == .dark ? .black : .white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .iumrahGlass(in: Capsule(), interactive: true, tint: palette.accent.opacity(0.56))
@@ -77,10 +77,7 @@ struct UmrahFlowNavigatorSheet: View {
 
                 Button {
                     IumrahHaptics.soft()
-                    dismiss()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
-                        onExit()
-                    }
+                    onExit()
                 } label: {
                     Text(UmrahFlowCopy.leaveUmrah(store.guideLanguage))
                         .font(.system(size: 15, weight: .semibold, design: .rounded))
@@ -111,7 +108,7 @@ struct UmrahFlowNavigatorSheet: View {
             HStack(spacing: 14) {
                 Image(systemName: stageSymbol(stage))
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(selected ? Color.white : palette.textSecondary)
+                    .foregroundStyle(selected ? (colorScheme == .dark ? Color.black : Color.white) : palette.textSecondary)
                     .frame(width: 38, height: 38)
                     .iumrahGlass(in: Circle(), interactive: true, tint: selected ? palette.accent.opacity(0.56) : nil)
 

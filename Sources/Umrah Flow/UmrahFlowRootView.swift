@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct UmrahFlowRootView: View {
     @EnvironmentObject private var chrome: AppChromeStore
@@ -10,6 +11,9 @@ struct UmrahFlowRootView: View {
     @StateObject private var store: UmrahFlowStore
     @StateObject private var audio = UmrahFlowAudioService()
     @State private var showsNavigator = false
+    @State private var exitRequested = false
+    @State private var showsResumePrompt = false
+    @State private var hasPresentedResumePrompt = false
 
     init(
         initialStage: UmrahFlowState.Stage = .start,
@@ -28,9 +32,9 @@ struct UmrahFlowRootView: View {
                 UmrahFlowHeader(
                     title: stageTitle,
                     progress: flow.topProgress,
-                    advisorTitle: UmrahFlowCopy.advisorTitle(guideLanguage),
-                    advisorSubtitle: UmrahFlowCopy.advisorSubtitle(guideLanguage),
-                    advisorStatus: advisorStatus,
+                    stageNumber: flow.routeStageNumber,
+                    language: guideLanguage,
+                    onClose: close,
                     onOpenNavigator: {
                         audio.stop()
                         showsNavigator = true
@@ -65,23 +69,50 @@ struct UmrahFlowRootView: View {
         // aura still reaches the physical screen edge without dragging controls under
         // the Home indicator.
         .navigationTitle(UmrahFlowCopy.advisorTitle(guideLanguage))
-        .toolbar(.visible, for: .navigationBar)
-        .navigationBarBackButtonHidden(false)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .task(id: guideLanguage.rawValue) {
             await store.load(language: guideLanguage)
         }
-        .onChange(of: flow.stage) { _, _ in
-            audio.stop()
+        .onChange(of: flow.stage) { _, _ in audio.stop() }
+        .onChange(of: store.guideLanguage) { _, _ in audio.stop() }
+        .onAppear {
+            chrome.setImmersive(true)
+            if !hasPresentedResumePrompt {
+                hasPresentedResumePrompt = true
+                showsResumePrompt = UmrahFlowState.hasSavedProgress
+            }
         }
-        .onAppear { chrome.setImmersive(true) }
+        .onReceive(flow.objectWillChange.debounce(for: .milliseconds(450), scheduler: RunLoop.main)) { _ in
+            guard !showsResumePrompt else { return }
+            flow.saveCheckpoint()
+        }
+        .alert(UmrahFlowCopy.resumeTitle(guideLanguage), isPresented: $showsResumePrompt) {
+            Button(UmrahFlowCopy.resumeAction(guideLanguage)) {
+                flow.restoreCheckpoint()
+            }
+            Button(UmrahFlowCopy.restartAction(guideLanguage), role: .destructive) {
+                UmrahFlowState.discardCheckpoint()
+                flow.reset()
+            }
+        } message: {
+            Text(UmrahFlowCopy.resumeMessage(guideLanguage))
+        }
         .onDisappear {
             audio.stop()
+            if !showsResumePrompt { flow.saveCheckpoint() }
             chrome.setImmersive(false)
         }
-        .sheet(isPresented: $showsNavigator) {
-            UmrahFlowNavigatorSheet(flow: flow, store: store, onExit: close)
+        .sheet(isPresented: $showsNavigator, onDismiss: {
+            if exitRequested {
+                exitRequested = false
+                close()
+            }
+        }) {
+            UmrahFlowNavigatorSheet(flow: flow, store: store, onExit: {
+                exitRequested = true
+                showsNavigator = false
+            })
         }
     }
 
@@ -102,7 +133,7 @@ struct UmrahFlowRootView: View {
         if audio.isPlaying {
             return UmrahFlowCopy.advisorSpeaking(guideLanguage)
         }
-        return UmrahFlowCopy.tapToListen(guideLanguage)
+        return UmrahFlowCopy.playVoice(guideLanguage)
     }
 
     private var stageTitle: String {

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct UmrahFlowPrimaryButton: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     var systemImage: String? = "arrow.right"
     let action: () -> Void
@@ -17,14 +18,14 @@ struct UmrahFlowPrimaryButton: View {
                 }
             }
             .font(.headline)
-            .foregroundStyle(.white)
+            .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
             .padding(.horizontal, 20)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 60)
             .iumrahGlass(
                 in: Capsule(),
                 interactive: true,
-                tint: Color(red: 0.96, green: 0.38, blue: 0.04).opacity(0.58)
+                tint: (colorScheme == .dark ? Color.white : Color.black).opacity(0.58)
             )
         }
         .buttonStyle(.plain)
@@ -32,6 +33,7 @@ struct UmrahFlowPrimaryButton: View {
 }
 
 struct UmrahFlowSecondaryButton: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     var systemImage: String? = "chevron.left"
     let action: () -> Void
@@ -43,7 +45,7 @@ struct UmrahFlowSecondaryButton: View {
                 Text(title)
             }
             .font(.headline)
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
             .padding(.horizontal, 18)
             .frame(minHeight: 60)
             .iumrahGlass(in: Capsule(), interactive: true)
@@ -76,7 +78,7 @@ struct UmrahRoundSwipeControl: View {
                     .iumrahGlass(in: Capsule())
 
                 Capsule()
-                    .fill(Color(red: 0.96, green: 0.38, blue: 0.04).opacity(isEnabled ? 0.60 : 0.18))
+                    .fill(Color.primary.opacity(isEnabled ? 0.60 : 0.18))
                     .frame(width: max(knob + 18, 18 + knob + dragX))
 
                 HStack {
@@ -86,7 +88,7 @@ struct UmrahRoundSwipeControl: View {
                         Circle()
                             .trim(from: 0, to: Double(round) / Double(max(total, 1)))
                             .stroke(
-                                Color(red: 1.00, green: 0.54, blue: 0.10),
+                                Color.primary,
                                 style: StrokeStyle(lineWidth: 8, lineCap: .round)
                             )
                             .rotationEffect(.degrees(-90))
@@ -116,7 +118,7 @@ struct UmrahRoundSwipeControl: View {
                     .iumrahGlass(
                         in: Circle(),
                         interactive: true,
-                        tint: Color(red: 0.96, green: 0.38, blue: 0.04).opacity(isEnabled ? 0.62 : 0.20)
+                        tint: Color.primary.opacity(isEnabled ? 0.62 : 0.20)
                     )
                     .offset(x: 9 + dragX)
                     .gesture(

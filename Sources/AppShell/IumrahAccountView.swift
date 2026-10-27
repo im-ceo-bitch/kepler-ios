@@ -140,10 +140,12 @@ struct IumrahAccountView: View {
                     }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 12)
-                .padding(.bottom, 46)
+                .padding(.top, 0)
+                .padding(.bottom, 120)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background(Color.iumrahPageBackground)
             }
+            .iumrahSignatureScrollChrome(title: accountPageTitle)
             .onChange(of: loginScrollNonce) { _, _ in
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.90)) {
                     proxy.scrollTo("account-login", anchor: .top)

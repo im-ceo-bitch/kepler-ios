@@ -62,8 +62,7 @@ struct UmrahFlowSupabaseClient {
                 )
                 let urls = rows.reduce(into: [String: URL]()) { result, row in
                     guard let url = URL(string: row.url),
-                          url.scheme?.lowercased() == "https",
-                          url.host != nil else { return }
+                          UmrahFlowAudioURLPolicy.isAllowed(url) else { return }
                     result[row.key] = url
                 }
                 if !urls.isEmpty { return urls }

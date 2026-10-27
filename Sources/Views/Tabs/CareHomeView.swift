@@ -57,11 +57,12 @@ struct CareHomeView: View {
                 }
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
+            .padding(.top, 0)
             .padding(.bottom, 112)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(Color.iumrahPageBackground)
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .iumrahSignatureScrollChrome(title: "iumrah Care")
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {

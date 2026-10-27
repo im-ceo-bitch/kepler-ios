@@ -42,28 +42,28 @@ struct SafaReadingPage: View {
                             .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundStyle(palette.textSecondary)
                     }
-                    .padding(.horizontal, 72)
+                    .padding(.horizontal, 20)
                     .padding(.top, 8)
 
                     readingPager
-                }
 
-                HStack {
-                    UmrahSideStepButton(
+                    HStack {
+                        UmrahSideStepButton(
                         systemName: "chevron.backward",
                         accessibilityLabel: UmrahFlowCopy.previous(store.guideLanguage),
                         action: previousStep
                     )
-                    Spacer()
-                    UmrahSideStepButton(
+                        Spacer()
+                        UmrahSideStepButton(
                         systemName: isLastStep ? "checkmark" : "chevron.right",
                         emphasized: true,
                         accessibilityLabel: isLastStep ? UmrahFlowCopy.done(store.guideLanguage) : UmrahFlowCopy.next(store.guideLanguage),
                         action: nextStep
-                    )
+                        )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
                 }
-                .padding(.horizontal, 14)
-                .offset(y: -8)
             }
         }
         .onChange(of: pageID) { _, newValue in
@@ -83,18 +83,17 @@ struct SafaReadingPage: View {
     }
 
     private var readingPager: some View {
-        ScrollView(.vertical) {
-            LazyVStack(spacing: 0) {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
                 guidancePage
-                    .containerRelativeFrame(.vertical)
+                    .containerRelativeFrame(.horizontal)
                     .id(0)
                 duaPage
-                    .containerRelativeFrame(.vertical)
+                    .containerRelativeFrame(.horizontal)
                     .id(1)
             }
             .scrollTargetLayout()
         }
-        .contentMargins(.horizontal, 72, for: .scrollContent)
         .scrollIndicators(.hidden)
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $pageID)
@@ -177,8 +176,9 @@ struct SafaReadingPage: View {
                 }
             }
             .frame(maxWidth: 620)
-            .frame(maxWidth: .infinity, minHeight: 330, alignment: .center)
-            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, minHeight: 260, alignment: .center)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 20)
         }
         .scrollIndicators(.hidden)
     }

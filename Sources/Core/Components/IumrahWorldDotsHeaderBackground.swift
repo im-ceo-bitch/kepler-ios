@@ -7,7 +7,7 @@ import SwiftUI
 /// It stays strictly decorative: no hit-testing, accessibility or layout impact.
 struct IumrahWorldDotsHeaderBackground: View {
     /// Set at the point of use if a special header needs even less texture.
-    var mapOpacity: Double = 0.34
+    var mapOpacity: Double = 0.425
     var waveSpeed: Double = 0.56
     var waveIntensity: Double = 0.78
 

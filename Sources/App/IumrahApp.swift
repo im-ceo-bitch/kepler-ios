@@ -12,6 +12,8 @@ struct IumrahApp: App {
         // sessions can never be loaded into memory after a reinstall.
         AppInstallationLifecycle.prepare()
         Self.configureNativeLiquidGlassTabBar()
+        // All primary tabs pull over a black background, with white spinner.
+        UIRefreshControl.appearance().tintColor = .white
     }
 
     /// Customize only the foreground colors and the native selection tint.

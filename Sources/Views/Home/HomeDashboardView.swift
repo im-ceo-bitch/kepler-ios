@@ -176,11 +176,12 @@ struct HomeDashboardView: View {
             // Same adaptive page-column rule as Account/Gear. Padding is part of
             // the column first; the outer frame then clamps the whole tree to the viewport.
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 12)
-            .padding(.bottom, 46)
+            .padding(.top, 0)
+            .padding(.bottom, 120)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(Color.iumrahPageBackground)
         }
-        .background(Color.iumrahPageBackground)
+        .iumrahSignatureScrollChrome(title: L10n.text("tab_home", settings.language))
     }
 
 

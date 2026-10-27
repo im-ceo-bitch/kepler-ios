@@ -13,7 +13,6 @@ const service = read('Sources/Services/NuiteeHotelService.swift');
 test('Nuitee supplier authorization stays exclusively on server', () => {
   assert.match(backend, /'X-API-Key': key/);
   assert.match(router, /handleNuiteeHotelRequest/);
-  // Credentials are managed as a Cloudflare Worker Secret, not a GitHub Actions Secret.
   assert.match(env, /NUITEE_API_KEY\?: string/);
   assert.match(backend, /env\.NUITEE_API_KEY/);
   assert.doesNotMatch(service, /NUITEE_API_KEY|X-API-Key|api\.liteapi\.travel/);
@@ -21,7 +20,7 @@ test('Nuitee supplier authorization stays exclusively on server', () => {
 });
 
 test('Hotels board switches provider without touching Flights and Sunday Club', () => {
-  assert.match(home, /private var hotelsBoard:[\s\S]{0,150}NuiteeHotelsCatalogView\(\)/);
+  assert.match(home, /private var hotelsBoard:[\s\S]{0,150}NuiteeHotelsCatalogView\([^)]*\)/);
   assert.match(home, /case \.flights: flightsBoard/);
   assert.match(home, /case \.sundayClub: sundayClubBoard/);
   assert.match(view, /case makkah, madinah/);

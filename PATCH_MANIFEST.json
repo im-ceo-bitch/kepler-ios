@@ -1,18 +1,35 @@
 {
-  "name": "iumrah beta Swift compiler hotfix: UmrahVoiceStepScreen argument ordering",
-  "date": "2026-10-27",
-  "base": "Black Identity Umrah Flow V2 + Header Booking Home Accordion V3",
+  "name": "iumrah Hotels Search & Booking-style UX V4",
+  "created_utc": "2026-10-28T09:25:04.225763+00:00",
+  "applies_over": "Existing kepler-ios main with October 27 Black Identity, Hotels Nuitee and Umrah Flow V2 patches already installed",
   "files": {
-    "Sources/Umrah Flow/Views/UmrahStartView.swift": {
-      "bytes": 2272,
-      "sha256": "a0708ae486ebc4998f21b39ed2bae71ced5b02d774e3e1b254e67c1ea1488567"
+    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": {
+      "sha256": "6fc0bf18132c8b5f6e91de2040f4ddbdb13c21d5d6d1f1653aa8f8d72397d340",
+      "bytes": 57565
+    },
+    "Sources/Views/Tabs/HotelsHomeView.swift": {
+      "sha256": "46a000f4bf90db53001f582a659d660f5591371f322f0a7298aeb89d95d74225",
+      "bytes": 255718
+    },
+    "Sources/Views/Tabs/BookingsHomeView.swift": {
+      "sha256": "76c2bdf831be88f638e0650dde8c077f8c08eb01cb6659b8b53c03a5b50286aa",
+      "bytes": 119952
+    },
+    "Sources/Views/Tabs/CareHomeView.swift": {
+      "sha256": "2e935edc29af56f8b9f2b3a46163473d468af4b68225e55b01125419c8965ffc",
+      "bytes": 27289
+    },
+    "Sources/AppShell/SidebarDrawerView.swift": {
+      "sha256": "9e14ee51f8eadf84fa0ec07b0c271dbab5ff997c90b5ffbc52b5d786c52be6a9",
+      "bytes": 10080
     }
   },
-  "note": "Moves recordingKey after counterText. No behaviour change; no workflow or build-number edits.",
-  "verification": {
-    "log_error_matched": true,
-    "all_four_UmrahVoiceStepScreen_invocations_argument_order_checked": true,
-    "swift_parser_all_279_files_passed": true,
-    "full_xcode_build": "Not run: no macOS/Xcode"
-  }
+  "server_changed": false,
+  "workflow_changed": false,
+  "notes": [
+    "No Apple version/build changes",
+    "Existing Nuitee Cloudflare secret stays unchanged",
+    "Indicative Sandbox amounts are not bookable rates",
+    "Full macOS Xcode build unavailable in container; source parsing and static contracts checked"
+  ]
 }

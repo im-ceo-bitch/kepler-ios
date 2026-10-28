@@ -60,6 +60,9 @@ struct NuiteeHotelsCatalogView: View {
     @StateObject private var model = NuiteeCatalogModel()
     @State private var city: NuiteeCity = .makkah
     @State private var stars = 0
+    @State private var hotelQuery = ""
+    @State private var calendarPresented = false
+    @FocusState private var hotelSearchFocused: Bool
     @State private var checkin = Calendar.current.date(byAdding: .day, value: 10, to: Date()) ?? Date()
     @State private var nights = 1
     @State private var adults = 2
@@ -75,46 +78,81 @@ struct NuiteeHotelsCatalogView: View {
     private var reloadIdentity: String {
         [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults)].joined(separator: ":")
     }
-    private var filtered: [NuiteeHotel] {
+    private var candidateHotels: [NuiteeHotel] {
         model.hotels.filter { stars == 0 || $0.roundedStars == stars }
+    }
+    private var normalizedQuery: String { hotelQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var matchingHotels: [NuiteeHotel] {
+        guard !normalizedQuery.isEmpty else { return candidateHotels }
+        let terms = normalizedQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        return candidateHotels.filter { hotel in
+            let haystack = hotel.name + " " + (hotel.address ?? "")
+            return terms.allSatisfy { haystack.localizedStandardContains($0) }
+        }
+    }
+    private var alternativeHotels: [NuiteeHotel] {
+        guard !normalizedQuery.isEmpty else { return [] }
+        let selected = Set(matchingHotels.map(\.id))
+        let preferredStars = matchingHotels.first?.roundedStars
+        return candidateHotels.filter { !selected.contains($0.id) }
+            .sorted { a, b in
+                let first = preferredStars.map { abs($0 - a.roundedStars) } ?? 0
+                let second = preferredStars.map { abs($0 - b.roundedStars) } ?? 0
+                if first != second { return first < second }
+                return (a.rating ?? 0) > (b.rating ?? 0)
+            }
+            .prefix(8).map { $0 }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Picker("City", selection: $city) {
-                ForEach(NuiteeCity.allCases, id: \.self) { item in
-                    Text(item.title(settings.language)).tag(item)
-                }
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: city) { _, _ in stars = 0; visibleCount = 20 }
-
             IumrahGraphiteSearchSurface(
                 isExpanded: $searchExpanded,
-                summary: city.title(settings.language),
+                summary: normalizedQuery.isEmpty ? city.title(settings.language) : normalizedQuery,
                 subtitle: "\(checkin.formatted(date: .abbreviated, time: .omitted)) · \(nights) "
                     + NuiteeCopy.text("ночь · ", "tun · ", "night(s) · ", settings.language)
                     + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language)
             ) {
                 VStack(alignment: .leading, spacing: 13) {
                     HStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField(NuiteeCopy.text("Название отеля, например Hilton Makkah", "Mehmonxona nomi, masalan Hilton Makkah", "Hotel name, e.g. Hilton Makkah", settings.language), text: $hotelQuery)
+                            .textInputAutocapitalization(.words)
+                            .autocorrectionDisabled()
+                            .focused($hotelSearchFocused)
+                            .submitLabel(.search)
+                            .onSubmit { hotelSearchFocused = false; searchExpanded = false }
+                        if !hotelQuery.isEmpty {
+                            Button { hotelQuery = "" } label: {
+                                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                            }.accessibilityLabel(NuiteeCopy.text("Очистить поиск", "Qidiruvni tozalash", "Clear search", settings.language))
+                        }
+                    }
+                    .padding(13)
+                    .background(Color.black.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
+                    HStack(spacing: 12) {
                         Label(NuiteeCopy.text("Даты проживания", "Yashash sanalari", "Stay dates", settings.language), systemImage: "calendar")
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        DatePicker("", selection: $draftCheckin, in: Date()..., displayedComponents: .date)
-                            .labelsHidden().datePickerStyle(.compact).tint(.black)
+                        Button {
+                            hotelSearchFocused = false
+                            calendarPresented = true
+                        } label: {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(draftCheckin.formatted(date: .abbreviated, time: .omitted))
+                                Text("\(draftNights) " + NuiteeCopy.text("ночь", "tun", "night(s)", settings.language))
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.black)
+                        }.buttonStyle(.plain)
                     }
                     Divider()
                     HStack(spacing: 12) {
                         Label(NuiteeCopy.text("Ночей", "Tunlar", "Nights", settings.language), systemImage: "moon")
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        Picker("Nights", selection: $draftNights) {
-                            ForEach([1, 2, 3, 5, 7, 10, 14], id: \.self) { value in
-                                Text("\(value)").tag(value)
-                            }
-                        }
-                        .tint(.black)
+                        Stepper("\(draftNights)", value: $draftNights, in: 1...28)
+                            .fixedSize()
                     }
                     Divider()
                     Stepper(value: $draftAdults, in: 1...6) {
@@ -129,7 +167,8 @@ struct NuiteeHotelsCatalogView: View {
                             searchExpanded = false
                         }
                         IumrahHaptics.selection()
-                        Task { await reload() }
+                        // Search by name operates on the already loaded catalogue; only
+                        // stay parameters trigger a supplier rate refresh.
                     } label: {
                         Label(NuiteeCopy.text("Найти отели", "Mehmonxonalarni topish", "Find hotels", settings.language), systemImage: "magnifyingglass")
                             .font(.system(size: 16, weight: .bold))
@@ -139,6 +178,15 @@ struct NuiteeHotelsCatalogView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
             }
+
+            Picker("City", selection: $city) {
+                ForEach(NuiteeCity.allCases, id: \.self) { item in
+                    Text(item.title(settings.language)).tag(item)
+                }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: city) { _, _ in stars = 0; visibleCount = 20; hotelQuery = "" }
+
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -172,7 +220,7 @@ struct NuiteeHotelsCatalogView: View {
             }
 
             if model.sandbox {
-                Label(NuiteeCopy.text("Тестовые цены Nuitee — не для оплаты", "Nuitee sinov narxlari", "Nuitee sandbox prices — not bookable", settings.language), systemImage: "info.circle")
+                Label(NuiteeCopy.text("Предварительные цены · бронирование пока недоступно", "Taxminiy narxlar · bronlash hali mavjud emas", "Indicative prices · booking unavailable", settings.language), systemImage: "info.circle")
                     .font(.caption).foregroundStyle(.secondary)
             }
             if model.catalogStale {
@@ -197,31 +245,55 @@ struct NuiteeHotelsCatalogView: View {
                     .buttonStyle(.borderedProminent).tint(.black)
                 }
                 .frame(maxWidth: .infinity).padding(25)
-            } else if filtered.isEmpty && !model.busy {
+            } else if candidateHotels.isEmpty && !model.busy {
                 ContentUnavailableView(NuiteeCopy.text("Нет отелей", "Mehmonxonalar topilmadi", "No hotels", settings.language), systemImage: "building.2", description: Text(NuiteeCopy.text("Попробуйте другой фильтр или даты", "Filtr yoki sanani almashtiring", "Change stars or dates", settings.language)))
             } else {
+                if !normalizedQuery.isEmpty {
+                    Text(NuiteeCopy.text("Результаты поиска", "Qidiruv natijalari", "Search results", settings.language))
+                        .font(.headline)
+                }
                 HStack {
-                    Text("\(filtered.count) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))
+                    Text("\(matchingHotels.count) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary)
                     Spacer()
                     if model.busy { ProgressView().controlSize(.small) }
                 }
+                if matchingHotels.isEmpty && !normalizedQuery.isEmpty {
+                    Text(NuiteeCopy.text("Точных совпадений нет. Ниже — другие отели города.", "Mos mehmonxona topilmadi. Quyida boshqa variantlar.", "No matching hotels. Explore other stays below.", settings.language))
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
                 LazyVStack(spacing: 12) {
-                    ForEach(Array(filtered.prefix(visibleCount))) { hotel in
+                    ForEach(Array(matchingHotels.prefix(visibleCount))) { hotel in
                         NuiteeHotelListingCard(
                             hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
                             favorite: favorites.contains(hotel.id),
                             onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
                         )
                     }
-                    if filtered.count > visibleCount {
+                    if matchingHotels.count > visibleCount {
                         Color.clear.frame(height: 1).onAppear { visibleCount += 20 }
+                    }
+                }
+                if !alternativeHotels.isEmpty {
+                    Text(NuiteeCopy.text("Похожие отели в городе", "Shahardagi o‘xshash mehmonxonalar", "Alternative hotels nearby", settings.language))
+                        .font(.headline).padding(.top, 12)
+                    LazyVStack(spacing: 12) {
+                        ForEach(alternativeHotels) { hotel in
+                            NuiteeHotelListingCard(
+                                hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
+                                favorite: favorites.contains(hotel.id),
+                                onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
+                            )
+                        }
                     }
                 }
             }
         }
         .task(id: reloadIdentity) { await reload() }
         .onChange(of: refreshSignal) { _, _ in Task { await reload() } }
+        .sheet(isPresented: $calendarPresented) {
+            NuiteeStayCalendarSheet(checkin: $draftCheckin, nights: $draftNights)
+        }
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox)
         }
@@ -252,7 +324,7 @@ private struct NuiteeHotelListingCard: View {
             let width = min(max(proxy.size.width * 0.31, 108), 122)
             HStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    NuiteeHotelCollage(images: (hotel.previewImages?.isEmpty == false) ? (hotel.previewImages ?? []) : [hotel.imageURL].compactMap { $0 })
+                    NuiteeCatalogPreviewCollage(hotel: hotel)
                         .frame(width: width, height: 204)
                     HStack(spacing: 5) {
                         Button(action: onFavorite) {
@@ -298,7 +370,7 @@ private struct NuiteeHotelListingCard: View {
                         Text(NuiteeCopy.text("Цена недоступна", "Narx mavjud emas", "Rate unavailable", settings.language)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text(sandbox ? NuiteeCopy.text("Тестовый тариф", "Sinov narxi", "Sandbox rate", settings.language) : NuiteeCopy.text("Стоимость проживания", "Turar joy narxi", "Stay price", settings.language))
+                        Text(sandbox ? NuiteeCopy.text("Предварительная цена", "Taxminiy narx", "Indicative price", settings.language) : NuiteeCopy.text("Стоимость проживания", "Turar joy narxi", "Stay price", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
@@ -321,10 +393,19 @@ private struct NuiteeHotelCollage: View {
     let images: [String]
     var body: some View {
         GeometryReader { box in
-            if images.count < 3 {
+            if images.count < 2 {
                 HotelCachedImage(rawURL: images.first)
                     .frame(width: box.size.width, height: box.size.height)
                     .clipped()
+            } else if images.count == 2 {
+                VStack(spacing: 3) {
+                    HotelCachedImage(rawURL: images[0])
+                        .frame(height: box.size.height * 0.64)
+                        .clipped()
+                    HotelCachedImage(rawURL: images[1])
+                        .frame(height: box.size.height * 0.36 - 3)
+                        .clipped()
+                }
             } else {
             let gap: CGFloat = 3
             let upper = box.size.height * 0.64
@@ -359,6 +440,7 @@ struct NuiteeHotelDetailView: View {
     @State private var isGalleryPresented = false
     @State private var showSaveConfirmation = false
     @State private var chosenOffer: NuiteeRoomRate?
+    @State private var expandedRoomRate: NuiteeRoomRate?
     private let service = NuiteeHotelService()
 
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
@@ -465,6 +547,15 @@ struct NuiteeHotelDetailView: View {
         .fullScreenCover(isPresented: $isGalleryPresented) {
             NuiteeHotelGallery(images: photos, hotelName: hotel.name)
         }
+        .navigationDestination(item: $expandedRoomRate) { rate in
+            NuiteeRoomDetailsPage(
+                hotelName: hotel.name,
+                rate: rate,
+                room: detail?.rooms.first(where: { $0.id == rate.roomId }),
+                nights: nights,
+                onAdd: { saveRate(rate); expandedRoomRate = nil }
+            )
+        }
         .alert("Выбор номера сохранён", isPresented: $showSaveConfirmation) {
             Button("Понятно", role: .cancel) { }
         } message: {
@@ -475,22 +566,27 @@ struct NuiteeHotelDetailView: View {
     private var collage: some View {
         let hero = Array(photos.prefix(5))
         return VStack(spacing: 4) {
-            HStack(spacing: 4) {
-                ForEach(0..<2, id: \.self) { idx in
-                    HotelCachedImage(rawURL: hero.indices.contains(idx) ? hero[idx] : nil)
-                        .frame(height: 156)
+            if !hero.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(0..<min(2, hero.count), id: \.self) { idx in
+                        HotelCachedImage(rawURL: hero[idx])
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 156)
+                    }
                 }
-            }
-            HStack(spacing: 4) {
-                ForEach(2..<5, id: \.self) { idx in
-                    ZStack {
-                        HotelCachedImage(rawURL: hero.indices.contains(idx) ? hero[idx] : nil)
-                        if idx == 4 && photos.count > 5 {
-                            Color.black.opacity(0.35)
-                            Text("+\(photos.count - 5)")
-                                .font(.title3.weight(.bold)).foregroundStyle(.white)
+                if hero.count > 2 {
+                    HStack(spacing: 4) {
+                        ForEach(2..<hero.count, id: \.self) { idx in
+                            ZStack {
+                                HotelCachedImage(rawURL: hero[idx])
+                                if idx == 4 && photos.count > 5 {
+                                    Color.black.opacity(0.35)
+                                    Text("+\(photos.count - 5)")
+                                        .font(.title3.weight(.bold)).foregroundStyle(.white)
+                                }
+                            }.frame(maxWidth: .infinity).frame(height: 96)
                         }
-                    }.frame(height: 96)
+                    }
                 }
             }
         }
@@ -515,9 +611,8 @@ struct NuiteeHotelDetailView: View {
                 DatePicker(NuiteeCopy.text("Заезд", "Kirish", "Check-in", settings.language), selection: $checkin, in: Date()..., displayedComponents: .date)
                     .datePickerStyle(.compact)
                 Spacer(minLength: 0)
-                Picker("Nights", selection: $nights) {
-                    ForEach([1, 2, 3, 5, 7, 10, 14], id: \.self) { n in Text("\(n) н.").tag(n) }
-                }.tint(.primary)
+                Stepper("\(nights)", value: $nights, in: 1...28)
+                    .fixedSize()
             }
             Stepper("\(adults) " + NuiteeCopy.text("взрослых", "kattalar", "adults", settings.language), value: $adults, in: 1...6)
                 .font(.subheadline)
@@ -528,38 +623,54 @@ struct NuiteeHotelDetailView: View {
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
     }
 
+    private func saveRate(_ rate: NuiteeRoomRate) {
+        NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
+            provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
+            checkin: dateISO(checkin), checkout: dateISO(checkout), adults: adults,
+            offerId: rate.offerId, roomId: rate.roomId, roomName: rate.roomName,
+            totalUSD: rate.price, mealPlan: rate.mealPlan, cancellationTag: rate.cancellationTag,
+            selectedAt: Date()
+        ))
+        chosenOffer = rate
+        showSaveConfirmation = true
+    }
+
     private func rateCard(_ rate: NuiteeRoomRate) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                if let image = detail?.rooms.first(where: { $0.id == rate.roomId })?.images.first {
-                    HotelCachedImage(rawURL: image).frame(width: 100, height: 90)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(rate.roomName).font(.headline)
-                    if !rate.mealPlan.isEmpty {
-                        Label(rate.mealPlan, systemImage: "fork.knife").font(.caption).foregroundStyle(.secondary)
-                    }
-                    Text(NuiteeHotelService.usd(rate.price))
-                        .font(.title2.weight(.bold))
-                    Text("\(nights) " + NuiteeCopy.text("ночей · за номер", "tun · xona uchun", "nights · per room", settings.language))
+        let room = detail?.rooms.first(where: { $0.id == rate.roomId })
+        return VStack(alignment: .leading, spacing: 12) {
+            NuiteeRoomPhotoCarousel(images: room?.images ?? [], height: 176)
+            Text(rate.roomName).font(.headline)
+            if let room {
+                if let capacity = room.maxOccupancy, capacity > 0 {
+                    Label("\(capacity) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language), systemImage: "person.2")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 0)
+                if !room.amenities.isEmpty {
+                    Text(room.amenities.prefix(3).joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            if !rate.mealPlan.isEmpty {
+                Label(rate.mealPlan, systemImage: "fork.knife")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             cancellationView(rate)
+            Text(NuiteeHotelService.usd(rate.price))
+                .font(.title2.weight(.bold))
+            Text("\(nights) " + NuiteeCopy.text("ночей · за номер", "tun · xona uchun", "nights · per room", settings.language))
+                .font(.caption).foregroundStyle(.secondary)
             Button {
-                NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
-                    provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
-                    checkin: dateISO(checkin), checkout: dateISO(checkout), adults: adults,
-                    offerId: rate.offerId, roomId: rate.roomId, roomName: rate.roomName,
-                    totalUSD: rate.price, mealPlan: rate.mealPlan, cancellationTag: rate.cancellationTag,
-                    selectedAt: Date()
-                ))
-                chosenOffer = rate
-                showSaveConfirmation = true
+                expandedRoomRate = rate
             } label: {
-                Text(NuiteeCopy.text("Выбрать номер", "Xonani tanlash", "Select room", settings.language))
+                HStack {
+                    Text(NuiteeCopy.text("Подробнее о номере", "Xona haqida batafsil", "Room details", settings.language))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }.font(.subheadline.weight(.semibold)).padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+            Button { saveRate(rate) } label: {
+                Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
                     .font(.subheadline.weight(.bold))
                     .frame(maxWidth: .infinity).frame(height: 48)
             }
@@ -626,7 +737,7 @@ struct NuiteeHotelDetailView: View {
                 "Rate lookup sends stay dates, guest count and default nationality (UZ) to Nuitee. Passport details are not collected here.", settings.language
             )).font(.footnote).foregroundStyle(.secondary)
             if sandbox {
-                Label("Sandbox: цены тестовые, бронирование и оплата отключены", systemImage: "info.circle")
+                Label(NuiteeCopy.text("Цены предварительные. Подтверждение и оплата пока недоступны.", "Narxlar taxminiy. Tasdiqlash va to‘lov hali mavjud emas.", "Prices are indicative. Confirmation and payment are unavailable.", settings.language), systemImage: "info.circle")
                     .font(.caption.weight(.medium))
             }
         }
@@ -699,5 +810,253 @@ private struct NuiteeHotelGallery: View {
                     .padding().background(.black.opacity(0.45), in: Capsule()).padding(.bottom, 22)
             }
         }
+    }
+}
+
+// Lazy image enrichment: request full static detail only for cards that become
+// visible and have fewer than 3 real supplier photos. The server caches detail.
+private actor NuiteePreviewGate {
+    static let shared = NuiteePreviewGate()
+    private var running = 0
+    func acquire() async -> Bool {
+        while running >= 3 {
+            if Task.isCancelled { return false }
+            try? await Task.sleep(for: .milliseconds(120))
+        }
+        guard !Task.isCancelled else { return false }
+        running += 1
+        return true
+    }
+    func release() { running = max(0, running - 1) }
+}
+
+@MainActor
+private final class NuiteePreviewCache {
+    static let shared = NuiteePreviewCache()
+    private var photos: [String: [String]] = [:]
+    func get(_ id: String) -> [String]? { photos[id] }
+    func put(_ id: String, images: [String]) { photos[id] = images }
+}
+
+private struct NuiteeCatalogPreviewCollage: View {
+    let hotel: NuiteeHotel
+    @State private var enriched: [String] = []
+    private var initial: [String] {
+        let values = hotel.previewImages ?? []
+        return values.isEmpty ? [hotel.coverImageURL].compactMap { $0 } : values
+    }
+    var body: some View {
+        NuiteeHotelCollage(images: enriched.count >= 3 ? enriched : initial)
+            .task(id: hotel.id) {
+                guard initial.count < 3 else { return }
+                if let stored = NuiteePreviewCache.shared.get(hotel.id) {
+                    enriched = stored
+                    return
+                }
+                guard await NuiteePreviewGate.shared.acquire() else { return }
+                defer { Task { await NuiteePreviewGate.shared.release() } }
+                guard !Task.isCancelled else { return }
+                guard let detail = try? await NuiteeHotelService().detail(hotelID: hotel.id) else { return }
+                var seen = Set<String>()
+                let photos = (initial + detail.images).filter { !$0.isEmpty && seen.insert($0).inserted }
+                NuiteePreviewCache.shared.put(hotel.id, images: photos)
+                enriched = photos
+            }
+    }
+}
+
+private struct NuiteeRoomPhotoCarousel: View {
+    let images: [String]
+    let height: CGFloat
+    @State private var selected = 0
+    var body: some View {
+        Group {
+            if !images.isEmpty {
+                TabView(selection: $selected) {
+                    ForEach(images.indices, id: \.self) { index in
+                        HotelCachedImage(rawURL: images[index])
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: images.count > 1 ? .always : .never))
+                .frame(height: height)
+                .clipShape(RoundedRectangle(cornerRadius: 17))
+                .overlay(alignment: .topTrailing) {
+                    Text("\(selected + 1)/\(images.count)")
+                        .font(.caption2.weight(.semibold))
+                        .padding(8)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(9)
+                }
+            }
+        }
+    }
+}
+
+private struct NuiteeRoomDetailsPage: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    let hotelName: String
+    let rate: NuiteeRoomRate
+    let room: NuiteeRoomDescription?
+    let nights: Int
+    let onAdd: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                    NuiteeRoomPhotoCarousel(images: room?.images ?? [], height: 260)
+                    Text(rate.roomName).font(.title2.bold())
+                    Text(hotelName).font(.subheadline).foregroundStyle(.secondary)
+                    if let room {
+                        if !room.description.isEmpty { Text(room.description).font(.body) }
+                        if let maxOccupancy = room.maxOccupancy {
+                            Label("\(maxOccupancy) " + NuiteeCopy.text("гостей", "mehmon", "guests", settings.language), systemImage: "person.2")
+                        }
+                        ForEach(room.amenities, id: \.self) { amenity in
+                            Label(amenity, systemImage: "checkmark.circle")
+                                .font(.subheadline)
+                        }
+                    }
+                    if !rate.mealPlan.isEmpty {
+                        Label(rate.mealPlan, systemImage: "fork.knife")
+                    }
+                    Divider()
+                    Text(rate.refundable ?
+                        NuiteeCopy.text("Возвратный тариф", "Qaytariladigan tarif", "Refundable rate", settings.language) :
+                        NuiteeCopy.text("Невозвратный тариф", "Qaytarilmaydigan tarif", "Non-refundable rate", settings.language))
+                        .font(.headline)
+                    if !rate.cancellationDescription.isEmpty { Text(rate.cancellationDescription) }
+                    ForEach(rate.cancellationDeadlines, id: \.until) { deadline in
+                        Text(deadline.until + (deadline.amount.map { " · " + NuiteeHotelService.usd($0) } ?? ""))
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Text(NuiteeHotelService.usd(rate.price))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                    Text("\(nights) " + NuiteeCopy.text("ночей · 1 номер", "tun · 1 xona", "nights · 1 room", settings.language))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text(NuiteeCopy.text("Предварительная стоимость, не подтверждённое бронирование", "Taxminiy narx, tasdiqlangan bron emas", "Indicative price, not a confirmed reservation", settings.language))
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                .padding(20)
+                .padding(.bottom, 80)
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button(action: onAdd) {
+                    Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
+                        .frame(maxWidth: .infinity).frame(height: 48)
+                }
+                .buttonStyle(.borderedProminent).tint(.black)
+                .disabled(rate.offerId.isEmpty)
+                .padding(.horizontal, 20).padding(.vertical, 8)
+                .background(.regularMaterial)
+            }
+            .navigationTitle(NuiteeCopy.text("Номер", "Xona", "Room", settings.language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.iumrahSignatureBlack, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+    }
+}
+
+private struct NuiteeStayCalendarSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Binding var checkin: Date
+    @Binding var nights: Int
+    @State private var proposedStart: Date = .now
+    @State private var proposedEnd: Date = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
+    @State private var choosingEnd = false
+    private let calendar = Calendar.current
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    Text(choosingEnd
+                        ? NuiteeCopy.text("Выберите дату выезда", "Chiqish sanasini tanlang", "Select check-out", settings.language)
+                        : NuiteeCopy.text("Выберите дату заезда", "Kirish sanasini tanlang", "Select check-in", settings.language))
+                        .font(.headline)
+                    HStack {
+                        Label(proposedStart.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                        Spacer()
+                        Label(proposedEnd.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    ForEach(0..<6, id: \.self) { offset in
+                        monthGrid(offset: offset)
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle(NuiteeCopy.text("Даты проживания", "Yashash sanalari", "Stay dates", settings.language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button(NuiteeCopy.text("Отмена", "Bekor qilish", "Cancel", settings.language)) { dismiss() } } }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    checkin = proposedStart
+                    nights = max(1, min(28, calendar.dateComponents([.day], from: proposedStart, to: proposedEnd).day ?? 1))
+                    dismiss()
+                } label: {
+                    Text(NuiteeCopy.text("Выбрать даты", "Sanalarni tanlash", "Select dates", settings.language)
+                         + " · \(max(1, calendar.dateComponents([.day], from: proposedStart, to: proposedEnd).day ?? 1)) "
+                         + NuiteeCopy.text("ночей", "tun", "nights", settings.language))
+                        .font(.headline).frame(maxWidth: .infinity).frame(height: 48)
+                }
+                .buttonStyle(.borderedProminent).tint(.black)
+                .padding(.horizontal, 18).padding(.vertical, 8)
+                .background(.regularMaterial)
+            }
+        }
+        .onAppear {
+            proposedStart = calendar.startOfDay(for: checkin)
+            proposedEnd = calendar.date(byAdding: .day, value: nights, to: proposedStart) ?? proposedStart
+        }
+    }
+
+    private func monthGrid(offset: Int) -> some View {
+        let firstMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) ?? Date()
+        let month = calendar.date(byAdding: .month, value: offset, to: firstMonth) ?? firstMonth
+        let range = calendar.range(of: .day, in: .month, for: month) ?? 1..<29
+        let weekday = calendar.component(.weekday, from: month)
+        let firstOffset = (weekday - calendar.firstWeekday + 7) % 7
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(month.formatted(.dateTime.month(.wide).year()))
+                .font(.headline)
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 7) {
+                ForEach(0..<firstOffset, id: \.self) { _ in Color.clear.frame(height: 40) }
+                ForEach(Array(range), id: \.self) { day in
+                    if let date = calendar.date(byAdding: .day, value: day - 1, to: month) {
+                        let today = calendar.startOfDay(for: Date())
+                        let maxStayEnd = calendar.date(byAdding: .day, value: 28, to: proposedStart) ?? proposedStart
+                        let selectable = date >= today && date <= (calendar.date(byAdding: .day, value: 730, to: today) ?? today)
+                            && (!choosingEnd || date <= maxStayEnd || date <= proposedStart)
+                        let isEdge = calendar.isDate(date, inSameDayAs: proposedStart) || calendar.isDate(date, inSameDayAs: proposedEnd)
+                        let inside = date > proposedStart && date < proposedEnd
+                        Button {
+                            if !choosingEnd || date <= proposedStart {
+                                proposedStart = date
+                                proposedEnd = calendar.date(byAdding: .day, value: 1, to: date) ?? date
+                                choosingEnd = true
+                            } else {
+                                proposedEnd = date
+                                choosingEnd = false
+                            }
+                        } label: {
+                            Text("\(day)")
+                                .font(.subheadline.weight(isEdge ? .bold : .regular))
+                                .foregroundStyle(isEdge ? Color.white : selectable ? Color.primary : Color.secondary.opacity(0.45))
+                                .frame(maxWidth: .infinity).frame(height: 40)
+                                .background(isEdge ? Color.black : inside ? Color.black.opacity(0.10) : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!selectable)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 10)
     }
 }

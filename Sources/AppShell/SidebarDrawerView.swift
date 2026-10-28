@@ -65,7 +65,7 @@ struct SidebarDrawerView: View {
             VStack(spacing: 8) {
                 drawerRow(icon: "house.fill", title: copy(.home)) { go(.home) }
                 drawerRow(icon: "suitcase.fill", title: copy(.bookings)) { go(.booking) }
-                drawerRow(icon: "heart.fill", title: "iumrah Care") { go(.care) }
+                drawerRow(icon: "heart.fill", title: L10n.text("tab_care", settings.language)) { go(.care) }
                 drawerRow(icon: "person.crop.circle.fill", title: copy(.account)) { go(.account) }
             }
             .padding(.top, 22)

@@ -285,7 +285,7 @@ struct BookingsHomeView: View {
     }
 
     private var bookingPanelPicker: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 7) {
             ForEach(BookingPanel.allCases) { panel in
                 Button {
                     guard bookingPanel != panel else { return }
@@ -293,21 +293,18 @@ struct BookingsHomeView: View {
                     IumrahHaptics.selection()
                 } label: {
                     Text(bookingPanelTitle(panel))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 11.5, weight: .semibold))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
+                        .minimumScaleFactor(0.66)
+                        .frame(maxWidth: .infinity, minHeight: 41)
                         .foregroundStyle(bookingPanel == panel ? Color.black : Color.white)
                         .background(bookingPanel == panel ? Color.white : Color.clear, in: Capsule())
+                        .overlay { Capsule().strokeBorder(Color.white.opacity(bookingPanel == panel ? 0 : 0.38), lineWidth: 0.9) }
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(bookingPanel == panel ? .isSelected : [])
             }
         }
-        .padding(4)
-        .background(Color.white.opacity(0.12), in: Capsule())
-        .overlay { Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8) }
     }
 
     private func bookingPanelTitle(_ panel: BookingPanel) -> String {

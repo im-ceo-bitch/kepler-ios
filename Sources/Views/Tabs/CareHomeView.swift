@@ -23,7 +23,7 @@ struct CareHomeView: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 IumrahRootPageTitle(
-                    title: "iumrah Care",
+                    title: L10n.text("tab_care", settings.language),
                     subtitle: tr(
                         "Personal assistance throughout your Umrah",
                         "Помощь на каждом этапе умры",
@@ -70,7 +70,7 @@ struct CareHomeView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(Color.iumrahPageBackground)
         }
-        .iumrahSignatureScrollChrome(title: "iumrah Care")
+        .iumrahSignatureScrollChrome(title: L10n.text("tab_care", settings.language))
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
@@ -327,9 +327,9 @@ struct CareHomeView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(tr(
                     "Care is linked to your active trip",
-                    "Care привязан к вашей активной поездке",
-                    "Care faol safaringizga bog‘langan",
-                    "Care фаол сафарингизга боғланган"
+                    "Поддержка привязана к вашей активной поездке",
+                    "Yordam faol safaringizga bog‘langan",
+                    "Ёрдам фаол сафарингизга боғланган"
                 ))
                 .font(.system(size: 14.5, weight: .semibold, design: .rounded))
 
@@ -438,7 +438,7 @@ struct CareHomeView: View {
                 tr("Quick answers", "Быстрые ответы", "Tezkor javoblar", "Тезкор жавоблар"),
                 subtitle: tr(
                     "The essentials before you contact Care.",
-                    "Самое важное до обращения в Care.",
+                    "Самое важное перед обращением в поддержку.",
                     "Care’ga murojaat qilishdan oldingi asosiy ma’lumotlar.",
                     "Care’га мурожаат қилишдан олдинги асосий маълумотлар."
                 )
@@ -469,7 +469,7 @@ struct CareHomeView: View {
                 divider
                 answerRow(
                     icon: "checkmark.shield.fill",
-                    title: tr("What can Care handle?", "С чем поможет Care?", "Care nimalarda yordam beradi?", "Care нималарда ёрдам беради?"),
+                    title: tr("What can Care handle?", "С чем поможет поддержка?", "Care nimalarda yordam beradi?", "Care нималарда ёрдам беради?"),
                     body: tr(
                         "Route, hotel, transfer, services, booking questions and practical changes connected to your journey.",
                         "Маршрут, отель, трансфер, услуги, вопросы по бронированию и практические изменения, связанные с поездкой.",

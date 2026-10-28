@@ -1,5 +1,10 @@
 import SwiftUI
 
+private struct IumrahHotelsContentOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+}
+
 struct HotelsHomeView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
@@ -18,6 +23,7 @@ struct HotelsHomeView: View {
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
     @State private var hotelRefreshNonce = 0
+    @State private var compactHeader = false
 
     // Root content uses the same single-viewport ScrollView / LazyVStack
     // architecture as IumrahFlightsView. The viewport, not an image or a
@@ -30,30 +36,54 @@ struct HotelsHomeView: View {
             let gutter = IumrahDesign.pagePadding
             let columnWidth = max(0, contentWidth - 2 * gutter)
 
-            ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 22) {
-                        // Signature black header + embedded white/black navigation.
-                        // The departure airport remains a normal content control.
-                        VStack(spacing: 0) {
-                            IumrahRootPageTitle(title: pageTitle, drawsSignatureBackground: false)
-
-                            HStack(spacing: 7) {
-                                boardTile(.hotels, icon: "building.2", title: L10n.text("tab_hotels", settings.language))
-                                boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
-                                boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
+            VStack(spacing: 0) {
+                // Pinned brand chrome is outside the refreshable ScrollView.
+                // Its black status bar / navigation surface never rubber-bands.
+                VStack(spacing: 0) {
+                    if compactHeader {
+                        HStack(spacing: 10) {
+                            Image("HeaderWordmarkDark")
+                                .resizable().scaledToFit()
+                                .frame(width: 95, height: 33)
+                            Text(pageTitle)
+                                .font(.system(size: 17, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                            Spacer(minLength: 4)
+                            Button { chrome.openNotifications() } label: {
+                                Image(systemName: "bell").foregroundStyle(.white)
                             }
-                            .padding(.horizontal, gutter)
-                            .padding(.bottom, 19)
-                            .padding(.horizontal, -gutter)
+                            Button { chrome.openSidebar() } label: {
+                                Image(systemName: "line.3.horizontal").foregroundStyle(.white)
+                            }
                         }
-                        // One uninterrupted animated map underneath BOTH the
-                        // wordmark/title and hotel/flight/weekend navigation.
-                        .background {
-                            IumrahWorldDotsHeaderBackground()
-                                .padding(.horizontal, -gutter)
-                        }
+                        .frame(height: 52)
+                    } else {
+                        IumrahRootPageTitle(title: pageTitle, drawsSignatureBackground: false)
+                    }
+                    HStack(spacing: 7) {
+                        boardTile(.hotels, icon: "building.2", title: L10n.text("tab_hotels", settings.language))
+                        boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
+                        boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
+                    }
+                    .padding(.bottom, compactHeader ? 9 : 19)
+                }
+                .frame(width: columnWidth)
+                .padding(.horizontal, gutter)
+                .background {
+                    IumrahWorldDotsHeaderBackground()
+                }
+                .animation(.easeInOut(duration: 0.20), value: compactHeader)
 
+                ScrollView(showsIndicators: false) {
+                    GeometryReader { geometry in
+                        Color.clear.preference(
+                            key: IumrahHotelsContentOffsetKey.self,
+                            value: geometry.frame(in: .named("iumrah.hotels.content")).minY
+                        )
+                    }
+                    .frame(height: 0)
+                    LazyVStack(spacing: 0) {
                         Group {
                             switch board {
                             case .hotels: hotelsBoard
@@ -63,17 +93,29 @@ struct HotelsHomeView: View {
                         }
                         .frame(width: columnWidth, alignment: .leading)
                     }
-                    .frame(width: columnWidth, alignment: .leading)
-                    .padding(.horizontal, gutter)
-                    .padding(.top, 0)
+                    .frame(width: contentWidth, alignment: .top)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .padding(.top, 22)
                     .padding(.bottom, 140)
                 }
-                .frame(width: contentWidth, alignment: .top)
-                .frame(maxWidth: .infinity, alignment: .top)
+                .coordinateSpace(name: "iumrah.hotels.content")
+                .onPreferenceChange(IumrahHotelsContentOffsetKey.self) { offset in
+                    let next = offset < -70
+                    if next != compactHeader {
+                        withAnimation(.easeInOut(duration: 0.20)) { compactHeader = next }
+                    }
+                }
+                .refreshable {
+                    if board == .hotels {
+                        hotelRefreshNonce += 1
+                    } else {
+                        await storefront.updateDepartureAirport(journey.trip.originCode)
+                        await storefront.refresh()
+                    }
+                }
                 .background(Color.iumrahPageBackground)
             }
             .frame(width: viewportWidth, height: viewport.size.height)
-            .iumrahSignatureScrollChrome(title: pageTitle)
         }
         // The background may reach the screen edges, but readable content
         // never ignores the iPhone safe area.
@@ -98,17 +140,7 @@ struct HotelsHomeView: View {
                 .padding(.bottom, 2)
             }
         }
-        .refreshable {
-            if board == .hotels {
-                // Refresh the current Nuitee catalog without loading the legacy store.
-                hotelRefreshNonce += 1
-                try? await Task.sleep(for: .milliseconds(500))
-            } else {
-                await storefront.updateDepartureAirport(journey.trip.originCode)
-                await storefront.refresh()
-            }
-        }
-        .background(Color.iumrahPageBackground)
+        .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
         .task(id: journey.trip.originCode.uppercased()) {
             // The old D1 Hotels storefront is retained for legacy packages
             // and Flights, but never loaded just for the Nuitee Hotels tab.
@@ -117,6 +149,7 @@ struct HotelsHomeView: View {
             await storefront.updateDepartureAirport(journey.trip.originCode)
         }
         .onChange(of: board) { _, newBoard in
+            compactHeader = false
             guard newBoard != .hotels else { return }
             Task {
                 await storefront.prepareIfNeeded()

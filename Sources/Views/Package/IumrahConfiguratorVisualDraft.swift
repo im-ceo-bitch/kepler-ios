@@ -394,6 +394,18 @@ struct IumrahConfiguratorCartBar: View {
         if !journey.stagedUmrahFlights.isEmpty { return journey.stagedUmrahFlights.count }
         return (journey.selectedOutbound != nil ? 1 : 0) + (journey.selectedInbound != nil ? 1 : 0)
     }
+    /// Keep the SwiftUI view builder small: precompute localized cart text.
+    /// Large nested String concatenations previously made Xcode's type checker time out.
+    private var cartSummaryText: String {
+        let flights = String(flightCount)
+        let hotels = String(hotelCount)
+        let services = String(draft.selected.count + (draft.includeESIM ? 1 : 0) + 1)
+        let flightTitle = ConfiguratorCopy.text("рейсов", "flights", "reys", settings.language)
+        let hotelTitle = ConfiguratorCopy.text("отеля", "hotels", "mehmonxona", settings.language)
+        let serviceTitle = ConfiguratorCopy.text("услуг", "services", "xizmat", settings.language)
+        return "\(flights) \(flightTitle) · \(hotels) \(hotelTitle) · \(services) \(serviceTitle)"
+    }
+
     var body: some View {
         Button(action: onOpenSummary) {
             HStack(spacing: 11) {
@@ -405,9 +417,7 @@ struct IumrahConfiguratorCartBar: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(ConfiguratorCopy.text("Моя умра", "My Umrah", "Mening umram", settings.language))
                         .font(.subheadline.weight(.bold))
-                    Text("\(flightCount) " + ConfiguratorCopy.text("рейсов", "flights", "reys", settings.language)
-                         + " · \(hotelCount) " + ConfiguratorCopy.text("отеля", "hotels", "mehmonxona", settings.language)
-                         + " · \(draft.selected.count + (draft.includeESIM ? 1 : 0) + 1) " + ConfiguratorCopy.text("услуг", "services", "xizmat", settings.language))
+                    Text(cartSummaryText)
                         .font(.caption).foregroundStyle(.secondary)
                         .lineLimit(1).minimumScaleFactor(0.75)
                 }

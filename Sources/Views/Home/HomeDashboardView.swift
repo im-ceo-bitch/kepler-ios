@@ -212,8 +212,8 @@ struct HomeDashboardView: View {
     private func homeSignatureTabs(scrollProxy: ScrollViewProxy) -> some View {
         IumrahSignatureThreeTabs(
             tabs: [
-                .init(id: "prayer", title: prayerTimesTitle),
-                .init(id: "weather", title: weatherTitle),
+                .init(id: "prayer", title: prayerEntryTitle),
+                .init(id: "weather", title: weatherEntryTitle),
                 .init(id: "create", title: homeCreateTitle)
             ],
             selectedID: selectedPilgrimTool?.rawValue ?? ""

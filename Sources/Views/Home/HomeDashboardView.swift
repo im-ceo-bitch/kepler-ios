@@ -31,6 +31,7 @@ struct HomeDashboardView: View {
     @State private var integrationCarouselID: String? = "plan"
     @State private var expandedHomeFAQID: String?
     @State private var showAboutProject = false
+    @State private var selectedPilgrimTool: IumrahHomePilgrimTools.Tool?
 
     private struct ReadyPackageItem: Identifiable {
         let option: StorefrontFlightOption
@@ -132,9 +133,10 @@ struct HomeDashboardView: View {
     }
 
     private var marketingHome: some View {
+        ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 30) {
-                IumrahRootPageTitle(title: L10n.text("tab_home", settings.language), usesBrandLogo: true, brandScale: 1.25, showsConnectivityStatus: true)
+                homeSignatureHeader(scrollProxy: scrollProxy)
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
                         notifications: Array(clientNotifications.homeNotifications.prefix(5)),
@@ -143,6 +145,7 @@ struct HomeDashboardView: View {
                     )
                 }
                 tripToolsSection
+                    .id("home.tools")
                 HomeEmotionalJourneyPrompt()
                 HomeVideoCarousel()
 
@@ -181,9 +184,59 @@ struct HomeDashboardView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(Color.iumrahPageBackground)
         }
-        .iumrahSignatureScrollChrome(title: L10n.text("tab_home", settings.language))
+        .iumrahSignatureScrollChrome(
+            title: L10n.text("tab_home", settings.language),
+            pinnedAccessory: AnyView(homeSignatureTabs(scrollProxy: scrollProxy))
+        )
+        }
     }
 
+    private func homeSignatureHeader(scrollProxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 0) {
+            IumrahRootPageTitle(
+                title: L10n.text("tab_home", settings.language),
+                usesBrandLogo: true,
+                showsConnectivityStatus: true,
+                drawsSignatureBackground: false
+            )
+            homeSignatureTabs(scrollProxy: scrollProxy)
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, 18)
+        }
+        .background {
+            IumrahWorldDotsHeaderBackground()
+                .padding(.horizontal, -IumrahDesign.pagePadding)
+        }
+    }
+
+    private func homeSignatureTabs(scrollProxy: ScrollViewProxy) -> some View {
+        IumrahSignatureThreeTabs(
+            tabs: [
+                .init(id: "prayer", title: prayerTimesTitle),
+                .init(id: "weather", title: weatherTitle),
+                .init(id: "create", title: homeCreateTitle)
+            ],
+            selectedID: selectedPilgrimTool?.rawValue ?? ""
+        ) { rawID in
+            guard let tool = IumrahHomePilgrimTools.Tool(rawValue: rawID) else { return }
+            IumrahHaptics.selection()
+            withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) {
+                selectedPilgrimTool = selectedPilgrimTool == tool ? nil : tool
+                scrollProxy.scrollTo("home.tools", anchor: .center)
+            }
+        }
+    }
+
+    private var homeCreateTitle: String {
+        switch settings.language {
+        case .russian: return "Создать умру"
+        case .uzbek: return "Umra yaratish"
+        case .uzbekCyrillic: return "Умра яратиш"
+        case .turkish: return "Umre oluştur"
+        case .arabic: return ArabicLocalization.phrase("Create Umrah")
+        case .indonesian, .malay, .english: return "Create Umrah"
+        }
+    }
 
     private func dismissSystemNotification(_ notification: ClientSystemNotification) {
         IumrahHaptics.selection()
@@ -569,7 +622,8 @@ struct HomeDashboardView: View {
         IumrahHomePilgrimTools(
             language: settings.language,
             onCreateUmrah: { chrome.startNewTrip() },
-            onOpenPrayerSettings: { showPrayerTimes = true }
+            onOpenPrayerSettings: { showPrayerTimes = true },
+            expanded: $selectedPilgrimTool
         )
     }
 
@@ -2653,7 +2707,7 @@ private struct IumrahHomePilgrimTools: View {
 
     @StateObject private var prayerPreferences = IumrahPrayerState()
     @StateObject private var location = IumrahPrayerLocation()
-    @State private var expanded: Tool?
+    @Binding var expanded: Tool?
     @State private var localWeather: (temperature: Double, min: Double, max: Double, symbol: String, updated: Date)?
     @State private var loadingWeather = false
     @State private var weatherError: String?
@@ -2671,10 +2725,7 @@ private struct IumrahHomePilgrimTools: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.88)) {
                             expanded = expanded == tool ? nil : tool
                         }
-                        if expanded == .prayer || expanded == .weather {
-                            if location.resolved == nil { location.request() }
-                            else if expanded == .weather { Task { await fetchLocalWeather(for: displayPlace) } }
-                        }
+
                     } label: {
                         VStack(spacing: 6) {
                             Image(systemName: tool.icon)
@@ -2732,6 +2783,14 @@ private struct IumrahHomePilgrimTools: View {
                 .background(Color.iumrahSignatureBlack, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .accessibilityIdentifier("home.tool.expanded")
+            }
+        }
+        .onChange(of: expanded) { _, value in
+            guard value == .prayer || value == .weather else { return }
+            if location.resolved == nil {
+                location.request()
+            } else if value == .weather {
+                Task { await fetchLocalWeather(for: displayPlace) }
             }
         }
         .onChange(of: location.resolved) { _, newLocation in

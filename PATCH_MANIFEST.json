@@ -1,35 +1,29 @@
 {
-  "name": "iumrah Hotels Search & Booking-style UX V4",
-  "created_utc": "2026-10-28T09:25:04.225763+00:00",
-  "applies_over": "Existing kepler-ios main with October 27 Black Identity, Hotels Nuitee and Umrah Flow V2 patches already installed",
-  "files": {
-    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": {
-      "sha256": "6fc0bf18132c8b5f6e91de2040f4ddbdb13c21d5d6d1f1653aa8f8d72397d340",
-      "bytes": 57565
-    },
-    "Sources/Views/Tabs/HotelsHomeView.swift": {
-      "sha256": "46a000f4bf90db53001f582a659d660f5591371f322f0a7298aeb89d95d74225",
-      "bytes": 255718
-    },
-    "Sources/Views/Tabs/BookingsHomeView.swift": {
-      "sha256": "76c2bdf831be88f638e0650dde8c077f8c08eb01cb6659b8b53c03a5b50286aa",
-      "bytes": 119952
-    },
-    "Sources/Views/Tabs/CareHomeView.swift": {
-      "sha256": "2e935edc29af56f8b9f2b3a46163473d468af4b68225e55b01125419c8965ffc",
-      "bytes": 27289
-    },
-    "Sources/AppShell/SidebarDrawerView.swift": {
-      "sha256": "9e14ee51f8eadf84fa0ec07b0c271dbab5ff997c90b5ffbc52b5d786c52be6a9",
-      "bytes": 10080
-    }
+  "patch": "iumrah-beta-update-20261029-configurator-unified-headers-2in1",
+  "date": "2026-10-29",
+  "source_archives": [
+    "iumrah-beta-update-20261029-configurator-visual-flow-v1.zip",
+    "iumrah-beta-update-20261029-root-signature-tabs-v2.zip"
+  ],
+  "apply_order": "configurator-visual-flow-v1, then root-signature-tabs-v2",
+  "on_file_conflict": "last archive wins; V2 HotelsHomeView.swift preserves V1 configurator and increases logo",
+  "based_on": "kepler-ios-main 4.zip",
+  "file_count_excluding_manifest": 12,
+  "files_sha256": {
+    "README_CONFIGURATOR_VISUAL_V1_RU.md": "66d49bb200964e76c06c9548fc4843a0223647f24c309a73c589a8cfa529f632",
+    "README_ROOT_SIGNATURE_V2_RU.md": "24c09ddff687b8fab5821e0734a0cc36b5add24b3730d874340e16ac518d8911",
+    "Sources/AppShell/IumrahAccountView.swift": "3a5bec1bc627fb1ef75ca5540ce4f6f4592d1d99219a4388c1dd5181862765c8",
+    "Sources/Core/Components/IumrahSignatureChrome.swift": "7a17de979dbaf58da1f698d274b4b763f40a2ccef86890bdbf09b92999b774ea",
+    "Sources/Models/HotelStorefrontModels.swift": "9ed4275bee4073b19b0d0f0fd0f8c70a4cb71fc493844b10614d53c17a4bcc02",
+    "Sources/Views/Components/IumrahRootPageTitle.swift": "0bc3de2dd52285cb813dff13e88bae5ca79c63c76610cd3e2fda75029f405529",
+    "Sources/Views/Home/HomeDashboardView.swift": "62545d923362f96421c8086d73b6e8175197466c828589888242fb0e6c2204ae",
+    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": "03e50a837260e68501ddc354e4be2ccd4ed6627216334903cd5fdc014a42ec05",
+    "Sources/Views/Package/IumrahConfiguratorVisualDraft.swift": "b40de17af6d477f23f19854a39b81a1680fe741325e98e8f94bc64afa7fd720f",
+    "Sources/Views/Tabs/BookingsHomeView.swift": "194702a9c3f6d3f831b84defdb513838d4990e747c7e83c979e16c6c6d0d9550",
+    "Sources/Views/Tabs/CareHomeView.swift": "cf1db79de923900b63566591aabeb8bf8a0d686a5857efcd08d08b6149c0fbd9",
+    "Sources/Views/Tabs/HotelsHomeView.swift": "8878e5059e4ca1e1ffe4815b00d5522b54d2a5ed826421ab33cc1578e09d1bc1"
   },
-  "server_changed": false,
-  "workflow_changed": false,
-  "notes": [
-    "No Apple version/build changes",
-    "Existing Nuitee Cloudflare secret stays unchanged",
-    "Indicative Sandbox amounts are not bookable rates",
-    "Full macOS Xcode build unavailable in container; source parsing and static contracts checked"
-  ]
+  "no_github_workflows": true,
+  "no_build_number_changes": true,
+  "xcode_compilation": "not run"
 }

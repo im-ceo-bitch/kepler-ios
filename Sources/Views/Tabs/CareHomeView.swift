@@ -9,6 +9,7 @@ struct CareHomeView: View {
 
     @State private var careProfile: IumrahPublicProfile?
     @State private var isLoadingCareProfile = false
+    @State private var careHeaderSection = "contacts"
     @AppStorage("iumrah.care.cachedPhoneSA") private var cachedPhoneSA = ""
     @AppStorage("iumrah.care.cachedPhoneUZ") private var cachedPhoneUZ = "+998 50 889 88 45"
     @AppStorage("iumrah.care.cachedTelegram") private var cachedTelegram = "@saudiclub966"
@@ -20,25 +21,20 @@ struct CareHomeView: View {
     }
 
     var body: some View {
+        ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                IumrahRootPageTitle(
-                    title: L10n.text("tab_care", settings.language),
-                    subtitle: tr(
-                        "Personal assistance throughout your Umrah",
-                        "Помощь на каждом этапе умры",
-                        "Umra davomida shaxsiy yordam",
-                        "Умра давомида шахсий ёрдам"
-                    )
-                )
+                careSignatureHeader(scrollProxy: scrollProxy)
                     .padding(.bottom, 14)
 
                 careQuickContacts
+                    .id("care.contacts")
                     .padding(.bottom, 24)
 
                 intro
                     .padding(.bottom, 24)
 
+                Color.clear.frame(height: 0).id("care.help")
                 if adaptiveLayout.isWide {
                     HStack(alignment: .top, spacing: 22) {
                         careHero
@@ -49,6 +45,7 @@ struct CareHomeView: View {
                                 .padding(.bottom, 30)
 
                             quickAnswers
+                                .id("care.faq")
                                 .padding(.bottom, 14)
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -61,6 +58,7 @@ struct CareHomeView: View {
                         .padding(.bottom, 30)
 
                     quickAnswers
+                        .id("care.faq")
                         .padding(.bottom, 14)
                 }
             }
@@ -70,7 +68,10 @@ struct CareHomeView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(Color.iumrahPageBackground)
         }
-        .iumrahSignatureScrollChrome(title: L10n.text("tab_care", settings.language))
+        .iumrahSignatureScrollChrome(
+            title: L10n.text("tab_care", settings.language),
+            pinnedAccessory: AnyView(careSignatureTabs(scrollProxy: scrollProxy))
+        )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {
@@ -78,6 +79,41 @@ struct CareHomeView: View {
         }
         .task {
             await refreshCare()
+        }
+        }
+    }
+
+    private func careSignatureHeader(scrollProxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 0) {
+            IumrahRootPageTitle(
+                title: L10n.text("tab_care", settings.language),
+                subtitle: tr("Personal assistance throughout your Umrah", "Помощь на каждом этапе умры", "Umra davomida shaxsiy yordam", "Умра давомида шахсий ёрдам"),
+                drawsSignatureBackground: false
+            )
+            careSignatureTabs(scrollProxy: scrollProxy)
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, 18)
+        }
+        .background {
+            IumrahWorldDotsHeaderBackground()
+                .padding(.horizontal, -IumrahDesign.pagePadding)
+        }
+    }
+
+    private func careSignatureTabs(scrollProxy: ScrollViewProxy) -> some View {
+        IumrahSignatureThreeTabs(
+            tabs: [
+                .init(id: "contacts", title: tr("Contact", "Связаться", "Bog‘lanish", "Боғланиш")),
+                .init(id: "help", title: tr("Services", "Услуги", "Xizmatlar", "Хизматлар")),
+                .init(id: "faq", title: tr("Questions", "Вопросы", "Savollar", "Саволлар"))
+            ],
+            selectedID: careHeaderSection
+        ) { target in
+            careHeaderSection = target
+            IumrahHaptics.selection()
+            withAnimation(.easeInOut(duration: 0.30)) {
+                scrollProxy.scrollTo("care.\(target)", anchor: .center)
+            }
         }
     }
 

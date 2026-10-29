@@ -285,25 +285,13 @@ struct BookingsHomeView: View {
     }
 
     private var bookingPanelPicker: some View {
-        HStack(spacing: 7) {
-            ForEach(BookingPanel.allCases) { panel in
-                Button {
-                    guard bookingPanel != panel else { return }
-                    withAnimation(.snappy(duration: 0.28)) { bookingPanel = panel }
-                    IumrahHaptics.selection()
-                } label: {
-                    Text(bookingPanelTitle(panel))
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.66)
-                        .frame(maxWidth: .infinity, minHeight: 41)
-                        .foregroundStyle(bookingPanel == panel ? Color.black : Color.white)
-                        .background(bookingPanel == panel ? Color.white : Color.clear, in: Capsule())
-                        .overlay { Capsule().strokeBorder(Color.white.opacity(bookingPanel == panel ? 0 : 0.38), lineWidth: 0.9) }
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(bookingPanel == panel ? .isSelected : [])
-            }
+        IumrahSignatureThreeTabs(
+            tabs: BookingPanel.allCases.map { .init(id: $0.rawValue, title: bookingPanelTitle($0)) },
+            selectedID: bookingPanel.rawValue
+        ) { rawID in
+            guard let target = BookingPanel(rawValue: rawID), bookingPanel != target else { return }
+            withAnimation(.snappy(duration: 0.28)) { bookingPanel = target }
+            IumrahHaptics.selection()
         }
     }
 

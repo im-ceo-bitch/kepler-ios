@@ -49,12 +49,11 @@ struct IumrahRootPageTitle: View {
         VStack(alignment: .leading, spacing: 18) {
             IumrahSignatureScrollMarker()
             ViewThatFits(in: .horizontal) {
-                signatureBrandRow(wordmarkWidth: 165, controlSize: 42, spacing: 9)
-                signatureBrandRow(wordmarkWidth: 131, controlSize: 38, spacing: 7)
-                signatureBrandRow(wordmarkWidth: 105, controlSize: 36, spacing: 5)
+                signatureBrandRow(wordmarkWidth: 190, controlSize: 42, spacing: 9)
+                signatureBrandRow(wordmarkWidth: 157, controlSize: 38, spacing: 7)
+                signatureBrandRow(wordmarkWidth: 125, controlSize: 36, spacing: 5)
             }
 
-            if !showsConnectivityStatus {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title)
                         .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -70,11 +69,11 @@ struct IumrahRootPageTitle: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-            }
+
         }
         .padding(.horizontal, IumrahDesign.pagePadding)
-        .padding(.top, 14)
-        .padding(.bottom, showsConnectivityStatus ? 22 : 25)
+        .padding(.top, 7)
+        .padding(.bottom, showsConnectivityStatus ? 18 : 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             if drawsSignatureBackground {
@@ -89,7 +88,7 @@ struct IumrahRootPageTitle: View {
             Image("HeaderWordmarkDark")
                 .resizable()
                 .scaledToFit()
-                .frame(width: wordmarkWidth, height: 42, alignment: .leading)
+                .frame(width: wordmarkWidth, height: 46, alignment: .leading)
                 .accessibilityLabel("iumrah Project")
 
             Spacer(minLength: 0)

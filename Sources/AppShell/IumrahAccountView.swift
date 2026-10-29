@@ -99,12 +99,13 @@ struct IumrahAccountView: View {
     @State private var identityPublicURL: String?
     @State private var identityCopyMessage: String?
     @State private var tripScope: IumrahAccountTripScope = .active
+    @State private var accountHeaderSection = "profile"
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
-                    accountHeader
+                    accountHeader(scrollProxy: proxy)
 
                     if let profile = account.account {
                         IumrahAccountIdentityHeroCard(
@@ -116,6 +117,7 @@ struct IumrahAccountView: View {
                         )
 
                         userDataEntryCard(profile)
+                            .id("account.profile")
                         travelCompanionsEntryCard
                         walletSection(profile)
 
@@ -123,20 +125,24 @@ struct IumrahAccountView: View {
                             IumrahTripWalletEntry(session: active, profile: profile, language: settings.language)
                         }
                         tripsSection
+                            .id("account.trips")
                         telegramIntegrationSection
                         paymentSecuritySection
                         servicesSection
                         settingsSection
+                            .id("account.settings")
                         signOutButton
                     } else {
                         IumrahLockedIdentityCard(language: settings.language) {
                             showIdentityUnlockSheet = true
                         }
+                        Color.clear.frame(height: 0).id("account.trips")
                         loginCard
                             .id("account-login")
                         telegramIntegrationSection
                         paymentSecuritySection
                         guestSettingsSection
+                            .id("account.settings")
                     }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
@@ -145,7 +151,10 @@ struct IumrahAccountView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .background(Color.iumrahPageBackground)
             }
-            .iumrahSignatureScrollChrome(title: accountPageTitle)
+            .iumrahSignatureScrollChrome(
+                title: accountPageTitle,
+                pinnedAccessory: AnyView(accountSignatureTabs(scrollProxy: proxy))
+            )
             .onChange(of: loginScrollNonce) { _, _ in
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.90)) {
                     proxy.scrollTo("account-login", anchor: .top)
@@ -220,13 +229,44 @@ struct IumrahAccountView: View {
         }
     }
 
-    private var accountHeader: some View {
-        IumrahRootPageTitle(
-            title: accountPageTitle,
-            subtitle: account.isAuthenticated
-                ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз")
-                : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг")
-        )
+    private func accountHeader(scrollProxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 0) {
+            IumrahRootPageTitle(
+                title: accountPageTitle,
+                subtitle: account.isAuthenticated
+                    ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз")
+                    : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг"),
+                drawsSignatureBackground: false
+            )
+            accountSignatureTabs(scrollProxy: scrollProxy)
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, 18)
+        }
+        .background {
+            IumrahWorldDotsHeaderBackground()
+                .padding(.horizontal, -IumrahDesign.pagePadding)
+        }
+    }
+
+    private func accountSignatureTabs(scrollProxy: ScrollViewProxy) -> some View {
+        IumrahSignatureThreeTabs(
+            tabs: [
+                .init(id: "profile", title: tr("Profile", "Профиль", "Profil", "Профил")),
+                .init(id: "trips", title: tr("Trips", "Поездки", "Safarlar", "Сафарлар")),
+                .init(id: "settings", title: tr("Settings", "Настройки", "Sozlamalar", "Созламалар"))
+            ],
+            selectedID: accountHeaderSection
+        ) { target in
+            accountHeaderSection = target
+            IumrahHaptics.selection()
+            withAnimation(.easeInOut(duration: 0.30)) {
+                if target == "profile" && account.account == nil {
+                    scrollProxy.scrollTo("account-login", anchor: .center)
+                } else {
+                    scrollProxy.scrollTo("account.\(target)", anchor: .center)
+                }
+            }
+        }
     }
 
     private var accountPageTitle: String {

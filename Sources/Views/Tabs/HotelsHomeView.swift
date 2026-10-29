@@ -12,7 +12,8 @@ struct HotelsHomeView: View {
     @EnvironmentObject private var storefront: HotelStorefrontStore
     @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
 
-    @State private var board: HotelsShowcaseBoard = .hotels
+    @State private var board: HotelsShowcaseBoard = .flights
+    @StateObject private var visualDraft = IumrahConfiguratorVisualDraft()
     @State private var selectedHotel: HotelSummary?
     @State private var selectedFlightPackage: StorefrontFlightPackagePreview?
     @State private var selectedHotelPackageID: String?
@@ -24,6 +25,7 @@ struct HotelsHomeView: View {
     @State private var packageAssemblyExpanded = false
     @State private var hotelRefreshNonce = 0
     @State private var compactHeader = false
+    @State private var flightFlowTutorial = false
 
     // Root content uses the same single-viewport ScrollView / LazyVStack
     // architecture as IumrahFlightsView. The viewport, not an image or a
@@ -37,43 +39,37 @@ struct HotelsHomeView: View {
             let columnWidth = max(0, contentWidth - 2 * gutter)
 
             VStack(spacing: 0) {
-                // Pinned brand chrome is outside the refreshable ScrollView.
-                // Its black status bar / navigation surface never rubber-bands.
-                VStack(spacing: 0) {
+                // Only the small navigation bar is pinned; the large brand/title and
+                // step pills participate in the list's natural scroll movement.
+                HStack(spacing: 10) {
+                    Image("HeaderWordmarkDark")
+                        .resizable().scaledToFit()
+                        .frame(width: compactHeader ? 106 : 145, height: 44)
+                        .accessibilityLabel("iumrah Project")
                     if compactHeader {
-                        HStack(spacing: 10) {
-                            Image("HeaderWordmarkDark")
-                                .resizable().scaledToFit()
-                                .frame(width: 95, height: 33)
-                            Text(pageTitle)
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                            Spacer(minLength: 4)
-                            Button { chrome.openNotifications() } label: {
-                                Image(systemName: "bell").foregroundStyle(.white)
-                            }
-                            Button { chrome.openSidebar() } label: {
-                                Image(systemName: "line.3.horizontal").foregroundStyle(.white)
-                            }
-                        }
-                        .frame(height: 52)
-                    } else {
-                        IumrahRootPageTitle(title: pageTitle, drawsSignatureBackground: false)
+                        Text(pageTitle)
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
                     }
-                    HStack(spacing: 7) {
-                        boardTile(.hotels, icon: "building.2", title: L10n.text("tab_hotels", settings.language))
-                        boardTile(.flights, icon: "airplane", title: L10n.text("hotel_storefront_flights", settings.language))
-                        boardTile(.sundayClub, icon: "calendar", title: L10n.text("hotel_storefront_weekend", settings.language))
+                    Spacer(minLength: 4)
+                    Button { chrome.openNotifications() } label: {
+                        Image(systemName: "bell")
+                            .font(.system(size: 17))
+                            .frame(width: 38, height: 38)
+                            .foregroundStyle(.white)
                     }
-                    .padding(.bottom, compactHeader ? 9 : 19)
+                    Button { chrome.openSidebar() } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 17))
+                            .frame(width: 38, height: 38)
+                            .foregroundStyle(.white)
+                    }
                 }
-                .frame(width: columnWidth)
+                .frame(width: columnWidth, height: 56)
                 .padding(.horizontal, gutter)
-                .background {
-                    IumrahWorldDotsHeaderBackground()
-                }
-                .animation(.easeInOut(duration: 0.20), value: compactHeader)
+                .background(Color.iumrahSignatureBlack)
+                .animation(.easeInOut(duration: 0.22), value: compactHeader)
 
                 ScrollView(showsIndicators: false) {
                     GeometryReader { geometry in
@@ -84,23 +80,75 @@ struct HotelsHomeView: View {
                     }
                     .frame(height: 0)
                     LazyVStack(spacing: 0) {
+                        // Large header scrolls away with the content instead of
+                        // consuming a third of the viewport on every hotel card.
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(pageTitle)
+                                .font(.system(size: 31, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 9) {
+                                    boardTile(.flights, icon: "airplane", title: configCopy("Авиабилеты", "Flights", "Aviachiptalar"))
+                                    boardTile(.hotels, icon: "building.2", title: configCopy("Отели", "Hotels", "Mehmonxonalar"))
+                                    boardTile(.services, icon: "car.side", title: configCopy("Услуги", "Services", "Xizmatlar"))
+                                    boardTile(.summary, icon: "checkmark.circle", title: configCopy("Итог", "Summary", "Yakun"))
+                                }
+                            }
+                        }
+                        .padding(.horizontal, gutter)
+                        .padding(.top, 14)
+                        .padding(.bottom, 20)
+                        .frame(width: contentWidth, alignment: .leading)
+                        .background { IumrahWorldDotsHeaderBackground() }
+
                         Group {
                             switch board {
-                            case .hotels: hotelsBoard
                             case .flights: flightsBoard
+                            case .hotels: hotelsBoard
+                            case .services:
+                                IumrahConfiguratorServicesView(draft: visualDraft)
+                            case .summary:
+                                IumrahConfiguratorSummaryView(draft: visualDraft, onSelectStage: { board = $0 })
                             case .sundayClub: sundayClubBoard
                             }
                         }
+                        .padding(.horizontal, gutter)
                         .frame(width: columnWidth, alignment: .leading)
+                        if board != .summary && board != .sundayClub {
+                            Button {
+                                withAnimation(.snappy(duration: 0.25)) {
+                                    switch board {
+                                    case .flights: board = .hotels
+                                    case .hotels: board = .services
+                                    case .services: board = .summary
+                                    default: break
+                                    }
+                                }
+                                IumrahHaptics.selection()
+                            } label: {
+                                HStack {
+                                    Text(nextStageTitle).font(.system(size: 16, weight: .bold))
+                                    Spacer()
+                                    Image(systemName: "arrow.right")
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 20)
+                                .frame(height: 55)
+                                .background(.black, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, gutter)
+                            .padding(.top, 22)
+                        }
                     }
                     .frame(width: contentWidth, alignment: .top)
                     .frame(maxWidth: .infinity, alignment: .top)
-                    .padding(.top, 22)
-                    .padding(.bottom, 140)
+                    .padding(.bottom, 36)
                 }
+                .id(board)
                 .coordinateSpace(name: "iumrah.hotels.content")
                 .onPreferenceChange(IumrahHotelsContentOffsetKey.self) { offset in
-                    let next = offset < -70
+                    let next = offset < -104
                     if next != compactHeader {
                         withAnimation(.easeInOut(duration: 0.20)) { compactHeader = next }
                     }
@@ -108,7 +156,7 @@ struct HotelsHomeView: View {
                 .refreshable {
                     if board == .hotels {
                         hotelRefreshNonce += 1
-                    } else {
+                    } else if board == .flights || board == .sundayClub {
                         await storefront.updateDepartureAirport(journey.trip.originCode)
                         await storefront.refresh()
                     }
@@ -121,36 +169,23 @@ struct HotelsHomeView: View {
         // never ignores the iPhone safe area.
         .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if board == .flights {
-                IumrahPackageAssemblyBar(
-                    language: settings.language,
-                    selections: journey.stagedUmrahFlights,
-                    isExpanded: $packageAssemblyExpanded,
-                    onContinue: {
-                        guard journey.hasCompleteStagedFlightSelection else {
-                            IumrahHaptics.error()
-                            return
-                        }
-                        IumrahHaptics.selection()
-                        journey.prepareFlightFirstHotelStage()
-                        chrome.startFlightFirstTrip()
-                    }
-                )
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.bottom, 2)
+            IumrahConfiguratorCartBar(draft: visualDraft, journey: journey, currentStage: board) {
+                withAnimation(.snappy(duration: 0.25)) { board = .summary }
             }
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.bottom, 2)
         }
         .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
         .task(id: journey.trip.originCode.uppercased()) {
             // The old D1 Hotels storefront is retained for legacy packages
             // and Flights, but never loaded just for the Nuitee Hotels tab.
-            guard board != .hotels else { return }
+            guard board == .flights || board == .sundayClub else { return }
             await storefront.prepareIfNeeded()
             await storefront.updateDepartureAirport(journey.trip.originCode)
         }
         .onChange(of: board) { _, newBoard in
             compactHeader = false
-            guard newBoard != .hotels else { return }
+            guard newBoard == .flights || newBoard == .sundayClub else { return }
             Task {
                 await storefront.prepareIfNeeded()
                 await storefront.updateDepartureAirport(journey.trip.originCode)
@@ -215,7 +250,8 @@ struct HotelsHomeView: View {
                     .minimumScaleFactor(0.66)
             }
             .foregroundStyle(active ? Color.iumrahSignatureBlack : Color.white)
-            .frame(maxWidth: .infinity, minHeight: 41)
+            .padding(.horizontal, 13)
+            .frame(height: 42)
             .background(active ? Color.white : Color.clear, in: Capsule())
             .overlay { Capsule().strokeBorder(Color.white.opacity(active ? 0 : 0.38), lineWidth: 0.9) }
             .contentShape(Capsule())
@@ -235,6 +271,26 @@ struct HotelsHomeView: View {
         case .hotels: return L10n.text("tab_hotels", settings.language)
         case .flights: return L10n.text("hotel_storefront_flights", settings.language)
         case .sundayClub: return "Sunday Umrah Club"
+        case .services: return configCopy("Услуги", "Services", "Xizmatlar")
+        case .summary: return configCopy("Итог умры", "Umrah summary", "Umra yakuni")
+        }
+    }
+
+    private func configCopy(_ ru: String, _ en: String, _ uz: String) -> String {
+        switch settings.language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return ru
+        default: return en
+        }
+    }
+
+    private var nextStageTitle: String {
+        switch board {
+        case .flights: return configCopy("Далее · Отели", "Next · Hotels", "Keyingi · Mehmonxonalar")
+        case .hotels: return configCopy("Далее · Услуги", "Next · Services", "Keyingi · Xizmatlar")
+        case .services: return configCopy("Посмотреть итог", "View summary", "Yakunini ko‘rish")
+        default: return configCopy("Продолжить", "Continue", "Davom etish")
         }
     }
 

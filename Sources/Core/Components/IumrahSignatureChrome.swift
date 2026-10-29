@@ -34,7 +34,7 @@ private struct IumrahCompactSignatureHeader: View {
             Image("HeaderWordmarkDark")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 91, height: 31, alignment: .leading)
+                .frame(width: 107, height: 35, alignment: .leading)
                 .accessibilityLabel("iumrah Project")
             Rectangle().fill(.white.opacity(0.35)).frame(width: 1, height: 22)
             Text(title)
@@ -102,6 +102,46 @@ private struct IumrahSignatureScrollChrome: ViewModifier {
 extension View {
     func iumrahSignatureScrollChrome(title: String, pinnedAccessory: AnyView? = nil) -> some View {
         modifier(IumrahSignatureScrollChrome(title: title, pinnedAccessory: pinnedAccessory))
+    }
+}
+
+/// The same three-button signature switch is used by every root tab.
+/// Selection/actions are supplied by the screen; it does not create fake pages.
+struct IumrahSignatureTab: Identifiable {
+    let id: String
+    let title: String
+}
+
+struct IumrahSignatureThreeTabs: View {
+    let tabs: [IumrahSignatureTab]
+    let selectedID: String
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(tabs) { tab in
+                let active = selectedID == tab.id
+                Button {
+                    onSelect(tab.id)
+                } label: {
+                    Text(tab.title)
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.62)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .foregroundStyle(active ? Color.iumrahSignatureBlack : Color.white)
+                        .background(active ? Color.white : Color.clear, in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(Color.white.opacity(active ? 0 : 0.4), lineWidth: 0.9)
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(active ? .isSelected : [])
+                .accessibilityIdentifier("signature.tab.\(tab.id)")
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

@@ -4,6 +4,8 @@ enum HotelsShowcaseBoard: String, CaseIterable, Identifiable {
     case hotels
     case flights
     case sundayClub
+    case services
+    case summary
 
     var id: String { rawValue }
 }

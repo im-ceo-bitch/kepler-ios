@@ -74,9 +74,23 @@ final class IumrahConfiguratorVisualDraft: ObservableObject {
     }
 }
 
+enum IumrahConfiguratorServiceScope: Equatable {
+    case all, visa, transfer, guide
+}
+
 struct IumrahConfiguratorServicesView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @ObservedObject var draft: IumrahConfiguratorVisualDraft
+    var scope: IumrahConfiguratorServiceScope = .all
+
+    private var visibleServices: [IumrahDraftService] {
+        switch scope {
+        case .all: return IumrahDraftService.allCases
+        case .visa: return [.visa]
+        case .transfer: return [.transfer]
+        case .guide: return [.guide, .ziyarat, .meals]
+        }
+    }
 
     private func t(_ ru: String, _ en: String, _ uz: String) -> String {
         ConfiguratorCopy.text(ru, en, uz, settings.language)
@@ -89,10 +103,12 @@ struct IumrahConfiguratorServicesView: View {
             Text(t("Выберите нужное. Это визуальный черновик: стоимость и подтверждение будут подключены позже.", "Choose what you need. Pricing and confirmation are not connected yet.", "Kerakli xizmatlarni tanlang. Narx va tasdiqlash keyin ulanadi."))
                 .font(.subheadline).foregroundStyle(.secondary)
 
-            ForEach(IumrahDraftService.allCases) { service in
+            ForEach(visibleServices) { service in
                 serviceCard(service)
             }
-            supportCard
+            if scope == .guide || scope == .all {
+                supportCard
+            }
         }
         .padding(.top, 18)
     }
@@ -220,7 +236,7 @@ struct IumrahConfiguratorSummaryView: View {
             IumrahConfiguratorStayCard(city: "makkah", stay: selectedStays["makkah"], fallback: journey.selectedHotel, lang: settings.language)
             IumrahConfiguratorStayCard(city: "madinah", stay: selectedStays["madinah"], fallback: journey.selectedMadinahHotel, lang: settings.language)
 
-            summarySectionHeader(t("Услуги и сопровождение", "Services and assistance", "Xizmatlar va yordam"), icon: "checklist", stage: .services)
+            summarySectionHeader(t("Услуги и сопровождение", "Services and assistance", "Xizmatlar va yordam"), icon: "checklist", stage: .guide)
             ForEach(IumrahDraftService.allCases) { service in
                 serviceSummary(service)
             }

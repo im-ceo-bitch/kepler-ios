@@ -4,7 +4,10 @@ enum HotelsShowcaseBoard: String, CaseIterable, Identifiable {
     case hotels
     case flights
     case sundayClub
-    case services
+    case services // Backward-compatible legacy request, not a visible step.
+    case visa
+    case transfer
+    case guide
     case summary
 
     var id: String { rawValue }

@@ -1,27 +1,23 @@
 {
-  "patch": "iumrah-beta-update-20261029-configurator-unified-headers-2in1-buildfix-v3",
-  "based_on_archive": "iumrah-beta-update-20261029-configurator-unified-headers-2in1.zip",
-  "build_log": "logs_110704905981.zip",
-  "fixed_errors": [
-    "HomeDashboardView.swift:215: missing prayerTimesTitle",
-    "HomeDashboardView.swift:216: missing weatherTitle",
-    "IumrahConfiguratorVisualDraft.swift:410: Swift type checker timeout"
+  "name": "iumrah_layout_recovery_v5",
+  "base": "kepler-ios-main 4.zip + 20261029 Configurator & Headers Buildfix V3",
+  "swift_files": [
+    "Sources/Core/Components/IumrahSignatureChrome.swift",
+    "Sources/Models/HotelStorefrontModels.swift",
+    "Sources/Views/Components/IumrahRootPageTitle.swift",
+    "Sources/Views/Home/HomeDashboardView.swift",
+    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift",
+    "Sources/Views/Package/IumrahConfiguratorVisualDraft.swift",
+    "Sources/Views/Tabs/HotelsHomeView.swift"
   ],
-  "scope": "same complete combined 2-in-1 update, with minimal corrections to 2 Swift files",
-  "xcode_build": "NOT RUN: macOS Xcode unavailable",
-  "file_sha256": {
-    "README_BUILD_FIX_RU.md": "771d485e9ac508ebfe1a2dbbff60a1f769027a9137c564dfa22c8d679482e28c",
-    "README_CONFIGURATOR_VISUAL_V1_RU.md": "66d49bb200964e76c06c9548fc4843a0223647f24c309a73c589a8cfa529f632",
-    "README_ROOT_SIGNATURE_V2_RU.md": "24c09ddff687b8fab5821e0734a0cc36b5add24b3730d874340e16ac518d8911",
-    "Sources/AppShell/IumrahAccountView.swift": "3a5bec1bc627fb1ef75ca5540ce4f6f4592d1d99219a4388c1dd5181862765c8",
-    "Sources/Core/Components/IumrahSignatureChrome.swift": "7a17de979dbaf58da1f698d274b4b763f40a2ccef86890bdbf09b92999b774ea",
-    "Sources/Models/HotelStorefrontModels.swift": "9ed4275bee4073b19b0d0f0fd0f8c70a4cb71fc493844b10614d53c17a4bcc02",
-    "Sources/Views/Components/IumrahRootPageTitle.swift": "0bc3de2dd52285cb813dff13e88bae5ca79c63c76610cd3e2fda75029f405529",
-    "Sources/Views/Home/HomeDashboardView.swift": "e181e9987e4c559c217ce69ff72c09895681df077a2da4ce0df79c1706e4b767",
-    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": "03e50a837260e68501ddc354e4be2ccd4ed6627216334903cd5fdc014a42ec05",
-    "Sources/Views/Package/IumrahConfiguratorVisualDraft.swift": "f9fdab8b5bde044292c47b460ae3ae0674de573be37b0b94eb1e01133ae55b9c",
-    "Sources/Views/Tabs/BookingsHomeView.swift": "194702a9c3f6d3f831b84defdb513838d4990e747c7e83c979e16c6c6d0d9550",
-    "Sources/Views/Tabs/CareHomeView.swift": "cf1db79de923900b63566591aabeb8bf8a0d686a5857efcd08d08b6149c0fbd9",
-    "Sources/Views/Tabs/HotelsHomeView.swift": "8878e5059e4ca1e1ffe4815b00d5522b54d2a5ed826421ab33cc1578e09d1bc1"
-  }
+  "sha256": {
+    "Sources/Core/Components/IumrahSignatureChrome.swift": "2052dca2ff0e9d72ceedcaaf30df0765251c86261f187e5fc9d0107970078185",
+    "Sources/Models/HotelStorefrontModels.swift": "4e6487f916a5e7410814feaf5d95a3229a51254f3922a7ee3dc0df3c0f48b6f3",
+    "Sources/Views/Components/IumrahRootPageTitle.swift": "9d9167cb8d296b03b6f4602b0047e3a644f2c585dbae4eb50317c06d338b9fb7",
+    "Sources/Views/Home/HomeDashboardView.swift": "ff247046de18a4d92125650f9d65b57d234ef5669b887552d3dd1eb3cd8f1dfa",
+    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": "6fc0bf18132c8b5f6e91de2040f4ddbdb13c21d5d6d1f1653aa8f8d72397d340",
+    "Sources/Views/Package/IumrahConfiguratorVisualDraft.swift": "efe2f9c2022510c082b5997a8097a9a9565d42e6a2718cbc24a96b98fa1becd1",
+    "Sources/Views/Tabs/HotelsHomeView.swift": "387e5dd13f9c90a5006b3b1776c41bc98f5f17cdaa9a1cd2725243f23b9585aa"
+  },
+  "xcode_build": "NOT_RUN"
 }

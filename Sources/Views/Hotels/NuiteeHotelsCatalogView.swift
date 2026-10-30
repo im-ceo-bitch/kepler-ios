@@ -60,13 +60,6 @@ struct NuiteeHotelsCatalogView: View {
     @StateObject private var model = NuiteeCatalogModel()
     @State private var city: NuiteeCity = .makkah
     @State private var stars = 0
-    @State private var selectedTier: PackageTier? = nil
-    @State private var rooms = 1
-    @State private var children = 0
-    @State private var infants = 0
-    @State private var draftRooms = 1
-    @State private var draftChildren = 0
-    @State private var draftInfants = 0
     @State private var hotelQuery = ""
     @State private var calendarPresented = false
     @FocusState private var hotelSearchFocused: Bool
@@ -86,10 +79,7 @@ struct NuiteeHotelsCatalogView: View {
         [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults)].joined(separator: ":")
     }
     private var candidateHotels: [NuiteeHotel] {
-        model.hotels.filter { hotel in
-            let tierMatch = selectedTier.map { $0.selectableHotelStars.contains(hotel.roundedStars) } ?? true
-            return tierMatch && (stars == 0 || hotel.roundedStars == stars)
-        }
+        model.hotels.filter { stars == 0 || $0.roundedStars == stars }
     }
     private var normalizedQuery: String { hotelQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
     private var matchingHotels: [NuiteeHotel] {
@@ -118,7 +108,7 @@ struct NuiteeHotelsCatalogView: View {
         VStack(alignment: .leading, spacing: 16) {
             IumrahGraphiteSearchSurface(
                 isExpanded: $searchExpanded,
-                summary: searchExpanded ? NuiteeCopy.text("Название отеля", "Mehmonxona nomi", "Hotel name", settings.language) : (normalizedQuery.isEmpty ? city.title(settings.language) : normalizedQuery),
+                summary: normalizedQuery.isEmpty ? city.title(settings.language) : normalizedQuery,
                 subtitle: "\(checkin.formatted(date: .abbreviated, time: .omitted)) · \(nights) "
                     + NuiteeCopy.text("ночь · ", "tun · ", "night(s) · ", settings.language)
                     + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language)
@@ -169,38 +159,10 @@ struct NuiteeHotelsCatalogView: View {
                         Label("\(draftAdults) " + NuiteeCopy.text("взрослых", "katta", "adults", settings.language), systemImage: "person.2")
                             .font(.subheadline.weight(.semibold))
                     }
-                    Divider()
-                    HStack(spacing: 12) {
-                        Label(NuiteeCopy.text("Комнат", "Xonalar", "Rooms", settings.language), systemImage: "bed.double")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Stepper("\(draftRooms)", value: $draftRooms, in: 1...5).fixedSize()
-                    }
-                    Divider()
-                    HStack(spacing: 12) {
-                        Label(NuiteeCopy.text("Детей", "Bolalar", "Children", settings.language), systemImage: "figure.child")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Stepper("\(draftChildren)", value: $draftChildren, in: 0...6).fixedSize()
-                    }
-                    Divider()
-                    HStack(spacing: 12) {
-                        Label(NuiteeCopy.text("Младенцев", "Chaqaloqlar", "Infants", settings.language), systemImage: "figure.child.circle")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Stepper("\(draftInfants)", value: $draftInfants, in: 0...4).fixedSize()
-                    }
-                    if draftRooms != 1 || draftChildren > 0 || draftInfants > 0 {
-                        Text(NuiteeCopy.text("Каталожная цена рассчитана только для взрослых и одного номера. Итоговая стоимость с детьми и несколькими комнатами будет проверяться отдельно.", "Katalog narxi faqat kattalar va bitta xona uchun. Yakuniy narx alohida tekshiriladi.", "Catalogue rates only cover adults in one room. Child and multi-room pricing requires separate verification.", settings.language))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
                     Button {
                         checkin = draftCheckin
                         nights = draftNights
                         adults = draftAdults
-                        rooms = draftRooms
-                        children = draftChildren
-                        infants = draftInfants
                         withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
                             searchExpanded = false
                         }
@@ -225,16 +187,6 @@ struct NuiteeHotelsCatalogView: View {
             .pickerStyle(.segmented)
             .onChange(of: city) { _, _ in stars = 0; visibleCount = 20; hotelQuery = "" }
 
-
-            // The package tiers are presentation filters, not supplier bookings.
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    tierChip(nil, title: NuiteeCopy.text("Все пакеты", "Barcha paketlar", "All packages", settings.language))
-                    ForEach(PackageTier.allCases) { tier in
-                        tierChip(tier, title: tier.title(settings.language))
-                    }
-                }
-            }
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -345,21 +297,6 @@ struct NuiteeHotelsCatalogView: View {
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox)
         }
-    }
-
-    private func tierChip(_ tier: PackageTier?, title: String) -> some View {
-        let isSelected = selectedTier == tier
-        return Button {
-            selectedTier = tier
-            stars = 0
-            visibleCount = 20
-        } label: {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? Color.white : Color.black)
-                .padding(.horizontal, 15).frame(height: 38)
-                .background(isSelected ? Color.black : Color.white, in: Capsule())
-        }.buttonStyle(.plain)
     }
 
     private func reload() async {

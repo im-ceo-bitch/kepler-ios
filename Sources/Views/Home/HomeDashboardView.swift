@@ -144,8 +144,6 @@ struct HomeDashboardView: View {
                         onDismiss: { dismissSystemNotification($0) }
                     )
                 }
-                tripToolsSection
-                    .id("home.tools")
                 HomeEmotionalJourneyPrompt()
                 HomeVideoCarousel()
 
@@ -185,7 +183,7 @@ struct HomeDashboardView: View {
             .background(Color.iumrahPageBackground)
         }
         .iumrahSignatureScrollChrome(
-            title: L10n.text("tab_home", settings.language),
+            title: "",
             pinnedAccessory: AnyView(homeSignatureTabs(scrollProxy: scrollProxy))
         )
         }
@@ -196,12 +194,19 @@ struct HomeDashboardView: View {
             IumrahRootPageTitle(
                 title: L10n.text("tab_home", settings.language),
                 usesBrandLogo: true,
-                showsConnectivityStatus: true,
-                drawsSignatureBackground: false
+                showsConnectivityStatus: false,
+                drawsSignatureBackground: false,
+                showsTitle: false
             )
             homeSignatureTabs(scrollProxy: scrollProxy)
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.bottom, 18)
+                .padding(.bottom, selectedPilgrimTool == nil ? 18 : 4)
+            // Keep the stateful content mounted so location/weather onChange
+            // runs on the first tap. No duplicate selector cards below the header.
+            tripToolsSection
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, selectedPilgrimTool == nil ? 0 : 18)
+                .id("home.tools")
         }
         .background {
             IumrahWorldDotsHeaderBackground()
@@ -222,7 +227,6 @@ struct HomeDashboardView: View {
             IumrahHaptics.selection()
             withAnimation(.spring(response: 0.36, dampingFraction: 0.88)) {
                 selectedPilgrimTool = selectedPilgrimTool == tool ? nil : tool
-                scrollProxy.scrollTo("home.tools", anchor: .center)
             }
         }
     }
@@ -623,7 +627,8 @@ struct HomeDashboardView: View {
             language: settings.language,
             onCreateUmrah: { chrome.startNewTrip() },
             onOpenPrayerSettings: { showPrayerTimes = true },
-            expanded: $selectedPilgrimTool
+            expanded: $selectedPilgrimTool,
+            embeddedInHeader: true
         )
     }
 
@@ -2708,6 +2713,7 @@ private struct IumrahHomePilgrimTools: View {
     @StateObject private var prayerPreferences = IumrahPrayerState()
     @StateObject private var location = IumrahPrayerLocation()
     @Binding var expanded: Tool?
+    var embeddedInHeader = false
     @State private var localWeather: (temperature: Double, min: Double, max: Double, symbol: String, updated: Date)?
     @State private var loadingWeather = false
     @State private var weatherError: String?
@@ -2718,6 +2724,7 @@ private struct IumrahHomePilgrimTools: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            if !embeddedInHeader {
             HStack(spacing: 5) {
                 ForEach(Tool.allCases) { tool in
                     Button {
@@ -2755,6 +2762,7 @@ private struct IumrahHomePilgrimTools: View {
                     .strokeBorder(Color.black.opacity(0.065), lineWidth: 1)
             }
 
+            }
             if let expanded {
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
@@ -2780,7 +2788,7 @@ private struct IumrahHomePilgrimTools: View {
                 .foregroundStyle(.white)
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.iumrahSignatureBlack, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+                .background(embeddedInHeader ? Color.clear : Color.iumrahSignatureBlack, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .accessibilityIdentifier("home.tool.expanded")
             }

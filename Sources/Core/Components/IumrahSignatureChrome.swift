@@ -36,12 +36,14 @@ private struct IumrahCompactSignatureHeader: View {
                 .scaledToFit()
                 .frame(width: 107, height: 35, alignment: .leading)
                 .accessibilityLabel("iumrah Project")
-            Rectangle().fill(.white.opacity(0.35)).frame(width: 1, height: 22)
-            Text(title)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .foregroundStyle(.white)
+            if !title.isEmpty {
+                Rectangle().fill(.white.opacity(0.35)).frame(width: 1, height: 22)
+                Text(title)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .foregroundStyle(.white)
+            }
             Spacer(minLength: 0)
             Button { chrome.openNotifications() } label: {
                 Image(systemName: notifications.unreadCount > 0 ? "bell.badge.fill" : "bell")
@@ -72,9 +74,9 @@ private struct IumrahSignatureScrollChrome: ViewModifier {
     func body(content: Content) -> some View {
         content
             .coordinateSpace(name: "iumrah.root.signature.scroll")
-            // A black scroll-container background makes the rubber-band area
-            // black, not system grouped grey, when the user pulls to refresh.
-            .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
+            // Refresh / rubber-band occurs on the same light surface as the content.
+            // Black is reserved for the brand header and system status-bar region.
+            .background(Color.iumrahPageBackground)
             .onPreferenceChange(IumrahSignatureTopPreference.self) { top in
                 let next = top < -108
                 if next != collapsed {

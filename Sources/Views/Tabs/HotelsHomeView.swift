@@ -12,7 +12,7 @@ struct HotelsHomeView: View {
     @EnvironmentObject private var storefront: HotelStorefrontStore
     @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
 
-    @State private var board: HotelsShowcaseBoard = .flights
+    @State private var board: HotelsShowcaseBoard = .hotels
     @StateObject private var visualDraft = IumrahConfiguratorVisualDraft()
     @State private var selectedHotel: HotelSummary?
     @State private var selectedFlightPackage: StorefrontFlightPackagePreview?
@@ -41,17 +41,15 @@ struct HotelsHomeView: View {
             VStack(spacing: 0) {
                 // Only the small navigation bar is pinned; the large brand/title and
                 // step pills participate in the list's natural scroll movement.
+                if compactHeader {
+                    stageSelector
+                        .frame(height: 56)
+                } else {
                 HStack(spacing: 10) {
                     Image("HeaderWordmarkDark")
                         .resizable().scaledToFit()
-                        .frame(width: compactHeader ? 106 : 145, height: 44)
+                        .frame(width: 165, height: 44)
                         .accessibilityLabel("iumrah Project")
-                    if compactHeader {
-                        Text(pageTitle)
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                    }
                     Spacer(minLength: 4)
                     Button { chrome.openNotifications() } label: {
                         Image(systemName: "bell")
@@ -69,6 +67,7 @@ struct HotelsHomeView: View {
                 .frame(width: columnWidth, height: 56)
                 .padding(.horizontal, gutter)
                 .background(Color.iumrahSignatureBlack)
+                }
                 .animation(.easeInOut(duration: 0.22), value: compactHeader)
 
                 ScrollView(showsIndicators: false) {
@@ -86,14 +85,7 @@ struct HotelsHomeView: View {
                             Text(pageTitle)
                                 .font(.system(size: 31, weight: .bold, design: .rounded))
                                 .foregroundStyle(.white)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 9) {
-                                    boardTile(.flights, icon: "airplane", title: configCopy("Авиабилеты", "Flights", "Aviachiptalar"))
-                                    boardTile(.hotels, icon: "building.2", title: configCopy("Отели", "Hotels", "Mehmonxonalar"))
-                                    boardTile(.services, icon: "car.side", title: configCopy("Услуги", "Services", "Xizmatlar"))
-                                    boardTile(.summary, icon: "checkmark.circle", title: configCopy("Итог", "Summary", "Yakun"))
-                                }
-                            }
+                            stageSelector
                         }
                         .padding(.horizontal, gutter)
                         .padding(.top, 14)
@@ -105,8 +97,12 @@ struct HotelsHomeView: View {
                             switch board {
                             case .flights: flightsBoard
                             case .hotels: hotelsBoard
-                            case .services:
-                                IumrahConfiguratorServicesView(draft: visualDraft)
+                            case .visa:
+                                IumrahConfiguratorServicesView(draft: visualDraft, scope: .visa)
+                            case .transfer:
+                                IumrahConfiguratorServicesView(draft: visualDraft, scope: .transfer)
+                            case .guide, .services:
+                                IumrahConfiguratorServicesView(draft: visualDraft, scope: .guide)
                             case .summary:
                                 IumrahConfiguratorSummaryView(draft: visualDraft, onSelectStage: { board = $0 })
                             case .sundayClub: sundayClubBoard
@@ -118,9 +114,11 @@ struct HotelsHomeView: View {
                             Button {
                                 withAnimation(.snappy(duration: 0.25)) {
                                     switch board {
+                                    case .visa: board = .flights
                                     case .flights: board = .hotels
-                                    case .hotels: board = .services
-                                    case .services: board = .summary
+                                    case .hotels: board = .transfer
+                                    case .transfer: board = .guide
+                                    case .guide, .services: board = .summary
                                     default: break
                                     }
                                 }
@@ -148,7 +146,7 @@ struct HotelsHomeView: View {
                 .id(board)
                 .coordinateSpace(name: "iumrah.hotels.content")
                 .onPreferenceChange(IumrahHotelsContentOffsetKey.self) { offset in
-                    let next = offset < -104
+                    let next = offset < -32
                     if next != compactHeader {
                         withAnimation(.easeInOut(duration: 0.20)) { compactHeader = next }
                     }
@@ -169,11 +167,13 @@ struct HotelsHomeView: View {
         // never ignores the iPhone safe area.
         .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            IumrahConfiguratorCartBar(draft: visualDraft, journey: journey, currentStage: board) {
-                withAnimation(.snappy(duration: 0.25)) { board = .summary }
+            if board != .hotels {
+                IumrahConfiguratorCartBar(draft: visualDraft, journey: journey, currentStage: board) {
+                    withAnimation(.snappy(duration: 0.25)) { board = .summary }
+                }
+                .padding(.horizontal, IumrahDesign.pagePadding)
+                .padding(.bottom, 2)
             }
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.bottom, 2)
         }
         .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
         .task(id: journey.trip.originCode.uppercased()) {
@@ -235,6 +235,23 @@ struct HotelsHomeView: View {
         }
     }
 
+    /// Shared, left-anchored horizontal steps. The exact same selector remains
+    /// visible in the compact pinned header while the enlarged title scrolls away.
+    private var stageSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 9) {
+                boardTile(.visa, icon: "doc.text", title: configCopy("Виза", "Visa", "Viza"))
+                boardTile(.flights, icon: "airplane", title: configCopy("Авиабилеты", "Flights", "Aviachiptalar"))
+                boardTile(.hotels, icon: "building.2", title: configCopy("Отели", "Hotels", "Mehmonxonalar"))
+                boardTile(.transfer, icon: "car.side", title: configCopy("Трансфер", "Transfer", "Transfer"))
+                boardTile(.guide, icon: "person.crop.circle", title: configCopy("Гид и поддержка", "Guide & support", "Gid va yordam"))
+                boardTile(.summary, icon: "checkmark.circle", title: configCopy("Итог", "Summary", "Yakun"))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("configurator.stageSelector")
+    }
+
     private func boardTile(_ target: HotelsShowcaseBoard, icon: String, title: String) -> some View {
         let active = board == target
         return Button {
@@ -272,6 +289,9 @@ struct HotelsHomeView: View {
         case .flights: return L10n.text("hotel_storefront_flights", settings.language)
         case .sundayClub: return "Sunday Umrah Club"
         case .services: return configCopy("Услуги", "Services", "Xizmatlar")
+        case .visa: return configCopy("Виза", "Visa", "Viza")
+        case .transfer: return configCopy("Трансфер", "Transfer", "Transfer")
+        case .guide: return configCopy("Гид и поддержка", "Guide & support", "Gid va yordam")
         case .summary: return configCopy("Итог умры", "Umrah summary", "Umra yakuni")
         }
     }
@@ -287,9 +307,11 @@ struct HotelsHomeView: View {
 
     private var nextStageTitle: String {
         switch board {
+        case .visa: return configCopy("Далее · Авиабилеты", "Next · Flights", "Keyingi · Aviachiptalar")
         case .flights: return configCopy("Далее · Отели", "Next · Hotels", "Keyingi · Mehmonxonalar")
-        case .hotels: return configCopy("Далее · Услуги", "Next · Services", "Keyingi · Xizmatlar")
-        case .services: return configCopy("Посмотреть итог", "View summary", "Yakunini ko‘rish")
+        case .hotels: return configCopy("Далее · Трансфер", "Next · Transfer", "Keyingi · Transfer")
+        case .transfer: return configCopy("Далее · Гид", "Next · Guide", "Keyingi · Gid")
+        case .guide, .services: return configCopy("Посмотреть итог", "View summary", "Yakunini ko‘rish")
         default: return configCopy("Продолжить", "Continue", "Davom etish")
         }
     }

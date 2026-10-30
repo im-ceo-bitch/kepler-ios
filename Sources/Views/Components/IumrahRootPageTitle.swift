@@ -17,6 +17,8 @@ struct IumrahRootPageTitle: View {
     /// Hotels uses one shared map surface for the title + segment control.
     /// Disable the local background in that container only.
     var drawsSignatureBackground = true
+    /// Home shows the enlarged wordmark without a redundant "Home" heading.
+    var showsTitle = true
 
     var body: some View {
         Group {
@@ -49,11 +51,12 @@ struct IumrahRootPageTitle: View {
         VStack(alignment: .leading, spacing: 18) {
             IumrahSignatureScrollMarker()
             ViewThatFits(in: .horizontal) {
-                signatureBrandRow(wordmarkWidth: 190, controlSize: 42, spacing: 9)
-                signatureBrandRow(wordmarkWidth: 157, controlSize: 38, spacing: 7)
-                signatureBrandRow(wordmarkWidth: 125, controlSize: 36, spacing: 5)
+                signatureBrandRow(wordmarkWidth: 215, controlSize: 42, spacing: 9)
+                signatureBrandRow(wordmarkWidth: 180, controlSize: 38, spacing: 7)
+                signatureBrandRow(wordmarkWidth: 144, controlSize: 36, spacing: 5)
             }
 
+                if showsTitle {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(title)
                         .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -68,6 +71,7 @@ struct IumrahRootPageTitle: View {
                             .foregroundStyle(Color.white.opacity(0.70))
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
                 }
 
         }

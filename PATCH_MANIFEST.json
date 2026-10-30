@@ -1,23 +1,31 @@
 {
-  "name": "iumrah_layout_recovery_v5",
-  "base": "kepler-ios-main 4.zip + 20261029 Configurator & Headers Buildfix V3",
-  "swift_files": [
-    "Sources/Core/Components/IumrahSignatureChrome.swift",
-    "Sources/Models/HotelStorefrontModels.swift",
-    "Sources/Views/Components/IumrahRootPageTitle.swift",
-    "Sources/Views/Home/HomeDashboardView.swift",
-    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift",
-    "Sources/Views/Package/IumrahConfiguratorVisualDraft.swift",
+  "name": "iumrah_hotels_typecheck_buildfix_v6",
+  "scope": "single-file SwiftUI root view compiler decomposition only",
+  "base_patch": "iumrah-beta-update-20261030-layout-recovery-v5.zip",
+  "source_compile_error": "HotelsHomeView.swift:188:19: unable to type-check expression in reasonable time",
+  "build_log": "logs_111195993054.zip",
+  "files": [
     "Sources/Views/Tabs/HotelsHomeView.swift"
   ],
-  "sha256": {
-    "Sources/Core/Components/IumrahSignatureChrome.swift": "2052dca2ff0e9d72ceedcaaf30df0765251c86261f187e5fc9d0107970078185",
-    "Sources/Models/HotelStorefrontModels.swift": "4e6487f916a5e7410814feaf5d95a3229a51254f3922a7ee3dc0df3c0f48b6f3",
-    "Sources/Views/Components/IumrahRootPageTitle.swift": "9d9167cb8d296b03b6f4602b0047e3a644f2c585dbae4eb50317c06d338b9fb7",
-    "Sources/Views/Home/HomeDashboardView.swift": "ff247046de18a4d92125650f9d65b57d234ef5669b887552d3dd1eb3cd8f1dfa",
-    "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": "6fc0bf18132c8b5f6e91de2040f4ddbdb13c21d5d6d1f1653aa8f8d72397d340",
-    "Sources/Views/Package/IumrahConfiguratorVisualDraft.swift": "efe2f9c2022510c082b5997a8097a9a9565d42e6a2718cbc24a96b98fa1becd1",
-    "Sources/Views/Tabs/HotelsHomeView.swift": "387e5dd13f9c90a5006b3b1776c41bc98f5f17cdaa9a1cd2725243f23b9585aa"
+  "preimage_sha256": "387e5dd13f9c90a5006b3b1776c41bc98f5f17cdaa9a1cd2725243f23b9585aa",
+  "postimage_sha256": "286c9e8e54ce195b261a32b277eba125b7a26d67ccda50eb255f8f01d8164846",
+  "swift_parse": {
+    "status": "PASS",
+    "files": 281,
+    "note": "Syntax only; type checking requires macOS Xcode"
   },
-  "xcode_build": "NOT_RUN"
+  "static_checks": {
+    "six stage buttons": true,
+    "board-specific content": true,
+    "Nuitee board": true,
+    "preserved refresh": true,
+    "compact header": true,
+    "deep-link handling": true,
+    "go to detail": true,
+    "existing next-stage routing": true,
+    "single body declaration": true,
+    "reduced main body": true,
+    "original elements not changed after body": true
+  },
+  "xcode_archive": "NOT_RUN - unavailable in this environment"
 }

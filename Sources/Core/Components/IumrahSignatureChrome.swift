@@ -23,81 +23,112 @@ struct IumrahSignatureScrollMarker: View {
     }
 }
 
-/// The compact chrome stays above scrolled content; it never creates a second tab bar.
-private struct IumrahCompactSignatureHeader: View {
+/// A single, permanently mounted 56-pt top rail shared by all five tabs.
+/// The full-size title and selector live in the ScrollView below; the scroll
+/// offset simply crossfades the rail from brand controls to the pinned selector.
+/// This does not reflow the scroll view or move the refresh indicator.
+struct IumrahSignaturePinnedBar: View {
+    let collapseProgress: CGFloat
     let title: String
+    var accessory: AnyView? = nil
     @EnvironmentObject private var chrome: AppChromeStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
 
+    private var fraction: CGFloat { min(1, max(0, collapseProgress)) }
+
     var body: some View {
+        ZStack(alignment: .leading) {
+            brandControls
+                .opacity(1 - fraction)
+                .offset(y: -10 * fraction)
+                .allowsHitTesting(fraction < 0.5)
+                .accessibilityHidden(fraction >= 0.5)
+
+            Group {
+                if let accessory {
+                    accessory
+                } else {
+                    Text(title)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+            }
+            .opacity(fraction)
+            .offset(y: 10 * (1 - fraction))
+            .allowsHitTesting(fraction >= 0.5)
+            .accessibilityHidden(fraction < 0.5)
+        }
+        .frame(height: 56)
+        .padding(.horizontal, IumrahDesign.pagePadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // Only the rail owns the status-bar background. The scroll view remains
+        // light and its native pull-to-refresh indicator appears BELOW the rail.
+        .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
+    }
+
+    private var brandControls: some View {
+        ViewThatFits(in: .horizontal) {
+            brandRow(wordmarkWidth: 192)
+            brandRow(wordmarkWidth: 158)
+        }
+    }
+
+    private func brandRow(wordmarkWidth: CGFloat) -> some View {
         HStack(spacing: 10) {
             Image("HeaderWordmarkDark")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 107, height: 35, alignment: .leading)
+                .frame(width: wordmarkWidth, height: 45, alignment: .leading)
                 .accessibilityLabel("iumrah Project")
-            if !title.isEmpty {
-                Rectangle().fill(.white.opacity(0.35)).frame(width: 1, height: 22)
-                Text(title)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .foregroundStyle(.white)
-            }
-            Spacer(minLength: 0)
+            Spacer(minLength: 2)
             Button { chrome.openNotifications() } label: {
                 Image(systemName: notifications.unreadCount > 0 ? "bell.badge.fill" : "bell")
-                    .font(.system(size: 16))
+                    .font(.system(size: 17))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 38, height: 38)
+                    .background(Color.white.opacity(0.10), in: Circle())
             }
             .accessibilityLabel("Notifications")
             Button { chrome.openSidebar() } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 16))
+                    .font(.system(size: 17))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 38, height: 38)
+                    .background(Color.white.opacity(0.10), in: Circle())
             }
             .accessibilityLabel("Menu")
         }
-        .padding(.horizontal, IumrahDesign.pagePadding)
-        .frame(height: 53)
-        .background(Color.iumrahSignatureBlack)
     }
+
 }
 
 private struct IumrahSignatureScrollChrome: ViewModifier {
     let title: String
     var pinnedAccessory: AnyView? = nil
-    @State private var collapsed = false
+    @State private var scrollTop: CGFloat = 0
+
+    private var collapseProgress: CGFloat {
+        min(1, max(0, -scrollTop / 140))
+    }
 
     func body(content: Content) -> some View {
-        content
-            .coordinateSpace(name: "iumrah.root.signature.scroll")
-            // Refresh / rubber-band occurs on the same light surface as the content.
-            // Black is reserved for the brand header and system status-bar region.
-            .background(Color.iumrahPageBackground)
-            .onPreferenceChange(IumrahSignatureTopPreference.self) { top in
-                let next = top < -108
-                if next != collapsed {
-                    withAnimation(.easeInOut(duration: 0.20)) { collapsed = next }
+        VStack(spacing: 0) {
+            IumrahSignaturePinnedBar(
+                collapseProgress: collapseProgress,
+                title: title,
+                accessory: pinnedAccessory
+            )
+            content
+                .coordinateSpace(name: "iumrah.root.signature.scroll")
+                .background(Color.iumrahPageBackground)
+                .onPreferenceChange(IumrahSignatureTopPreference.self) { top in
+                    // Do not animate discrete layout changes on every scroll tick:
+                    // the continuous opacity/offset tracks the actual gesture.
+                    scrollTop = min(0, top)
                 }
-            }
-            .overlay(alignment: .top) {
-                if collapsed {
-                    VStack(spacing: 0) {
-                        IumrahCompactSignatureHeader(title: title)
-                        if let pinnedAccessory {
-                            pinnedAccessory
-                                .padding(.horizontal, IumrahDesign.pagePadding)
-                                .padding(.bottom, 10)
-                        }
-                    }
-                    .background(Color.iumrahSignatureBlack)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .zIndex(10)
-                }
-            }
+        }
+        .background(Color.iumrahPageBackground)
     }
 }
 
@@ -120,28 +151,29 @@ struct IumrahSignatureThreeTabs: View {
     let onSelect: (String) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(tabs) { tab in
-                let active = selectedID == tab.id
-                Button {
-                    onSelect(tab.id)
-                } label: {
-                    Text(tab.title)
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.62)
-                        .frame(maxWidth: .infinity, minHeight: 42)
-                        .foregroundStyle(active ? Color.iumrahSignatureBlack : Color.white)
-                        .background(active ? Color.white : Color.clear, in: Capsule())
-                        .overlay {
-                            Capsule().strokeBorder(Color.white.opacity(active ? 0 : 0.4), lineWidth: 0.9)
-                        }
-                        .contentShape(Capsule())
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(tabs) { tab in
+                    let active = selectedID == tab.id
+                    Button { onSelect(tab.id) } label: {
+                        Text(tab.title)
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .lineLimit(1)
+                            .padding(.horizontal, 16)
+                            .frame(height: 42)
+                            .foregroundStyle(active ? Color.iumrahSignatureBlack : .white)
+                            .background(active ? Color.white : Color.clear, in: Capsule())
+                            .overlay {
+                                Capsule().strokeBorder(Color.white.opacity(active ? 0 : 0.4), lineWidth: 0.9)
+                            }
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(active ? .isSelected : [])
+                    .accessibilityIdentifier("signature.tab.\(tab.id)")
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(active ? .isSelected : [])
-                .accessibilityIdentifier("signature.tab.\(tab.id)")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .contain)
     }

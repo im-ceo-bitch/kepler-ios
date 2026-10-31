@@ -24,7 +24,7 @@ struct HotelsHomeView: View {
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
     @State private var hotelRefreshNonce = 0
-    @State private var compactHeader = false
+    @State private var scrollTop: CGFloat = 0
     @State private var flightFlowTutorial = false
 
     // This screen deliberately separates the view tree into small typed pieces.
@@ -96,7 +96,7 @@ struct HotelsHomeView: View {
                 await storefront.updateDepartureAirport(journey.trip.originCode)
             }
             .onChange(of: board) { _, newBoard in
-                compactHeader = false
+                scrollTop = 0
                 guard newBoard == .flights || newBoard == .sundayClub else { return }
                 Task {
                     await storefront.prepareIfNeeded()
@@ -109,7 +109,7 @@ struct HotelsHomeView: View {
         GeometryReader { viewport in
             viewportContent(viewport)
         }
-        .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
+        .background(Color.iumrahPageBackground)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if board != .hotels {
                 IumrahConfiguratorCartBar(draft: visualDraft, journey: journey, currentStage: board) {
@@ -119,7 +119,7 @@ struct HotelsHomeView: View {
                 .padding(.bottom, 2)
             }
         }
-        .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
+        .background(Color.iumrahPageBackground)
     }
 
     private func viewportContent(_ viewport: GeometryProxy) -> some View {
@@ -129,42 +129,14 @@ struct HotelsHomeView: View {
         let columnWidth = max(0, contentWidth - 2 * gutter)
 
         return VStack(spacing: 0) {
-            pinnedHeader(columnWidth: columnWidth, gutter: gutter)
-                .animation(.easeInOut(duration: 0.22), value: compactHeader)
+            IumrahSignaturePinnedBar(
+                collapseProgress: min(1, max(0, -scrollTop / 140)),
+                title: pageTitle,
+                accessory: AnyView(stageSelector)
+            )
             scrollableBoards(contentWidth: contentWidth, columnWidth: columnWidth, gutter: gutter)
         }
         .frame(width: viewportWidth, height: viewport.size.height)
-    }
-
-    @ViewBuilder
-    private func pinnedHeader(columnWidth: CGFloat, gutter: CGFloat) -> some View {
-        if compactHeader {
-            stageSelector
-                .frame(height: 56)
-        } else {
-            HStack(spacing: 10) {
-                Image("HeaderWordmarkDark")
-                    .resizable().scaledToFit()
-                    .frame(width: 165, height: 44)
-                    .accessibilityLabel("iumrah Project")
-                Spacer(minLength: 4)
-                Button { chrome.openNotifications() } label: {
-                    Image(systemName: "bell")
-                        .font(.system(size: 17))
-                        .frame(width: 38, height: 38)
-                        .foregroundStyle(.white)
-                }
-                Button { chrome.openSidebar() } label: {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 17))
-                        .frame(width: 38, height: 38)
-                        .foregroundStyle(.white)
-                }
-            }
-            .frame(width: columnWidth, height: 56)
-            .padding(.horizontal, gutter)
-            .background(Color.iumrahSignatureBlack)
-        }
     }
 
     private func scrollableBoards(contentWidth: CGFloat, columnWidth: CGFloat, gutter: CGFloat) -> some View {
@@ -183,10 +155,9 @@ struct HotelsHomeView: View {
         .id(board)
         .coordinateSpace(name: "iumrah.hotels.content")
         .onPreferenceChange(IumrahHotelsContentOffsetKey.self) { offset in
-            let next = offset < -32
-            if next != compactHeader {
-                withAnimation(.easeInOut(duration: 0.20)) { compactHeader = next }
-            }
+            // Continuous progress avoids jumpy if/else height changes.
+            // The fixed rail never participates in ScrollView refresh/bounce.
+            scrollTop = min(0, offset)
         }
         .refreshable {
             if board == .hotels {
@@ -203,10 +174,11 @@ struct HotelsHomeView: View {
         LazyVStack(spacing: 0) {
             expandedHeader(contentWidth: contentWidth, gutter: gutter)
             activeBoardContent
-                .padding(.horizontal, gutter)
                 .frame(width: columnWidth, alignment: .leading)
+                .padding(.horizontal, gutter)
             if board != .summary && board != .sundayClub {
                 nextStageButton
+                    .frame(width: columnWidth, alignment: .leading)
                     .padding(.horizontal, gutter)
                     .padding(.top, 22)
             }

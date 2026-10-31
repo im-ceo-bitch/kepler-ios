@@ -151,6 +151,7 @@ struct IumrahAccountView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .background(Color.iumrahPageBackground)
             }
+            .refreshable { await refreshAccountContent() }
             .iumrahSignatureScrollChrome(
                 title: accountPageTitle,
                 pinnedAccessory: AnyView(accountSignatureTabs(scrollProxy: proxy))
@@ -162,9 +163,6 @@ struct IumrahAccountView: View {
             }
         }
         .background(Color.iumrahPageBackground)
-        .refreshable {
-            await refreshAccountContent()
-        }
         .task {
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
@@ -236,7 +234,8 @@ struct IumrahAccountView: View {
                 subtitle: account.isAuthenticated
                     ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз")
                     : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг"),
-                drawsSignatureBackground: false
+                drawsSignatureBackground: false,
+                showsSignatureBrandRow: false
             )
             accountSignatureTabs(scrollProxy: scrollProxy)
                 .padding(.horizontal, IumrahDesign.pagePadding)

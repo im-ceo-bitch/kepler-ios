@@ -19,6 +19,7 @@ struct IumrahRootPageTitle: View {
     var drawsSignatureBackground = true
     /// Home shows the enlarged wordmark without a redundant "Home" heading.
     var showsTitle = true
+    var showsSignatureBrandRow = true
 
     var body: some View {
         Group {
@@ -49,11 +50,12 @@ struct IumrahRootPageTitle: View {
     // existing padded scroll column without changing that column's content width.
     private var signatureHeader: some View {
         VStack(alignment: .leading, spacing: 18) {
-            IumrahSignatureScrollMarker()
-            ViewThatFits(in: .horizontal) {
-                signatureBrandRow(wordmarkWidth: 215, controlSize: 42, spacing: 9)
-                signatureBrandRow(wordmarkWidth: 180, controlSize: 38, spacing: 7)
-                signatureBrandRow(wordmarkWidth: 144, controlSize: 36, spacing: 5)
+            if showsSignatureBrandRow {
+                ViewThatFits(in: .horizontal) {
+                    signatureBrandRow(wordmarkWidth: 215, controlSize: 42, spacing: 9)
+                    signatureBrandRow(wordmarkWidth: 180, controlSize: 38, spacing: 7)
+                    signatureBrandRow(wordmarkWidth: 144, controlSize: 36, spacing: 5)
+                }
             }
 
                 if showsTitle {
@@ -79,6 +81,7 @@ struct IumrahRootPageTitle: View {
         .padding(.top, 7)
         .padding(.bottom, showsConnectivityStatus ? 18 : 18)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(alignment: .top) { IumrahSignatureScrollMarker() }
         .background {
             if drawsSignatureBackground {
                 IumrahWorldDotsHeaderBackground()

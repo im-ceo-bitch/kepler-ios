@@ -68,15 +68,15 @@ struct CareHomeView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(Color.iumrahPageBackground)
         }
+        .refreshable {
+            await refreshCare()
+        }
         .iumrahSignatureScrollChrome(
             title: L10n.text("tab_care", settings.language),
             pinnedAccessory: AnyView(careSignatureTabs(scrollProxy: scrollProxy))
         )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable {
-            await refreshCare()
-        }
         .task {
             await refreshCare()
         }
@@ -88,7 +88,8 @@ struct CareHomeView: View {
             IumrahRootPageTitle(
                 title: L10n.text("tab_care", settings.language),
                 subtitle: tr("Personal assistance throughout your Umrah", "Помощь на каждом этапе умры", "Umra davomida shaxsiy yordam", "Умра давомида шахсий ёрдам"),
-                drawsSignatureBackground: false
+                drawsSignatureBackground: false,
+                showsSignatureBrandRow: false
             )
             careSignatureTabs(scrollProxy: scrollProxy)
                 .padding(.horizontal, IumrahDesign.pagePadding)

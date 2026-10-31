@@ -52,10 +52,6 @@ struct BookingsHomeView: View {
                 emptyBookingHome
             }
         }
-        .refreshable {
-            await bookings.refreshAll()
-            await loadActiveCheckout()
-        }
         .task {
             await bookings.refreshAll()
             await loadActiveCheckout()
@@ -190,6 +186,10 @@ struct BookingsHomeView: View {
             .padding(.bottom, 120)
             .background(Color.iumrahPageBackground)
         }
+        .refreshable {
+            await bookings.refreshAll()
+            await loadActiveCheckout()
+        }
         .iumrahSignatureScrollChrome(
             title: L10n.text("tab_booking", settings.language),
             pinnedAccessory: AnyView(bookingPanelPicker)
@@ -272,7 +272,8 @@ struct BookingsHomeView: View {
                 subtitle: localized("Поездки, статус и расписание", "Trips, status and itinerary", "Safarlar, holat va jadval", "Сафарлар, ҳолат ва жадвал"),
                 showsMakkahTime: false,
                 usesBrandLogo: true,
-                drawsSignatureBackground: false
+                drawsSignatureBackground: false,
+                showsSignatureBrandRow: false
             )
             bookingPanelPicker
                 .padding(.horizontal, IumrahDesign.pagePadding)
@@ -1698,6 +1699,10 @@ struct BookingsHomeView: View {
             .padding(.top, 0)
             .padding(.bottom, 120)
             .background(Color.iumrahPageBackground)
+        }
+        .refreshable {
+            await bookings.refreshAll()
+            await loadActiveCheckout()
         }
         .iumrahSignatureScrollChrome(
             title: L10n.text("tab_booking", settings.language),

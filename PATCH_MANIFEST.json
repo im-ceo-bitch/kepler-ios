@@ -1,31 +1,36 @@
 {
-  "name": "iumrah_hotels_typecheck_buildfix_v6",
-  "scope": "single-file SwiftUI root view compiler decomposition only",
-  "base_patch": "iumrah-beta-update-20261030-layout-recovery-v5.zip",
-  "source_compile_error": "HotelsHomeView.swift:188:19: unable to type-check expression in reasonable time",
-  "build_log": "logs_111195993054.zip",
+  "patch": "iumrah unified pinned/collapsing header V7",
+  "baseline": "kepler-ios-main 4.zip + configurator unified-headers buildfix V3 + layout-recovery V5 + hotels typecheck buildfix V6",
+  "swift_parse_passed": 280,
+  "xcode_archive_tested": false,
   "files": [
-    "Sources/Views/Tabs/HotelsHomeView.swift"
-  ],
-  "preimage_sha256": "387e5dd13f9c90a5006b3b1776c41bc98f5f17cdaa9a1cd2725243f23b9585aa",
-  "postimage_sha256": "286c9e8e54ce195b261a32b277eba125b7a26d67ccda50eb255f8f01d8164846",
-  "swift_parse": {
-    "status": "PASS",
-    "files": 281,
-    "note": "Syntax only; type checking requires macOS Xcode"
-  },
-  "static_checks": {
-    "six stage buttons": true,
-    "board-specific content": true,
-    "Nuitee board": true,
-    "preserved refresh": true,
-    "compact header": true,
-    "deep-link handling": true,
-    "go to detail": true,
-    "existing next-stage routing": true,
-    "single body declaration": true,
-    "reduced main body": true,
-    "original elements not changed after body": true
-  },
-  "xcode_archive": "NOT_RUN - unavailable in this environment"
+    {
+      "path": "Sources/Core/Components/IumrahSignatureChrome.swift",
+      "sha256": "38aada8865b673bc950a23200da1fceba01abd68f624562edd26142697aece14"
+    },
+    {
+      "path": "Sources/Views/Components/IumrahRootPageTitle.swift",
+      "sha256": "0eac700c6b7344f01a7a62e5ca661d962bdb8d85dc3d4c9cf1aaa0760f3bc6f8"
+    },
+    {
+      "path": "Sources/Views/Tabs/HotelsHomeView.swift",
+      "sha256": "4a54f8d4f81bf97eda7656c551fa7e2779d995d8f3ec6f082062db432c777bbb"
+    },
+    {
+      "path": "Sources/Views/Tabs/BookingsHomeView.swift",
+      "sha256": "8e07c713a3fa281b118156e53d6b0864d76a23e4163792e69978921d6957bc6e"
+    },
+    {
+      "path": "Sources/Views/Tabs/CareHomeView.swift",
+      "sha256": "ddb617b5cf5b3056389c7eb0622270bef74056f580e2bdb3e65d1f9c98380355"
+    },
+    {
+      "path": "Sources/Views/Home/HomeDashboardView.swift",
+      "sha256": "a88de591bb020103b7e5878005d25b2d31ede655259f3adabd3b2aa656591355"
+    },
+    {
+      "path": "Sources/AppShell/IumrahAccountView.swift",
+      "sha256": "2ea3a41427097f077d979c9efa3e4bd3ae31ece6e7a35c5cf97117a71db6cd43"
+    }
+  ]
 }

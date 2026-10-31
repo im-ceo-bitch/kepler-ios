@@ -182,6 +182,9 @@ struct HomeDashboardView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(Color.iumrahPageBackground)
         }
+        .refreshable {
+            await bookings.refreshAll()
+        }
         .iumrahSignatureScrollChrome(
             title: "",
             pinnedAccessory: AnyView(homeSignatureTabs(scrollProxy: scrollProxy))
@@ -191,13 +194,10 @@ struct HomeDashboardView: View {
 
     private func homeSignatureHeader(scrollProxy: ScrollViewProxy) -> some View {
         VStack(spacing: 0) {
-            IumrahRootPageTitle(
-                title: L10n.text("tab_home", settings.language),
-                usesBrandLogo: true,
-                showsConnectivityStatus: false,
-                drawsSignatureBackground: false,
-                showsTitle: false
-            )
+            // The root rail already shows the large iumrah wordmark.
+            // This zero-height marker measures the scroll without adding a
+            // duplicate title or unnecessary blank space above the selector.
+            IumrahSignatureScrollMarker()
             homeSignatureTabs(scrollProxy: scrollProxy)
                 .padding(.horizontal, IumrahDesign.pagePadding)
                 .padding(.bottom, selectedPilgrimTool == nil ? 18 : 4)

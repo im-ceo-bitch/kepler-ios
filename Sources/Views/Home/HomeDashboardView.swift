@@ -136,7 +136,6 @@ struct HomeDashboardView: View {
         ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 30) {
-                homeSignatureHeader(scrollProxy: scrollProxy)
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
                         notifications: Array(clientNotifications.homeNotifications.prefix(5)),
@@ -180,6 +179,7 @@ struct HomeDashboardView: View {
             .padding(.top, 0)
             .padding(.bottom, 120)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(alignment: .top) { IumrahSignatureScrollMarker() }
             .background(Color.iumrahPageBackground)
         }
         .refreshable {
@@ -187,7 +187,9 @@ struct HomeDashboardView: View {
         }
         .iumrahSignatureScrollChrome(
             title: "",
-            pinnedAccessory: AnyView(homeSignatureTabs(scrollProxy: scrollProxy))
+            pinnedAccessory: AnyView(homeSignatureTabs(scrollProxy: scrollProxy)),
+            showsHeading: false,
+            expandedContent: selectedPilgrimTool == nil ? nil : AnyView(tripToolsSection)
         )
         }
     }

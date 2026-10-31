@@ -105,7 +105,7 @@ struct IumrahAccountView: View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
-                    accountHeader(scrollProxy: proxy)
+                    IumrahSignatureScrollMarker()
 
                     if let profile = account.account {
                         IumrahAccountIdentityHeroCard(
@@ -154,6 +154,9 @@ struct IumrahAccountView: View {
             .refreshable { await refreshAccountContent() }
             .iumrahSignatureScrollChrome(
                 title: accountPageTitle,
+                subtitle: account.isAuthenticated
+                    ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз")
+                    : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг"),
                 pinnedAccessory: AnyView(accountSignatureTabs(scrollProxy: proxy))
             )
             .onChange(of: loginScrollNonce) { _, _ in

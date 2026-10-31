@@ -172,7 +172,6 @@ struct HotelsHomeView: View {
 
     private func scrollContent(contentWidth: CGFloat, columnWidth: CGFloat, gutter: CGFloat) -> some View {
         LazyVStack(spacing: 0) {
-            expandedHeader(contentWidth: contentWidth, gutter: gutter)
             activeBoardContent
                 .frame(width: columnWidth, alignment: .leading)
                 .padding(.horizontal, gutter)
@@ -185,6 +184,7 @@ struct HotelsHomeView: View {
         }
         .frame(width: contentWidth, alignment: .top)
         .frame(maxWidth: .infinity, alignment: .top)
+        .padding(.top, 16)
         .padding(.bottom, 36)
     }
 

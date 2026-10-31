@@ -119,8 +119,6 @@ struct BookingsHomeView: View {
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 0) {
-                bookingSignatureHeader
-                    .padding(.bottom, 16)
 
                 JourneyTravelInfoView(onOpenPrayer: { showBookingPrayers = true }, onOpenWeather: { showBookingWeather = true })
                     .padding(.bottom, 18)
@@ -184,6 +182,7 @@ struct BookingsHomeView: View {
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
             .padding(.bottom, 120)
+            .background(alignment: .top) { IumrahSignatureScrollMarker() }
             .background(Color.iumrahPageBackground)
         }
         .refreshable {
@@ -192,6 +191,7 @@ struct BookingsHomeView: View {
         }
         .iumrahSignatureScrollChrome(
             title: L10n.text("tab_booking", settings.language),
+            subtitle: localized("Поездки, статус и расписание", "Trips, status and itinerary", "Safarlar, holat va jadval", "Сафарлар, ҳолат ва жадвал"),
             pinnedAccessory: AnyView(bookingPanelPicker)
         )
         .animation(.snappy(duration: 0.34), value: session.effectiveStatus)
@@ -1670,7 +1670,7 @@ struct BookingsHomeView: View {
     private var emptyBookingHome: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                bookingSignatureHeader
+                IumrahSignatureScrollMarker()
 
                 if bookingPanel == .booking {
                     JourneyTravelInfoView(
@@ -1706,6 +1706,7 @@ struct BookingsHomeView: View {
         }
         .iumrahSignatureScrollChrome(
             title: L10n.text("tab_booking", settings.language),
+            subtitle: localized("Поездки, статус и расписание", "Trips, status and itinerary", "Safarlar, holat va jadval", "Сафарлар, ҳолат ва жадвал"),
             pinnedAccessory: AnyView(bookingPanelPicker)
         )
     }

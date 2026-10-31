@@ -24,7 +24,7 @@ struct CareHomeView: View {
         ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                careSignatureHeader(scrollProxy: scrollProxy)
+                IumrahSignatureScrollMarker()
                     .padding(.bottom, 14)
 
                 careQuickContacts
@@ -73,6 +73,7 @@ struct CareHomeView: View {
         }
         .iumrahSignatureScrollChrome(
             title: L10n.text("tab_care", settings.language),
+            subtitle: tr("Personal assistance throughout your Umrah", "Помощь на каждом этапе умры", "Umra davomida shaxsiy yordam", "Умра давомида шахсий ёрдам"),
             pinnedAccessory: AnyView(careSignatureTabs(scrollProxy: scrollProxy))
         )
         .navigationTitle("")

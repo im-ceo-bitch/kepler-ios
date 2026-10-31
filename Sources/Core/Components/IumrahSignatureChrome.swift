@@ -23,48 +23,83 @@ struct IumrahSignatureScrollMarker: View {
     }
 }
 
-/// A single, permanently mounted 56-pt top rail shared by all five tabs.
-/// The full-size title and selector live in the ScrollView below; the scroll
-/// offset simply crossfades the rail from brand controls to the pinned selector.
-/// This does not reflow the scroll view or move the refresh indicator.
+/// Unified, edge-to-edge black header for the five root tabs.
+/// The entire expanded state lives here, OUTSIDE the refreshable ScrollView:
+/// UIKit therefore lays out the refresh control directly below this header.
+/// On scroll, only the left-aligned selector remains mounted and interactive.
 struct IumrahSignaturePinnedBar: View {
     let collapseProgress: CGFloat
     let title: String
+    var subtitle: String? = nil
     var accessory: AnyView? = nil
+    var showsHeading = true
+    var expandedContent: AnyView? = nil
     @EnvironmentObject private var chrome: AppChromeStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
 
     private var fraction: CGFloat { min(1, max(0, collapseProgress)) }
+    private var brandHeight: CGFloat { max(0, 64 * (1 - fraction)) }
+    private var titleHeight: CGFloat {
+        guard showsHeading else { return 0 }
+        return (subtitle == nil ? 60 : 88) * (1 - fraction)
+    }
 
     var body: some View {
-        ZStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 0) {
             brandControls
                 .opacity(1 - fraction)
-                .offset(y: -10 * fraction)
+                .frame(height: brandHeight, alignment: .top)
+                .clipped()
                 .allowsHitTesting(fraction < 0.5)
                 .accessibilityHidden(fraction >= 0.5)
+
+            if showsHeading {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.7))
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.top, 7)
+                .opacity(1 - fraction)
+                .frame(height: titleHeight, alignment: .top)
+                .clipped()
+                .accessibilityHidden(fraction >= 0.9)
+            }
 
             Group {
                 if let accessory {
                     accessory
                 } else {
                     Text(title)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
-                        .lineLimit(1)
+                        .font(.system(size: 16, weight: .semibold))
                 }
             }
-            .opacity(fraction)
-            .offset(y: 10 * (1 - fraction))
-            .allowsHitTesting(fraction >= 0.5)
-            .accessibilityHidden(fraction < 0.5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 52)
+            .accessibilityIdentifier("iumrah.root.pinnedSelector")
+
+            // Home's prayer/weather panel extends the SAME black surface.
+            // The panel is not another black section inside the ScrollView.
+            if fraction < 0.01, let expandedContent {
+                expandedContent
+                    .padding(.top, 4)
+                    .padding(.bottom, 12)
+            }
         }
-        .frame(height: 56)
         .padding(.horizontal, IumrahDesign.pagePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Only the rail owns the status-bar background. The scroll view remains
-        // light and its native pull-to-refresh indicator appears BELOW the rail.
+        .background { IumrahWorldDotsHeaderBackground() }
         .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
+        .accessibilityIdentifier("iumrah.root.unifiedHeader")
     }
 
     private var brandControls: some View {
@@ -100,16 +135,20 @@ struct IumrahSignaturePinnedBar: View {
             .accessibilityLabel("Menu")
         }
     }
-
 }
 
+/// The scroll view is permanently BELOW the single black header; no header
+/// fragments are rendered in the scrolling content. All five tabs use this.
 private struct IumrahSignatureScrollChrome: ViewModifier {
     let title: String
+    var subtitle: String? = nil
     var pinnedAccessory: AnyView? = nil
+    var showsHeading = true
+    var expandedContent: AnyView? = nil
     @State private var scrollTop: CGFloat = 0
 
     private var collapseProgress: CGFloat {
-        min(1, max(0, -scrollTop / 140))
+        min(1, max(0, -scrollTop / 135))
     }
 
     func body(content: Content) -> some View {
@@ -117,14 +156,17 @@ private struct IumrahSignatureScrollChrome: ViewModifier {
             IumrahSignaturePinnedBar(
                 collapseProgress: collapseProgress,
                 title: title,
-                accessory: pinnedAccessory
+                subtitle: subtitle,
+                accessory: pinnedAccessory,
+                showsHeading: showsHeading,
+                expandedContent: expandedContent
             )
             content
                 .coordinateSpace(name: "iumrah.root.signature.scroll")
                 .background(Color.iumrahPageBackground)
                 .onPreferenceChange(IumrahSignatureTopPreference.self) { top in
-                    // Do not animate discrete layout changes on every scroll tick:
-                    // the continuous opacity/offset tracks the actual gesture.
+                    // Ignore positive overscroll: pulling to refresh does NOT
+                    // stretch/move the black header or render a black gap.
                     scrollTop = min(0, top)
                 }
         }
@@ -133,8 +175,20 @@ private struct IumrahSignatureScrollChrome: ViewModifier {
 }
 
 extension View {
-    func iumrahSignatureScrollChrome(title: String, pinnedAccessory: AnyView? = nil) -> some View {
-        modifier(IumrahSignatureScrollChrome(title: title, pinnedAccessory: pinnedAccessory))
+    func iumrahSignatureScrollChrome(
+        title: String,
+        subtitle: String? = nil,
+        pinnedAccessory: AnyView? = nil,
+        showsHeading: Bool = true,
+        expandedContent: AnyView? = nil
+    ) -> some View {
+        modifier(IumrahSignatureScrollChrome(
+            title: title,
+            subtitle: subtitle,
+            pinnedAccessory: pinnedAccessory,
+            showsHeading: showsHeading,
+            expandedContent: expandedContent
+        ))
     }
 }
 

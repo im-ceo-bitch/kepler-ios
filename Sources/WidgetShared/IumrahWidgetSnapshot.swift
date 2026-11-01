@@ -63,10 +63,10 @@ enum IumrahWidgetDeepLink {
 }
 
 enum IumrahWidgetSharedStore {
-    // The production provisioning profile already permits the team wildcard
+    // The recipient team provisioning profile must permit this shared
     // keychain group. Using a shared keychain keeps widget data private and
     // avoids storing account/booking snapshots in a public container.
-    static let keychainAccessGroup = "2DQ678JTNG.com.iumrah.shared"
+    static let keychainAccessGroup = "HVT4U96286.com.iumrah.shared"
 
     private static let service = "com.iumrah.widget.snapshot"
     private static let account = "current"

@@ -1,0 +1,206 @@
+name: Iumrah | TestFlight | Intel | New Team
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'App Store version, e.g. 2.1.0 (must not be lower than repo)'
+        type: string
+        required: true
+        default: '2.1.0'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iumrah-newteam-testflight
+  cancel-in-progress: false
+
+jobs:
+  build_gate:
+    runs-on: macos-26-intel
+    timeout-minutes: 55
+    env:
+      APPLE_TEAM_ID: HVT4U96286
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm Xcode 26 / Intel
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64" || { echo "Intel runner required"; exit 1; }
+          xcodebuild -version
+          xcodebuild -version | grep -E '^Xcode 26\.'
+      - name: Validate Apple-transfer configuration
+        run: python3 scripts/ci_apple_transfer_check.py
+      - name: Repository preflight (Swift parsing + assets + locales)
+        run: python3 scripts/ci_preflight.py
+      - name: Prepare iPhone/iPad icons
+        run: python3 scripts/prepare_iumrah_icons_ci.py
+      - name: Install XcodeGen
+        run: |
+          brew list --versions xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen --version
+      - name: Generate project
+        run: xcodegen generate
+      - name: Build-only gate (NO Apple secrets and NO signing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          xcodebuild -project iUmra.xcodeproj -scheme iUmra -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/iumrah-gate-derived" \
+            IUMRAH_APPLE_TEAM_ID=HVT4U96286 CODE_SIGNING_ALLOWED=NO build \
+            2>&1 | tee "$RUNNER_TEMP/iumrah-build-gate.log"
+      - name: Upload gate logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iumrah-build-gate-${{ github.run_id }}
+          path: ${{ runner.temp }}/iumrah-build-gate.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  testflight_upload:
+    needs: build_gate
+    runs-on: macos-26-intel
+    timeout-minutes: 90
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+      MARKETING_VERSION: ${{ inputs.release_version || '2.1.0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require NEW Apple Team and new API credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${APPLE_TEAM_ID:-}" = 'HVT4U96286' || { echo 'STOP: APPLE_TEAM_ID not new team HVT4U96286'; exit 1; }
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_API_KEY_P8; do
+            test -n "${!name:-}" || { echo "Missing GitHub secret $name"; exit 1; }
+          done
+          if [ ! "$(uname -m)" = x86_64 ]; then echo 'Wrong runner'; exit 1; fi
+          xcodebuild -version | grep -E '^Xcode 26\.'
+          python3 scripts/ci_apple_transfer_check.py
+          python3 - <<'PYCODE'
+          import os,re
+          v=os.environ['MARKETING_VERSION'].strip(); repo='2.1.0'
+          def vparts(s):
+              if not re.fullmatch(r'\d+\.\d+\.\d+',s): raise ValueError('Invalid version')
+              return tuple(map(int,s.split('.')))
+          if vparts(v)<vparts(repo): raise SystemExit(f'Release version {v} is less than minimum {repo}. Set release_version to {repo} or higher in Run workflow.')
+          print('Release marketing version:',v)
+          PYCODE
+      - name: Install .p8 API key on runner (ephemeral)
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          mkdir -p "$RUNNER_TEMP/appstore-api"
+          KEYFILE="$RUNNER_TEMP/appstore-api/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_API_KEY_P8" > "$KEYFILE"
+          chmod 600 "$KEYFILE"
+          openssl pkey -in "$KEYFILE" -noout >/dev/null || { echo 'Invalid ASC_API_KEY_P8 PEM contents'; exit 1; }
+          echo "ASC_P8_PATH=$KEYFILE" >> "$GITHUB_ENV"
+          unset ASC_API_KEY_P8
+      - name: Determine build number by NEW App Store Connect App ID
+        shell: bash
+        run: ruby scripts/ci_next_testflight_build.rb
+      - name: Prepare app icons and XcodeGen
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_iumrah_icons_ci.py
+          brew list --versions xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen generate
+      - name: Archive using Apple authenticated automatic signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          # API authentication + allowProvisioningUpdates handles the receiving
+          # team's signing assets without committing profiles or a p12 to Git.
+          xcodebuild -project iUmra.xcodeproj -scheme iUmra -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Iumrah.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_P8_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            IUMRAH_APPLE_TEAM_ID="$APPLE_TEAM_ID" \
+            MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            archive 2>&1 | tee "$RUNNER_TEMP/iumrah-archive.log"
+      - name: Validate signed archive app and Widget ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/Iumrah.xcarchive/Products/Applications/iUmra.app"
+          test -d "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist" | grep -Fx 'com.iumrah.app'
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Info.plist" | grep -Fx "$MARKETING_VERSION"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP/Info.plist" | grep -Fx "$BUILD_NUMBER"
+          codesign --verify --strict "$APP"
+          codesign -dvv "$APP" 2> "$RUNNER_TEMP/app-codesign.txt"
+          grep -Fx "TeamIdentifier=$APPLE_TEAM_ID" "$RUNNER_TEMP/app-codesign.txt"
+          WIDGET="$APP/PlugIns/iUmraWidgets.appex"
+          test -d "$WIDGET"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$WIDGET/Info.plist" | grep -Fx 'com.iumrah.app.widgets'
+          codesign --verify --strict "$WIDGET"
+          codesign -dvv "$WIDGET" 2> "$RUNNER_TEMP/widget-codesign.txt"
+          grep -Fx "TeamIdentifier=$APPLE_TEAM_ID" "$RUNNER_TEMP/widget-codesign.txt"
+          codesign -d --entitlements :- "$APP" 2> /dev/null > "$RUNNER_TEMP/iumrah-signed-entitlements.plist"
+          /usr/libexec/PlistBuddy -c 'Print :keychain-access-groups:0' "$RUNNER_TEMP/iumrah-signed-entitlements.plist" | grep -Fx "$APPLE_TEAM_ID.com.iumrah.shared"
+      - name: Export IPA using new Apple Team
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+             <key>method</key><string>app-store-connect</string>
+             <key>signingStyle</key><string>automatic</string>
+             <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+             <key>stripSwiftSymbols</key><true/>
+          </dict></plist>
+          PLIST
+          plutil -lint "$RUNNER_TEMP/ExportOptions.plist"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Iumrah.xcarchive" \
+            -exportPath "$RUNNER_TEMP/iumrah-ipa" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_P8_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            2>&1 | tee "$RUNNER_TEMP/iumrah-export.log"
+          IPA=$(find "$RUNNER_TEMP/iumrah-ipa" -maxdepth 1 -name '*.ipa' -print -quit)
+          test -n "$IPA" || { echo 'No IPA produced'; exit 1; }
+          echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
+      - name: Upload to TestFlight (App Store Connect API, no app password)
+        uses: apple-actions/upload-testflight-build@v5
+        with:
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ secrets.ASC_ISSUER_ID }}
+          api-key-id: ${{ secrets.ASC_KEY_ID }}
+          api-private-key: ${{ secrets.ASC_API_KEY_P8 }}
+      - name: Summary
+        if: success()
+        shell: bash
+        run: |
+          echo "### Uploaded iumrah $MARKETING_VERSION ($BUILD_NUMBER)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Apple Team: HVT4U96286 / App: 6759577859 / com.iumrah.app" >> "$GITHUB_STEP_SUMMARY"
+          echo "Check App Store Connect → TestFlight after Apple's processing." >> "$GITHUB_STEP_SUMMARY"
+      - name: Save diagnostics (not signing materials)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iumrah-upload-diagnostics-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/iumrah-archive.log
+            ${{ runner.temp }}/iumrah-export.log
+          if-no-files-found: ignore
+          retention-days: 7

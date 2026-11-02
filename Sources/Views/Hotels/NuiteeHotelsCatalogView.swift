@@ -57,7 +57,10 @@ private final class NuiteeCatalogModel: ObservableObject {
 struct NuiteeHotelsCatalogView: View {
     let refreshSignal: Int
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var chrome: AppChromeStore
     @StateObject private var model = NuiteeCatalogModel()
+    @State private var appliedHomeSearchID: UUID?
+    @State private var homeSearchRevision = 0
     @State private var city: NuiteeCity = .makkah
     @State private var stars = 0
     @State private var hotelQuery = ""
@@ -69,14 +72,14 @@ struct NuiteeHotelsCatalogView: View {
     @State private var draftCheckin = Calendar.current.date(byAdding: .day, value: 10, to: Date()) ?? Date()
     @State private var draftNights = 1
     @State private var draftAdults = 2
-    @State private var searchExpanded = true
+    @State private var searchExpanded = false
     @State private var visibleCount = 20
     @State private var opened: NuiteeHotel?
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
 
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
     private var reloadIdentity: String {
-        [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults)].joined(separator: ":")
+        [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults), String(homeSearchRevision)].joined(separator: ":")
     }
     private var candidateHotels: [NuiteeHotel] {
         model.hotels.filter { stars == 0 || $0.roundedStars == stars }
@@ -290,6 +293,10 @@ struct NuiteeHotelsCatalogView: View {
             }
         }
         .task(id: reloadIdentity) { await reload() }
+        .onAppear { consumeHomeSearch(chrome.requestedHotelTabSearch) }
+        .onChange(of: chrome.requestedHotelTabSearch) { _, request in
+            consumeHomeSearch(request)
+        }
         .onChange(of: refreshSignal) { _, _ in Task { await reload() } }
         .sheet(isPresented: $calendarPresented) {
             NuiteeStayCalendarSheet(checkin: $draftCheckin, nights: $draftNights)
@@ -297,6 +304,26 @@ struct NuiteeHotelsCatalogView: View {
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox)
         }
+    }
+
+    /// Apply Home's request in-place; this view remains the single supplier-backed
+    /// search/results surface, including its existing filters and hotel details.
+    private func consumeHomeSearch(_ request: IumrahHotelTabSearch?) {
+        guard let request, appliedHomeSearchID != request.id else { return }
+        appliedHomeSearchID = request.id
+        homeSearchRevision += 1 // Repeat searches with identical dates still refresh supplier rates.
+        city = request.city == "madinah" ? .madinah : .makkah
+        checkin = request.checkin
+        nights = min(28, max(1, request.nights))
+        adults = min(6, max(1, request.adults))
+        draftCheckin = checkin
+        draftNights = nights
+        draftAdults = adults
+        hotelQuery = ""
+        stars = 0
+        visibleCount = 20
+        searchExpanded = false
+        hotelSearchFocused = false
     }
 
     private func reload() async {

@@ -24,9 +24,9 @@ struct IumrahSignatureScrollMarker: View {
 }
 
 /// Unified, edge-to-edge black header for the five root tabs.
-/// The entire expanded state lives here, OUTSIDE the refreshable ScrollView:
-/// UIKit therefore lays out the refresh control directly below this header.
-/// On scroll, only the left-aligned selector remains mounted and interactive.
+/// The expanded masthead is outside the refreshable ScrollView, but its
+/// measured height goes all the way to zero on scroll (including the selector).
+/// The search/list content therefore regains the full viewport on all root tabs.
 struct IumrahSignaturePinnedBar: View {
     let collapseProgress: CGFloat
     let title: String
@@ -38,10 +38,10 @@ struct IumrahSignaturePinnedBar: View {
     @ObservedObject private var notifications = ClientNotificationCenter.shared
 
     private var fraction: CGFloat { min(1, max(0, collapseProgress)) }
-    private var brandHeight: CGFloat { max(0, 64 * (1 - fraction)) }
+    private var brandHeight: CGFloat { max(0, 58 * (1 - fraction)) }
     private var titleHeight: CGFloat {
         guard showsHeading else { return 0 }
-        return (subtitle == nil ? 60 : 88) * (1 - fraction)
+        return (subtitle == nil ? 50 : 76) * (1 - fraction)
     }
 
     var body: some View {
@@ -56,7 +56,7 @@ struct IumrahSignaturePinnedBar: View {
             if showsHeading {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .font(.system(size: 29, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
@@ -74,18 +74,16 @@ struct IumrahSignaturePinnedBar: View {
                 .accessibilityHidden(fraction >= 0.9)
             }
 
-            Group {
-                if let accessory {
-                    accessory
-                } else {
-                    Text(title)
-                        .foregroundStyle(.white)
-                        .font(.system(size: 16, weight: .semibold))
-                }
+            if let accessory {
+                accessory
+                    .opacity(1 - fraction)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: max(0, 48 * (1 - fraction)))
+                    .clipped()
+                    .allowsHitTesting(fraction < 0.95)
+                    .accessibilityHidden(fraction >= 0.95)
+                    .accessibilityIdentifier("iumrah.root.pinnedSelector")
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 52)
-            .accessibilityIdentifier("iumrah.root.pinnedSelector")
 
             // Home's prayer/weather panel extends the SAME black surface.
             // The panel is not another black section inside the ScrollView.
@@ -273,7 +271,7 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
                         .foregroundStyle(.secondary)
                 }
                 .foregroundStyle(Color.black)
-                .padding(18)
+                .padding(16)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -288,10 +286,10 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .strokeBorder(Color(red: 28/255, green: 28/255, blue: 30/255), lineWidth: 2.3)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(Color(red: 28/255, green: 28/255, blue: 30/255), lineWidth: 0.9)
         }
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .animation(.easeInOut(duration: 0.20), value: isExpanded)

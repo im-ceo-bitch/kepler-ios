@@ -132,7 +132,8 @@ struct HotelsHomeView: View {
             IumrahSignaturePinnedBar(
                 collapseProgress: min(1, max(0, -scrollTop / 140)),
                 title: pageTitle,
-                accessory: AnyView(stageSelector)
+                accessory: AnyView(stageSelector),
+                showsHeading: !(chrome.requestedHotelTabSearch != nil && board == .hotels)
             )
             scrollableBoards(contentWidth: contentWidth, columnWidth: columnWidth, gutter: gutter)
         }
@@ -175,7 +176,8 @@ struct HotelsHomeView: View {
             activeBoardContent
                 .frame(width: columnWidth, alignment: .leading)
                 .padding(.horizontal, gutter)
-            if board != .summary && board != .sundayClub {
+            if board != .summary && board != .sundayClub &&
+                !(board == .hotels && chrome.requestedHotelTabSearch != nil) {
                 nextStageButton
                     .frame(width: columnWidth, alignment: .leading)
                     .padding(.horizontal, gutter)

@@ -135,7 +135,10 @@ struct HomeDashboardView: View {
     private var marketingHome: some View {
         ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 30) {
+            LazyVStack(spacing: 26) {
+                IumrahHomeHotelSearchView()
+                    .padding(.top, 12)
+
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
                         notifications: Array(clientNotifications.homeNotifications.prefix(5)),
@@ -187,9 +190,7 @@ struct HomeDashboardView: View {
         }
         .iumrahSignatureScrollChrome(
             title: "",
-            pinnedAccessory: AnyView(homeSignatureTabs(scrollProxy: scrollProxy)),
-            showsHeading: false,
-            expandedContent: selectedPilgrimTool == nil ? nil : AnyView(tripToolsSection)
+            showsHeading: false
         )
         }
     }

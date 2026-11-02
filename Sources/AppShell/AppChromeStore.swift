@@ -21,6 +21,16 @@ enum AppTab: Hashable {
     case account
 }
 
+/// Search hand-off from Home to the existing second tab. Only fields supported by
+/// the current Nuitee hotel supplier are included; never promise multi-room rates.
+struct IumrahHotelTabSearch: Equatable {
+    let id = UUID()
+    let city: String
+    let checkin: Date
+    let nights: Int
+    let adults: Int
+}
+
 final class AppChromeStore: ObservableObject {
     @Published var requestedTab: AppTab?
     @Published var currentTab: AppTab = .home
@@ -31,6 +41,7 @@ final class AppChromeStore: ObservableObject {
     @Published var requestedHotelConfiguratorID: String?
     @Published var requestedHotelConfiguratorDeepLink: HotelConfiguratorDeepLink?
     @Published var requestedHotelsBoard: HotelsShowcaseBoard?
+    @Published var requestedHotelTabSearch: IumrahHotelTabSearch?
     @Published var requestedPackageID: String?
     @Published var isImmersiveMode = false
     @Published var isSidebarOpen = false
@@ -65,6 +76,13 @@ final class AppChromeStore: ObservableObject {
         currentTab = .hotels
         requestedTab = .hotels
         IumrahHaptics.selection()
+    }
+
+    /// Switch TabView to Hotels rather than pushing a duplicate results screen.
+    func findHotels(_ search: IumrahHotelTabSearch) {
+        requestedHotelTabSearch = search
+        requestedHotelsBoard = .hotels
+        navigate(to: .hotels)
     }
 
     func openHotels(board: HotelsShowcaseBoard) {

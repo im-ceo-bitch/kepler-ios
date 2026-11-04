@@ -64,7 +64,7 @@ struct CareHomeView: View {
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
-            .padding(.bottom, 112)
+            .padding(.bottom, 64)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(Color.iumrahPageBackground)
         }
@@ -114,7 +114,7 @@ struct CareHomeView: View {
             careHeaderSection = target
             IumrahHaptics.selection()
             withAnimation(.easeInOut(duration: 0.30)) {
-                scrollProxy.scrollTo("care.\(target)", anchor: .center)
+                scrollProxy.scrollTo("care.\(target)", anchor: .top)
             }
         }
     }
@@ -167,11 +167,11 @@ struct CareHomeView: View {
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 105)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 25, style: .continuous))
+        .frame(height: 100)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 25, style: .continuous)
-                .strokeBorder(tint.opacity(enabled ? 0.22 : 0.06), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(tint.opacity(enabled ? 0.12 : 0.06), lineWidth: 0.8)
         }
         .opacity(enabled ? 1 : 0.48)
     }
@@ -186,7 +186,7 @@ struct CareHomeView: View {
                 "Umra safaringizni yig‘ish va rasmiylashtirishga yordam beramiz",
                 "Умра сафарингизни тузиш ва расмийлаштиришга ёрдам берамиз"
             ))
-            .font(.system(size: 27, weight: .bold, design: .rounded))
+            .font(.system(size: 24, weight: .bold, design: .rounded))
             .tracking(-0.5)
             .fixedSize(horizontal: false, vertical: true)
 

@@ -130,7 +130,7 @@ struct HotelsHomeView: View {
 
         return VStack(spacing: 0) {
             IumrahSignaturePinnedBar(
-                collapseProgress: min(1, max(0, -scrollTop / 140)),
+                collapseProgress: min(1, max(0, -scrollTop / 112)),
                 title: pageTitle,
                 accessory: AnyView(stageSelector),
                 showsHeading: !(chrome.requestedHotelTabSearch != nil && board == .hotels)
@@ -186,8 +186,8 @@ struct HotelsHomeView: View {
         }
         .frame(width: contentWidth, alignment: .top)
         .frame(maxWidth: .infinity, alignment: .top)
-        .padding(.top, 16)
-        .padding(.bottom, 36)
+        .padding(.top, 14)
+        .padding(.bottom, 64)
     }
 
     private func expandedHeader(contentWidth: CGFloat, gutter: CGFloat) -> some View {
@@ -275,13 +275,13 @@ struct HotelsHomeView: View {
                 Image(systemName: icon)
                     .font(.system(size: 13, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 11.5, weight: .semibold))
+                    .font(.system(size: 12.5, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.66)
             }
             .foregroundStyle(active ? Color.iumrahSignatureBlack : Color.white)
             .padding(.horizontal, 13)
-            .frame(height: 42)
+            .frame(height: 40)
             .background(active ? Color.white : Color.clear, in: Capsule())
             .overlay { Capsule().strokeBorder(Color.white.opacity(active ? 0 : 0.38), lineWidth: 0.9) }
             .contentShape(Capsule())

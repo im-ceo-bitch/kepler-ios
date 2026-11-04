@@ -372,9 +372,9 @@ private struct NuiteeHotelListingCard: View {
                         .buttonStyle(.plain)
                     }.padding(8)
                 }
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(hotel.name)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
                         .lineLimit(2)
                     HStack(spacing: 7) {
                         if hotel.roundedStars > 0 {
@@ -389,7 +389,7 @@ private struct NuiteeHotelListingCard: View {
                     Spacer(minLength: 0)
                     if let rate = hotel.minimumRate, rate.price > 0 {
                         Text(NuiteeHotelService.usd(rate.price))
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .font(.system(size: 23, weight: .bold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.7)
                         Text("\(nights) " + NuiteeCopy.text("ночь · 1 номер · ", "tun · 1 xona · ", "nights · 1 room · ", settings.language) + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
@@ -409,9 +409,9 @@ private struct NuiteeHotelListingCard: View {
             .frame(width: proxy.size.width, height: 204)
         }
         .frame(height: 204)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 27))
-        .clipShape(RoundedRectangle(cornerRadius: 27))
-        .contentShape(RoundedRectangle(cornerRadius: 27))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .onTapGesture(perform: onOpen)
     }
 }

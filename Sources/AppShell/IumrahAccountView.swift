@@ -148,7 +148,7 @@ struct IumrahAccountView: View {
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
                 .padding(.top, 0)
-                .padding(.bottom, 120)
+                .padding(.bottom, 64)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
                 .background(Color.iumrahPageBackground)
             }
@@ -264,9 +264,9 @@ struct IumrahAccountView: View {
             IumrahHaptics.selection()
             withAnimation(.easeInOut(duration: 0.30)) {
                 if target == "profile" && account.account == nil {
-                    scrollProxy.scrollTo("account-login", anchor: .center)
+                    scrollProxy.scrollTo("account-login", anchor: .top)
                 } else {
-                    scrollProxy.scrollTo("account.\(target)", anchor: .center)
+                    scrollProxy.scrollTo("account.\(target)", anchor: .top)
                 }
             }
         }

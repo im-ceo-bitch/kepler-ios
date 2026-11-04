@@ -23,10 +23,9 @@ struct IumrahSignatureScrollMarker: View {
     }
 }
 
-/// Unified, edge-to-edge black header for the five root tabs.
-/// The expanded masthead is outside the refreshable ScrollView, but its
-/// measured height goes all the way to zero on scroll (including the selector).
-/// The search/list content therefore regains the full viewport on all root tabs.
+/// One native root chrome for all five tabs.
+/// The large masthead collapses into a real, accessible compact navigation bar;
+/// it never disappears to a zero-height black strip above the results.
 struct IumrahSignaturePinnedBar: View {
     let collapseProgress: CGFloat
     let title: String
@@ -35,17 +34,26 @@ struct IumrahSignaturePinnedBar: View {
     var showsHeading = true
     var expandedContent: AnyView? = nil
     @EnvironmentObject private var chrome: AppChromeStore
+    @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
     @ObservedObject private var notifications = ClientNotificationCenter.shared
 
     private var fraction: CGFloat { min(1, max(0, collapseProgress)) }
-    private var brandHeight: CGFloat { max(0, 58 * (1 - fraction)) }
+    private var brandHeight: CGFloat { 52 * (1 - fraction) }
     private var titleHeight: CGFloat {
         guard showsHeading else { return 0 }
-        return (subtitle == nil ? 50 : 76) * (1 - fraction)
+        return (subtitle == nil ? 45 : 68) * (1 - fraction)
     }
+    private var compactHeight: CGFloat { 48 * fraction }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            compactControls
+                .opacity(fraction)
+                .frame(height: compactHeight, alignment: .center)
+                .clipped()
+                .allowsHitTesting(fraction > 0.5)
+                .accessibilityHidden(fraction <= 0.5)
+
             brandControls
                 .opacity(1 - fraction)
                 .frame(height: brandHeight, alignment: .top)
@@ -56,18 +64,18 @@ struct IumrahSignaturePinnedBar: View {
             if showsHeading {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.system(size: 29, weight: .bold, design: .rounded))
+                        .font(.system(size: 27, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                     if let subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.7))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.72))
                             .lineLimit(2)
                     }
                 }
-                .padding(.top, 7)
+                .padding(.top, 4)
                 .opacity(1 - fraction)
                 .frame(height: titleHeight, alignment: .top)
                 .clipped()
@@ -78,32 +86,47 @@ struct IumrahSignaturePinnedBar: View {
                 accessory
                     .opacity(1 - fraction)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .frame(height: max(0, 48 * (1 - fraction)))
+                    .frame(height: max(0, 46 * (1 - fraction)))
                     .clipped()
                     .allowsHitTesting(fraction < 0.95)
                     .accessibilityHidden(fraction >= 0.95)
                     .accessibilityIdentifier("iumrah.root.pinnedSelector")
             }
 
-            // Home's prayer/weather panel extends the SAME black surface.
-            // The panel is not another black section inside the ScrollView.
-            if fraction < 0.01, let expandedContent {
+            if let expandedContent {
                 expandedContent
-                    .padding(.top, 4)
-                    .padding(.bottom, 12)
+                    .opacity(1 - fraction)
+                    .frame(height: max(0, 56 * (1 - fraction)))
+                    .clipped()
+                    .allowsHitTesting(fraction < 0.5)
             }
         }
         .padding(.horizontal, IumrahDesign.pagePadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background { IumrahWorldDotsHeaderBackground() }
+        .background { IumrahWorldDotsHeaderBackground(mapOpacity: 0.28 * Double(1 - fraction)) }
         .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
         .accessibilityIdentifier("iumrah.root.unifiedHeader")
     }
 
+    /// Replaces the expanded wordmark/title/selector after the user scrolls.
+    /// Controls stay reachable, unlike the former disappearing header.
+    private var compactControls: some View {
+        HStack(spacing: 10) {
+            Text(title.isEmpty ? "iumrah" : title)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 6)
+            trailingControls
+        }
+    }
+
     private var brandControls: some View {
         ViewThatFits(in: .horizontal) {
-            brandRow(wordmarkWidth: 192)
-            brandRow(wordmarkWidth: 158)
+            brandRow(wordmarkWidth: 176)
+            brandRow(wordmarkWidth: 144)
         }
     }
 
@@ -112,25 +135,36 @@ struct IumrahSignaturePinnedBar: View {
             Image("HeaderWordmarkDark")
                 .resizable()
                 .scaledToFit()
-                .frame(width: wordmarkWidth, height: 45, alignment: .leading)
+                .frame(width: wordmarkWidth, height: 42, alignment: .leading)
                 .accessibilityLabel("iumrah Project")
             Spacer(minLength: 2)
+            trailingControls
+        }
+    }
+
+    private var trailingControls: some View {
+        HStack(spacing: 10) {
             Button { chrome.openNotifications() } label: {
                 Image(systemName: notifications.unreadCount > 0 ? "bell.badge.fill" : "bell")
-                    .font(.system(size: 17))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
+                    .frame(width: 40, height: 40)
                     .background(Color.white.opacity(0.10), in: Circle())
             }
+            .buttonStyle(.plain)
             .accessibilityLabel("Notifications")
-            Button { chrome.openSidebar() } label: {
-                Image(systemName: "line.3.horizontal")
-                    .font(.system(size: 17))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(Color.white.opacity(0.10), in: Circle())
+
+            if navigationChromeStyle == .drawer {
+                Button { chrome.openSidebar() } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white.opacity(0.10), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Menu")
             }
-            .accessibilityLabel("Menu")
         }
     }
 }
@@ -146,7 +180,7 @@ private struct IumrahSignatureScrollChrome: ViewModifier {
     @State private var scrollTop: CGFloat = 0
 
     private var collapseProgress: CGFloat {
-        min(1, max(0, -scrollTop / 135))
+        min(1, max(0, -scrollTop / 112))
     }
 
     func body(content: Content) -> some View {
@@ -209,10 +243,10 @@ struct IumrahSignatureThreeTabs: View {
                     let active = selectedID == tab.id
                     Button { onSelect(tab.id) } label: {
                         Text(tab.title)
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .lineLimit(1)
-                            .padding(.horizontal, 16)
-                            .frame(height: 42)
+                            .padding(.horizontal, 15)
+                            .frame(height: 40)
                             .foregroundStyle(active ? Color.iumrahSignatureBlack : .white)
                             .background(active ? Color.white : Color.clear, in: Capsule())
                             .overlay {
@@ -271,7 +305,7 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
                         .foregroundStyle(.secondary)
                 }
                 .foregroundStyle(Color.black)
-                .padding(16)
+                .padding(15)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -282,16 +316,16 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
             if isExpanded {
                 Rectangle().fill(Color.black.opacity(0.12)).frame(height: 1)
                 content
-                    .padding(16)
+                    .padding(15)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(Color(red: 28/255, green: 28/255, blue: 30/255), lineWidth: 0.9)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.11), lineWidth: 0.8)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .animation(.easeInOut(duration: 0.20), value: isExpanded)
         .environment(\.colorScheme, .light)
     }

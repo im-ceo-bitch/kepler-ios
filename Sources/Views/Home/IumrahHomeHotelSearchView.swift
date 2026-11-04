@@ -22,7 +22,7 @@ struct IumrahHomeHotelSearchView: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 5) {
                 Text(copy("Найдите отель для умры", "Umra uchun mehmonxona toping", "Find your Umrah hotel"))
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                    .font(.system(size: 23, weight: .bold, design: .rounded))
                     .tracking(-0.5)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
@@ -124,10 +124,10 @@ struct IumrahHomeHotelSearchView: View {
                 .accessibilityIdentifier("iumrah.home.hotels.find")
                 .padding(12)
             }
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.13), lineWidth: 0.9)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.09), lineWidth: 0.8)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

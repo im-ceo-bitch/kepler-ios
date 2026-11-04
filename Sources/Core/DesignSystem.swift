@@ -16,7 +16,7 @@ private extension UIColor {
     static let iumrahPage = UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? .systemBackground
-            : .systemGroupedBackground
+            : UIColor(white: 0.976, alpha: 1)
     }
 
     static let iumrahCard = UIColor { traits in

@@ -181,7 +181,7 @@ struct BookingsHomeView: View {
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
-            .padding(.bottom, 120)
+            .padding(.bottom, 64)
             .background(alignment: .top) { IumrahSignatureScrollMarker() }
             .background(Color.iumrahPageBackground)
         }
@@ -1697,7 +1697,7 @@ struct BookingsHomeView: View {
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
-            .padding(.bottom, 120)
+            .padding(.bottom, 64)
             .background(Color.iumrahPageBackground)
         }
         .refreshable {

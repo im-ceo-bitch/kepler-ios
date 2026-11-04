@@ -148,11 +148,20 @@ struct HomeDashboardView: View {
     private var marketingHome: some View {
         ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 26) {
-                VStack(alignment: .leading, spacing: 12) {
+            LazyVStack(spacing: 24) {
+                // Booking-style information architecture: useful search comes first,
+                // before discovery/editorial sections. The family flow stays intact.
+                IumrahHomeHotelSearchView()
+                    .padding(.top, 12)
+
+                VStack(alignment: .leading, spacing: 11) {
                     Text(familyCopy(settings.language, "Персональная умра для вашей семьи", "Private Umrah for your family", "Oilangiz uchun shaxsiy Umra", "Оилангиз учун шахсий Умра"))
-                        .font(.system(.title, design: .rounded).bold())
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .tracking(-0.35)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(familyCopy(settings.language, "Свой гид, отдельная машина и семейный номер.", "Your own guide, private car and family room.", "Shaxsiy gid, alohida mashina va oilaviy xona.", "Шахсий гид, алоҳида машина ва оилавий хона."))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     Button(!familyDraft.isEmpty
                            ? familyCopy(settings.language,"Продолжить подбор","Continue planning","Tanlashni davom ettirish","Танлашни давом эттириш")
                            : familyCopy(settings.language,"Рассчитать поездку","Price my trip","Safar narxini hisoblash","Сафар нархини ҳисоблаш")) {
@@ -161,11 +170,11 @@ struct HomeDashboardView: View {
                         }
                         showFamily = true
                     }
-                        .buttonStyle(IumrahPrimaryButtonStyle())
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(.top)
+                    .buttonStyle(IumrahPrimaryButtonStyle())
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 readyPackagesSection
-                IumrahHomeHotelSearchView()
-                    .padding(.top, 12)
 
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
@@ -207,7 +216,7 @@ struct HomeDashboardView: View {
             // the column first; the outer frame then clamps the whole tree to the viewport.
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
-            .padding(.bottom, 120)
+            .padding(.bottom, 64)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(alignment: .top) { IumrahSignatureScrollMarker() }
             .background(Color.iumrahPageBackground)

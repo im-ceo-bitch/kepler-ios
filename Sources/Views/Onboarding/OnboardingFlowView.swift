@@ -438,26 +438,15 @@ struct OnboardingFlowView: View {
             VStack(spacing: compact ? 14 : 18) {
                 Spacer(minLength: compact ? 58 : 92)
 
-                Image("OnboardingBrandIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: compact ? 138 : 164, height: compact ? 138 : 164)
-                    .scaleEffect(isActive || reduceMotion ? 1 : 0.92)
-                    .shadow(color: .black.opacity(0.16), radius: 24, y: 12)
-                    .animation(.spring(response: 0.68, dampingFraction: 0.84), value: isActive)
-
-                VStack(spacing: 6) {
-                    Text("iumrah")
-                        .font(.system(size: compact ? 33 : 38, weight: .bold, design: .rounded))
-                    Text("PROJECT")
-                        .font(.system(size: compact ? 10 : 12, weight: .semibold))
-                        .tracking(compact ? 3.2 : 4)
-                        .foregroundStyle(Color.secondary)
-                }
-                .foregroundStyle(Color.primary)
-                .opacity(isActive ? 1 : 0.82)
-                .offset(y: isActive || reduceMotion ? 0 : 10)
-                .animation(.spring(response: 0.60, dampingFraction: 0.84).delay(0.03), value: isActive)
+                IumrahOrbitIconRing(
+                    mode: .showcase,
+                    diameter: compact ? 210 : 252,
+                    isActive: isActive && scenePhase == .active,
+                    lightOnDark: colorScheme == .dark
+                )
+                .frame(maxWidth: .infinity)
+                .scaleEffect(isActive || reduceMotion ? 1 : 0.93)
+                .animation(.spring(response: 0.68, dampingFraction: 0.84), value: isActive)
 
                 VStack(spacing: 9) {
                     Text(L10n.text("onboarding_closing_headline", settings.language))

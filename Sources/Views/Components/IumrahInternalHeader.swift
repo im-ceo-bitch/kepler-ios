@@ -102,12 +102,27 @@ private struct GeneratorProgressStrip: View {
                 }
             }
 
-            HStack(spacing: 7) {
+            HStack(spacing: 5) {
                 ForEach(TripProgressStage.allCases, id: \.rawValue) { item in
-                    Capsule(style: .continuous)
-                        .fill(segmentColor(item))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: item == stage ? 5 : 3.5)
+                    let completed = item.rawValue < stage.rawValue
+                    let current = item == stage
+                    VStack(spacing: 3) {
+                        Circle()
+                            .fill(completed ? Color.green.opacity(0.85) :
+                                  current ? Color.primary : Color.secondary.opacity(0.13))
+                            .frame(width: current ? 30 : 25, height: current ? 30 : 25)
+                            .overlay {
+                                Image(systemName: completed ? "checkmark" : item.carouselSymbol)
+                                    .font(.system(size: current ? 12 : 10, weight: .bold))
+                                    .foregroundStyle(completed || current ? Color.iumrahPageBackground : Color.secondary)
+                            }
+                        Circle()
+                            .fill(current ? Color.primary : Color.clear)
+                            .frame(width: 3, height: 3)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel(L10n.text(item.localizationKey, settings.language))
+                    .accessibilityAddTraits(current ? [.isSelected] : [])
                 }
             }
         }
@@ -124,11 +139,6 @@ private struct GeneratorProgressStrip: View {
         }
     }
 
-    private func segmentColor(_ item: TripProgressStage) -> Color {
-        if item.rawValue < stage.rawValue { return Color(red: 0.25, green: 0.78, blue: 0.47) }
-        if item == stage { return Color.primary }
-        return Color.secondary.opacity(0.18)
-    }
 }
 
 /// Native SwiftUI circular carousel for the five real generator stages.

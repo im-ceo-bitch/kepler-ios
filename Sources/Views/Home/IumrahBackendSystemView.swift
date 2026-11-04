@@ -256,9 +256,14 @@ struct IumrahBackendSystemHomeCard: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
 
-                IumrahBackendNetworkView(style: .compact, reduceMotion: reduceMotion)
-                    .frame(height: 220)
-                    .padding(.horizontal, 2)
+                IumrahOrbitIconRing(
+                    mode: .showcase,
+                    diameter: 214,
+                    lightOnDark: true
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 220)
+                .padding(.horizontal, 2)
 
                 VStack(alignment: .leading, spacing: 9) {
                     Text(IumrahBackendCopy.text(.homeTitle, settings.language))

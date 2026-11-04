@@ -88,6 +88,9 @@ struct FinalPackageView: View {
                                     }
                                 }
                                 packageHeader
+                                if journey.hasFinalGeneratorQuote {
+                                    packageAssemblyCard
+                                }
                                 if journey.quote != nil, journey.hasFinalGeneratorQuote {
                                     packageTierCarousel
                                     packageRecommendationCard
@@ -404,6 +407,69 @@ struct FinalPackageView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var selectedOrbitServices: [IumrahOrbitService] {
+        var items: [IumrahOrbitService] = []
+        if journey.selectedOutbound != nil {
+            items.append(.init(id: "outbound", symbol: "airplane.departure"))
+        }
+        if journey.selectedHotel != nil {
+            items.append(.init(id: "makkahHotel", symbol: "building.2.fill"))
+        }
+        if needsMadinah && journey.selectedMadinahHotel != nil {
+            items.append(.init(id: "madinahHotel", symbol: "building.2.fill"))
+        }
+        if journey.selectedInbound != nil {
+            items.append(.init(id: "return", symbol: "airplane.arrival"))
+        }
+        items.append(.init(id: "transfer", symbol: "car.side.fill"))
+        if journey.haramainTrainSelected {
+            items.append(.init(id: "haramain", symbol: "tram.fill"))
+        }
+        items.append(.init(id: "ziyarat", symbol: "mappin.and.ellipse"))
+        items.append(.init(id: "guide", symbol: "person.2.fill"))
+        items.append(.init(id: "care", symbol: "heart.fill"))
+        items.append(.init(id: "visa", symbol: "doc.text.fill"))
+        items.append(.init(id: "meals", symbol: "fork.knife"))
+        items.append(.init(id: "esim", symbol: "antenna.radiowaves.left.and.right"))
+        return items
+    }
+
+    private var packageAssemblyCard: some View {
+        VStack(spacing: 12) {
+            Text(localizedFinal("ОДИН ПАКЕТ", "ONE PACKAGE", "BITTA PAKET", "БИТТА ПАКЕТ"))
+                .font(.caption2.weight(.bold))
+                .tracking(1.7)
+                .foregroundStyle(.white.opacity(0.55))
+
+            IumrahOrbitIconRing(
+                mode: .assembling,
+                services: selectedOrbitServices,
+                diameter: 238,
+                lightOnDark: true
+            )
+            .frame(maxWidth: .infinity)
+
+            Text(localizedFinal("Ваша Умра собрана", "Your Umrah package is assembled",
+                                "Umra paketingiz yig‘ildi", "Умра пакетингиз йиғилди"))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+
+            Text(localizedFinal("Выбранные услуги объединены в один пакет. Бронирование ещё не создано.",
+                                "Selected services form one package. Booking has not been created yet.",
+                                "Tanlangan xizmatlar bitta paketda. Bron hali yaratilmagan.",
+                                "Танланган хизматлар битта пакетда. Брон ҳали яратилмаган."))
+                .font(.system(size: 13, design: .rounded))
+                .foregroundStyle(.white.opacity(0.67))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .background(Color(red: 0.035, green: 0.035, blue: 0.047),
+                    in: RoundedRectangle(cornerRadius: 30, style: .continuous))
     }
 
     private var packageTierCarousel: some View {

@@ -133,12 +133,13 @@ struct IumrahAccountView: View {
                             .id("account.settings")
                         signOutButton
                     } else {
+                        guestOrbitHero
+                        loginCard
+                            .id("account-login")
                         IumrahLockedIdentityCard(language: settings.language) {
                             showIdentityUnlockSheet = true
                         }
-                        Color.clear.frame(height: 0).id("account.trips")
-                        loginCard
-                            .id("account-login")
+                        .id("account.trips")
                         telegramIntegrationSection
                         paymentSecuritySection
                         guestSettingsSection
@@ -1316,6 +1317,68 @@ struct IumrahAccountView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .iumrahCard()
+    }
+
+    // Show the product value before the existing SMS / email / Apple / Google form.
+    // Both CTAs switch the existing form; they do not create new authentication flows.
+    private var guestOrbitHero: some View {
+        VStack(spacing: 12) {
+            IumrahOrbitIconRing(mode: .showcase, diameter: 232, lightOnDark: true)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+
+            Text(tr("Your Umrah. One place.", "Ваша Умра. Всё в одном месте.",
+                    "Umrangiz. Hammasi bir joyda.", "Умрангиз. Ҳаммаси бир жойда."))
+                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+
+            Text(tr("Flights, hotels, transfers and care — one journey.",
+                    "Авиабилеты, отели, трансфер и поддержка — одна поездка.",
+                    "Parvozlar, mehmonxonalar, transfer va yordam — bitta safar.",
+                    "Парвозлар, меҳмонхоналар, трансфер ва ёрдам — битта сафар."))
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.64))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                guestOrbitButton(
+                    title: tr("Sign in", "Войти", "Kirish", "Кириш"),
+                    mode: .signIn,
+                    filled: true
+                )
+                guestOrbitButton(
+                    title: tr("Register", "Зарегистрироваться", "Ro‘yxatdan o‘tish", "Рўйхатдан ўтиш"),
+                    mode: .register,
+                    filled: false
+                )
+            }
+            .padding(.top, 8)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity)
+        .background(Color(red: 0.035, green: 0.035, blue: 0.047),
+                    in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+    }
+
+    private func guestOrbitButton(title: String, mode: IumrahGuestAccountMode, filled: Bool) -> some View {
+        Button {
+            guestAccountMode = mode
+            loginScrollNonce += 1
+            IumrahHaptics.selection()
+        } label: {
+            Text(title)
+                .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .foregroundStyle(filled ? Color.black : Color.white)
+                .background(filled ? Color.white : Color.white.opacity(0.095),
+                            in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     private var loginCard: some View {

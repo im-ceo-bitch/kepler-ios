@@ -280,7 +280,7 @@ struct TransferSelectionView: View {
                     )
 
                     if familyFlow {
-                        Text("06 / 08").font(.caption)
+                        IumrahFoundationCompactSteps(total: 8, current: 6, language: settings.language)
                         Text(localized("Услуги вашей семьи","Services for your family","Oilangiz uchun xizmatlar","Оилангиз учун хизматлар")).font(.title.bold())
                         DisclosureGroup(localized("Кто будет рядом?","Who accompanies us?","Kim hamroh bo‘ladi?","Ким ҳамроҳ бўлади?")) {
                             Text(localized("Ваш гид встретит вас, поможет заселиться и будет рядом на зияратах и во время умры.","Your guide meets you, helps you check in and accompanies you on ziyarat and Umrah.","Gidingiz sizni kutib oladi, joylashishda yordam beradi va ziyorat hamda Umrada hamroh bo‘ladi.","Гидингиз сизни кутиб олади, жойлашишда ёрдам беради ва зиёрат ҳамда Умрада ҳамроҳ бўлади."))
@@ -643,7 +643,7 @@ struct TransferSelectionView: View {
     private var familyReview: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("07 / 08").font(.caption)
+                IumrahFoundationCompactSteps(total: 8, current: 7, language: settings.language)
                 Text(localized("Ваша поездка","Your trip","Safaringiz","Сафарингиз")).font(.largeTitle.bold())
                 Label(journey.trip.originCode + " → " + journey.trip.outboundDestinationCode + " · " + journey.trip.returnOriginCode + " → " + journey.trip.originCode, systemImage: "airplane")
                 Text(dateRangeTitle)

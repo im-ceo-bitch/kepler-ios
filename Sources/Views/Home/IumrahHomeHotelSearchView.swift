@@ -20,16 +20,10 @@ struct IumrahHomeHotelSearchView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(copy("Найдите отель для умры", "Umra uchun mehmonxona toping", "Find your Umrah hotel"))
-                    .font(.system(size: 23, weight: .bold, design: .rounded))
-                    .tracking(-0.5)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-                Text(copy("Выберите город, даты и гостей", "Shahar, sana va mehmonlarni tanlang", "Choose a city, dates and guests"))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-            }
+            IumrahFoundationSectionTitle(
+                title: copy("Найдите отель для умры", "Umra uchun mehmonxona toping", "Find your Umrah hotel"),
+                subtitle: copy("Выберите город, даты и гостей", "Shahar, sana va mehmonlarni tanlang", "Choose a city, dates and guests")
+            )
 
             VStack(alignment: .leading, spacing: 0) {
                 citySelector
@@ -114,19 +108,14 @@ struct IumrahHomeHotelSearchView: View {
                     ))
                 } label: {
                     Label(copy("Найти отели", "Mehmonxonalarni topish", "Find hotels"), systemImage: "magnifyingglass")
-                        .font(.system(size: 16, weight: .bold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .foregroundStyle(.white)
-                        .background(Color.iumrahSignatureBlack, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(IumrahPrimaryButtonStyle())
                 .accessibilityIdentifier("iumrah.home.hotels.find")
                 .padding(12)
             }
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahFoundation.Radius.card, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: IumrahFoundation.Radius.card, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.09), lineWidth: 0.8)
             }
         }
@@ -174,7 +163,7 @@ struct IumrahHomeHotelSearchView: View {
             Button {
                 value.wrappedValue = max(minimum, value.wrappedValue - 1)
             } label: {
-                Image(systemName: "minus").frame(width: 38, height: 40)
+                Image(systemName: "minus").frame(width: IumrahFoundation.Size.minimumTapTarget, height: IumrahFoundation.Size.minimumTapTarget)
             }
             .disabled(value.wrappedValue <= minimum)
             Text("\(value.wrappedValue)")
@@ -184,7 +173,7 @@ struct IumrahHomeHotelSearchView: View {
             Button {
                 value.wrappedValue = min(maximum, value.wrappedValue + 1)
             } label: {
-                Image(systemName: "plus").frame(width: 38, height: 40)
+                Image(systemName: "plus").frame(width: IumrahFoundation.Size.minimumTapTarget, height: IumrahFoundation.Size.minimumTapTarget)
             }
             .disabled(value.wrappedValue >= maximum)
         }

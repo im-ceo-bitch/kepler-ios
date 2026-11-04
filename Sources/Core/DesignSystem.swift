@@ -4,11 +4,11 @@ import UIKit
 enum IumrahDesign {
     // Keep the same compact geometry discipline as the AutoSale Umar reference:
     // system surfaces, rounded continuous corners and restrained spacing.
-    static let pagePadding: CGFloat = 18
-    static let cardRadius: CGFloat = 28
-    static let heroRadius: CGFloat = 34
-    static let compactRadius: CGFloat = 19
-    static let controlHeight: CGFloat = 56
+    static let pagePadding: CGFloat = IumrahFoundation.Space.page
+    static let cardRadius: CGFloat = IumrahFoundation.Radius.card
+    static let heroRadius: CGFloat = IumrahFoundation.Radius.hero
+    static let compactRadius: CGFloat = IumrahFoundation.Radius.control
+    static let controlHeight: CGFloat = IumrahFoundation.Size.buttonHeight
     static let glassIconSize: CGFloat = 46
 }
 
@@ -16,7 +16,7 @@ private extension UIColor {
     static let iumrahPage = UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? .systemBackground
-            : UIColor(white: 0.976, alpha: 1)
+            : .systemGroupedBackground
     }
 
     static let iumrahCard = UIColor { traits in
@@ -314,6 +314,8 @@ extension View {
 /// Primary call-to-action follows the AutoSale Umar reference: a crisp system
 /// primary surface. Liquid Glass is reserved for floating / secondary controls.
 struct IumrahPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 16, weight: .semibold, design: .rounded))
@@ -325,12 +327,14 @@ struct IumrahPrimaryButtonStyle: ButtonStyle {
                 Color.iumrahPrimaryButtonBackground.opacity(configuration.isPressed ? 0.84 : 1),
                 in: RoundedRectangle(cornerRadius: IumrahDesign.compactRadius, style: .continuous)
             )
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.985 : 1))
+            .animation(reduceMotion ? nil : IumrahFoundation.Motion.press, value: configuration.isPressed)
     }
 }
 
 struct IumrahSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 16, weight: .semibold, design: .rounded))
@@ -343,9 +347,9 @@ struct IumrahSecondaryButtonStyle: ButtonStyle {
                 interactive: true,
                 chrome: true
             )
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.985 : 1))
             .opacity(configuration.isPressed ? 0.90 : 1)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : IumrahFoundation.Motion.press, value: configuration.isPressed)
     }
 }
 

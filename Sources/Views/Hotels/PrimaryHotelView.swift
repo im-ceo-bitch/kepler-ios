@@ -74,7 +74,7 @@ struct PrimaryHotelView: View {
 
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 21) {
-                        if familyFlow { Text("05 / 08").font(.caption) }
+                        if familyFlow { IumrahFoundationCompactSteps(total: 8, current: 5, language: settings.language) }
                         heading
                         if entryMode == .flightFirst {
                             flightFirstContextCard

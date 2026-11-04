@@ -31,7 +31,7 @@ struct TripBuilderView: View {
             ScrollView {
                 VStack(spacing: 22) {
                     if familyStep == 3 {
-                        Text("03 / 08").font(.caption)
+                        IumrahFoundationCompactSteps(total: 8, current: 3, language: settings.language)
                         routeCard
                         travelersCard
                         NavigationLink {
@@ -40,7 +40,7 @@ struct TripBuilderView: View {
                             Text(familyCopy(settings.language,"Выбрать даты","Choose dates","Sanalarni tanlash","Саналарни танлаш"))
                         }.buttonStyle(IumrahPrimaryButtonStyle())
                     } else if familyStep == 4 {
-                        Text("04 / 08").font(.caption)
+                        IumrahFoundationCompactSteps(total: 8, current: 4, language: settings.language)
                         familyDates
                         packageCard
                         NavigationLink {

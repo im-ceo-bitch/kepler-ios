@@ -148,33 +148,34 @@ struct HomeDashboardView: View {
     private var marketingHome: some View {
         ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 24) {
-                // Booking-style information architecture: useful search comes first,
-                // before discovery/editorial sections. The family flow stays intact.
+            LazyVStack(spacing: 26) {
+                IumrahFoundationHomeHero(
+                    title: familyCopy(settings.language,
+                                      "Ваша семья. Ваша Умра.", "Your family. Your Umrah.",
+                                      "Oilangiz. Sizning Umrangiz.", "Оилангиз. Сизнинг Умрангиз."),
+                    subtitle: familyCopy(settings.language,
+                                         "Личный гид, отдельный трансфер и отели в одном пакете. Вы сами выбираете даты и состав семьи.",
+                                         "Private guide, transfer and hotels in one package. Choose your dates and family.",
+                                         "Shaxsiy gid, transfer va mehmonxonalar bitta paketda. Sana va oila a’zolarini o‘zingiz tanlang.",
+                                         "Шахсий гид, трансфер ва меҳмонхоналар битта пакетда. Сана ва оила аъзоларини ўзингиз танланг."),
+                    actionTitle: !familyDraft.isEmpty
+                        ? familyCopy(settings.language, "Продолжить подбор", "Continue planning", "Tanlashni davom ettirish", "Танлашни давом эттириш")
+                        : familyCopy(settings.language, "Рассчитать поездку", "Plan my Umrah", "Umra narxini hisoblash", "Умра нархини ҳисоблаш"),
+                    kicker: familyCopy(settings.language, "ЧАСТНАЯ УМРА", "PRIVATE UMRAH", "SHAXSIY UMRA", "ШАХСИЙ УМРА"),
+                    featureTitles: [
+                        familyCopy(settings.language, "Рейсы", "Flights", "Reyslar", "Рейслар"),
+                        familyCopy(settings.language, "Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"),
+                        familyCopy(settings.language, "Личный гид", "Private guide", "Shaxsiy gid", "Шахсий гид")
+                    ]
+                ) {
+                    if let draft = try? JSONDecoder().decode(FamilyTripDraft.self, from: familyDraft) {
+                        draft.restore(journey)
+                    }
+                    showFamily = true
+                }
+                readyPackagesSection
                 IumrahHomeHotelSearchView()
                     .padding(.top, 12)
-
-                VStack(alignment: .leading, spacing: 11) {
-                    Text(familyCopy(settings.language, "Персональная умра для вашей семьи", "Private Umrah for your family", "Oilangiz uchun shaxsiy Umra", "Оилангиз учун шахсий Умра"))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .tracking(-0.35)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(familyCopy(settings.language, "Свой гид, отдельная машина и семейный номер.", "Your own guide, private car and family room.", "Shaxsiy gid, alohida mashina va oilaviy xona.", "Шахсий гид, алоҳида машина ва оилавий хона."))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Button(!familyDraft.isEmpty
-                           ? familyCopy(settings.language,"Продолжить подбор","Continue planning","Tanlashni davom ettirish","Танлашни давом эттириш")
-                           : familyCopy(settings.language,"Рассчитать поездку","Price my trip","Safar narxini hisoblash","Сафар нархини ҳисоблаш")) {
-                        if let draft = try? JSONDecoder().decode(FamilyTripDraft.self, from: familyDraft) {
-                            draft.restore(journey)
-                        }
-                        showFamily = true
-                    }
-                    .buttonStyle(IumrahPrimaryButtonStyle())
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                readyPackagesSection
 
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
@@ -216,7 +217,7 @@ struct HomeDashboardView: View {
             // the column first; the outer frame then clamps the whole tree to the viewport.
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
-            .padding(.bottom, 64)
+            .padding(.bottom, 120)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(alignment: .top) { IumrahSignatureScrollMarker() }
             .background(Color.iumrahPageBackground)

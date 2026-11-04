@@ -37,8 +37,8 @@ struct IumrahOrbitIconRing: View {
     var diameter: CGFloat = 240
     var isActive: Bool = true
     var lightOnDark: Bool = true
-    var rotationDuration: TimeInterval = 11
-    var revealDuration: TimeInterval = 0.95
+    var rotationDuration: TimeInterval = IumrahFoundation.Motion.orbitRevolution
+    var revealDuration: TimeInterval = IumrahFoundation.Motion.orbitReveal
 
     @State private var orbitStart = Date()
     @State private var assemblyStart = Date()

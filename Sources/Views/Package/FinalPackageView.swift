@@ -80,7 +80,7 @@ struct FinalPackageView: View {
                                 IumrahGeneratorHeader(stage: .ready)
                                 if familyFlow, let quote = journey.quote, journey.hasFinalGeneratorQuote {
                                     VStack(spacing: 6) {
-                                        Text("08 / 08").font(.caption)
+                                        IumrahFoundationCompactSteps(total: 8, current: 8, language: settings.language)
                                         Text(familyCopy(settings.language,"Итого за всю семью","Total for your family","Oila uchun jami","Оила учун жами")).font(.headline)
                                         Text(money(quote.totalPackagePrice, quote.currency)).font(.largeTitle.bold())
                                         Text(money(quote.pricePerPerson, quote.currency) + " / " + perPersonShortTitle)
@@ -399,10 +399,11 @@ struct FinalPackageView: View {
                 .tracking(1.25)
                 .foregroundStyle(.secondary)
             Text(FlowCopy.text(.finalTitle, settings.language))
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(IumrahFoundation.TypeStyle.hero)
                 .tracking(-0.9)
+                .accessibilityAddTraits(.isHeader)
             Text(FlowCopy.text(.finalBody, settings.language))
-                .font(.body)
+                .font(IumrahFoundation.TypeStyle.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -437,9 +438,10 @@ struct FinalPackageView: View {
     }
 
     private var packageAssemblyCard: some View {
-        VStack(spacing: 12) {
+        IumrahFoundationCard(dark: true) {
+            VStack(spacing: IumrahFoundation.Space.sm) {
             Text(localizedFinal("ОДИН ПАКЕТ", "ONE PACKAGE", "BITTA PAKET", "БИТТА ПАКЕТ"))
-                .font(.caption2.weight(.bold))
+                .font(IumrahFoundation.TypeStyle.eyebrow)
                 .tracking(1.7)
                 .foregroundStyle(.white.opacity(0.55))
 
@@ -453,7 +455,7 @@ struct FinalPackageView: View {
 
             Text(localizedFinal("Ваша Умра собрана", "Your Umrah package is assembled",
                                 "Umra paketingiz yig‘ildi", "Умра пакетингиз йиғилди"))
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .font(IumrahFoundation.TypeStyle.title)
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
 
@@ -461,15 +463,13 @@ struct FinalPackageView: View {
                                 "Selected services form one package. Booking has not been created yet.",
                                 "Tanlangan xizmatlar bitta paketda. Bron hali yaratilmagan.",
                                 "Танланган хизматлар битта пакетда. Брон ҳали яратилмаган."))
-                .font(.system(size: 13, design: .rounded))
+                .font(IumrahFoundation.TypeStyle.body)
                 .foregroundStyle(.white.opacity(0.67))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(Color(red: 0.035, green: 0.035, blue: 0.047),
-                    in: RoundedRectangle(cornerRadius: 30, style: .continuous))
     }
 
     private var packageTierCarousel: some View {

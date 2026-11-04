@@ -259,7 +259,9 @@ struct IumrahBackendSystemHomeCard: View {
                 IumrahOrbitIconRing(
                     mode: .showcase,
                     diameter: 214,
-                    lightOnDark: true
+                    lightOnDark: true,
+                    rotationDuration: IumrahFoundation.Motion.orbitRevolution,
+                    revealDuration: IumrahFoundation.Motion.orbitReveal
                 )
                 .frame(maxWidth: .infinity)
                 .frame(height: 220)

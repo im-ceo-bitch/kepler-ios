@@ -176,7 +176,7 @@ struct OnboardingFlowView: View {
                         .frame(width: index == page ? 25 : 7, height: 7)
                 }
             }
-            .animation(.snappy(duration: 0.24), value: page)
+            .animation(IumrahFoundation.Motion.change, value: page)
             .accessibilityHidden(true)
 
             if page == pageCount - 1 {
@@ -190,7 +190,7 @@ struct OnboardingFlowView: View {
                 if page == pageCount - 1 {
                     finishOnboarding()
                 } else {
-                    withAnimation(.spring(response: 0.42, dampingFraction: 0.88)) {
+                    withAnimation(reduceMotion ? nil : IumrahFoundation.Motion.entrance) {
                         pageID = page + 1
                     }
                 }
@@ -199,16 +199,12 @@ struct OnboardingFlowView: View {
                     Text(page == pageCount - 1
                          ? L10n.text("onboarding_start", settings.language)
                          : L10n.text("onboarding_next", settings.language))
-                    Image(systemName: page == pageCount - 1 ? "sparkles" : "arrow.right")
+                    Image(systemName: "arrow.right")
                         .font(.system(size: 14, weight: .semibold))
                 }
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: 18))
-            .controlSize(.large)
-            .tint(.black)
+            .buttonStyle(IumrahPrimaryButtonStyle())
         }
         .padding(.horizontal, 26)
         .frame(maxWidth: adaptiveLayout.layoutClass == .compact ? .infinity : 560)
@@ -423,71 +419,80 @@ struct OnboardingFlowView: View {
         let compact = size.height < 760
 
         return ZStack {
-            LinearGradient(
-                colors: [Color.iumrahPageBackground, Color.iumrahCareLight.opacity(0.10)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Color.iumrahPageBackground
 
             Circle()
-                .fill(Color.iumrahCareLight.opacity(0.22))
-                .frame(width: compact ? 270 : 320, height: compact ? 270 : 320)
-                .blur(radius: 26)
-                .offset(x: 0, y: compact ? -40 : -60)
+                .fill(Color.primary.opacity(0.035))
+                .frame(width: compact ? 270 : 330, height: compact ? 270 : 330)
+                .blur(radius: 28)
+                .offset(y: compact ? -40 : -60)
+                .accessibilityHidden(true)
 
-            VStack(spacing: compact ? 14 : 18) {
-                Spacer(minLength: compact ? 58 : 92)
+            VStack(spacing: compact ? 14 : 20) {
+                Spacer(minLength: compact ? 54 : 80)
+
+                Text("iumrah · " + closingBenefit("ЧАСТНАЯ УМРА", "PRIVATE UMRAH", "SHAXSIY UMRA", "ШАХСИЙ УМРА"))
+                    .font(IumrahFoundation.TypeStyle.eyebrow)
+                    .tracking(1.3)
+                    .foregroundStyle(.secondary)
 
                 IumrahOrbitIconRing(
                     mode: .showcase,
                     diameter: compact ? 210 : 252,
                     isActive: isActive && scenePhase == .active,
-                    lightOnDark: colorScheme == .dark
+                    lightOnDark: colorScheme == .dark,
+                    rotationDuration: IumrahFoundation.Motion.orbitRevolution,
+                    revealDuration: IumrahFoundation.Motion.orbitReveal
                 )
                 .frame(maxWidth: .infinity)
-                .scaleEffect(isActive || reduceMotion ? 1 : 0.93)
-                .animation(.spring(response: 0.68, dampingFraction: 0.84), value: isActive)
+                .scaleEffect(isActive || reduceMotion ? 1 : 0.96)
+                .animation(reduceMotion ? nil : IumrahFoundation.Motion.entrance, value: isActive)
 
-                VStack(spacing: 9) {
+                VStack(spacing: 10) {
                     Text(L10n.text("onboarding_closing_headline", settings.language))
-                        .font(.system(size: compact ? 22 : 25, weight: .bold, design: .rounded))
+                        .font(compact ? IumrahFoundation.TypeStyle.title : IumrahFoundation.TypeStyle.section)
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(Color.primary)
+                        .foregroundStyle(.primary)
+                        .accessibilityAddTraits(.isHeader)
                     Text(L10n.text("onboarding_closing_message", settings.language))
-                        .font(.system(size: compact ? 15.5 : 17, weight: .regular, design: .rounded))
+                        .font(IumrahFoundation.TypeStyle.body)
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(.secondary)
                         .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, compact ? 24 : 28)
-                .opacity(isActive ? 1 : 0.76)
-                .offset(y: isActive || reduceMotion ? 0 : 12)
-                .animation(.spring(response: 0.62, dampingFraction: 0.86).delay(0.08), value: isActive)
 
-                Spacer()
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 14) {
+                        closingBenefits
+                    }
+                    VStack(spacing: 10) {
+                        closingBenefits
+                    }
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 5)
+
+                Spacer(minLength: compact ? 85 : 110)
             }
-            .padding(.top, compact ? 48 : 78)
-            .padding(.bottom, compact ? 22 : 40)
+            .padding(.top, compact ? 45 : 70)
         }
     }
 
-    private var priceSpotlight: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(L10n.text("final_price", settings.language))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.70))
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("2 050 $")
-                    .font(.system(size: 23, weight: .bold, design: .rounded))
-                Text(L10n.text("price_per_person", settings.language))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.74))
-            }
-            .foregroundStyle(.white)
+    @ViewBuilder private var closingBenefits: some View {
+        IumrahFoundationFeature(symbol: "airplane", title: closingBenefit("Рейсы", "Flights", "Reyslar", "Рейслар"))
+        IumrahFoundationFeature(symbol: "building.2", title: closingBenefit("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"))
+        IumrahFoundationFeature(symbol: "person.2", title: closingBenefit("Гид", "Guide", "Gid", "Гид"))
+    }
+
+    private func closingBenefit(_ ru: String, _ en: String, _ uz: String, _ uzc: String) -> String {
+        switch settings.language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return uzc
+        default: return en
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .iumrahGlass(in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     private func floatingSummaryCard(title: String, subtitle: String, icon: String) -> some View {

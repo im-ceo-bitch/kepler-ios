@@ -33,7 +33,7 @@ struct IumrahOrbitIconRing: View {
     @Environment(\.scenePhase) private var scenePhase
 
     var mode: IumrahOrbitMode = .showcase
-    var services: [IumrahOrbitService] = .showcase
+    var services: [IumrahOrbitService] = IumrahOrbitService.showcase
     var diameter: CGFloat = 240
     var isActive: Bool = true
     var lightOnDark: Bool = true

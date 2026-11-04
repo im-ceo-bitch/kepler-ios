@@ -41,6 +41,7 @@ struct FinalPackageView: View {
     @State private var isLoadingComparisons = false
     @State private var isApplyingComparison = false
 
+    var familyFlow = false
     private var needsMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
     private var canBook: Bool {
         journey.hasFinalGeneratorQuote &&
@@ -77,6 +78,15 @@ struct FinalPackageView: View {
                                     .frame(width: 0, height: 0)
 
                                 IumrahGeneratorHeader(stage: .ready)
+                                if familyFlow, let quote = journey.quote, journey.hasFinalGeneratorQuote {
+                                    VStack(spacing: 6) {
+                                        Text("08 / 08").font(.caption)
+                                        Text(familyCopy(settings.language,"Итого за всю семью","Total for your family","Oila uchun jami","Оила учун жами")).font(.headline)
+                                        Text(money(quote.totalPackagePrice, quote.currency)).font(.largeTitle.bold())
+                                        Text(money(quote.pricePerPerson, quote.currency) + " / " + perPersonShortTitle)
+                                        Text(familyCopy(settings.language,"Наличие подтвердим до оплаты.","We confirm availability before payment.","To‘lovdan oldin mavjudligini tasdiqlaymiz.","Тўловдан олдин мавжудлигини тасдиқлаймиз.")).font(.footnote)
+                                    }
+                                }
                                 packageHeader
                                 if journey.quote != nil, journey.hasFinalGeneratorQuote {
                                     packageTierCarousel

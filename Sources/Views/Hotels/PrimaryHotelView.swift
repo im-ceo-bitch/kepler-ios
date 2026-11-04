@@ -46,6 +46,7 @@ struct PrimaryHotelView: View {
         (journey.packageFlightPath == .aviasalesSelected && journey.hasCompleteStagedFlightSelection)
     }
 
+    var familyFlow = false
     var entryMode: PrimaryHotelEntryMode = .standard
 
     private var requiresMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
@@ -73,6 +74,7 @@ struct PrimaryHotelView: View {
 
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 21) {
+                        if familyFlow { Text("05 / 08").font(.caption) }
                         heading
                         if entryMode == .flightFirst {
                             flightFirstContextCard
@@ -118,7 +120,7 @@ struct PrimaryHotelView: View {
             IumrahHaptics.selection()
         }
         .navigationDestination(isPresented: $showTransfer) {
-            TransferSelectionView()
+            TransferSelectionView(familyFlow: familyFlow)
         }
         .navigationDestination(item: $hotelForDetails) { hotel in
             HotelDetailView(hotel: hotel, selectionFlow: true, selectionRole: activeHotelCity)

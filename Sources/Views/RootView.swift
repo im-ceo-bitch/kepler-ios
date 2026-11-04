@@ -3,7 +3,7 @@ import Foundation
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("iumrah.hasCompletedOnboarding.cinematic.v4") private var hasCompletedOnboarding = false
+    @AppStorage("iumrah.hasCompletedOnboarding.family.v1") private var hasCompletedOnboarding = false
     @StateObject private var settings = AppSettingsStore()
     @ObservedObject var chrome: AppChromeStore
     @StateObject private var journey = JourneyStore()
@@ -359,7 +359,8 @@ struct RootView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.985)))
             } else {
-                OnboardingFlowView {
+                FamilyWelcome { startBuilder in
+                    UserDefaults.standard.set(startBuilder, forKey: "family.openBuilder")
                     withAnimation(.easeInOut(duration: 0.34)) {
                         hasCompletedOnboarding = true
                     }

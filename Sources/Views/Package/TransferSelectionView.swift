@@ -46,8 +46,12 @@ struct TransferSelectionView: View {
         return basePackagePriceUsd + selectedVehicleAddOnUsd + selectedTrainAddOnUsd
     }
 
+    var familyFlow = false
+    @State private var reviewing = false
+
     var body: some View {
         Group {
+            if familyFlow && reviewing { familyReview } else {
             switch discoveryPhase {
             case .searching:
                 searchExperience
@@ -59,6 +63,7 @@ struct TransferSelectionView: View {
                     .environment(\.colorScheme, isVIP ? .dark : .light)
             }
         }
+        }
         .animation(.easeInOut(duration: 0.58), value: isVIP)
         .iumrahInternalNavigation(
             progress: .transfer,
@@ -67,7 +72,7 @@ struct TransferSelectionView: View {
         )
         .background(transferPageBackground)
         .navigationDestination(isPresented: $showFinalPackage) {
-            FinalPackageView()
+            FinalPackageView(familyFlow: familyFlow)
         }
         .alert(errorTitle, isPresented: Binding(
             get: { confirmationError != nil },
@@ -274,7 +279,13 @@ struct TransferSelectionView: View {
                         currentPriceText: currentPackagePriceTitle
                     )
 
-                    matchedHeader
+                    if familyFlow {
+                        Text("06 / 08").font(.caption)
+                        Text(localized("Услуги вашей семьи","Services for your family","Oilangiz uchun xizmatlar","Оилангиз учун хизматлар")).font(.title.bold())
+                        DisclosureGroup(localized("Кто будет рядом?","Who accompanies us?","Kim hamroh bo‘ladi?","Ким ҳамроҳ бўлади?")) {
+                            Text(localized("Ваш гид встретит вас, поможет заселиться и будет рядом на зияратах и во время умры.","Your guide meets you, helps you check in and accompanies you on ziyarat and Umrah.","Gidingiz sizni kutib oladi, joylashishda yordam beradi va ziyorat hamda Umrada hamroh bo‘ladi.","Гидингиз сизни кутиб олади, жойлашишда ёрдам беради ва зиёрат ҳамда Умрада ҳамроҳ бўлади."))
+                        }.iumrahCard()
+                    } else { matchedHeader }
 
                     if adaptiveLayout.isWide {
                         HStack(alignment: .top, spacing: 20) {
@@ -297,7 +308,10 @@ struct TransferSelectionView: View {
                         haramainExpandedCard
                     }
 
-                    confirmationButton
+                    if familyFlow {
+                        Button(localized("Проверить поездку","Review trip","Safarni tekshirish","Сафарни текшириш")) { reviewing = true }
+                            .buttonStyle(IumrahPrimaryButtonStyle())
+                    } else { confirmationButton }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
                 .padding(.top, 10)
@@ -626,6 +640,27 @@ struct TransferSelectionView: View {
             .background(Color.iumrahRaisedBackground, in: Capsule())
     }
 
+    private var familyReview: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("07 / 08").font(.caption)
+                Text(localized("Ваша поездка","Your trip","Safaringiz","Сафарингиз")).font(.largeTitle.bold())
+                Label(journey.trip.originCode + " → " + journey.trip.outboundDestinationCode + " · " + journey.trip.returnOriginCode + " → " + journey.trip.originCode, systemImage: "airplane")
+                Text(dateRangeTitle)
+                Label(String(journey.trip.travelerCount), systemImage: "person.2")
+                if let hotel = journey.selectedHotel { Label(hotel.name, systemImage: "bed.double") }
+                if let hotel = journey.selectedMadinahHotel, includesMadinah { Label(hotel.name, systemImage: "bed.double") }
+                Label(selectedVehicle.rawValue.capitalized, systemImage: "car")
+                if journey.haramainTrainSelected { Label("Haramain", systemImage: "tram") }
+                Text(localized("Предварительная стоимость","Estimated total","Taxminiy narx","Тахминий нарх")).font(.caption)
+                Text(currentPackagePriceTitle).font(.title2.bold())
+                Button(localized("Изменить услуги","Edit services","Xizmatlarni o‘zgartirish","Хизматларни ўзгартириш")) { reviewing = false }
+                confirmationButton
+                if isConfirming { FamilyQuoteOrbit(still: reduceMotion).frame(maxWidth: .infinity) }
+            }.padding(20).disabled(isConfirming)
+        }
+    }
+
     private var confirmationButton: some View {
         Button {
             Task { await confirmTransfer() }
@@ -633,7 +668,7 @@ struct TransferSelectionView: View {
             HStack(spacing: 10) {
                 if isConfirming { ProgressView().tint(.white) }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(isConfirming ? confirmingTitle : confirmTitle)
+                    Text(isConfirming ? confirmingTitle : (familyFlow ? localized("Собрать пакет","Build package","Paketni yig‘ish","Пакетни йиғиш") : confirmTitle))
                     if !isConfirming {
                         Text(currentPackagePriceTitle)
                             .font(.caption.monospacedDigit())
@@ -654,6 +689,14 @@ struct TransferSelectionView: View {
     @MainActor
     private func startDiscoveryIfNeeded() async {
         journey.ensureHaramainTicketDefaults()
+        if familyFlow {
+            let choice = journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle()
+            selectedIndex = vehicles.firstIndex(of: choice) ?? 0
+            journey.chooseTransferVehicle(choice)
+            discoveryPhase = .matched
+            await refreshBasePackagePrice()
+            return
+        }
         journey.setHaramainFareClass(.economy)
 
         let selected = journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle()

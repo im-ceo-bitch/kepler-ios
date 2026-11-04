@@ -20,12 +20,35 @@ struct TripBuilderView: View {
     @State private var isLoadingCuratedFlights = false
     @State private var curatedDisplayMode: CuratedDisplayMode = .separate
 
+    var familyStep = 0
+    @State private var outboundDay = ""
+    @State private var returnDay = ""
+
     var body: some View {
         GeometryReader { proxy in
             let contentWidth = max(0, proxy.size.width - (IumrahDesign.pagePadding * 2))
 
             ScrollView {
                 VStack(spacing: 22) {
+                    if familyStep == 3 {
+                        Text("03 / 08").font(.caption)
+                        routeCard
+                        travelersCard
+                        NavigationLink {
+                            TripBuilderView(familyStep: 4)
+                        } label: {
+                            Text(familyCopy(settings.language,"Выбрать даты","Choose dates","Sanalarni tanlash","Саналарни танлаш"))
+                        }.buttonStyle(IumrahPrimaryButtonStyle())
+                    } else if familyStep == 4 {
+                        Text("04 / 08").font(.caption)
+                        familyDates
+                        packageCard
+                        NavigationLink {
+                            PrimaryHotelView(familyFlow: true)
+                        } label: { Text(L10n.text("trip_continue_hotel", settings.language)) }
+                        .buttonStyle(IumrahPrimaryButtonStyle())
+                        .disabled(!validFamilyFlights || !journey.trip.canContinue)
+                    } else {
                     IumrahGeneratorHeader(stage: .trip)
 
                     if adaptiveLayout.isWide {
@@ -64,6 +87,7 @@ struct TripBuilderView: View {
                         packageCard
                         continueButton
                     }
+                    }
                 }
                 .frame(width: contentWidth, alignment: .top)
                 .padding(.horizontal, IumrahDesign.pagePadding)
@@ -76,7 +100,7 @@ struct TripBuilderView: View {
         .iumrahInternalNavigation(progress: .trip, showsGeneratorAmbient: true)
         .task(id: curatedFlightsQueryKey) {
             curatedDisplayMode = .separate
-            await loadCuratedFlights()
+            if familyStep != 3 { await loadCuratedFlights() }
         }
         .onChange(of: routeSelectionKey) { _, _ in
             guard !journey.trip.isWeekendUmrah else { return }
@@ -86,6 +110,10 @@ struct TripBuilderView: View {
         .onAppear {
             // Package category is now the single hotel-level choice. This also
             // normalizes drafts created by builds where Standard defaulted to 4★.
+            if familyStep != 0 {
+                journey.trip.flexibility = .exact
+                journey.packageFlightPath = .publishedDirect
+            }
             journey.selectPackageTier(journey.trip.packageTier)
             curatedDisplayMode = .separate
 
@@ -111,6 +139,57 @@ struct TripBuilderView: View {
         }
     }
 
+
+    private var todayKey: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Tashkent")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+    private var familyOut: [CuratedFlightRecommendation] {
+        let today = todayKey
+        return (curatedOutboundFlights + curatedRoundTripFlights).filter { $0.outboundDate >= today }
+    }
+    private var validFamilyFlights: Bool {
+        if let id = journey.selectedPublishedCompleteID { return familyOut.contains { $0.id == id } }
+        return familyOut.contains { $0.id == journey.selectedPublishedOutboundID }
+            && curatedReturnFlights.contains { $0.id == journey.selectedPublishedReturnID }
+    }
+    @ViewBuilder private var familyDates: some View {
+        if isLoadingCuratedFlights { ProgressView() }
+        else if familyOut.isEmpty {
+            Text(curatedEmptyRowLabel)
+            Button { Task { await loadCuratedFlights() } } label: { Text(curatedFlightsTitle) }
+        } else {
+            Text(curatedOutboundRowTitle).font(.headline)
+            PublishedDayGrid(days: familyOut.map(\.outboundDate), selection: Binding(get: { outboundDay }, set: { key in
+                if key != outboundDay {
+                    journey.resetAfterTripChange()
+                    outboundDay = key
+                    returnDay = ""
+                }
+            }))
+            ForEach(familyOut.filter { $0.outboundDate == outboundDay }) { flight in
+                if flight.inbound != nil { curatedRoundTripCard(flight) }
+                else { curatedOneWayCard(flight, leg: flight.outbound, date: flight.outboundDate, selection: .outbound) }
+            }
+            if journey.selectedPublishedOutboundID != nil {
+                Text(curatedReturnRowTitle).font(.headline)
+                PublishedDayGrid(days: curatedReturnFlights.map(\.outboundDate), selection: Binding(get: { returnDay }, set: { key in
+                    if returnDay != key {
+                        journey.resetAfterTripChange(keepingPublishedFlightSelection: true)
+                        journey.selectedPublishedReturnID = nil
+                        returnDay = key
+                    }
+                }))
+                if curatedReturnFlights.isEmpty { Text(curatedEmptyRowLabel) }
+                ForEach(curatedReturnFlights.filter { $0.outboundDate == returnDay }) { flight in
+                    curatedOneWayCard(flight, leg: flight.outbound, date: flight.outboundDate, selection: .inbound)
+                }
+            }
+        }
+    }
 
     private var continueButton: some View {
         NavigationLink {
@@ -898,6 +977,10 @@ struct TripBuilderView: View {
                     systemImage: selection == .outbound ? "airplane.departure" : "airplane.arrival"
                 )
 
+                if familyStep == 4 {
+                    Text([leg.departureAt, leg.arrivalAt].map { String($0.dropFirst(11).prefix(5)) }.joined(separator: " → "))
+                        .font(.caption.monospacedDigit())
+                }
                 HStack {
                     Text(curatedChooseFlightLabel)
                         .font(.caption.weight(.bold))
@@ -1180,7 +1263,21 @@ struct TripBuilderView: View {
         isLoadingCuratedFlights = true
         defer { isLoadingCuratedFlights = false }
         do {
-            curatedFlights = try await CuratedFlightRecommendationService.shared.load(trip: journey.trip)
+            let loaded = try await CuratedFlightRecommendationService.shared.load(trip: journey.trip)
+            guard !Task.isCancelled else { return }
+            let now = Date()
+            let standard = ISO8601DateFormatter()
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            curatedFlights = familyStep == 4 ? loaded.filter { item in
+                let stamp = item.outbound.departureAt
+                if let departure = standard.date(from: stamp) ?? fractional.date(from: stamp) { return departure > now }
+                return item.outboundDate > todayKey
+            } : loaded
+            if familyStep == 4 {
+                outboundDay = familyOut.first { $0.id == journey.selectedPublishedOutboundID || $0.id == journey.selectedPublishedCompleteID }?.outboundDate ?? ""
+                returnDay = curatedReturnFlights.first { $0.id == journey.selectedPublishedReturnID }?.outboundDate ?? ""
+            }
 
             // Keep the currently chosen presentation whenever it has inventory. If a
             // route has only one published product shape, fall back automatically so
@@ -1196,6 +1293,7 @@ struct TripBuilderView: View {
                 curatedDisplayMode = .roundTrip
             }
         } catch {
+            guard !Task.isCancelled else { return }
             curatedFlights = []
         }
     }

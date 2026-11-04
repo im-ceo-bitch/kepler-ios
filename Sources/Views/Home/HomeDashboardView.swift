@@ -33,6 +33,10 @@ struct HomeDashboardView: View {
     @State private var showAboutProject = false
     @State private var selectedPilgrimTool: IumrahHomePilgrimTools.Tool?
 
+    @AppStorage("family.openBuilder") private var startFamily = false
+    @AppStorage(FamilyTripDraft.key) private var familyDraft = Data()
+    @State private var showFamily = false
+
     private struct ReadyPackageItem: Identifiable {
         let option: StorefrontFlightOption
         let preview: StorefrontFlightPackagePreview
@@ -45,6 +49,15 @@ struct HomeDashboardView: View {
 
     var body: some View {
         marketingHome
+            .onAppear {
+                if startFamily { startFamily = false; showFamily = true }
+            }
+            .navigationDestination(isPresented: $showFamily) {
+                TripBuilderView(familyStep: 3)
+                    .onChange(of: FamilyTripDraft(journey), initial: true) { _, value in
+                        if let data = try? JSONEncoder().encode(value), familyDraft != data { familyDraft = data }
+                    }
+            }
             .task(id: activeSession?.id) {
                 // Do not compete with the first app frame. Booking refresh begins only
                 // after Home is visibly mounted.
@@ -136,6 +149,21 @@ struct HomeDashboardView: View {
         ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 26) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(familyCopy(settings.language, "Персональная умра для вашей семьи", "Private Umrah for your family", "Oilangiz uchun shaxsiy Umra", "Оилангиз учун шахсий Умра"))
+                        .font(.system(.title, design: .rounded).bold())
+                    Text(familyCopy(settings.language, "Свой гид, отдельная машина и семейный номер.", "Your own guide, private car and family room.", "Shaxsiy gid, alohida mashina va oilaviy xona.", "Шахсий гид, алоҳида машина ва оилавий хона."))
+                    Button(!familyDraft.isEmpty
+                           ? familyCopy(settings.language,"Продолжить подбор","Continue planning","Tanlashni davom ettirish","Танлашни давом эттириш")
+                           : familyCopy(settings.language,"Рассчитать поездку","Price my trip","Safar narxini hisoblash","Сафар нархини ҳисоблаш")) {
+                        if let draft = try? JSONDecoder().decode(FamilyTripDraft.self, from: familyDraft) {
+                            draft.restore(journey)
+                        }
+                        showFamily = true
+                    }
+                        .buttonStyle(IumrahPrimaryButtonStyle())
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(.top)
+                readyPackagesSection
                 IumrahHomeHotelSearchView()
                     .padding(.top, 12)
 
@@ -160,7 +188,6 @@ struct HomeDashboardView: View {
                     onZiyarats: { showZiyarats = true }
                 )
 
-                readyPackagesSection
                 hotelFirstPackagesSection
                 homeIntegrationsSection
 

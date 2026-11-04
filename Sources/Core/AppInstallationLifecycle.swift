@@ -58,6 +58,7 @@ enum AppInstallationLifecycle {
             // app does not. Preserve a real update, purge stale legacy credentials
             // on a fresh/reinstalled container.
             let existingInstallation = UserDefaults.standard.bool(forKey: onboardingKey)
+                || UserDefaults.standard.bool(forKey: "iumrah.hasCompletedOnboarding.family.v1")
             if !existingInstallation && containsProtectedKeychainState() {
                 resetProtectedKeychainState()
             }

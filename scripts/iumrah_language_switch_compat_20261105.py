@@ -82,6 +82,22 @@ def run(apply:bool):
     if apply:
         for p,after in changed.items():p.write_text(after,'utf-8')
         print('APPLIED: these are English fallbacks, NOT completed translations.')
+        # Reconcile the known mismatched SwiftUI component signatures after
+        # language compatibility, before preflight's swiftc parse / Xcode build.
+        # Fail closed on checkout changes; do not silently rewrite unknown code.
+        import subprocess
+        import sys
+        repair = ROOT / 'scripts' / 'iumrah_compile_repair_20261105.py'
+        if not repair.is_file():
+            raise UnsafeChange('Missing guarded SwiftUI compile-repair helper')
+        process = subprocess.run([sys.executable, str(repair), '--apply'],
+                                 cwd=str(ROOT), capture_output=True, text=True)
+        if process.stdout:
+            print(process.stdout, end='')
+        if process.stderr:
+            print(process.stderr, end='', file=sys.stderr)
+        if process.returncode != 0:
+            raise UnsafeChange(f'Guarded SwiftUI repair refused checkout (exit {process.returncode})')
     else:print('CHECK ONLY: no files changed')
 
 if __name__=='__main__':

@@ -31,8 +31,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Repository preflight (Swift parsing + assets + locales)
+        id: preflight
         run: python3 scripts/ci_preflight.py
       - name: Require NEW Apple Team and new API credentials
+        id: credentials
         shell: bash
         run: |
           set -euo pipefail
@@ -53,6 +55,7 @@ jobs:
           print('Release marketing version:',v)
           PYCODE
       - name: Install Distribution certificate and provisioning profiles
+        id: signing
         shell: bash
         env:
           IOS_DIST_P12_BASE64: ${{ secrets.IOS_DIST_P12_BASE64 }}
@@ -109,6 +112,7 @@ jobs:
           PYCODE
           echo "IUMRAH_CI_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
       - name: Install .p8 API key on runner (ephemeral)
+        id: asc_key
         shell: bash
         run: |
           set -euo pipefail
@@ -121,9 +125,11 @@ jobs:
           echo "ASC_P8_PATH=$KEYFILE" >> "$GITHUB_ENV"
           unset ASC_API_KEY_P8
       - name: Determine build number by NEW App Store Connect App ID
+        id: build_number
         shell: bash
         run: ruby scripts/ci_next_testflight_build.rb
       - name: Prepare app icons and XcodeGen
+        id: project_generation
         shell: bash
         run: |
           set -euo pipefail
@@ -162,11 +168,13 @@ jobs:
           PYCODE
           xcodegen generate
       - name: Install Metal Toolchain
+        id: metal
         shell: bash
         run: |
           set -euo pipefail
           xcodebuild -downloadComponent MetalToolchain
       - name: Archive using Apple authenticated automatic signing
+        id: archive
         shell: bash
         run: |
           set -euo pipefail
@@ -184,6 +192,7 @@ jobs:
             MARKETING_VERSION="$MARKETING_VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             archive 2>&1 | tee "$RUNNER_TEMP/iumrah-archive.log"
       - name: Validate signed archive app and Widget ID
+        id: validate
         shell: bash
         run: |
           set -euo pipefail
@@ -204,6 +213,7 @@ jobs:
           codesign -d --entitlements :- "$APP" 2> /dev/null > "$RUNNER_TEMP/iumrah-signed-entitlements.plist"
           /usr/libexec/PlistBuddy -c 'Print :keychain-access-groups:0' "$RUNNER_TEMP/iumrah-signed-entitlements.plist" | grep -Fx "$APPLE_TEAM_ID.com.iumrah.shared"
       - name: Export IPA using new Apple Team
+        id: export
         shell: bash
         run: |
           set -euo pipefail
@@ -236,6 +246,7 @@ jobs:
           test -n "$IPA" || { echo 'No IPA produced'; exit 1; }
           echo "IPA_PATH=$IPA" >> "$GITHUB_ENV"
       - name: Upload to TestFlight (App Store Connect API, no app password)
+        id: testflight
         uses: apple-actions/upload-testflight-build@v5
         with:
           app-path: ${{ env.IPA_PATH }}
@@ -249,11 +260,49 @@ jobs:
           echo "### Uploaded iumrah $MARKETING_VERSION ($BUILD_NUMBER)" >> "$GITHUB_STEP_SUMMARY"
           echo "Apple Team: HVT4U96286 / App: 6759577859 / com.iumrah.app" >> "$GITHUB_STEP_SUMMARY"
           echo "Check App Store Connect → TestFlight after Apple's processing." >> "$GITHUB_STEP_SUMMARY"
-      - name: Save diagnostics (not signing materials)
-        if: failure()
+      # This step runs only after another step has already failed.
+      # It must not depend on GitHub artifact availability.
+      - name: Explain original failure in Actions logs and summary
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "### iumrah TestFlight — failed step summary"
+            echo "This summary is available even if upload-artifact is offline."
+            echo ""
+            echo "| Step | Result |"
+            echo "| --- | --- |"
+            echo '| Preflight | ${{ steps.preflight.outcome }} |'
+            echo '| Apple credentials | ${{ steps.credentials.outcome }} |'
+            echo '| Signing certificate and profiles | ${{ steps.signing.outcome }} |'
+            echo '| App Store Connect API key | ${{ steps.asc_key.outcome }} |'
+            echo '| Build number | ${{ steps.build_number.outcome }} |'
+            echo '| XcodeGen / icons | ${{ steps.project_generation.outcome }} |'
+            echo '| Metal toolchain | ${{ steps.metal.outcome }} |'
+            echo '| Xcode archive | ${{ steps.archive.outcome }} |'
+            echo '| Code signing validation | ${{ steps.validate.outcome }} |'
+            echo '| IPA export | ${{ steps.export.outcome }} |'
+            echo '| TestFlight upload | ${{ steps.testflight.outcome }} |'
+            echo ""
+            echo "Open the earliest step with result **failure** above for its actual error."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          for logfile in "$RUNNER_TEMP/iumrah-archive.log" "$RUNNER_TEMP/iumrah-export.log"; do
+            if [ -f "$logfile" ]; then
+              echo "::group::Relevant build messages: $(basename "$logfile")"
+              grep -Ei '(error:|fatal error:|\*\* (archive|export) failed|provisioning profile|code signing failed|exportarchive:|unable to)' "$logfile" | tail -n 60 || true
+              echo "::endgroup::"
+            fi
+          done
+
+      # Best-effort diagnostics. A GitHub DNS/network outage must not obscure
+      # the real failure recorded in the summary and the previous steps.
+      - name: Save diagnostics (optional — not signing materials)
+        if: ${{ failure() }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: iumrah-upload-diagnostics-${{ github.run_id }}
+          name: iumrah-upload-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/iumrah-archive.log
             ${{ runner.temp }}/iumrah-export.log

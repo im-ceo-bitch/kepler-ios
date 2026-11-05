@@ -19,11 +19,11 @@ struct PackagePriceView: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Text(formatted)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .font(IumrahType.bold(24, relativeTo: .title2))
             if showsPerPerson {
                 Text(L10n.text("price_per_person", settings.language))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .font(IumrahType.caption)
+                    .foregroundStyle(Color.iumrahMuted)
             }
         }
     }

@@ -37,10 +37,6 @@ struct HotelDetailView: View {
     @State private var selectedPackageVariantIndex = 0
     @State private var selectedPackageVariantScrollID: Int? = 0
     @State private var hasAppliedInitialPackageSelection = false
-    // A drag in the horizontal carousel must never open a package.
-    // This is updated only for actual drags (not for ordinary taps).
-    @State private var lastPackageCarouselDragAt = Date.distantPast
-    @GestureState private var isPackageCarouselDragging = false
 
     private let service = HotelCatalogService()
     private let packageEngine = RemotePackageEngineClient()
@@ -128,9 +124,7 @@ struct HotelDetailView: View {
         }
         .onChange(of: selectedPackageVariantIndex) { oldValue, newValue in
             guard oldValue != newValue, hotelPackagePreviews.indices.contains(newValue) else { return }
-            // scrollPosition already tracks the user's swipe. Writing it back
-            // during that swipe can unexpectedly reposition the card under the
-            // finger and turn a scrolling interaction into a button press.
+            selectedPackageVariantScrollID = newValue
             IumrahHaptics.selection()
         }
         .fullScreenCover(isPresented: $isGalleryPresented) {
@@ -185,9 +179,7 @@ struct HotelDetailView: View {
     private var packageShareUnavailableText: String {
         switch settings.language {
         case .russian: return "Не удалось подготовить пакет для отправки. Обновите цены и попробуйте ещё раз."
-        case .turkish: return TurkishLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
-        case .arabic: return ArabicLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
-        case .indonesian, .malay, .english: return "The package could not be prepared for sharing. Refresh pricing and try again."
+        case .english: return "The package could not be prepared for sharing. Refresh pricing and try again."
         case .uzbek: return "Paketni ulashish uchun tayyorlab bo‘lmadi. Narxlarni yangilang va qayta urinib ko‘ring."
         case .uzbekCyrillic: return "Пакетни улашиш учун тайёрлаб бўлмади. Нархларни янгиланг ва қайта уриниб кўринг."
         }
@@ -196,9 +188,7 @@ struct HotelDetailView: View {
     private var packageShareErrorTitle: String {
         switch settings.language {
         case .russian: return "Не удалось поделиться"
-        case .turkish: return TurkishLocalization.phrase("Could not share")
-        case .arabic: return ArabicLocalization.phrase("Could not share")
-        case .indonesian, .malay, .english: return "Could not share"
+        case .english: return "Could not share"
         case .uzbek: return "Ulashib bo‘lmadi"
         case .uzbekCyrillic: return "Улашиб бўлмади"
         }
@@ -207,9 +197,7 @@ struct HotelDetailView: View {
     private var packageShareErrorDismiss: String {
         switch settings.language {
         case .russian: return "Понятно"
-        case .turkish: return TurkishLocalization.phrase("OK")
-        case .arabic: return ArabicLocalization.phrase("OK")
-        case .indonesian, .malay, .english: return "OK"
+        case .english: return "OK"
         case .uzbek: return "Tushunarli"
         case .uzbekCyrillic: return "Тушунарли"
         }
@@ -286,7 +274,7 @@ struct HotelDetailView: View {
     private var identitySection: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let stars = hotel.stars {
-                Text(String(repeating: "★", count: max(0, min(5, stars))))
+                Text(String(repeating: "★", count: stars))
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.secondary)
             }
@@ -342,7 +330,7 @@ struct HotelDetailView: View {
                 }
                 .padding(18)
                 .background(Color.iumrahCardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -383,15 +371,12 @@ struct HotelDetailView: View {
                     }
                     .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
                     .scrollPosition(id: $selectedPackageVariantScrollID, anchor: .leading)
-                    .simultaneousGesture(packageCarouselSwipeGesture)
                     .onChange(of: selectedPackageVariantScrollID) { _, newValue in
                         guard let newValue, hotelPackagePreviews.indices.contains(newValue), selectedPackageVariantIndex != newValue else { return }
                         selectedPackageVariantIndex = newValue
                     }
                 }
-                // Date strings can span two lines in RU/UZ, especially on iPhone
-                // mini. 332pt was shorter than the card's actual content height.
-                .frame(height: 402)
+                .frame(height: 332)
 
                 if hotelPackagePreviews.count > 1 {
                     HStack(spacing: 7) {
@@ -407,32 +392,6 @@ struct HotelDetailView: View {
                 }
             }
         }
-    }
-
-    // Observe a swipe without replacing SwiftUI's native ScrollView gesture.
-    // A simultaneous gesture leaves scrolling, view alignment and snapping intact.
-    private var packageCarouselSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 8, coordinateSpace: .local)
-            .updating($isPackageCarouselDragging) { _, isDragging, _ in
-                isDragging = true
-            }
-            .onChanged { value in
-                if abs(value.translation.width) >= 8 || abs(value.translation.height) >= 8 {
-                    lastPackageCarouselDragAt = Date()
-                }
-            }
-            .onEnded { _ in
-                lastPackageCarouselDragAt = Date()
-            }
-    }
-
-    private func openPackageConfiguratorFromExplicitTap(_ preview: StorefrontFlightPackagePreview) {
-        // Defend against touch-up delivered to a Button while the horizontally
-        // snapping scroll view is finishing a drag/deceleration.
-        guard !isPackageCarouselDragging,
-              Date().timeIntervalSince(lastPackageCarouselDragAt) > 0.35 else { return }
-        IumrahHaptics.selection()
-        selectedConfiguratorPreview = preview
     }
 
     private func synchronizeSelectedPackageVariant() {
@@ -490,12 +449,11 @@ struct HotelDetailView: View {
             }
 
             Text(packageVariantDateRange(preview))
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .bold, design: .rounded))
                 .tracking(-0.45)
                 .foregroundStyle(accent.text)
                 .lineLimit(2)
-                .minimumScaleFactor(0.72)
-                .fixedSize(horizontal: false, vertical: true)
+                .minimumScaleFactor(0.78)
 
             HStack(alignment: .lastTextBaseline, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -535,14 +493,15 @@ struct HotelDetailView: View {
             Spacer(minLength: 0)
 
             Button {
-                openPackageConfiguratorFromExplicitTap(preview)
+                IumrahHaptics.selection()
+                selectedConfiguratorPreview = preview
             } label: {
                 HStack(spacing: 9) {
                     Image(systemName: "slider.horizontal.3")
                     Text(L10n.text("hotel_detail_open_configurator", settings.language))
                         .font(.subheadline.weight(.bold))
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.forward")
+                    Image(systemName: "chevron.right")
                         .font(.caption.weight(.bold))
                 }
                 .foregroundStyle(.white)
@@ -565,9 +524,7 @@ struct HotelDetailView: View {
     private var packageTravelersLabel: String {
         switch settings.language {
         case .russian: return "паломников"
-        case .turkish: return TurkishLocalization.phrase("travelers")
-        case .arabic: return ArabicLocalization.phrase("travelers")
-        case .indonesian, .malay, .english: return "travelers"
+        case .english: return "travelers"
         case .uzbek: return "ziyoratchi"
         case .uzbekCyrillic: return "зиёратчи"
         }
@@ -599,9 +556,7 @@ struct HotelDetailView: View {
     private var durationFocusLabel: String {
         switch settings.language {
         case .russian: return "ДЛИТЕЛЬНОСТЬ"
-        case .turkish: return TurkishLocalization.phrase("DURATION")
-        case .arabic: return ArabicLocalization.phrase("DURATION")
-        case .indonesian, .malay, .english: return "DURATION"
+        case .english: return "DURATION"
         case .uzbek: return "DAVOMIYLIGI"
         case .uzbekCyrillic: return "ДАВОМИЙЛИГИ"
         }
@@ -771,8 +726,8 @@ struct HotelDetailView: View {
         }
         .padding(18)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
     }
 
     @ViewBuilder
@@ -892,9 +847,9 @@ struct HotelDetailView: View {
         .padding(18)
         .frame(minHeight: canSelectRooms ? 214 : 168, alignment: .topLeading)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(selected ? Color.iumrahCareLight.opacity(0.55) : Color.primary.opacity(0.055), lineWidth: selected ? 1.2 : 0.6)
         }
     }
@@ -1120,9 +1075,7 @@ struct HotelDetailView: View {
         let normalized = normalize(raw)
         if normalized.contains("twin") && normalized.contains("city view") {
             switch settings.language {
-            case .turkish: return TurkishLocalization.phrase("Twin Room · City View")
-            case .arabic: return ArabicLocalization.phrase("Twin Room · City View")
-            case .indonesian, .malay, .english: return "Twin Room · City View"
+            case .english: return "Twin Room · City View"
             case .russian: return "Twin · Вид на город"
             case .uzbek: return "Twin xona · Shahar manzarasi"
             case .uzbekCyrillic: return "Twin хона · Шаҳар манзараси"
@@ -1130,9 +1083,7 @@ struct HotelDetailView: View {
         }
         if normalized.contains("king") && normalized.contains("city view") {
             switch settings.language {
-            case .turkish: return TurkishLocalization.phrase("King Room · City View")
-            case .arabic: return ArabicLocalization.phrase("King Room · City View")
-            case .indonesian, .malay, .english: return "King Room · City View"
+            case .english: return "King Room · City View"
             case .russian: return "King · Вид на город"
             case .uzbek: return "King xona · Shahar manzarasi"
             case .uzbekCyrillic: return "King хона · Шаҳар манзараси"
@@ -1140,9 +1091,7 @@ struct HotelDetailView: View {
         }
         if normalized.contains("double") && normalized.contains("city view") {
             switch settings.language {
-            case .turkish: return TurkishLocalization.phrase("Double Room · City View")
-            case .arabic: return ArabicLocalization.phrase("Double Room · City View")
-            case .indonesian, .malay, .english: return "Double Room · City View"
+            case .english: return "Double Room · City View"
             case .russian: return "Двухместный · Вид на город"
             case .uzbek: return "Ikki kishilik xona · Shahar manzarasi"
             case .uzbekCyrillic: return "Икки кишилик хона · Шаҳар манзараси"
@@ -1219,7 +1168,7 @@ struct HotelDetailView: View {
                     Marker(hotel.name, coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
                 }
                 .frame(height: 245)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
 
                 if let url = AppConfig.absoluteURL(detail.googleMapsURL) {
                     Link(destination: url) {
@@ -1555,8 +1504,6 @@ struct HotelDetailView: View {
         do {
             let loaded = try await service.hotelDetail(id: hotel.id)
             detail = loaded
-            selectedImageIndex = 0  // Response may contain fewer photos than cached metadata.
-            roomImageIndices = [:]
             storefront.ingest(detail: loaded)
         } catch {
             errorMessage = L10n.text("hotels_load_error", settings.language)

@@ -3,7 +3,7 @@ import Foundation
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @AppStorage("iumrah.hasCompletedOnboarding.family.v1") private var hasCompletedOnboarding = false
+    @AppStorage("iumrah.hasCompletedOnboarding.cinematic.v4") private var hasCompletedOnboarding = false
     @StateObject private var settings = AppSettingsStore()
     @ObservedObject var chrome: AppChromeStore
     @StateObject private var journey = JourneyStore()
@@ -19,8 +19,6 @@ struct RootView: View {
             rootContent
         }
             .preferredColorScheme(settings.appearance.colorScheme)
-            .environment(\.locale, Locale(identifier: settings.language.localeIdentifier))
-            .environment(\.layoutDirection, settings.language.isRightToLeft ? .rightToLeft : .leftToRight)
             .environmentObject(settings)
             .environmentObject(chrome)
             .environmentObject(journey)
@@ -78,8 +76,6 @@ struct RootView: View {
                 }
             }
             .onChange(of: settings.language.rawValue) { _, _ in
-                // Update widget strings and dates on every in-app language change.
-                syncWidgets()
                 guard hasCompletedOnboarding else { return }
                 Task {
                     await syncPushSubscriptions()
@@ -240,8 +236,7 @@ struct RootView: View {
         IumrahWidgetSyncService.sync(
             bookings: bookings.sessions,
             account: account.account,
-            plannedTrip: UmrahPlanStore.shared.trip,
-            languageCode: settings.language.rawValue
+            plannedTrip: UmrahPlanStore.shared.trip
         )
     }
 
@@ -359,8 +354,7 @@ struct RootView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.985)))
             } else {
-                FamilyWelcome { startBuilder in
-                    UserDefaults.standard.set(startBuilder, forKey: "family.openBuilder")
+                OnboardingFlowView {
                     withAnimation(.easeInOut(duration: 0.34)) {
                         hasCompletedOnboarding = true
                     }
@@ -369,19 +363,6 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.28), value: hasCompletedOnboarding)
-    }
-
-    private var accountTabTitle: String {
-        switch settings.language {
-        case .russian: return "Аккаунт"
-        case .uzbek: return "Akkaunt"
-        case .uzbekCyrillic: return "Аккаунт"
-        case .arabic: return "الحساب"
-        case .turkish: return "Hesabım"
-        case .indonesian: return "Akun saya"
-        case .malay: return "Akaun"
-        case .english: return "Account"
-        }
     }
 
     private var tabs: some View {
@@ -403,13 +384,16 @@ struct RootView: View {
                 .tag(AppTab.care)
 
             tabScreen(for: .account) { IumrahAccountView() }
-                .tabItem { Label(accountTabTitle, systemImage: "person.crop.circle") }
+                .tabItem { Label(AppTab.account.title(for: settings.language), systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
-        // Keep the real iOS TabView bar: iOS 26 provides the native,
-        // interactive Liquid Glass capsule and selection animation.
-        // Only the accent and native UIKit selection indicator are tinted.
-        .tint(Color.iumrahSignatureBlack)
+        // Navigation chrome uses one restrained app accent; content icons carry
+        // the richer semantic palette. This keeps the native tab bar adult and legible.
+        .tint(Color.iumrahInk)
+        .toolbarBackground(Color.iumrahHeaderBackground, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
+        .onAppear { IumrahTabBarAppearance.configure() }
+        .toolbar((chrome.isImmersiveMode || chrome.isInternalNavigationActive) ? .hidden : .visible, for: .tabBar)
     }
 
     @ViewBuilder

@@ -72,13 +72,10 @@ struct CareChatMessageRow: View {
                 } else {
                     // Messages-style incoming bubble: always an opaque system surface.
                     // Wallpaper never bleeds through the text, so contrast stays stable.
-                    shape.fill(Color(uiColor: .secondarySystemBackground).opacity(wallpaperActive ? 0.98 : 1))
+                    shape.fill(Color.iumrahCardBackground.opacity(wallpaperActive ? 0.98 : 1))
                 }
             }
-            .overlay {
-                shape.stroke(incomingStrokeColor, lineWidth: isMine ? 0 : 0.55)
-            }
-            .shadow(color: bubbleShadow, radius: 1.2, y: 0.6)
+
             .contentShape(shape)
             .accessibilityElement(children: .combine)
     }
@@ -95,7 +92,7 @@ struct CareChatMessageRow: View {
             let trimmed = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
                 Text(message.body)
-                    .font(.system(size: 17, weight: .regular))
+                    .font(IumrahType.body)
                     .foregroundStyle(isMine ? Color.white : Color.primary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -125,7 +122,7 @@ struct CareChatMessageRow: View {
     }
 
     private var outgoingBubbleColor: Color {
-        Color(uiColor: .systemBlue)
+        Color.iumrahInk
     }
 
     private var incomingStrokeColor: Color {
@@ -150,9 +147,7 @@ struct CareChatMessageRow: View {
 
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch language {
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
-        case .indonesian, .malay, .english: return en
+        case .english: return en
         case .russian: return ru
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

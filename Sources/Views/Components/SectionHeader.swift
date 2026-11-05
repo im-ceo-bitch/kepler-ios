@@ -15,17 +15,17 @@ struct SectionHeader: View {
         VStack(alignment: .leading, spacing: 7) {
             if let eyebrow {
                 Text(eyebrow.uppercased())
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(IumrahType.bold(12, relativeTo: .caption))
+                    .foregroundStyle(Color.iumrahMuted)
                     .tracking(0.7)
             }
             Text(title)
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .font(IumrahType.sectionTitle)
                 .tracking(-0.7)
             if let subtitle {
                 Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(IumrahType.secondary)
+                    .foregroundStyle(Color.iumrahMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -41,7 +41,6 @@ struct FinalPackageView: View {
     @State private var isLoadingComparisons = false
     @State private var isApplyingComparison = false
 
-    var familyFlow = false
     private var needsMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
     private var canBook: Bool {
         journey.hasFinalGeneratorQuote &&
@@ -78,19 +77,7 @@ struct FinalPackageView: View {
                                     .frame(width: 0, height: 0)
 
                                 IumrahGeneratorHeader(stage: .ready)
-                                if familyFlow, let quote = journey.quote, journey.hasFinalGeneratorQuote {
-                                    VStack(spacing: 6) {
-                                        IumrahFoundationCompactSteps(total: 8, current: 8, language: settings.language)
-                                        Text(familyCopy(settings.language,"Итого за всю семью","Total for your family","Oila uchun jami","Оила учун жами")).font(.headline)
-                                        Text(money(quote.totalPackagePrice, quote.currency)).font(.largeTitle.bold())
-                                        Text(money(quote.pricePerPerson, quote.currency) + " / " + perPersonShortTitle)
-                                        Text(familyCopy(settings.language,"Наличие подтвердим до оплаты.","We confirm availability before payment.","To‘lovdan oldin mavjudligini tasdiqlaymiz.","Тўловдан олдин мавжудлигини тасдиқлаймиз.")).font(.footnote)
-                                    }
-                                }
                                 packageHeader
-                                if journey.hasFinalGeneratorQuote {
-                                    packageAssemblyCard
-                                }
                                 if journey.quote != nil, journey.hasFinalGeneratorQuote {
                                     packageTierCarousel
                                     packageRecommendationCard
@@ -141,10 +128,11 @@ struct FinalPackageView: View {
             }
             await push.refreshAndRegisterIfAllowed()
         }
-        .navigationDestination(isPresented: $isProfileSheetPresented) {
-            IumrahBookingConfirmationView(createBooking: { profile in
-                try await createBooking(profile: profile)
-            })
+        .sheet(isPresented: $isProfileSheetPresented) {
+            BookingProfileCaptureSheet {
+                Task { await createBooking() }
+            }
+            .environmentObject(settings)
         }
         .sheet(isPresented: $showCareExplanation) {
             UmrahCarePackageExplanationView()
@@ -261,9 +249,7 @@ struct FinalPackageView: View {
     private var calculatingPriceTitle: String {
         switch settings.language {
         case .russian: return "Рассчитываем цену пакета"
-        case .turkish: return TurkishLocalization.phrase("Calculating your package price")
-        case .arabic: return ArabicLocalization.phrase("Calculating your package price")
-        case .indonesian, .malay, .english: return "Calculating your package price"
+        case .english: return "Calculating your package price"
         case .uzbek: return "Paket narxi hisoblanmoqda"
         case .uzbekCyrillic: return "Пакет нархи ҳисобланмоқда"
         }
@@ -272,9 +258,7 @@ struct FinalPackageView: View {
     private var calculatingPriceBody: String {
         switch settings.language {
         case .russian: return "Собираем выбранные перелёты, отели и услуги в одну итоговую цену поездки."
-        case .turkish: return TurkishLocalization.phrase("Combining your selected flights, hotels and services into one trip price.")
-        case .arabic: return ArabicLocalization.phrase("Combining your selected flights, hotels and services into one trip price.")
-        case .indonesian, .malay, .english: return "Combining your selected flights, hotels and services into one trip price."
+        case .english: return "Combining your selected flights, hotels and services into one trip price."
         case .uzbek: return "Tanlangan reyslar, mehmonxonalar va xizmatlarni safarning yagona narxiga birlashtiramiz."
         case .uzbekCyrillic: return "Танланган рейслар, меҳмонхоналар ва хизматларни сафарнинг ягона нархига бирлаштирамиз."
         }
@@ -283,9 +267,7 @@ struct FinalPackageView: View {
     private var pricingUnavailableTitle: String {
         switch settings.language {
         case .russian: return "Не удалось обновить пакет"
-        case .turkish: return TurkishLocalization.phrase("The package could not be refreshed")
-        case .arabic: return ArabicLocalization.phrase("The package could not be refreshed")
-        case .indonesian, .malay, .english: return "The package could not be refreshed"
+        case .english: return "The package could not be refreshed"
         case .uzbek: return "Paketni yangilab bo‘lmadi"
         case .uzbekCyrillic: return "Пакетни янгилаб бўлмади"
         }
@@ -294,9 +276,7 @@ struct FinalPackageView: View {
     private var pricingUnavailableBody: String {
         switch settings.language {
         case .russian: return "Ваш выбор сохранён. Повторная проверка обновит доступность выбранных отелей и пересчитает поездку без потери маршрута."
-        case .turkish: return TurkishLocalization.phrase("Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route.")
-        case .arabic: return ArabicLocalization.phrase("Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route.")
-        case .indonesian, .malay, .english: return "Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route."
+        case .english: return "Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route."
         case .uzbek: return "Tanlovlaringiz saqlanadi. Qayta tekshirish mehmonxona mavjudligini yangilaydi va yo‘nalishni yo‘qotmasdan safarni qayta hisoblaydi."
         case .uzbekCyrillic: return "Танловларингиз сақланади. Қайта текшириш меҳмонхона мавжудлигини янгилайди ва йўналишни йўқотмасдан сафарни қайта ҳисоблайди."
         }
@@ -309,9 +289,7 @@ struct FinalPackageView: View {
     private var changeHotelTitle: String {
         switch settings.language {
         case .russian: return "Изменить отель"
-        case .turkish: return TurkishLocalization.phrase("Change hotel")
-        case .arabic: return ArabicLocalization.phrase("Change hotel")
-        case .indonesian, .malay, .english: return "Change hotel"
+        case .english: return "Change hotel"
         case .uzbek: return "Mehmonxonani o‘zgartirish"
         case .uzbekCyrillic: return "Меҳмонхонани ўзгартириш"
         }
@@ -320,9 +298,7 @@ struct FinalPackageView: View {
     private var retryPricingTitle: String {
         switch settings.language {
         case .russian: return "Повторно проверить пакет"
-        case .turkish: return TurkishLocalization.phrase("Recheck package")
-        case .arabic: return ArabicLocalization.phrase("Recheck package")
-        case .indonesian, .malay, .english: return "Recheck package"
+        case .english: return "Recheck package"
         case .uzbek: return "Narxni qayta olish"
         case .uzbekCyrillic: return "Нархни қайта олиш"
         }
@@ -349,7 +325,7 @@ struct FinalPackageView: View {
                             .minimumScaleFactor(0.85)
                         Spacer(minLength: 6)
                         if !isSubmitting {
-                            Image(systemName: "arrow.forward")
+                            Image(systemName: "arrow.right")
                                 .font(.system(size: 14, weight: .bold))
                         }
                     }
@@ -376,7 +352,7 @@ struct FinalPackageView: View {
                             .minimumScaleFactor(0.78)
                         Spacer(minLength: 6)
                         if !isApplyingComparison {
-                            Image(systemName: "arrow.forward")
+                            Image(systemName: "arrow.right")
                                 .font(.system(size: 13, weight: .bold))
                         }
                     }
@@ -399,77 +375,14 @@ struct FinalPackageView: View {
                 .tracking(1.25)
                 .foregroundStyle(.secondary)
             Text(FlowCopy.text(.finalTitle, settings.language))
-                .font(IumrahFoundation.TypeStyle.hero)
+                .font(.system(size: 34, weight: .bold, design: .rounded))
                 .tracking(-0.9)
-                .accessibilityAddTraits(.isHeader)
             Text(FlowCopy.text(.finalBody, settings.language))
-                .font(IumrahFoundation.TypeStyle.body)
+                .font(.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var selectedOrbitServices: [IumrahOrbitService] {
-        var items: [IumrahOrbitService] = []
-        if journey.selectedOutbound != nil {
-            items.append(.init(id: "outbound", symbol: "airplane.departure"))
-        }
-        if journey.selectedHotel != nil {
-            items.append(.init(id: "makkahHotel", symbol: "building.2.fill"))
-        }
-        if needsMadinah && journey.selectedMadinahHotel != nil {
-            items.append(.init(id: "madinahHotel", symbol: "building.2.fill"))
-        }
-        if journey.selectedInbound != nil {
-            items.append(.init(id: "return", symbol: "airplane.arrival"))
-        }
-        items.append(.init(id: "transfer", symbol: "car.side.fill"))
-        if journey.haramainTrainSelected {
-            items.append(.init(id: "haramain", symbol: "tram.fill"))
-        }
-        items.append(.init(id: "ziyarat", symbol: "mappin.and.ellipse"))
-        items.append(.init(id: "guide", symbol: "person.2.fill"))
-        items.append(.init(id: "care", symbol: "heart.fill"))
-        items.append(.init(id: "visa", symbol: "doc.text.fill"))
-        items.append(.init(id: "meals", symbol: "fork.knife"))
-        items.append(.init(id: "esim", symbol: "antenna.radiowaves.left.and.right"))
-        return items
-    }
-
-    private var packageAssemblyCard: some View {
-        IumrahFoundationCard(dark: true) {
-            VStack(spacing: IumrahFoundation.Space.sm) {
-            Text(localizedFinal("ОДИН ПАКЕТ", "ONE PACKAGE", "BITTA PAKET", "БИТТА ПАКЕТ"))
-                .font(IumrahFoundation.TypeStyle.eyebrow)
-                .tracking(1.7)
-                .foregroundStyle(.white.opacity(0.55))
-
-            IumrahOrbitIconRing(
-                mode: .assembling,
-                services: selectedOrbitServices,
-                diameter: 238,
-                lightOnDark: true
-            )
-            .frame(maxWidth: .infinity)
-
-            Text(localizedFinal("Ваша Умра собрана", "Your Umrah package is assembled",
-                                "Umra paketingiz yig‘ildi", "Умра пакетингиз йиғилди"))
-                .font(IumrahFoundation.TypeStyle.title)
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-
-            Text(localizedFinal("Выбранные услуги объединены в один пакет. Бронирование ещё не создано.",
-                                "Selected services form one package. Booking has not been created yet.",
-                                "Tanlangan xizmatlar bitta paketda. Bron hali yaratilmagan.",
-                                "Танланган хизматлар битта пакетда. Брон ҳали яратилмаган."))
-                .font(IumrahFoundation.TypeStyle.body)
-                .foregroundStyle(.white.opacity(0.67))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity)
-        }
     }
 
     private var packageTierCarousel: some View {
@@ -666,7 +579,7 @@ struct FinalPackageView: View {
                             .lineLimit(1)
                         Spacer(minLength: 8)
                         if !isApplyingComparison {
-                            Image(systemName: "arrow.forward")
+                            Image(systemName: "arrow.right")
                                 .font(.system(size: 12, weight: .bold))
                         }
                     }
@@ -773,9 +686,7 @@ struct FinalPackageView: View {
     private var continueBelowTitle: String {
         switch settings.language {
         case .russian: return "Продолжение — внизу страницы"
-        case .turkish: return TurkishLocalization.phrase("Continue below on this page")
-        case .arabic: return ArabicLocalization.phrase("Continue below on this page")
-        case .indonesian, .malay, .english: return "Continue below on this page"
+        case .english: return "Continue below on this page"
         case .uzbek: return "Davomi sahifa pastida"
         case .uzbekCyrillic: return "Давоми саҳифа пастида"
         }
@@ -784,9 +695,7 @@ struct FinalPackageView: View {
     private var changePackageBelowTitle: String {
         switch settings.language {
         case .russian: return "Выбор пакета — кнопкой внизу"
-        case .turkish: return TurkishLocalization.phrase("Choose this package with the button below")
-        case .arabic: return ArabicLocalization.phrase("Choose this package with the button below")
-        case .indonesian, .malay, .english: return "Choose this package with the button below"
+        case .english: return "Choose this package with the button below"
         case .uzbek: return "Paketni pastdagi tugma bilan tanlang"
         case .uzbekCyrillic: return "Пакетни пастдаги тугма билан танланг"
         }
@@ -832,9 +741,9 @@ struct FinalPackageView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.56), lineWidth: 0.9)
         }
     }
@@ -966,9 +875,9 @@ struct FinalPackageView: View {
             }
             .padding(18)
             .background(Color.iumrahCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.7)
             }
         }
@@ -991,7 +900,7 @@ struct FinalPackageView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
-                    Image(systemName: "arrow.forward")
+                    Image(systemName: "arrow.right")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.tertiary)
                     Text(target)
@@ -1306,8 +1215,8 @@ struct FinalPackageView: View {
         }
         .padding(20)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
     }
 
     @ViewBuilder
@@ -1574,7 +1483,7 @@ struct FinalPackageView: View {
 
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(settings.language == .turkish ? "Standart" : "Standard").font(.subheadline.weight(.bold))
+                    Text("Standard").font(.subheadline.weight(.bold))
                     Text("\(max(1, journey.haramainTicketCount)) × $150")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1736,12 +1645,8 @@ struct FinalPackageView: View {
         switch (settings.language, city) {
         case (.russian, .makkah): return "Мекка"
         case (.russian, .madinah): return "Медина"
-        case (.turkish, .makkah): return TurkishLocalization.phrase("Makkah")
-        case (.arabic, .makkah): return ArabicLocalization.phrase("Makkah")
-        case (.indonesian, .makkah), (.malay, .makkah), (.english, .makkah): return "Makkah"
-        case (.turkish, .madinah): return TurkishLocalization.phrase("Madinah")
-        case (.arabic, .madinah): return ArabicLocalization.phrase("Madinah")
-        case (.indonesian, .madinah), (.malay, .madinah), (.english, .madinah): return "Madinah"
+        case (.english, .makkah): return "Makkah"
+        case (.english, .madinah): return "Madinah"
         case (.uzbek, .makkah): return "Makka"
         case (.uzbek, .madinah): return "Madina"
         case (.uzbekCyrillic, .makkah): return "Макка"
@@ -1797,9 +1702,7 @@ struct FinalPackageView: View {
     private func localizedFinal(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
-        case .indonesian, .malay, .english: return en
+        case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
         }
@@ -1880,9 +1783,9 @@ struct FinalPackageView: View {
             .padding(18)
         }
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
         }
     }
@@ -1890,9 +1793,7 @@ struct FinalPackageView: View {
     private var careCardTitle: String {
         switch settings.language {
         case .russian: return "Мы проверим баланс цены и маршрута"
-        case .turkish: return TurkishLocalization.phrase("We review the balance between price and itinerary")
-        case .arabic: return ArabicLocalization.phrase("We review the balance between price and itinerary")
-        case .indonesian, .malay, .english: return "We review the balance between price and itinerary"
+        case .english: return "We review the balance between price and itinerary"
         case .uzbek: return "Narx va yo‘nalish muvozanatini tekshiramiz"
         case .uzbekCyrillic: return "Нарх ва йўналиш мувозанатини текширамиз"
         }
@@ -1901,9 +1802,7 @@ struct FinalPackageView: View {
     private var careCardBody: String {
         switch settings.language {
         case .russian: return "Если текущая цена выше ожидаемой или даты гибкие, специалисты iumrah Care дополнительно проверят более удобные прямые рейсы, логичное распределение ночей и отели ближе к ключевым местам — без потери качества поездки."
-        case .turkish: return TurkishLocalization.phrase("If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey.")
-        case .arabic: return ArabicLocalization.phrase("If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey.")
-        case .indonesian, .malay, .english: return "If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey."
+        case .english: return "If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey."
         case .uzbek: return "Agar joriy narx kutilganidan yuqori bo‘lsa yoki sanalaringiz moslashuvchan bo‘lsa, iumrah Care qulayroq to‘g‘ridan-to‘g‘ri reyslar, tunlarning mantiqiy taqsimoti va yaqinroq mehmonxonalarni qo‘shimcha tekshiradi."
         case .uzbekCyrillic: return "Агар жорий нарх кутилганидан юқори бўлса ёки саналарингиз мослашувчан бўлса, iumrah Care қулайроқ тўғридан-тўғри рейслар, тунларнинг мантиқий тақсимоти ва яқинроқ меҳмонхоналарни қўшимча текширади."
         }
@@ -1912,9 +1811,7 @@ struct FinalPackageView: View {
     private var careHowItWorks: String {
         switch settings.language {
         case .russian: return "Как это работает"
-        case .turkish: return TurkishLocalization.phrase("How it works")
-        case .arabic: return ArabicLocalization.phrase("How it works")
-        case .indonesian, .malay, .english: return "How it works"
+        case .english: return "How it works"
         case .uzbek: return "Qanday ishlaydi"
         case .uzbekCyrillic: return "Қандай ишлайди"
         }
@@ -2006,44 +1903,63 @@ struct FinalPackageView: View {
     }
 
     @MainActor
-    private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
-        guard let hotel = journey.selectedHotel,
+    private func createBooking() async {
+        guard !isSubmitting,
+              let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
-              let quote = journey.quote,
-              outbound.isVerifiedForBooking,
-              (!journey.trip.isRoundTripFlight || journey.selectedInbound?.isVerifiedForBooking == true),
-              (!needsMadinah || journey.selectedMadinahHotel != nil) else {
-            throw BookingStoreError.authoritativeQuoteRequired
+              let quote = journey.quote else { return }
+        let inbound = journey.selectedInbound
+        guard outbound.isVerifiedForBooking,
+              (!journey.trip.isRoundTripFlight || inbound?.isVerifiedForBooking == true) else {
+            errorMessage = invalidFlightSelectionMessage
+            IumrahHaptics.error()
+            return
         }
-        let session = try await bookings.create(
-            trip: journey.trip,
-            hotel: hotel,
-            madinahHotel: journey.selectedMadinahHotel,
-            room: journey.selectedRoom,
-            roomCategory: journey.selectedRoomCategory,
-            madinahRoom: journey.selectedMadinahRoom,
-            madinahRoomCategory: journey.selectedMadinahRoomCategory,
-            intercityTransport: needsMadinah ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil,
-            transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
-            outbound: outbound,
-            inbound: journey.selectedInbound,
-            quote: quote,
-            language: settings.language,
-            pilgrimProfile: profile
-        )
-        if let deviceToken = push.deviceToken {
-            await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
+        if needsMadinah && journey.selectedMadinahHotel == nil { return }
+
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+
+        do {
+            let profile = BookingPilgrimProfile(
+                firstName: settings.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
+                lastName: settings.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
+                telegram: settings.telegram.trimmingCharacters(in: .whitespacesAndNewlines),
+                whatsapp: settings.whatsapp.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            let session = try await bookings.create(
+                trip: journey.trip,
+                hotel: hotel,
+                madinahHotel: journey.selectedMadinahHotel,
+                room: journey.selectedRoom,
+                roomCategory: journey.selectedRoomCategory,
+                madinahRoom: journey.selectedMadinahRoom,
+                madinahRoomCategory: journey.selectedMadinahRoomCategory,
+                intercityTransport: needsMadinah ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil,
+                transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
+                outbound: outbound,
+                inbound: inbound,
+                quote: quote,
+                language: settings.language,
+                pilgrimProfile: profile
+            )
+            createdSession = session
+            if let deviceToken = push.deviceToken {
+                await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
+            }
+            IumrahHaptics.success()
+        } catch {
+            errorMessage = L10n.error(error, settings.language)
+            IumrahHaptics.error()
         }
-        return session
     }
 
 
     private var invalidFlightSelectionMessage: String {
         switch settings.language {
         case .russian: return "Выберите актуальный маршрут. Система автоматически свяжет его с вашим Umrah-пакетом."
-        case .turkish: return TurkishLocalization.phrase("Select a current itinerary. The system will automatically connect it to your Umrah package.")
-        case .arabic: return ArabicLocalization.phrase("Select a current itinerary. The system will automatically connect it to your Umrah package.")
-        case .indonesian, .malay, .english: return "Select a current itinerary. The system will automatically connect it to your Umrah package."
+        case .english: return "Select a current itinerary. The system will automatically connect it to your Umrah package."
         case .uzbek: return "Joriy yo‘nalishni tanlang. Tizim uni Umra paketingiz bilan avtomatik bog‘laydi."
         case .uzbekCyrillic: return "Жорий йўналишни танланг. Тизим уни Умра пакетингиз билан автоматик боғлайди."
         }
@@ -2052,9 +1968,7 @@ struct FinalPackageView: View {
     private var indicativePriceTitle: String {
         switch settings.language {
         case .russian: return "Цена вашего Umrah-пакета"
-        case .turkish: return TurkishLocalization.phrase("Your Umrah package price")
-        case .arabic: return ArabicLocalization.phrase("Your Umrah package price")
-        case .indonesian, .malay, .english: return "Your Umrah package price"
+        case .english: return "Your Umrah package price"
         case .uzbek: return "Umra paketingiz narxi"
         case .uzbekCyrillic: return "Умра пакетингиз нархи"
         }
@@ -2175,9 +2089,7 @@ private struct FinalPackageInformationSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch language {
         case .russian: return ru
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
-        case .indonesian, .malay, .english: return en
+        case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
         }

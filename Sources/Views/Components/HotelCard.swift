@@ -12,11 +12,11 @@ struct HotelCard: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 210)
                     .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 if let badge {
                     Text(badge)
-                        .font(.caption.weight(.semibold))
+                        .font(IumrahType.bold(12, relativeTo: .caption))
                         .padding(.horizontal, 11)
                         .padding(.vertical, 7)
                         .iumrahGlass(in: Capsule())
@@ -26,7 +26,7 @@ struct HotelCard: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(hotel.name)
-                    .font(.title3.weight(.bold))
+                    .font(IumrahType.cardTitle)
                     .lineLimit(2)
 
                 HStack(spacing: 10) {
@@ -48,7 +48,7 @@ struct HotelCard: View {
                     }
                 }
                 .font(.caption.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.iumrahMuted)
 
             }
         }

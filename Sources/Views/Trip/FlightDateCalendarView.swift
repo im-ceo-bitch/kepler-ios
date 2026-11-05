@@ -87,28 +87,16 @@ struct FlightDateCalendarView: View {
     }
 
     private var calendarBackground: some View {
-        ZStack {
-            Color.iumrahPageBackground
-            LinearGradient(
-                colors: [
-                    Color.primary.opacity(colorScheme == .dark ? 0.025 : 0.018),
-                    Color.clear,
-                    Color.green.opacity(colorScheme == .dark ? 0.035 : 0.055)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-        .ignoresSafeArea()
+        Color.iumrahPageBackground.ignoresSafeArea()
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(copy(.title))
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .font(IumrahType.screenTitle)
                 .tracking(-0.5)
             Text(copy(.subtitle))
-                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .font(IumrahType.body)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -117,7 +105,7 @@ struct FlightDateCalendarView: View {
     private var routeSummary: some View {
         HStack(spacing: 10) {
             routeCode(trip.originCode)
-            Image(systemName: "arrow.forward")
+            Image(systemName: "arrow.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
             routeCode(trip.outboundDestinationCode)
@@ -125,7 +113,7 @@ struct FlightDateCalendarView: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
             routeCode(trip.returnOriginCode)
-            Image(systemName: "arrow.forward")
+            Image(systemName: "arrow.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.secondary)
             routeCode(trip.originCode)
@@ -146,11 +134,11 @@ struct FlightDateCalendarView: View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.green.opacity(0.14))
+                    .fill(Color.iumrahInk.opacity(0.14))
                     .frame(width: 42, height: 42)
                 Image(systemName: "sparkles")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.green)
+                    .foregroundStyle(Color.iumrahInk)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -174,10 +162,10 @@ struct FlightDateCalendarView: View {
             }
         }
         .padding(14)
-        .background(Color.green.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.iumrahInk.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.green.opacity(0.16), lineWidth: 1)
+                .strokeBorder(Color.iumrahInk.opacity(0.16), lineWidth: 1)
         }
     }
 
@@ -229,7 +217,8 @@ struct FlightDateCalendarView: View {
             }
         }
         .padding(16)
-        .iumrahGlass(in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .background(Color.iumrahCardBackground,
+                    in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
     }
 
     private func dayCell(_ date: Date) -> some View {
@@ -252,24 +241,24 @@ struct FlightDateCalendarView: View {
                 .background {
                     if isDeparture || isReturn {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(directPair ? Color.green : Color.primary)
+                            .fill(directPair ? Color.iumrahInk : Color.primary)
                     } else if inRange {
                         Rectangle()
-                            .fill(directPair ? Color.green.opacity(0.15) : Color.primary.opacity(0.055))
+                            .fill(directPair ? Color.iumrahInk.opacity(0.15) : Color.primary.opacity(0.055))
                     } else if directDay {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.green.opacity(0.14))
+                            .fill(Color.iumrahInk.opacity(0.14))
                     }
                 }
                 .foregroundStyle(
                     disabled
                         ? Color.secondary.opacity(0.36)
-                        : ((isDeparture || isReturn) ? Color.iumrahCardBackground : (directDay ? Color.green : Color.primary))
+                        : ((isDeparture || isReturn) ? Color.iumrahCardBackground : (directDay ? Color.iumrahInk : Color.primary))
                 )
                 .overlay {
                     if directDay && !isDeparture && !isReturn {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.green.opacity(0.24), lineWidth: 0.8)
+                            .strokeBorder(Color.iumrahInk.opacity(0.24), lineWidth: 0.8)
                     }
                 }
                 .contentShape(Rectangle())
@@ -377,7 +366,7 @@ struct FlightDateCalendarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.iumrahCardBackground)
-                .background(Color.green, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+                .background(Color.iumrahInk, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
 
                 Button {
                     guard let departure, let returnDate else { return }
@@ -586,9 +575,7 @@ struct FlightDateCalendarView: View {
 
     private var locale: Locale {
         switch settings.language {
-        case .turkish: return Locale(identifier: "tr_TR")
-        case .arabic: return Locale(identifier: "ar_SA")
-        case .indonesian, .malay, .english: return Locale(identifier: "en_US")
+        case .english: return Locale(identifier: "en_US")
         case .russian: return Locale(identifier: "ru_RU")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
@@ -598,9 +585,7 @@ struct FlightDateCalendarView: View {
     private var closeLabel: String {
         switch settings.language {
         case .russian: return "Закрыть"
-        case .turkish: return TurkishLocalization.phrase("Close")
-        case .arabic: return ArabicLocalization.phrase("Close")
-        case .indonesian, .malay, .english: return "Close"
+        case .english: return "Close"
         case .uzbek: return "Yopish"
         case .uzbekCyrillic: return "Ёпиш"
         }
@@ -630,52 +615,21 @@ struct FlightDateCalendarView: View {
         case (.russian, .continueFlexible): return "Продолжить с гибкими датами"
         case (.russian, .directAccessibility): return "Опубликованный прямой рейс"
 
-        case (.turkish, .title): return TurkishLocalization.phrase("Choose your dates")
-
-        case (.arabic, .title): return ArabicLocalization.phrase("Choose your dates")
-        case (.indonesian, .title), (.malay, .title), (.english, .title): return "Choose your dates"
-        case (.turkish, .subtitle): return TurkishLocalization.phrase("Green days are iumrah-published direct flights")
-        case (.arabic, .subtitle): return ArabicLocalization.phrase("Green days are iumrah-published direct flights")
-        case (.indonesian, .subtitle), (.malay, .subtitle), (.english, .subtitle): return "Green days are iumrah-published direct flights"
-        case (.turkish, .recommendedDirect): return TurkishLocalization.phrase("Recommended by iumrah AI")
-        case (.arabic, .recommendedDirect): return ArabicLocalization.phrase("Recommended by iumrah AI")
-        case (.indonesian, .recommendedDirect), (.malay, .recommendedDirect), (.english, .recommendedDirect): return "Recommended by iumrah AI"
-        case (.turkish, .loading): return TurkishLocalization.phrase("Checking published direct flights…")
-        case (.arabic, .loading): return ArabicLocalization.phrase("Checking published direct flights…")
-        case (.indonesian, .loading), (.malay, .loading), (.english, .loading): return "Checking published direct flights…"
-        case (.turkish, .directHint): return TurkishLocalization.phrase("Green days are available in iumrah inventory: direct flights that are usually more convenient and better value than connecting options.")
-        case (.arabic, .directHint): return ArabicLocalization.phrase("Green days are available in iumrah inventory: direct flights that are usually more convenient and better value than connecting options.")
-        case (.indonesian, .directHint), (.malay, .directHint), (.english, .directHint): return "Green days are available in iumrah inventory: direct flights that are usually more convenient and better value than connecting options."
-        case (.turkish, .retry): return TurkishLocalization.phrase("Refresh")
-        case (.arabic, .retry): return ArabicLocalization.phrase("Refresh")
-        case (.indonesian, .retry), (.malay, .retry), (.english, .retry): return "Refresh"
-        case (.turkish, .noDirectTitle): return TurkishLocalization.phrase("No direct flights on these dates")
-        case (.arabic, .noDirectTitle): return ArabicLocalization.phrase("No direct flights on these dates")
-        case (.indonesian, .noDirectTitle), (.malay, .noDirectTitle), (.english, .noDirectTitle): return "No direct flights on these dates"
-        case (.turkish, .noDirectInlineBody): return TurkishLocalization.phrase("You can continue with flexible dates, but the system may offer one- or two-stop flights at a higher fare. This affects your final package total.")
-        case (.arabic, .noDirectInlineBody): return ArabicLocalization.phrase("You can continue with flexible dates, but the system may offer one- or two-stop flights at a higher fare. This affects your final package total.")
-        case (.indonesian, .noDirectInlineBody), (.malay, .noDirectInlineBody), (.english, .noDirectInlineBody): return "You can continue with flexible dates, but the system may offer one- or two-stop flights at a higher fare. This affects your final package total."
-        case (.turkish, .noDirectPopupBody): return TurkishLocalization.phrase("iumrah currently has no published direct-flight pair for these dates. Flexible search may return one- or two-stop options at a higher fare, increasing your final package total.")
-        case (.arabic, .noDirectPopupBody): return ArabicLocalization.phrase("iumrah currently has no published direct-flight pair for these dates. Flexible search may return one- or two-stop options at a higher fare, increasing your final package total.")
-        case (.indonesian, .noDirectPopupBody), (.malay, .noDirectPopupBody), (.english, .noDirectPopupBody): return "iumrah currently has no published direct-flight pair for these dates. Flexible search may return one- or two-stop options at a higher fare, increasing your final package total."
-        case (.turkish, .inventoryNote): return TurkishLocalization.phrase("Green days come only from flights published in the iumrah database. Other dates are never marked direct automatically.")
-        case (.arabic, .inventoryNote): return ArabicLocalization.phrase("Green days come only from flights published in the iumrah database. Other dates are never marked direct automatically.")
-        case (.indonesian, .inventoryNote), (.malay, .inventoryNote), (.english, .inventoryNote): return "Green days come only from flights published in the iumrah database. Other dates are never marked direct automatically."
-        case (.turkish, .reset): return TurkishLocalization.phrase("Reset")
-        case (.arabic, .reset): return ArabicLocalization.phrase("Reset")
-        case (.indonesian, .reset), (.malay, .reset), (.english, .reset): return "Reset"
-        case (.turkish, .chooseDates): return TurkishLocalization.phrase("Continue")
-        case (.arabic, .chooseDates): return ArabicLocalization.phrase("Continue")
-        case (.indonesian, .chooseDates), (.malay, .chooseDates), (.english, .chooseDates): return "Continue"
-        case (.turkish, .chooseDirectDates): return TurkishLocalization.phrase("Choose direct-flight dates")
-        case (.arabic, .chooseDirectDates): return ArabicLocalization.phrase("Choose direct-flight dates")
-        case (.indonesian, .chooseDirectDates), (.malay, .chooseDirectDates), (.english, .chooseDirectDates): return "Choose direct-flight dates"
-        case (.turkish, .continueFlexible): return TurkishLocalization.phrase("Continue with flexible dates")
-        case (.arabic, .continueFlexible): return ArabicLocalization.phrase("Continue with flexible dates")
-        case (.indonesian, .continueFlexible), (.malay, .continueFlexible), (.english, .continueFlexible): return "Continue with flexible dates"
-        case (.turkish, .directAccessibility): return TurkishLocalization.phrase("Published direct flight")
-        case (.arabic, .directAccessibility): return ArabicLocalization.phrase("Published direct flight")
-        case (.indonesian, .directAccessibility), (.malay, .directAccessibility), (.english, .directAccessibility): return "Published direct flight"
+        case (.english, .title): return "Choose your dates"
+        case (.english, .subtitle): return "Green days are iumrah-published direct flights"
+        case (.english, .recommendedDirect): return "Recommended by iumrah AI"
+        case (.english, .loading): return "Checking published direct flights…"
+        case (.english, .directHint): return "Green days are available in iumrah inventory: direct flights that are usually more convenient and better value than connecting options."
+        case (.english, .retry): return "Refresh"
+        case (.english, .noDirectTitle): return "No direct flights on these dates"
+        case (.english, .noDirectInlineBody): return "You can continue with flexible dates, but the system may offer one- or two-stop flights at a higher fare. This affects your final package total."
+        case (.english, .noDirectPopupBody): return "iumrah currently has no published direct-flight pair for these dates. Flexible search may return one- or two-stop options at a higher fare, increasing your final package total."
+        case (.english, .inventoryNote): return "Green days come only from flights published in the iumrah database. Other dates are never marked direct automatically."
+        case (.english, .reset): return "Reset"
+        case (.english, .chooseDates): return "Continue"
+        case (.english, .chooseDirectDates): return "Choose direct-flight dates"
+        case (.english, .continueFlexible): return "Continue with flexible dates"
+        case (.english, .directAccessibility): return "Published direct flight"
 
         case (.uzbek, .title): return "Sanalarni tanlang"
         case (.uzbek, .subtitle): return "Yashil kunlar — iumrah e’lon qilgan to‘g‘ridan-to‘g‘ri reyslar"

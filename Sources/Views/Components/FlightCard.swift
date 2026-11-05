@@ -24,14 +24,13 @@ struct FlightCard: View {
             Divider().opacity(0.55)
             bottomMeta
         }
-        .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .padding(IumrahDesign.Space.md)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(isSelected ? Color.primary : Color.primary.opacity(0.08), lineWidth: isSelected ? 1.7 : 0.8)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                .strokeBorder(isSelected ? Color.iumrahInk : Color.clear, lineWidth: 1)
         }
-        .shadow(color: Color.primary.opacity(0.045), radius: 14, x: 0, y: 6)
-        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
     }
 
     private var header: some View {
@@ -40,7 +39,7 @@ struct FlightCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(offer.airlinesSummary)
-                    .font(.headline.weight(.bold))
+                    .font(IumrahType.cardTitle)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -59,7 +58,7 @@ struct FlightCard: View {
                     ProgressView().controlSize(.small)
                 } else {
                     Text(deltaDisplay)
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(IumrahType.sectionTitle)
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -99,9 +98,6 @@ struct FlightCard: View {
             timeBlock(date: offer.arrivalAt, code: offer.destination, alignment: .trailing, isArrival: true)
                 .frame(width: 82, alignment: .trailing)
         }
-        // A route is a chronological technical diagram (origin → destination).
-        // Arabic copy mirrors the card, but IATA codes and timing retain this order.
-        .environment(\.layoutDirection, .leftToRight)
     }
 
     private func timeBlock(date: Date, code: String, alignment: HorizontalAlignment, isArrival: Bool) -> some View {
@@ -214,9 +210,7 @@ struct FlightCard: View {
     private var deltaLabel: String {
         switch settings.language {
         case .russian: return "к пакету / 1 человек"
-        case .turkish: return TurkishLocalization.phrase("package difference / traveler")
-        case .arabic: return ArabicLocalization.phrase("package difference / traveler")
-        case .indonesian, .malay, .english: return "package difference / traveler"
+        case .english: return "package difference / traveler"
         case .uzbek: return "paket farqi / 1 kishi"
         case .uzbekCyrillic: return "пакет фарқи / 1 киши"
         }
@@ -226,9 +220,7 @@ struct FlightCard: View {
         switch settings.language {
         case .russian:
             return "\(stopLabel) · \(offer.origin) → \(offer.destination)"
-        case .turkish:
-            return "\(stopLabel) · \(offer.origin) → \(offer.destination)"
-        case .arabic, .indonesian, .malay, .english:
+        case .english:
             return "\(stopLabel) · \(offer.origin) → \(offer.destination)"
         case .uzbek, .uzbekCyrillic:
             return "\(stopLabel) · \(offer.origin) → \(offer.destination)"
@@ -239,11 +231,7 @@ struct FlightCard: View {
         switch settings.language {
         case .russian:
             return offer.stops == 0 ? "прямой" : offer.stops == 1 ? "1 пересадка" : "\(offer.stops) пересадки"
-        case .turkish:
-            return offer.stops == 0 ? "nonstop" : offer.stops == 1 ? "1 aktarma" : "\(offer.stops) aktarma"
-        case .arabic:
-            return offer.stops == 0 ? "مباشر" : offer.stops == 1 ? "توقف واحد" : "\(offer.stops) توقفات"
-        case .indonesian, .malay, .english:
+        case .english:
             return offer.stops == 0 ? "nonstop" : offer.stops == 1 ? "1 stop" : "\(offer.stops) stops"
         case .uzbek:
             return offer.stops == 0 ? "to‘g‘ridan-to‘g‘ri" : "\(offer.stops) ta to‘xtash"
@@ -255,9 +243,7 @@ struct FlightCard: View {
     private var recommendedLabel: String {
         switch settings.language {
         case .russian: return "Рекомендуем"
-        case .turkish: return TurkishLocalization.phrase("Recommended")
-        case .arabic: return ArabicLocalization.phrase("Recommended")
-        case .indonesian, .malay, .english: return "Recommended"
+        case .english: return "Recommended"
         case .uzbek: return "Tavsiya"
         case .uzbekCyrillic: return "Тавсия"
         }
@@ -270,18 +256,10 @@ struct FlightCard: View {
         case ("first", .russian): return "Первый"
         case ("premium_economy", .russian): return "Премиум эконом"
         case (_, .russian): return "Эконом"
-        case ("business", .turkish): return TurkishLocalization.phrase("Business")
-        case ("business", .arabic): return ArabicLocalization.phrase("Business")
-        case ("business", .indonesian), ("business", .english): return "Business"
-        case ("first", .turkish): return TurkishLocalization.phrase("First")
-        case ("first", .arabic): return ArabicLocalization.phrase("First")
-        case ("first", .indonesian), ("first", .english): return "First"
-        case ("premium_economy", .turkish): return TurkishLocalization.phrase("Premium economy")
-        case ("premium_economy", .arabic): return ArabicLocalization.phrase("Premium economy")
-        case ("premium_economy", .indonesian), ("premium_economy", .english): return "Premium economy"
-        case (_, .turkish): return TurkishLocalization.phrase("Economy")
-        case (_, .arabic): return ArabicLocalization.phrase("Economy")
-        case (_, .indonesian), (_, .english): return "Economy"
+        case ("business", .english): return "Business"
+        case ("first", .english): return "First"
+        case ("premium_economy", .english): return "Premium economy"
+        case (_, .english): return "Economy"
         case ("business", .uzbek), ("business", .uzbekCyrillic): return "Business"
         case ("first", .uzbek), ("first", .uzbekCyrillic): return "First"
         case ("premium_economy", .uzbek), ("premium_economy", .uzbekCyrillic): return "Premium economy"
@@ -298,9 +276,7 @@ struct FlightCard: View {
         let city = layover.airport.displayCity
         switch settings.language {
         case .russian: return "Пересадка · \(city) (\(layover.airport.code))"
-        case .turkish: return TurkishLocalization.phrase("Layover · \(city) (\(layover.airport.code))")
-        case .arabic: return ArabicLocalization.phrase("Layover · \(city) (\(layover.airport.code))")
-        case .indonesian, .malay, .english: return "Layover · \(city) (\(layover.airport.code))"
+        case .english: return "Layover · \(city) (\(layover.airport.code))"
         case .uzbek: return "To‘xtash · \(city) (\(layover.airport.code))"
         case .uzbekCyrillic: return "Тўхташ · \(city) (\(layover.airport.code))"
         }
@@ -309,9 +285,7 @@ struct FlightCard: View {
     private func connectionText(_ airport: FlightAirportSnapshot) -> String {
         switch settings.language {
         case .russian: return "Пересадка · \(airport.displayCity) (\(airport.code))"
-        case .turkish: return TurkishLocalization.phrase("Connection · \(airport.displayCity) (\(airport.code))")
-        case .arabic: return ArabicLocalization.phrase("Connection · \(airport.displayCity) (\(airport.code))")
-        case .indonesian, .malay, .english: return "Connection · \(airport.displayCity) (\(airport.code))"
+        case .english: return "Connection · \(airport.displayCity) (\(airport.code))"
         case .uzbek: return "Ulanish · \(airport.displayCity) (\(airport.code))"
         case .uzbekCyrillic: return "Уланиш · \(airport.displayCity) (\(airport.code))"
         }
@@ -333,9 +307,7 @@ struct FlightCard: View {
         let rest = max(0, minutes) % 60
         switch settings.language {
         case .russian: return rest == 0 ? "\(hours)ч" : "\(hours)ч \(rest)м"
-        case .turkish: return rest == 0 ? "\(hours)h" : "\(hours) sa. \(rest) dk."
-        case .arabic: return rest == 0 ? "\(hours) س" : "\(hours) س \(rest) د"
-        case .indonesian, .malay, .english: return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
+        case .english: return rest == 0 ? "\(hours)h" : "\(hours)h \(rest)m"
         case .uzbek: return rest == 0 ? "\(hours)soat" : "\(hours)soat \(rest)d"
         case .uzbekCyrillic: return rest == 0 ? "\(hours)соат" : "\(hours)соат \(rest)д"
         }

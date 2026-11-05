@@ -9,7 +9,6 @@ struct CareHomeView: View {
 
     @State private var careProfile: IumrahPublicProfile?
     @State private var isLoadingCareProfile = false
-    @State private var careHeaderSection = "contacts"
     @AppStorage("iumrah.care.cachedPhoneSA") private var cachedPhoneSA = ""
     @AppStorage("iumrah.care.cachedPhoneUZ") private var cachedPhoneUZ = "+998 50 889 88 45"
     @AppStorage("iumrah.care.cachedTelegram") private var cachedTelegram = "@saudiclub966"
@@ -21,20 +20,14 @@ struct CareHomeView: View {
     }
 
     var body: some View {
-        ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                IumrahSignatureScrollMarker()
+                IumrahRootPageTitle(title: "iumrah Care")
                     .padding(.bottom, 14)
-
-                careQuickContacts
-                    .id("care.contacts")
-                    .padding(.bottom, 24)
 
                 intro
                     .padding(.bottom, 24)
 
-                Color.clear.frame(height: 0).id("care.help")
                 if adaptiveLayout.isWide {
                     HStack(alignment: .top, spacing: 22) {
                         careHero
@@ -45,7 +38,6 @@ struct CareHomeView: View {
                                 .padding(.bottom, 30)
 
                             quickAnswers
-                                .id("care.faq")
                                 .padding(.bottom, 14)
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -58,122 +50,23 @@ struct CareHomeView: View {
                         .padding(.bottom, 30)
 
                     quickAnswers
-                        .id("care.faq")
                         .padding(.bottom, 14)
                 }
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
-            .padding(.bottom, 64)
+            .padding(.bottom, 112)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(Color.iumrahPageBackground)
         }
+        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             await refreshCare()
         }
-        .iumrahSignatureScrollChrome(
-            title: L10n.text("tab_care", settings.language),
-            subtitle: tr("Personal assistance throughout your Umrah", "Помощь на каждом этапе умры", "Umra davomida shaxsiy yordam", "Умра давомида шахсий ёрдам"),
-            pinnedAccessory: AnyView(careSignatureTabs(scrollProxy: scrollProxy))
-        )
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
         .task {
             await refreshCare()
         }
-        }
-    }
-
-    private func careSignatureHeader(scrollProxy: ScrollViewProxy) -> some View {
-        VStack(spacing: 0) {
-            IumrahRootPageTitle(
-                title: L10n.text("tab_care", settings.language),
-                subtitle: tr("Personal assistance throughout your Umrah", "Помощь на каждом этапе умры", "Umra davomida shaxsiy yordam", "Умра давомида шахсий ёрдам"),
-                drawsSignatureBackground: false,
-                showsSignatureBrandRow: false
-            )
-            careSignatureTabs(scrollProxy: scrollProxy)
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.bottom, 18)
-        }
-        .background {
-            IumrahWorldDotsHeaderBackground()
-                .padding(.horizontal, -IumrahDesign.pagePadding)
-        }
-    }
-
-    private func careSignatureTabs(scrollProxy: ScrollViewProxy) -> some View {
-        IumrahSignatureThreeTabs(
-            tabs: [
-                .init(id: "contacts", title: tr("Contact", "Связаться", "Bog‘lanish", "Боғланиш")),
-                .init(id: "help", title: tr("Services", "Услуги", "Xizmatlar", "Хизматлар")),
-                .init(id: "faq", title: tr("Questions", "Вопросы", "Savollar", "Саволлар"))
-            ],
-            selectedID: careHeaderSection
-        ) { target in
-            careHeaderSection = target
-            IumrahHaptics.selection()
-            withAnimation(.easeInOut(duration: 0.30)) {
-                scrollProxy.scrollTo("care.\(target)", anchor: .top)
-            }
-        }
-    }
-
-    // Direct support controls are always shown directly beneath the header.
-    // Booking chat remains available only with a valid booking session.
-    private var careQuickContacts: some View {
-        HStack(spacing: 11) {
-            Button(action: openPhone) {
-                quickContactTile("phone.fill", title: tr("Call", "Позвонить", "Qo‘ng‘iroq", "Қўнғироқ"), tint: .primary, enabled: !preferredPhone.isEmpty)
-            }
-            .disabled(preferredPhone.isEmpty)
-
-            Button(action: openTelegram) {
-                quickContactTile("paperplane.fill", title: "Telegram", tint: .primary, enabled: telegramURL != nil)
-            }
-            .disabled(telegramURL == nil)
-
-            if let activeSession {
-                NavigationLink {
-                    BookingChatView(bookingID: activeSession.id)
-                } label: {
-                    quickContactTile("bubble.left.and.bubble.right.fill", title: tr("Chat", "Чат", "Chat", "Чат"), tint: .primary, enabled: true)
-                }
-            } else {
-                quickContactTile("bubble.left.and.bubble.right.fill", title: tr("Chat", "Чат", "Chat", "Чат"), tint: .secondary, enabled: false)
-                    .accessibilityAddTraits(.isStaticText)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func quickContactTile(_ icon: String, title: String, tint: Color, enabled: Bool) -> some View {
-        VStack(spacing: 12) {
-            Group {
-                if icon == "paperplane.fill" {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 25, weight: .medium))
-                        .foregroundStyle(enabled ? Color.primary : Color.secondary)
-                } else {
-                    Image(systemName: icon)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(enabled ? tint : Color.secondary)
-                }
-            }
-            .frame(height: 30)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 100)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(tint.opacity(enabled ? 0.12 : 0.06), lineWidth: 0.8)
-        }
-        .opacity(enabled ? 1 : 0.48)
     }
 
     // MARK: - Intro
@@ -186,7 +79,7 @@ struct CareHomeView: View {
                 "Umra safaringizni yig‘ish va rasmiylashtirishga yordam beramiz",
                 "Умра сафарингизни тузиш ва расмийлаштиришга ёрдам берамиз"
             ))
-            .font(.system(size: 24, weight: .bold, design: .rounded))
+            .font(IumrahType.screenTitle)
             .tracking(-0.5)
             .fixedSize(horizontal: false, vertical: true)
 
@@ -196,7 +89,7 @@ struct CareHomeView: View {
                 "Agar barcha tafsilotlarni o‘zingiz hal qilishni istamasangiz, iumrah Care yo‘nalish, mehmonxona va xizmatlarni tanlashga, tafsilotlarni tekshirishga va bronni tayyor safargacha olib borishga yordam beradi.",
                 "Агар барча тафсилотларни ўзингиз ҳал қилишни истамасангиз, iumrah Care йўналиш, меҳмонхона ва хизматларни танлашга, тафсилотларни текширишга ва бронни тайёр сафаргача олиб боришга ёрдам беради."
             ))
-            .font(.system(size: 16, weight: .regular))
+            .font(IumrahType.body)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -216,7 +109,7 @@ struct CareHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("iumrah Care")
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .font(IumrahType.screenTitle)
                         .tracking(-0.65)
 
                     Text(tr(
@@ -317,16 +210,10 @@ struct CareHomeView: View {
                     .fill(neutralIconBackground)
                     .frame(width: 48, height: 48)
 
-                Group {
-                    if icon == "paperplane.fill" {
-                        IumrahTelegramMark(size: 28)
-                    } else {
-                        Image(systemName: icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(enabled ? Color.primary : Color.secondary.opacity(0.56))
-                    }
-                }
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(enabled ? Color.primary : Color.secondary.opacity(0.56))
             }
 
             VStack(spacing: 2) {
@@ -365,9 +252,9 @@ struct CareHomeView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(tr(
                     "Care is linked to your active trip",
-                    "Поддержка привязана к вашей активной поездке",
-                    "Yordam faol safaringizga bog‘langan",
-                    "Ёрдам фаол сафарингизга боғланган"
+                    "Care привязан к вашей активной поездке",
+                    "Care faol safaringizga bog‘langan",
+                    "Care фаол сафарингизга боғланган"
                 ))
                 .font(.system(size: 14.5, weight: .semibold, design: .rounded))
 
@@ -476,7 +363,7 @@ struct CareHomeView: View {
                 tr("Quick answers", "Быстрые ответы", "Tezkor javoblar", "Тезкор жавоблар"),
                 subtitle: tr(
                     "The essentials before you contact Care.",
-                    "Самое важное перед обращением в поддержку.",
+                    "Самое важное до обращения в Care.",
                     "Care’ga murojaat qilishdan oldingi asosiy ma’lumotlar.",
                     "Care’га мурожаат қилишдан олдинги асосий маълумотлар."
                 )
@@ -507,7 +394,7 @@ struct CareHomeView: View {
                 divider
                 answerRow(
                     icon: "checkmark.shield.fill",
-                    title: tr("What can Care handle?", "С чем поможет поддержка?", "Care nimalarda yordam beradi?", "Care нималарда ёрдам беради?"),
+                    title: tr("What can Care handle?", "С чем поможет Care?", "Care nimalarda yordam beradi?", "Care нималарда ёрдам беради?"),
                     body: tr(
                         "Route, hotel, transfer, services, booking questions and practical changes connected to your journey.",
                         "Маршрут, отель, трансфер, услуги, вопросы по бронированию и практические изменения, связанные с поездкой.",
@@ -630,9 +517,7 @@ struct CareHomeView: View {
 
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
-        case .indonesian, .malay, .english: return en
+        case .english: return en
         case .russian: return ru
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

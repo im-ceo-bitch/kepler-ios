@@ -5,7 +5,21 @@ struct IumrahHomeSectionHeader: View {
     var subtitle: String? = nil
 
     var body: some View {
-        IumrahFoundationSectionTitle(title: title, subtitle: subtitle)
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(IumrahType.sectionTitle)
+                .tracking(-0.8)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let subtitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -50,7 +64,8 @@ struct IumrahHomeAudienceSection: View {
                 LazyHStack(spacing: 12) {
                     ForEach(items) { item in
                         audienceCard(item)
-                            .frame(width: 286, height: 235)
+                            .frame(width: 286)
+                            .frame(minHeight: 235)
                             .id(item.id)
                     }
                 }
@@ -84,33 +99,28 @@ struct IumrahHomeAudienceSection: View {
             Spacer(minLength: 14)
 
             Text(item.title)
-                .font(.system(size: 23, weight: .bold, design: .default))
+                .font(IumrahType.cardTitle)
                 .tracking(-0.5)
                 .foregroundStyle(item.foreground)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(item.body)
-                .font(.system(size: 14, weight: .regular, design: .default))
-                .foregroundStyle(item.foreground.opacity(0.72))
+                .font(IumrahType.secondary)
+                .foregroundStyle(item.foreground.opacity(0.68))
                 .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 7)
         }
         .padding(20)
         .background(item.background)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(item.foreground.opacity(0.06), lineWidth: 0.8)
-        }
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+
     }
 
     private var sectionTitle: String {
         switch language {
         case .russian: return "Для кого создан Iumrah"
-        case .turkish: return TurkishLocalization.phrase("Who Iumrah is for")
-        case .arabic: return ArabicLocalization.phrase("Who Iumrah is for")
-        case .indonesian, .malay, .english: return "Who Iumrah is for"
+        case .english: return "Who Iumrah is for"
         case .uzbek: return "Iumrah kimlar uchun"
         case .uzbekCyrillic: return "Iumrah кимлар учун"
         }
@@ -125,55 +135,43 @@ struct IumrahHomeAudienceSection: View {
                     icon: "slider.horizontal.3",
                     title: "Соберите поездку сами",
                     body: "Перелёт, отели, трансфер и сервисы — один персональный пакет Умры, который Вы собираете под себя.",
-                    background: Color(red: 0.965, green: 0.965, blue: 0.955),
-                    foreground: Color(red: 0.10, green: 0.10, blue: 0.10)
+                    background: Color.iumrahCardBackground,
+                    foreground: Color.iumrahInk
                 ),
                 Item(
                     id: "family",
                     icon: "person.3.fill",
                     title: "Семья и близкие",
                     body: "Организуйте Умру для семьи или друзей вместе, сохраняя приватность и удобный темп поездки.",
-                    background: Color(red: 0.945, green: 0.945, blue: 0.935),
-                    foreground: Color(red: 0.10, green: 0.10, blue: 0.10)
+                    background: Color.iumrahCardBackground,
+                    foreground: Color.iumrahInk
                 ),
                 Item(
                     id: "vip",
                     icon: "sparkles",
                     title: "Индивидуальный и VIP",
                     body: "Премиальные отели, приватный транспорт, индивидуальный сервис и максимум личного пространства.",
-                    background: Color(red: 0.925, green: 0.925, blue: 0.915),
-                    foreground: Color(red: 0.10, green: 0.10, blue: 0.10)
+                    background: Color.iumrahCardBackground,
+                    foreground: Color.iumrahInk
                 ),
             ]
-        case .turkish:
+        case .english:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Kendi istediğiniz gibi planlayın", body: "Uçuş, otel, transfer ve hizmetleri kendinize özel tek bir umre paketinde birleştirin.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "family", icon: "person.3.fill", title: "Aile ve arkadaşlar", body: "Umrenizi aileniz veya arkadaşlarınızla, kendi grubunuza uygun rahat ve özel bir tempoda düzenleyin.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "vip", icon: "sparkles", title: "Özel ve VIP", body: "Premium oteller, özel ulaşım, kişisel hizmet ve yolculuk boyunca daha fazla mahremiyet.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-            ]
-        case .arabic:
-            return [
-                Item(id: "self", icon: "slider.horizontal.3", title: ArabicLocalization.phrase("Build it your way"), body: ArabicLocalization.phrase("Flights, hotels, transfer and services in one personal Umrah package you configure for yourself."), background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "family", icon: "person.3.fill", title: ArabicLocalization.phrase("Family & friends"), body: ArabicLocalization.phrase("Organize Umrah together while keeping the journey private, comfortable and paced around your group."), background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "vip", icon: "sparkles", title: ArabicLocalization.phrase("Private & VIP"), body: ArabicLocalization.phrase("Premium hotels, private transport, individual service and more personal space throughout the journey."), background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-            ]
-case .indonesian, .malay, .english:
-            return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Build it your way", body: "Flights, hotels, transfer and services in one personal Umrah package you configure for yourself.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "family", icon: "person.3.fill", title: "Family & friends", body: "Organize Umrah together while keeping the journey private, comfortable and paced around your group.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "vip", icon: "sparkles", title: "Private & VIP", body: "Premium hotels, private transport, individual service and more personal space throughout the journey.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "self", icon: "slider.horizontal.3", title: "Build it your way", body: "Flights, hotels, transfer and services in one personal Umrah package you configure for yourself.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
+                Item(id: "family", icon: "person.3.fill", title: "Family & friends", body: "Organize Umrah together while keeping the journey private, comfortable and paced around your group.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
+                Item(id: "vip", icon: "sparkles", title: "Private & VIP", body: "Premium hotels, private transport, individual service and more personal space throughout the journey.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
             ]
         case .uzbek:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Safarni o‘zingiz tuzing", body: "Parvoz, mehmonxona, transfer va servislar — o‘zingizga mos bitta shaxsiy Umra paketi.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "family", icon: "person.3.fill", title: "Oila va yaqinlar", body: "Oila yoki do‘stlar bilan guruhingizga mos, qulay va xususiy tempda Umra safarini tashkil qiling.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "vip", icon: "sparkles", title: "Individual va VIP", body: "Premium mehmonxonalar, xususiy transport, individual servis va safar davomida maksimal maxfiylik.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "self", icon: "slider.horizontal.3", title: "Safarni o‘zingiz tuzing", body: "Parvoz, mehmonxona, transfer va servislar — o‘zingizga mos bitta shaxsiy Umra paketi.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
+                Item(id: "family", icon: "person.3.fill", title: "Oila va yaqinlar", body: "Oila yoki do‘stlar bilan guruhingizga mos, qulay va xususiy tempda Umra safarini tashkil qiling.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
+                Item(id: "vip", icon: "sparkles", title: "Individual va VIP", body: "Premium mehmonxonalar, xususiy transport, individual servis va safar davomida maksimal maxfiylik.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
             ]
         case .uzbekCyrillic:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Сафарни ўзингиз тузинг", body: "Парвоз, меҳмонхона, трансфер ва сервислар — ўзингизга мос битта шахсий Умра пакети.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "family", icon: "person.3.fill", title: "Оила ва яқинлар", body: "Оила ёки дўстлар билан гуруҳингизга мос, қулай ва хусусий темпда Умра сафарини ташкил қилинг.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
-                Item(id: "vip", icon: "sparkles", title: "Индивидуал ва VIP", body: "Премиум меҳмонхоналар, хусусий транспорт, индивидуал сервис ва сафар давомида максимал махфийлик.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "self", icon: "slider.horizontal.3", title: "Сафарни ўзингиз тузинг", body: "Парвоз, меҳмонхона, трансфер ва сервислар — ўзингизга мос битта шахсий Умра пакети.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
+                Item(id: "family", icon: "person.3.fill", title: "Оила ва яқинлар", body: "Оила ёки дўстлар билан гуруҳингизга мос, қулай ва хусусий темпда Умра сафарини ташкил қилинг.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
+                Item(id: "vip", icon: "sparkles", title: "Индивидуал ва VIP", body: "Премиум меҳмонхоналар, хусусий транспорт, индивидуал сервис ва сафар давомида максимал махфийлик.", background: Color.iumrahCardBackground, foreground: Color.iumrahInk),
             ]
         }
     }
@@ -229,9 +227,7 @@ struct IumrahHomeServicesSection: View {
     private var sectionTitle: String {
         switch language {
         case .russian: return "Что входит в Iumrah Services"
-        case .turkish: return TurkishLocalization.phrase("What’s inside Iumrah Services")
-        case .arabic: return ArabicLocalization.phrase("What’s inside Iumrah Services")
-        case .indonesian, .malay, .english: return "What’s inside Iumrah Services"
+        case .english: return "What’s inside Iumrah Services"
         case .uzbek: return "Iumrah Services nimalarni o‘z ichiga oladi"
         case .uzbekCyrillic: return "Iumrah Services нималарни ўз ичига олади"
         }
@@ -240,9 +236,7 @@ struct IumrahHomeServicesSection: View {
     private var sectionSubtitle: String {
         switch language {
         case .russian: return "Основные сервисы уже встроены в пакеты Iumrah и сопровождают поездку от вылета до возвращения."
-        case .turkish: return TurkishLocalization.phrase("Core services are built into Iumrah packages and stay with the journey from departure to return.")
-        case .arabic: return ArabicLocalization.phrase("Core services are built into Iumrah packages and stay with the journey from departure to return.")
-        case .indonesian, .malay, .english: return "Core services are built into Iumrah packages and stay with the journey from departure to return."
+        case .english: return "Core services are built into Iumrah packages and stay with the journey from departure to return."
         case .uzbek: return "Asosiy servislar Iumrah paketlariga kiritilgan va safarni uchishdan qaytishgacha kuzatadi."
         case .uzbekCyrillic: return "Асосий сервислар Iumrah пакетларига киритилган ва сафарни учишдан қайтишгача кузатади."
         }
@@ -257,21 +251,7 @@ struct IumrahHomeServicesSection: View {
                 Item(id: "esim", assets: ["IumrahESIMHomeCard"], title: "Iumrah eSIM", body: "Интернет в Саудовской Аравии готов к подключению сразу после приземления — без поиска SIM-карты в аэропорту.", badge: "Связь", icon: "antenna.radiowaves.left.and.right", action: onESIM),
                 Item(id: "flights", assets: ["IumrahFlightsHomeCard"], title: "Iumrah Flights", body: "Статус Вашего рейса в реальном времени: изменения времени, задержки и важные обновления поездки в одном месте.", badge: "Live status", icon: "airplane", action: onFlights),
             ]
-        case .turkish:
-            return [
-                Item(id: "transfer", assets: ["TransferMalibu", "TransferCarnival", "TransferYukon"], title: "Iumrah Transfer", body: "Havalimanında karşılama ve rotanın önemli noktaları arasında yolculuğunuza uygun araçla özel ulaşım.", badge: "Dahil", icon: "car.fill", action: onTransfer),
-                Item(id: "ziyarat", assets: ["ZiyaratQuba1", "ZiyaratQuba2", "ZiyaratQuba3", "ZiyaratQuba4", "ZiyaratQuba5"], title: "Iumrah Ziyarat", body: "Mekke ve Medine'deki ziyaret yerleri, bilgiler, navigasyon ve anlaşılır ziyaret sırasıyla tek rotada.", badge: "Routes", icon: "map.fill", action: onZiyarats),
-                Item(id: "esim", assets: ["IumrahESIMHomeCard"], title: "Iumrah eSIM", body: "Havalimanında yerel SIM kart aramadan, varışınızdan itibaren kullanıma hazır Suudi Arabistan interneti.", badge: "Bağlantı", icon: "antenna.radiowaves.left.and.right", action: onESIM),
-                Item(id: "flights", assets: ["IumrahFlightsHomeCard"], title: "Iumrah Flights", body: "Tarife değişiklikleri, gecikmeler ve önemli yolculuk güncellemeleriyle anlık uçuş durumu tek yerde.", badge: "Canlı durum", icon: "airplane", action: onFlights),
-            ]
-        case .arabic:
-            return [
-                Item(id: "transfer", assets: ["TransferMalibu", "TransferCarnival", "TransferYukon"], title: ArabicLocalization.phrase("Iumrah Transfer"), body: ArabicLocalization.phrase("Airport pickup and private rides between key stops, with the right vehicle for your journey."), badge: ArabicLocalization.phrase("Included"), icon: "car.fill", action: onTransfer),
-                Item(id: "ziyarat", assets: ["ZiyaratQuba1", "ZiyaratQuba2", "ZiyaratQuba3", "ZiyaratQuba4", "ZiyaratQuba5"], title: ArabicLocalization.phrase("Iumrah Ziyarat"), body: ArabicLocalization.phrase("Makkah and Madinah places in one route, with context, navigation and a clear visit sequence."), badge: ArabicLocalization.phrase("Routes"), icon: "map.fill", action: onZiyarats),
-                Item(id: "esim", assets: ["IumrahESIMHomeCard"], title: ArabicLocalization.phrase("Iumrah eSIM"), body: ArabicLocalization.phrase("Saudi internet ready from arrival, without having to search for a local SIM card at the airport."), badge: ArabicLocalization.phrase("Connectivity"), icon: "antenna.radiowaves.left.and.right", action: onESIM),
-                Item(id: "flights", assets: ["IumrahFlightsHomeCard"], title: ArabicLocalization.phrase("Iumrah Flights"), body: ArabicLocalization.phrase("Real-time flight status with schedule changes, delays and important journey updates in one place."), badge: ArabicLocalization.phrase("Live status"), icon: "airplane", action: onFlights),
-            ]
-case .indonesian, .malay, .english:
+        case .english:
             return [
                 Item(id: "transfer", assets: ["TransferMalibu", "TransferCarnival", "TransferYukon"], title: "Iumrah Transfer", body: "Airport pickup and private rides between key stops, with the right vehicle for your journey.", badge: "Included", icon: "car.fill", action: onTransfer),
                 Item(id: "ziyarat", assets: ["ZiyaratQuba1", "ZiyaratQuba2", "ZiyaratQuba3", "ZiyaratQuba4", "ZiyaratQuba5"], title: "Iumrah Ziyarat", body: "Makkah and Madinah places in one route, with context, navigation and a clear visit sequence.", badge: "Routes", icon: "map.fill", action: onZiyarats),
@@ -338,12 +318,12 @@ case .indonesian, .malay, .english:
                     .background(Color.white)
                 }
                 .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 31, style: .continuous)
+                    RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                         .strokeBorder(Color.black.opacity(0.055), lineWidth: 0.8)
                 }
-                .contentShape(RoundedRectangle(cornerRadius: 31, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
             }
             .buttonStyle(.plain)
         }
@@ -441,7 +421,7 @@ struct IumrahTransferServiceView: View {
                         Text(localized("Заказать автомобиль", "Book vehicle", "Avtomobil buyurtma qilish", "Автомобиль буюртма қилиш"))
                             .font(.headline)
                         Spacer()
-                        Image(systemName: "arrow.forward")
+                        Image(systemName: "arrow.right")
                             .font(.caption.weight(.bold))
                     }
                     .frame(maxWidth: .infinity)
@@ -711,9 +691,7 @@ struct IumrahTransferServiceView: View {
     private func localized(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
-        case .indonesian, .malay, .english: return en
+        case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -766,8 +744,6 @@ struct HomeStorefrontFlightOptionCard: View {
                     .foregroundStyle(.secondary)
                 }
 
-                Spacer(minLength: 2)
-
                 HStack(spacing: 8) {
                     Label(generatedStampText, systemImage: "seal.fill")
                         .font(.caption2.weight(.semibold))
@@ -780,17 +756,14 @@ struct HomeStorefrontFlightOptionCard: View {
 
                     Spacer(minLength: 4)
                     if packagePreview != nil {
-                        Image(systemName: "chevron.forward")
+                        Image(systemName: "chevron.right")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(16)
-            .frame(height: 280, alignment: .topLeading)
         }
-        .frame(height: 398, alignment: .top)
         .background(Color.iumrahCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
@@ -944,9 +917,7 @@ struct HomeStorefrontFlightOptionCard: View {
         let route = "\(preview.outbound.origin) → \(preview.outbound.destination) + \(preview.inbound.origin) → \(preview.inbound.destination)"
         switch language {
         case .russian: return "\(route) · \(preview.durationDays) дн. · \(packageScopeText(preview))"
-        case .turkish: return TurkishLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
-        case .arabic: return ArabicLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
-        case .indonesian, .malay, .english: return "\(route) · \(preview.durationDays) days · \(packageScopeText(preview))"
+        case .english: return "\(route) · \(preview.durationDays) days · \(packageScopeText(preview))"
         case .uzbek: return "\(route) · \(preview.durationDays) kun · \(packageScopeText(preview))"
         case .uzbekCyrillic: return "\(route) · \(preview.durationDays) кун · \(packageScopeText(preview))"
         }
@@ -959,15 +930,11 @@ struct HomeStorefrontFlightOptionCard: View {
     private func packageScopeText(_ preview: StorefrontFlightPackagePreview) -> String {
         switch (preview.kind, language) {
         case (.makkahComfortShort, .russian), (.hotelFirstMakkah, .russian): return "Только Мекка"
-        case (.makkahComfortShort, .turkish), (.hotelFirstMakkah, .turkish): return TurkishLocalization.phrase("Makkah only")
-        case (.makkahComfortShort, .arabic), (.hotelFirstMakkah, .arabic): return ArabicLocalization.phrase("Makkah only")
-        case (.makkahComfortShort, .indonesian), (.makkahComfortShort, .malay), (.makkahComfortShort, .english), (.hotelFirstMakkah, .indonesian), (.hotelFirstMakkah, .malay), (.hotelFirstMakkah, .english): return "Makkah only"
+        case (.makkahComfortShort, .english), (.hotelFirstMakkah, .english): return "Makkah only"
         case (.makkahComfortShort, .uzbek), (.hotelFirstMakkah, .uzbek): return "Faqat Makka"
         case (.makkahComfortShort, .uzbekCyrillic), (.hotelFirstMakkah, .uzbekCyrillic): return "Фақат Макка"
         case (.makkahMadinahStandard, .russian): return "Мекка + Медина"
-        case (.makkahMadinahStandard, .turkish): return TurkishLocalization.phrase("Makkah + Madinah")
-        case (.makkahMadinahStandard, .arabic): return ArabicLocalization.phrase("Makkah + Madinah")
-        case (.makkahMadinahStandard, .indonesian), (.makkahMadinahStandard, .malay), (.makkahMadinahStandard, .english): return "Makkah + Madinah"
+        case (.makkahMadinahStandard, .english): return "Makkah + Madinah"
         case (.makkahMadinahStandard, .uzbek): return "Makka + Madina"
         case (.makkahMadinahStandard, .uzbekCyrillic): return "Макка + Мадина"
         }
@@ -976,9 +943,7 @@ struct HomeStorefrontFlightOptionCard: View {
     private var generatedStampText: String {
         switch language {
         case .russian: return packagePreview == nil ? "Iumrah Flights Scanner" : "Сгенерировано Iumrah Configurator"
-        case .turkish: return packagePreview == nil ? "Iumrah Flights Scanner" : "Iumrah Configurator tarafından oluşturuldu"
-        case .arabic: return packagePreview == nil ? "ماسح رحلات iumrah" : "أُنشئت بواسطة iumrah Configurator"
-        case .indonesian, .malay, .english: return packagePreview == nil ? "Iumrah Flights Scanner" : "Generated by Iumrah Configurator"
+        case .english: return packagePreview == nil ? "Iumrah Flights Scanner" : "Generated by Iumrah Configurator"
         case .uzbek: return packagePreview == nil ? "Iumrah Flights Scanner" : "Iumrah Configurator yaratdi"
         case .uzbekCyrillic: return packagePreview == nil ? "Iumrah Flights Scanner" : "Iumrah Configurator яратди"
         }
@@ -987,9 +952,7 @@ struct HomeStorefrontFlightOptionCard: View {
     private var packagePerPersonText: String {
         switch language {
         case .russian: return "пакет · 1 человек"
-        case .turkish: return TurkishLocalization.phrase("package · 1 person")
-        case .arabic: return ArabicLocalization.phrase("package · 1 person")
-        case .indonesian, .malay, .english: return "package · 1 person"
+        case .english: return "package · 1 person"
         case .uzbek: return "paket · 1 kishi"
         case .uzbekCyrillic: return "пакет · 1 киши"
         }
@@ -998,9 +961,7 @@ struct HomeStorefrontFlightOptionCard: View {
     private var calculatingPackageText: String {
         switch language {
         case .russian: return "Считаем пакет"
-        case .turkish: return TurkishLocalization.phrase("Calculating package")
-        case .arabic: return ArabicLocalization.phrase("Calculating package")
-        case .indonesian, .malay, .english: return "Calculating package"
+        case .english: return "Calculating package"
         case .uzbek: return "Paket hisoblanmoqda"
         case .uzbekCyrillic: return "Пакет ҳисобланмоқда"
         }
@@ -1009,9 +970,7 @@ struct HomeStorefrontFlightOptionCard: View {
     private var packageUnavailableText: String {
         switch language {
         case .russian: return "нет пары 2–15 дней"
-        case .turkish: return TurkishLocalization.phrase("no 2–15 day pair")
-        case .arabic: return ArabicLocalization.phrase("no 2–15 day pair")
-        case .indonesian, .malay, .english: return "no 2–15 day pair"
+        case .english: return "no 2–15 day pair"
         case .uzbek: return "2–15 kunlik juftlik yo‘q"
         case .uzbekCyrillic: return "2–15 кунлик жуфтлик йўқ"
         }

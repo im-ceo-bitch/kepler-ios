@@ -79,7 +79,7 @@ struct IumrahAppearanceView: View {
                             if settings.appearance == appearance {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 21, weight: .semibold))
-                                    .foregroundStyle(Color.iumrahCareLight)
+                                    .foregroundStyle(Color.iumrahInk)
                                     .transition(.scale.combined(with: .opacity))
                             }
                         }
@@ -147,9 +147,9 @@ struct IumrahAppearanceView: View {
                         if currentAlternateIconName == nil {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.iumrahCareLight)
+                                .foregroundStyle(Color.iumrahInk)
                         } else if iconBeingChanged == nil {
-                            Image(systemName: "chevron.forward")
+                            Image(systemName: "chevron.right")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
@@ -290,9 +290,7 @@ struct IumrahAppearanceView: View {
 
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
-        case .indonesian, .malay, .english: return en
+        case .english: return en
         case .russian: return ru
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -365,23 +363,7 @@ private enum AppIconOption: String, CaseIterable, Identifiable {
             case .world: return "Дунё харитаси билан iumrah иконкаси"
             case .makkah: return "Каъба билан iumrah иконкаси"
             }
-        case .turkish:
-            switch self {
-            case .blue: return "Mavi iumrah uygulama simgesi"
-            case .cyan: return "Turkuaz iumrah uygulama simgesi"
-            case .deepBlue: return "Koyu mavi iumrah uygulama simgesi"
-            case .world: return "Dünya haritalı iumrah uygulama simgesi"
-            case .makkah: return "Mekke temalı iumrah uygulama simgesi"
-            }
-        case .arabic:
-            switch self {
-            case .blue: return "أيقونة iumrah الزرقاء"
-            case .cyan: return "أيقونة iumrah السماوية"
-            case .deepBlue: return "أيقونة iumrah الزرقاء الداكنة"
-            case .world: return "أيقونة iumrah بخريطة العالم"
-            case .makkah: return "أيقونة iumrah بطابع مكة"
-            }
-        case .indonesian, .malay, .english:
+        case .english:
             switch self {
             case .blue: return "Blue iumrah app icon"
             case .cyan: return "Cyan iumrah app icon"

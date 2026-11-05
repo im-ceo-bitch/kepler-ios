@@ -15,6 +15,7 @@ private enum IumrahGuestAccountMode: String, CaseIterable, Identifiable {
 private enum IumrahGuestAuthMethod: String, CaseIterable, Identifiable {
     case sms
     case email
+    case iumrahID
     var id: String { rawValue }
 }
 
@@ -52,12 +53,12 @@ struct IumrahAccountView: View {
 
     @State private var guestAccountMode: IumrahGuestAccountMode = .signIn
     @State private var guestAuthMethod: IumrahGuestAuthMethod = .sms
+    @State private var loginID = ""
     @State private var loginEmail = ""
-    @State private var loginEmailCode = ""
-    @State private var loginEmailChallengeID = ""
     @State private var loginPhone = "+998"
     @State private var loginSMSCode = ""
     @State private var loginSMSChallengeID = ""
+    @State private var loginPassword = ""
     @State private var loginEmailServerIssue: IumrahFieldIssue?
     @State private var registrationFirstName = ""
     @State private var registrationLastName = ""
@@ -68,6 +69,8 @@ struct IumrahAccountView: View {
     @State private var registrationPhone = "+998"
     @State private var registrationSMSCode = ""
     @State private var registrationSMSChallengeID = ""
+    @State private var registrationPassword = ""
+    @State private var registrationPasswordConfirm = ""
     @State private var isRegistering = false
     @State private var showSignOutConfirmation = false
     @State private var isLoggingIn = false
@@ -89,6 +92,7 @@ struct IumrahAccountView: View {
     @State private var showProfileEditor = false
     @State private var identityCardFlipped = false
     @State private var showIdentityFullscreen = false
+    @State private var showLanguageSheet = false
     @State private var showIdentityUnlockSheet = false
     @State private var identityRevealProgress: CGFloat = 0
     @State private var loginScrollNonce = 0
@@ -99,13 +103,12 @@ struct IumrahAccountView: View {
     @State private var identityPublicURL: String?
     @State private var identityCopyMessage: String?
     @State private var tripScope: IumrahAccountTripScope = .active
-    @State private var accountHeaderSection = "profile"
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
-                    IumrahSignatureScrollMarker()
+                    accountHeader
 
                     if let profile = account.account {
                         IumrahAccountIdentityHeroCard(
@@ -117,7 +120,6 @@ struct IumrahAccountView: View {
                         )
 
                         userDataEntryCard(profile)
-                            .id("account.profile")
                         travelCompanionsEntryCard
                         walletSection(profile)
 
@@ -125,41 +127,27 @@ struct IumrahAccountView: View {
                             IumrahTripWalletEntry(session: active, profile: profile, language: settings.language)
                         }
                         tripsSection
-                            .id("account.trips")
                         telegramIntegrationSection
                         paymentSecuritySection
                         servicesSection
                         settingsSection
-                            .id("account.settings")
                         signOutButton
                     } else {
-                        guestOrbitHero
-                        loginCard
-                            .id("account-login")
                         IumrahLockedIdentityCard(language: settings.language) {
                             showIdentityUnlockSheet = true
                         }
-                        .id("account.trips")
+                        loginCard
+                            .id("account-login")
                         telegramIntegrationSection
                         paymentSecuritySection
                         guestSettingsSection
-                            .id("account.settings")
                     }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 0)
-                .padding(.bottom, 64)
+                .padding(.top, 12)
+                .padding(.bottom, 46)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
-                .background(Color.iumrahPageBackground)
             }
-            .refreshable { await refreshAccountContent() }
-            .iumrahSignatureScrollChrome(
-                title: accountPageTitle,
-                subtitle: account.isAuthenticated
-                    ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз")
-                    : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг"),
-                pinnedAccessory: AnyView(accountSignatureTabs(scrollProxy: proxy))
-            )
             .onChange(of: loginScrollNonce) { _, _ in
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.90)) {
                     proxy.scrollTo("account-login", anchor: .top)
@@ -167,6 +155,9 @@ struct IumrahAccountView: View {
             }
         }
         .background(Color.iumrahPageBackground)
+        .refreshable {
+            await refreshAccountContent()
+        }
         .task {
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
@@ -183,6 +174,10 @@ struct IumrahAccountView: View {
         }
         .sheet(isPresented: $showProfileEditor) {
             profileEditorSheet
+        }
+        .sheet(isPresented: $showLanguageSheet) {
+            IumrahLanguageSelectionSheet()
+                .environmentObject(settings)
         }
         .sheet(isPresented: $showIdentityUnlockSheet) {
             IumrahIdentityUnlockSheet(language: settings.language) {
@@ -231,57 +226,55 @@ struct IumrahAccountView: View {
         }
     }
 
-    private func accountHeader(scrollProxy: ScrollViewProxy) -> some View {
-        VStack(spacing: 0) {
-            IumrahRootPageTitle(
-                title: accountPageTitle,
-                subtitle: account.isAuthenticated
-                    ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз")
-                    : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг"),
-                drawsSignatureBackground: false,
-                showsSignatureBrandRow: false
-            )
-            accountSignatureTabs(scrollProxy: scrollProxy)
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.bottom, 18)
-        }
-        .background {
-            IumrahWorldDotsHeaderBackground()
-                .padding(.horizontal, -IumrahDesign.pagePadding)
-        }
-    }
+    private var accountHeader: some View {
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Account")
+                    .font(.system(size: 38, weight: .bold, design: .rounded))
+                    .tracking(-1)
+                Text(account.isAuthenticated ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз") : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг"))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
 
-    private func accountSignatureTabs(scrollProxy: ScrollViewProxy) -> some View {
-        IumrahSignatureThreeTabs(
-            tabs: [
-                .init(id: "profile", title: tr("Profile", "Профиль", "Profil", "Профил")),
-                .init(id: "trips", title: tr("Trips", "Поездки", "Safarlar", "Сафарлар")),
-                .init(id: "settings", title: tr("Settings", "Настройки", "Sozlamalar", "Созламалар"))
-            ],
-            selectedID: accountHeaderSection
-        ) { target in
-            accountHeaderSection = target
-            IumrahHaptics.selection()
-            withAnimation(.easeInOut(duration: 0.30)) {
-                if target == "profile" && account.account == nil {
-                    scrollProxy.scrollTo("account-login", anchor: .top)
-                } else {
-                    scrollProxy.scrollTo("account.\(target)", anchor: .top)
+            Spacer(minLength: 10)
+
+            HStack(spacing: 10) {
+                Button {
+                    chrome.openNotifications()
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: clientNotifications.unreadCount > 0 ? "bell.badge.fill" : "bell")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 50, height: 50)
+                            .iumrahGlass(in: Circle(), interactive: true, chrome: true)
+
+                        if clientNotifications.unreadCount > 0 {
+                            Text(clientNotifications.unreadCount > 9 ? "9+" : "\(clientNotifications.unreadCount)")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, clientNotifications.unreadCount > 9 ? 5 : 0)
+                                .frame(minWidth: 16, minHeight: 16)
+                                .background(Color.red, in: Capsule())
+                                .overlay { Capsule().stroke(Color.white.opacity(0.95), lineWidth: 1) }
+                                .offset(x: -3, y: 4)
+                        }
+                    }
                 }
+                .buttonStyle(.plain)
+
+                Button {
+                    chrome.openSidebar()
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 50, height: 50)
+                        .iumrahGlass(in: Circle(), interactive: true, chrome: true)
+                }
+                .buttonStyle(.plain)
             }
         }
-    }
-
-    private var accountPageTitle: String {
-        switch settings.language {
-        case .russian: return "Аккаунт"
-        case .uzbek: return "Akkaunt"
-        case .uzbekCyrillic: return "Аккаунт"
-        case .turkish: return "Hesabım"
-        case .arabic: return ArabicLocalization.phrase("Account")
-        case .indonesian: return "Akun saya"
-        case .malay, .english: return "Account"
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func identityCard(_ profile: IumrahAccountProfile) -> some View {
@@ -304,7 +297,7 @@ struct IumrahAccountView: View {
             }
             .rotation3DEffect(.degrees(identityCardFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
             .animation(.spring(response: 0.52, dampingFraction: 0.82), value: identityCardFlipped)
-            .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
             .onTapGesture {
                 IumrahHaptics.selection()
                 identityCardFlipped.toggle()
@@ -346,7 +339,7 @@ struct IumrahAccountView: View {
         let first = fullName.first.map(String.init) ?? profile.firstName
         let last = fullName.dropFirst().first.map(String.init) ?? profile.lastName
         return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .fill(Color.white)
 
             LinearGradient(
@@ -354,7 +347,7 @@ struct IumrahAccountView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
 
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top) {
@@ -406,9 +399,9 @@ struct IumrahAccountView: View {
             }
             .padding(22)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.black.opacity(0.07), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.08), radius: 22, y: 12)
@@ -416,7 +409,7 @@ struct IumrahAccountView: View {
 
     private func identityBack(_ profile: IumrahAccountProfile) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .fill(Color.white)
 
             LinearGradient(
@@ -424,7 +417,7 @@ struct IumrahAccountView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
 
             HStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -458,9 +451,9 @@ struct IumrahAccountView: View {
             }
             .padding(22)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.black.opacity(0.07), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.08), radius: 22, y: 12)
@@ -659,12 +652,12 @@ struct IumrahAccountView: View {
                             .foregroundStyle(.secondary)
                         Text("\(session.booking.route.originCode) → \(session.booking.route.outboundDestination)")
                             .font(.system(size: 23, weight: .bold, design: .rounded))
-                        Text(L10n.format("booking_number_short", settings.language, session.displayBookingNumber))
+                        Text("Бронь \(session.displayBookingNumber)")
                             .font(.caption.monospaced().weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.forward")
+                    Image(systemName: "chevron.right")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 16)
@@ -706,7 +699,7 @@ struct IumrahAccountView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.forward")
+                    Image(systemName: "chevron.right")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.tertiary)
                         .frame(width: 34, height: 34)
@@ -772,7 +765,7 @@ struct IumrahAccountView: View {
                             Text(tr("Open all trips", "Открыть все поездки", "Barcha safarlarni ochish", "Барча сафарларни очиш"))
                                 .font(.subheadline.weight(.semibold))
                             Spacer()
-                            Image(systemName: "arrow.forward")
+                            Image(systemName: "arrow.right")
                                 .font(.caption.weight(.bold))
                         }
                         .padding(.horizontal, 14)
@@ -828,7 +821,7 @@ struct IumrahAccountView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Image(systemName: "chevron.forward")
+                Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white.opacity(0.52))
             }
@@ -840,10 +833,10 @@ struct IumrahAccountView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
-                in: RoundedRectangle(cornerRadius: 28, style: .continuous)
+                in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
             }
             .shadow(color: .black.opacity(0.12), radius: 20, y: 10)
@@ -898,16 +891,16 @@ struct IumrahAccountView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Image(systemName: "chevron.forward")
+                    Image(systemName: "chevron.right")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.tertiary)
                 }
                 .padding(16)
             }
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
             }
             .shadow(color: .black.opacity(0.045), radius: 18, y: 8)
@@ -970,8 +963,7 @@ struct IumrahAccountView: View {
 
     private func accountSummaryRow(icon: String, role: IumrahIconRole, title: String, value: String) -> some View {
         HStack(spacing: 12) {
-            if role == .telegram { IumrahTelegramMark(size: 36).frame(width: 38, height: 38) }
-            else { IumrahIconBadge(systemName: icon, role: role, size: 38, symbolSize: 14, cornerRadius: 12) }
+            IumrahIconBadge(systemName: icon, role: role, size: 38, symbolSize: 14, cornerRadius: 12)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.caption)
@@ -1241,9 +1233,9 @@ struct IumrahAccountView: View {
                 Divider().padding(.leading, 54)
             }
 
-            NavigationLink {
-                IumrahLanguageSelectionSheet(currentLanguage: settings.language)
-                    .environmentObject(settings)
+            Button {
+                IumrahHaptics.soft()
+                showLanguageSheet = true
             } label: {
                 settingsRow(icon: "globe", title: tr("Language", "Язык", "Til", "Тил"), value: settings.language.title)
             }
@@ -1319,68 +1311,6 @@ struct IumrahAccountView: View {
         .iumrahCard()
     }
 
-    // Show the product value before the existing SMS / email / Apple / Google form.
-    // Both CTAs switch the existing form; they do not create new authentication flows.
-    private var guestOrbitHero: some View {
-        VStack(spacing: 12) {
-            IumrahOrbitIconRing(mode: .showcase, diameter: 232, lightOnDark: true)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 4)
-
-            Text(tr("Your Umrah. One place.", "Ваша Умра. Всё в одном месте.",
-                    "Umrangiz. Hammasi bir joyda.", "Умрангиз. Ҳаммаси бир жойда."))
-                .font(.system(size: 25, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-
-            Text(tr("Flights, hotels, transfers and care — one journey.",
-                    "Авиабилеты, отели, трансфер и поддержка — одна поездка.",
-                    "Parvozlar, mehmonxonalar, transfer va yordam — bitta safar.",
-                    "Парвозлар, меҳмонхоналар, трансфер ва ёрдам — битта сафар."))
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.64))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 10) {
-                guestOrbitButton(
-                    title: tr("Sign in", "Войти", "Kirish", "Кириш"),
-                    mode: .signIn,
-                    filled: true
-                )
-                guestOrbitButton(
-                    title: tr("Register", "Зарегистрироваться", "Ro‘yxatdan o‘tish", "Рўйхатдан ўтиш"),
-                    mode: .register,
-                    filled: false
-                )
-            }
-            .padding(.top, 8)
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(Color(red: 0.035, green: 0.035, blue: 0.047),
-                    in: RoundedRectangle(cornerRadius: 30, style: .continuous))
-    }
-
-    private func guestOrbitButton(title: String, mode: IumrahGuestAccountMode, filled: Bool) -> some View {
-        Button {
-            guestAccountMode = mode
-            loginScrollNonce += 1
-            IumrahHaptics.selection()
-        } label: {
-            Text(title)
-                .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .foregroundStyle(filled ? Color.black : Color.white)
-                .background(filled ? Color.white : Color.white.opacity(0.095),
-                            in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
     private var loginCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeader(
@@ -1402,8 +1332,6 @@ struct IumrahAccountView: View {
                 loginError = nil
                 loginEmailServerIssue = nil
                 resetPhoneLoginState()
-                loginEmailChallengeID = ""
-                loginEmailCode = ""
                 resetPhoneRegistrationState()
                 registrationEmailChallengeID = ""
                 registrationEmailCode = ""
@@ -1413,14 +1341,13 @@ struct IumrahAccountView: View {
             Picker("", selection: $guestAuthMethod) {
                 Text("SMS").tag(IumrahGuestAuthMethod.sms)
                 Text("Email").tag(IumrahGuestAuthMethod.email)
+                Text("iumrah ID").tag(IumrahGuestAuthMethod.iumrahID)
             }
             .pickerStyle(.segmented)
             .onChange(of: guestAuthMethod) { _, _ in
                 loginError = nil
                 loginEmailServerIssue = nil
                 resetPhoneLoginState()
-                loginEmailChallengeID = ""
-                loginEmailCode = ""
                 resetPhoneRegistrationState()
             }
 
@@ -1479,55 +1406,53 @@ struct IumrahAccountView: View {
     @ViewBuilder
     private var guestSignInFields: some View {
         switch guestAuthMethod {
+        case .iumrahID:
+            accountInputField(symbol: "number", placeholder: "00000016", text: $loginID, keyboard: .numberPad, contentType: .username) { raw in
+                let digits = String(raw.filter(\.isNumber).prefix(8))
+                if digits != raw { loginID = digits }
+            }
+
+            accountPasswordField(text: $loginPassword, placeholder: tr("Password", "Пароль", "Parol", "Парол"))
+
+            Button {
+                Task { await login() }
+            } label: {
+                HStack(spacing: 10) {
+                    if isLoggingIn { ProgressView().tint(.white) }
+                    Image(systemName: "person.crop.circle.fill")
+                    Text(tr("Sign in to iumrah", "Войти в iumrah", "iumrah ga kirish", "iumrah га кириш"))
+                    Spacer(minLength: 10)
+                    Image(systemName: "arrow.right")
+                }
+            }
+            .buttonStyle(IumrahPrimaryButtonStyle())
+            .disabled(!guestLoginReady || isLoggingIn || isAppleSigningIn || isGoogleSigningIn)
+
         case .email:
             accountInputField(symbol: "envelope.fill", placeholder: "name@example.com", text: $loginEmail, keyboard: .emailAddress, contentType: .emailAddress) { raw in
                 let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 if cleaned != raw { loginEmail = cleaned }
                 loginEmailServerIssue = nil
             }
-            .disabled(!loginEmailChallengeID.isEmpty)
             if let issue = loginEmailFieldIssue {
                 fieldIssueView(issue)
             }
 
-            if !loginEmailChallengeID.isEmpty {
-                accountInputField(symbol: "number.square.fill", placeholder: tr("6-digit email code", "6-значный код из письма", "Emaildan 6 xonali kod", "Emailдан 6 хонали код"), text: $loginEmailCode, keyboard: .numberPad, contentType: .oneTimeCode) { raw in
-                    let digits = String(raw.filter(\.isNumber).prefix(6))
-                    if digits != raw { loginEmailCode = digits }
-                }
-            }
+            accountPasswordField(text: $loginPassword, placeholder: tr("Password", "Пароль", "Parol", "Парол"))
 
             Button {
-                Task {
-                    if loginEmailChallengeID.isEmpty { await startEmailLogin() }
-                    else { await confirmEmailLogin() }
-                }
+                Task { await login() }
             } label: {
                 HStack(spacing: 10) {
                     if isLoggingIn { ProgressView().tint(.white) }
-                    Image(systemName: loginEmailChallengeID.isEmpty ? "envelope.badge.fill" : "checkmark.shield.fill")
-                    Text(loginEmailChallengeID.isEmpty
-                        ? tr("Send email code", "Получить код на почту", "Email kodini yuborish", "Email кодини юбориш")
-                        : tr("Confirm and sign in", "Подтвердить и войти", "Tasdiqlab kirish", "Тасдиқлаб кириш"))
+                    Image(systemName: "person.crop.circle.fill")
+                    Text(tr("Sign in to iumrah", "Войти в iumrah", "iumrah ga kirish", "iumrah га кириш"))
                     Spacer(minLength: 10)
-                    Image(systemName: "arrow.forward")
+                    Image(systemName: "arrow.right")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
             .disabled(!guestLoginReady || isLoggingIn || isAppleSigningIn || isGoogleSigningIn)
-            if !loginEmailChallengeID.isEmpty {
-                HStack {
-                    Button(tr("Change email", "Изменить почту", "Emailni o‘zgartirish", "Emailни ўзгартириш")) {
-                        loginEmailChallengeID = ""
-                        loginEmailCode = ""
-                    }
-                    Spacer()
-                    Button(tr("Send again", "Отправить ещё раз", "Qayta yuborish", "Қайта юбориш")) {
-                        Task { await startEmailLogin() }
-                    }.disabled(isLoggingIn)
-                }
-                .font(.caption.weight(.semibold))
-            }
 
         case .sms:
             accountInputField(symbol: "phone.fill", placeholder: "+998 90 123 45 67", text: $loginPhone, keyboard: .phonePad, contentType: .telephoneNumber) { raw in
@@ -1574,7 +1499,7 @@ struct IumrahAccountView: View {
                          ? tr("Send SMS code", "Отправить SMS-код", "SMS kodni yuborish", "SMS кодни юбориш")
                          : tr("Confirm and sign in", "Подтвердить и войти", "Tasdiqlab kirish", "Тасдиқлаб кириш"))
                     Spacer(minLength: 10)
-                    Image(systemName: "arrow.forward")
+                    Image(systemName: "arrow.right")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1607,6 +1532,8 @@ struct IumrahAccountView: View {
                     let digits = String(raw.filter(\.isNumber).prefix(6))
                     if digits != raw { registrationEmailCode = digits }
                 }
+                accountPasswordField(text: $registrationPassword, placeholder: tr("Create password", "Создайте пароль", "Parol yarating", "Парол яратинг"))
+                accountPasswordField(text: $registrationPasswordConfirm, placeholder: tr("Confirm password", "Подтвердите пароль", "Parolni tasdiqlang", "Паролни тасдиқланг"))
             }
 
             Button {
@@ -1671,10 +1598,10 @@ struct IumrahAccountView: View {
                         "Доимий iumrah аккаунтингизни 6 хонали SMS коди билан яратинг. +998 Ўзбекистон рақамлари қўлланади."
                      )
                      : tr(
-                        "Enter the SMS code to finish creating your account. No password is needed.",
-                        "Введите SMS-код, чтобы создать аккаунт. Пароль не нужен.",
-                        "Akkaunt yaratish uchun SMS kodini kiriting. Parol kerak emas.",
-                        "Аккаунт яратиш учун SMS кодини киритинг. Парол керак эмас."
+                        "Enter the SMS code, then create a password for iumrah ID sign-in as a backup.",
+                        "Введите SMS-код, затем создайте пароль для резервного входа по iumrah ID.",
+                        "SMS kodni kiriting, so‘ng zaxira iumrah ID kirishi uchun parol yarating.",
+                        "SMS кодни киритинг, сўнг захира iumrah ID кириши учун парол яратинг."
                      ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1693,6 +1620,14 @@ struct IumrahAccountView: View {
                     if digits != raw { registrationSMSCode = digits }
                 }
 
+                accountPasswordField(
+                    text: $registrationPassword,
+                    placeholder: tr("Create password", "Создайте пароль", "Parol yarating", "Парол яратинг")
+                )
+                accountPasswordField(
+                    text: $registrationPasswordConfirm,
+                    placeholder: tr("Confirm password", "Подтвердите пароль", "Parolni tasdiqlang", "Паролни тасдиқланг")
+                )
             }
 
             Button {
@@ -1711,13 +1646,19 @@ struct IumrahAccountView: View {
                          ? tr("Send SMS code", "Отправить SMS-код", "SMS kodni yuborish", "SMS кодни юбориш")
                          : tr("Create iumrah account", "Создать аккаунт iumrah", "iumrah akkauntini yaratish", "iumrah аккаунтини яратиш"))
                     Spacer(minLength: 10)
-                    Image(systemName: "arrow.forward")
+                    Image(systemName: "arrow.right")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
             .disabled(!guestSMSRegistrationReady || isRegistering || isAppleSigningIn || isGoogleSigningIn)
 
-
+        case .iumrahID:
+            bookingBoundRegistrationNotice(
+                icon: "person.text.rectangle.fill",
+                title: tr("iumrah ID is issued with your booking", "iumrah ID выдаётся вместе с бронью", "iumrah ID bron bilan beriladi", "iumrah ID брон билан берилади"),
+                text: tr("Open a booking that is ready for activation. Your permanent ID will be shown there and can be activated immediately.", "Откройте бронь, готовую к активации. Там будет показан Ваш постоянный ID, который можно сразу активировать.", "Faollashtirishga tayyor bronni oching. Doimiy ID shu yerda ko‘rinadi va uni darhol faollashtirish mumkin.", "Фаоллаштиришга тайёр бронни очинг. Доимий ID шу ерда кўринади ва уни дарҳол фаоллаштириш мумкин.")
+            )
+            pendingActivationButton
         }
     }
 
@@ -1730,7 +1671,7 @@ struct IumrahAccountView: View {
                 HStack {
                     Text(tr("Open booking activation", "Открыть активацию брони", "Bron faollashtirishini ochish", "Брон фаоллаштиришини очиш"))
                     Spacer()
-                    Image(systemName: "arrow.forward")
+                    Image(systemName: "arrow.right")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1810,14 +1751,36 @@ struct IumrahAccountView: View {
         }
     }
 
+    private func accountPasswordField(text: Binding<String>, placeholder: String) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: "lock.fill")
+                .foregroundStyle(.secondary)
+                .frame(width: 22)
+            SecureField(placeholder, text: text)
+                .textContentType(.password)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 56)
+        .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
+        }
+    }
+
     private var guestLoginReady: Bool {
         switch guestAuthMethod {
+        case .iumrahID:
+            guard loginPassword.count >= 8 else { return false }
+            return [6, 8].contains(loginID.filter(\.isNumber).count)
         case .email:
-            let valid = loginEmailFieldIssue == nil && loginEmail.contains("@") && loginEmail.contains(".")
-            return valid && (loginEmailChallengeID.isEmpty || loginEmailCode.count == 6)
+            guard loginPassword.count >= 8 else { return false }
+            return loginEmailFieldIssue == nil && !loginEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .sms:
             let phoneReady = normalizedUZPhoneInput(loginPhone).count == 13 && normalizedUZPhoneInput(loginPhone).hasPrefix("+998")
-            return phoneReady && (loginSMSChallengeID.isEmpty || loginSMSCode.count == 6)
+            if !phoneReady { return false }
+            if loginSMSChallengeID.isEmpty { return true }
+            return loginSMSCode.count == 6
         }
     }
 
@@ -1828,7 +1791,7 @@ struct IumrahAccountView: View {
               !registrationFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !registrationLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         if registrationEmailChallengeID.isEmpty { return true }
-        return registrationEmailCode.count == 6
+        return registrationEmailCode.count == 6 && registrationPassword.count >= 8 && registrationPassword == registrationPasswordConfirm
     }
 
 
@@ -1839,6 +1802,8 @@ struct IumrahAccountView: View {
               !registrationLastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         if registrationSMSChallengeID.isEmpty { return true }
         return registrationSMSCode.count == 6
+            && registrationPassword.count >= 8
+            && registrationPassword == registrationPasswordConfirm
     }
 
     private func activationShortcut(_ session: StoredBookingSession) -> some View {
@@ -1857,7 +1822,7 @@ struct IumrahAccountView: View {
                     }
                 }
                 Spacer(minLength: 10)
-                Image(systemName: "chevron.forward")
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -1877,9 +1842,9 @@ struct IumrahAccountView: View {
             )
             .padding(.bottom, 8)
 
-            NavigationLink {
-                IumrahLanguageSelectionSheet(currentLanguage: settings.language)
-                    .environmentObject(settings)
+            Button {
+                IumrahHaptics.soft()
+                showLanguageSheet = true
             } label: {
                 settingsRow(icon: "globe", title: tr("Language", "Язык", "Til", "Тил"), value: settings.language.title)
             }
@@ -1936,7 +1901,7 @@ struct IumrahAccountView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(session.booking.route.originCode) → \(session.booking.route.outboundDestination)")
                     .font(.subheadline.weight(.bold))
-                Text("\(L10n.format("booking_number_short", settings.language, session.displayBookingNumber)) · \(L10n.date(session.booking.input.startDate, settings.language))")
+                Text("Бронь \(session.displayBookingNumber) · \(L10n.date(session.booking.input.startDate, settings.language))")
                     .font(.caption.monospaced().weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -1946,7 +1911,7 @@ struct IumrahAccountView: View {
                     .lineLimit(2)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.forward")
+            Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.tertiary)
         }
@@ -1998,7 +1963,7 @@ struct IumrahAccountView: View {
             }
             Spacer(minLength: 8)
             if showsChevron {
-                Image(systemName: "chevron.forward")
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -2099,44 +2064,30 @@ struct IumrahAccountView: View {
     }
 
     @MainActor
-    private func startEmailLogin() async {
+    private func login() async {
         isLoggingIn = true
         loginError = nil
         loginEmailServerIssue = nil
         defer { isLoggingIn = false }
         do {
-            let response = try await account.startEmailLogin(
-                email: loginEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                locale: settings.language.rawValue
-            )
-            loginEmailChallengeID = response.challengeID
-            loginEmailCode = ""
-            IumrahHaptics.success()
-        } catch {
-            if let issue = serverIssueForEmailLogin(error) { loginEmailServerIssue = issue }
-            else { loginError = smartLoginError(error) }
-            IumrahHaptics.error()
-        }
-    }
-
-    @MainActor
-    private func confirmEmailLogin() async {
-        guard !loginEmailChallengeID.isEmpty else { return }
-        isLoggingIn = true
-        loginError = nil
-        defer { isLoggingIn = false }
-        do {
-            let profile = try await account.confirmEmailLogin(
-                challengeID: loginEmailChallengeID,
-                code: loginEmailCode,
-                locale: settings.language.rawValue
-            )
+            let identifier: String
+            switch guestAuthMethod {
+            case .iumrahID: identifier = normalizedLoginIdentifier(loginID)
+            case .email: identifier = loginEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            case .sms: identifier = normalizedUZPhoneInput(loginPhone)
+            }
+            let profile = try await account.login(identifier: identifier, password: loginPassword, locale: settings.language.rawValue)
             await completeAuthenticatedLogin(profile)
-            loginEmailChallengeID = ""
-            loginEmailCode = ""
+            loginPassword = ""
             IumrahHaptics.success()
         } catch {
-            loginError = smartLoginError(error)
+            if guestAuthMethod == .email,
+               let issue = serverIssueForEmailLogin(error) {
+                loginEmailServerIssue = issue
+                loginError = nil
+            } else {
+                loginError = smartLoginError(error)
+            }
             IumrahHaptics.error()
         }
     }
@@ -2212,9 +2163,12 @@ struct IumrahAccountView: View {
             let profile = try await account.confirmPhoneRegistration(
                 challengeID: registrationSMSChallengeID,
                 code: registrationSMSCode,
+                password: registrationPassword,
                 locale: settings.language.rawValue
             )
             await completeAuthenticatedLogin(profile)
+            registrationPassword = ""
+            registrationPasswordConfirm = ""
             resetPhoneRegistrationState()
             IumrahHaptics.success()
         } catch {
@@ -2259,13 +2213,21 @@ struct IumrahAccountView: View {
             let response = try await IumrahAccountActivationBridge().confirmEmailRegistration(
                 challengeID: registrationEmailChallengeID,
                 code: registrationEmailCode,
+                password: registrationPassword,
                 firstName: registrationFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
                 lastName: registrationLastName.trimmingCharacters(in: .whitespacesAndNewlines),
                 locale: settings.language.rawValue
             )
-            // Save the session issued after OTP verification. No password login follows.
-            let profile = await account.acceptVerifiedSession(response, locale: settings.language.rawValue)
+            // Establish the normal app session through IumrahAccountStore so Keychain,
+            // push registration and trip restore follow the same path as every login.
+            let profile = try await account.login(
+                identifier: response.account.iumrahID,
+                password: registrationPassword,
+                locale: settings.language.rawValue
+            )
             await completeAuthenticatedLogin(profile)
+            registrationPassword = ""
+            registrationPasswordConfirm = ""
             registrationEmailCode = ""
             IumrahHaptics.success()
         } catch {
@@ -2593,10 +2555,10 @@ struct IumrahAccountView: View {
                     )
                 }
                 return tr(
-                    "Could not sign in. Please check your code or try again.",
-                    "Не удалось войти. Проверьте код или попробуйте снова.",
-                    "Kirish amalga oshmadi. Kodni tekshiring yoki qayta urinib ko‘ring.",
-                    "Кириш амалга ошмади. Кодни текширинг ёки қайта уриниб кўринг."
+                    "The account was not found or the password is incorrect.",
+                    "Аккаунт не найден или пароль введён неверно.",
+                    "Akkaunt topilmadi yoki parol noto‘g‘ri kiritildi.",
+                    "Аккаунт топилмади ёки парол нотўғри киритилди."
                 )
             case "VERIFICATION_CODE_INVALID":
                 return tr(
@@ -2661,21 +2623,12 @@ struct IumrahAccountView: View {
         case "INVALID_CREDENTIALS":
             return IumrahFieldIssue(
                 message: tr(
-                    "We couldn't sign you in. Check your email or verification code.",
-                    "Не удалось войти. Проверьте почту или код подтверждения.",
-                    "Kirish amalga oshmadi. Email yoki tasdiqlash kodini tekshiring.",
-                    "Кириш амалга ошмади. Email ёки тасдиқлаш кодини текширинг."
+                    "We couldn’t sign you in. Check the email and password.",
+                    "Не удалось войти. Проверьте email и пароль.",
+                    "Kirish amalga oshmadi. Email va parolni tekshiring.",
+                    "Кириш амалга ошмади. Email ва паролни текширинг."
                 ),
                 tone: .error
-            )
-        case "EMAIL_ACCOUNT_NOT_FOUND":
-            return IumrahFieldIssue(
-                message: tr(
-                    "No verified iumrah account uses this email. Register or use SMS instead.",
-                    "К этой почте не привязан подтверждённый аккаунт iumrah. Зарегистрируйтесь или используйте SMS.",
-                    "Bu emailga tasdiqlangan iumrah akkaunti ulanmagan. Ro‘yxatdan o‘ting yoki SMSdan foydalaning.",
-                    "Бу emailга тасдиқланган iumrah аккаунти уланмаган. Рўйхатдан ўтинг ёки SMSдан фойдаланинг."
-                ), tone: .warning
             )
         case "EMAIL_INVALID":
             return IumrahFieldIssue(
@@ -2826,10 +2779,7 @@ struct IumrahAccountView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
-        case .english, .malay: return en
+        case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
         }

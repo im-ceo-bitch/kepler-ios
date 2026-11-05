@@ -8,18 +8,11 @@ struct IumrahRootPageTitle: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
 
     let title: String
-    var subtitle: String? = nil
     var showsMakkahTime = false
     var lightStyle = false
     var usesBrandLogo = false
     var brandScale: CGFloat = 1.0
     var showsConnectivityStatus = false
-    /// Hotels uses one shared map surface for the title + segment control.
-    /// Disable the local background in that container only.
-    var drawsSignatureBackground = true
-    /// Home shows the enlarged wordmark without a redundant "Home" heading.
-    var showsTitle = true
-    var showsSignatureBrandRow = true
 
     var body: some View {
         Group {
@@ -27,112 +20,23 @@ struct IumrahRootPageTitle: View {
             // Online pill and two circular controls. Keep that row adaptive so
             // the trailing controls can never be pushed past the screen edge on
             // narrower iPhones or larger Dynamic Type sizes.
-            if lightStyle {
-                // Immersive photo headers keep their original contrast treatment.
-                if usesBrandLogo && showsConnectivityStatus {
-                    ViewThatFits(in: .horizontal) {
-                        connectedBrandHeader(brandWidth: 165, controlSize: 44, spacing: 8)
-                        connectedBrandHeader(brandWidth: 137, controlSize: 40, spacing: 7)
-                        connectedBrandHeader(brandWidth: 120, controlSize: 38, spacing: 6)
-                    }
-                } else {
-                    standardHeader
+            if usesBrandLogo && showsConnectivityStatus {
+                ViewThatFits(in: .horizontal) {
+                    connectedBrandHeader(brandWidth: 132, controlSize: 44, spacing: 8)
+                    connectedBrandHeader(brandWidth: 110, controlSize: 44, spacing: 7)
+                    connectedBrandHeader(brandWidth: 96, controlSize: 44, spacing: 6)
                 }
             } else {
-                signatureHeader
+                standardHeader
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // A single monochrome brand signature is repeated in all five primary tabs.
-    // Negative horizontal padding lets the header run edge-to-edge inside each
-    // existing padded scroll column without changing that column's content width.
-    private var signatureHeader: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if showsSignatureBrandRow {
-                ViewThatFits(in: .horizontal) {
-                    signatureBrandRow(wordmarkWidth: 215, controlSize: 42, spacing: 9)
-                    signatureBrandRow(wordmarkWidth: 180, controlSize: 38, spacing: 7)
-                    signatureBrandRow(wordmarkWidth: 144, controlSize: 36, spacing: 5)
-                }
-            }
-
-                if showsTitle {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(title)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .tracking(-0.8)
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.76)
-                        .accessibilityAddTraits(.isHeader)
-                    if let subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.70))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                }
-
-        }
-        .padding(.horizontal, IumrahDesign.pagePadding)
-        .padding(.top, 7)
-        .padding(.bottom, showsConnectivityStatus ? 18 : 18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(alignment: .top) { IumrahSignatureScrollMarker() }
-        .background {
-            if drawsSignatureBackground {
-                IumrahWorldDotsHeaderBackground()
-            }
-        }
-        .padding(.horizontal, -IumrahDesign.pagePadding)
-    }
-
-    private func signatureBrandRow(wordmarkWidth: CGFloat, controlSize: CGFloat, spacing: CGFloat) -> some View {
-        HStack(alignment: .center, spacing: spacing) {
-            Image("HeaderWordmarkDark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: wordmarkWidth, height: 46, alignment: .leading)
-                .accessibilityLabel("iumrah Project")
-
-            Spacer(minLength: 0)
-
-            if showsConnectivityStatus {
-                IumrahAnimatedConnectivityIndicator(lightStyle: true)
-                    .layoutPriority(1)
-            }
-
-            signatureControl(icon: clientNotifications.unreadCount > 0 ? "bell.badge.fill" : "bell", size: controlSize, label: notificationAccessibilityLabel) {
-                chrome.openNotifications()
-            }
-            .overlay(alignment: .topTrailing) {
-                if clientNotifications.unreadCount > 0 {
-                    unreadDot.offset(x: 3, y: -4)
-                }
-            }
-
-            if navigationChromeStyle == .drawer {
-                signatureControl(icon: "line.3.horizontal", size: controlSize, label: menuAccessibilityLabel) {
-                    chrome.openSidebar()
-                }
-            }
-        }
-    }
-
-    private func signatureControl(icon: String, size: CGFloat, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: size, height: size)
-                .background(Color.white.opacity(0.105), in: Circle())
-                .overlay { Circle().strokeBorder(Color.white.opacity(0.25), lineWidth: 0.8) }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .padding(.horizontal, lightStyle ? 0 : IumrahDesign.pagePadding)
+        .padding(.top, lightStyle ? 0 : 12)
+        .padding(.bottom, lightStyle ? 0 : 16)
+        .background(lightStyle ? Color.clear : Color.iumrahHeaderBackground)
+        .padding(.horizontal, lightStyle ? 0 : -IumrahDesign.pagePadding)
+        .accessibilityElement(children: .contain)
     }
 
     private var standardHeader: some View {
@@ -142,11 +46,11 @@ struct IumrahRootPageTitle: View {
                     brandImage(width: 180 * brandScale)
                 } else {
                     Text(title)
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
+                        .font(IumrahType.screenTitle)
                         .tracking(-1.0)
                         .foregroundStyle(lightStyle ? Color.white : Color.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -260,9 +164,7 @@ struct IumrahRootPageTitle: View {
     private var notificationAccessibilityLabel: String {
         switch settings.language {
         case .russian: return "Уведомления"
-        case .turkish: return TurkishLocalization.phrase("Notifications")
-        case .arabic: return ArabicLocalization.phrase("Notifications")
-        case .indonesian, .malay, .english: return "Notifications"
+        case .english: return "Notifications"
         case .uzbek: return "Bildirishnomalar"
         case .uzbekCyrillic: return "Билдиришномалар"
         }
@@ -271,9 +173,7 @@ struct IumrahRootPageTitle: View {
     private var menuAccessibilityLabel: String {
         switch settings.language {
         case .russian: return "Меню"
-        case .turkish: return TurkishLocalization.phrase("Menu")
-        case .arabic: return ArabicLocalization.phrase("Menu")
-        case .indonesian, .malay, .english: return "Menu"
+        case .english: return "Menu"
         case .uzbek: return "Menyu"
         case .uzbekCyrillic: return "Меню"
         }

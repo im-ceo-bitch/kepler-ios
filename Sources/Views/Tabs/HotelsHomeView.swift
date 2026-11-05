@@ -1,19 +1,12 @@
 import SwiftUI
 
-private struct IumrahHotelsContentOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
-
 struct HotelsHomeView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var storefront: HotelStorefrontStore
-    @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
 
     @State private var board: HotelsShowcaseBoard = .hotels
-    @StateObject private var visualDraft = IumrahConfiguratorVisualDraft()
     @State private var selectedHotel: HotelSummary?
     @State private var selectedFlightPackage: StorefrontFlightPackagePreview?
     @State private var selectedHotelPackageID: String?
@@ -23,271 +16,116 @@ struct HotelsHomeView: View {
     @State private var packageShareArtifacts: IumrahPackageShareArtifacts?
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
-    @State private var hotelRefreshNonce = 0
-    @State private var scrollTop: CGFloat = 0
-    @State private var flightFlowTutorial = false
 
-    // This screen deliberately separates the view tree into small typed pieces.
-    // Keeping a single large SwiftUI modifier chain here overwhelmed Xcode 26.6's
-    // type checker during archive, even though the file parsed successfully.
     var body: some View {
-        presentedScreen
-    }
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 22) {
+                IumrahRootPageTitle(title: pageTitle)
 
-    // Navigation and presentations are type-checked independently of the
-    // GeometryReader, root content, and lifecycle modifiers.
-    private var presentedScreen: some View {
-        observedScreen
-            .navigationDestination(item: $selectedHotel) { hotel in
-                HotelDetailView(
-                    hotel: hotel,
-                    autoOpenConfigurator: autoOpenConfiguratorHotelID == hotel.id,
-                    configuratorDeepLink: autoOpenConfiguratorDeepLink?.hotelID == hotel.id ? autoOpenConfiguratorDeepLink : nil,
-                    initialPackageID: selectedHotelPackageID
-                )
-            }
-            .navigationDestination(item: $selectedFlightPackage) { preview in
-                StorefrontUmrahPackageDetailView(preview: preview)
-            }
-            .sheet(isPresented: $carePresented) {
-                HotelCareContactSheet()
-                    .environmentObject(settings)
-            }
-            .sheet(item: $packageShareArtifacts) { artifacts in
-                IumrahPackageActivitySheet(artifacts: artifacts)
-            }
-            .alert(packageShareErrorTitle, isPresented: Binding(
-                get: { packageShareError != nil },
-                set: { if !$0 { packageShareError = nil } }
-            )) {
-                Button(packageShareErrorDismiss, role: .cancel) { packageShareError = nil }
-            } message: {
-                Text(packageShareError ?? "")
-            }
-    }
-
-    private var observedScreen: some View {
-        lifecycleScreen
-            .onAppear {
-                applyRequestedBoard()
-                openRequestedPackage(chrome.requestedPackageID)
-            }
-            .onChange(of: chrome.requestedHotelsBoard) { _, _ in
-                applyRequestedBoard()
-            }
-            .onChange(of: chrome.requestedHotelID) { _, hotelID in
-                openRequestedHotel(hotelID)
-            }
-            .onChange(of: chrome.requestedPackageID) { _, packageID in
-                openRequestedPackage(packageID)
-            }
-            .onChange(of: storefront.allHotels.map(\.id)) { _, _ in
-                openRequestedHotel(chrome.requestedHotelID)
-            }
-    }
-
-    private var lifecycleScreen: some View {
-        viewportScreen
-            .task(id: journey.trip.originCode.uppercased()) {
-                // Preserve lazy loading: Nuitee Hotels must not trigger
-                // the legacy flights/D1 storefront requests.
-                guard board == .flights || board == .sundayClub else { return }
-                await storefront.prepareIfNeeded()
-                await storefront.updateDepartureAirport(journey.trip.originCode)
-            }
-            .onChange(of: board) { _, newBoard in
-                scrollTop = 0
-                guard newBoard == .flights || newBoard == .sundayClub else { return }
-                Task {
-                    await storefront.prepareIfNeeded()
-                    await storefront.updateDepartureAirport(journey.trip.originCode)
+                if board != .flights {
+                    AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
                 }
-            }
-    }
 
-    private var viewportScreen: some View {
-        GeometryReader { viewport in
-            viewportContent(viewport)
+                Picker(L10n.text("hotel_storefront_section", settings.language), selection: $board) {
+                    Text(L10n.text("tab_hotels", settings.language)).tag(HotelsShowcaseBoard.hotels)
+                    Text(L10n.text("hotel_storefront_flights", settings.language)).tag(HotelsShowcaseBoard.flights)
+                    Text(L10n.text("hotel_storefront_weekend", settings.language)).tag(HotelsShowcaseBoard.sundayClub)
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: board) { _, _ in IumrahHaptics.selection() }
+
+                switch board {
+                case .hotels:
+                    hotelsBoard
+                case .flights:
+                    flightsBoard
+                case .sundayClub:
+                    sundayClubBoard
+                }
+
+            }
+            // Preserve the original storefront spacing and the 204pt hotel cards.
+            // The iOS floating tab bar covers more of the scroll viewport than a
+            // classic bar: reserve scroll clearance without moving any card.
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.top, 0)
+            .padding(.bottom, board == .hotels ? 112 : 42)
         }
         .background(Color.iumrahPageBackground)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if board != .hotels {
-                IumrahConfiguratorCartBar(draft: visualDraft, journey: journey, currentStage: board) {
-                    withAnimation(.snappy(duration: 0.25)) { board = .summary }
-                }
+        // With the navigation bar hidden, iOS can render scrolled section titles
+        // behind the system status bar. Clip the scroll content to the safe-area
+        // viewport, keeping all hotel card geometry and original side insets.
+        .clipped()
+        .safeAreaInset(edge: .bottom, spacing: 2) {
+            if board == .flights {
+                IumrahPackageAssemblyBar(
+                    language: settings.language,
+                    selections: journey.stagedUmrahFlights,
+                    isExpanded: $packageAssemblyExpanded,
+                    onContinue: {
+                        guard journey.hasCompleteStagedFlightSelection else {
+                            IumrahHaptics.error()
+                            return
+                        }
+                        IumrahHaptics.selection()
+                        journey.prepareFlightFirstHotelStage()
+                        chrome.startFlightFirstTrip()
+                    }
+                )
                 .padding(.horizontal, IumrahDesign.pagePadding)
                 .padding(.bottom, 2)
             }
         }
-        .background(Color.iumrahPageBackground)
-    }
-
-    private func viewportContent(_ viewport: GeometryProxy) -> some View {
-        let viewportWidth = max(0, viewport.size.width)
-        let contentWidth = min(viewportWidth, adaptiveLayout.rootContentMaxWidth)
-        let gutter = IumrahDesign.pagePadding
-        let columnWidth = max(0, contentWidth - 2 * gutter)
-
-        return VStack(spacing: 0) {
-            IumrahSignaturePinnedBar(
-                collapseProgress: min(1, max(0, -scrollTop / 112)),
-                title: pageTitle,
-                accessory: AnyView(stageSelector),
-                showsHeading: !(chrome.requestedHotelTabSearch != nil && board == .hotels)
-            )
-            scrollableBoards(contentWidth: contentWidth, columnWidth: columnWidth, gutter: gutter)
-        }
-        .frame(width: viewportWidth, height: viewport.size.height)
-    }
-
-    private func scrollableBoards(contentWidth: CGFloat, columnWidth: CGFloat, gutter: CGFloat) -> some View {
-        ScrollView(showsIndicators: false) {
-            // Keep the original zero-height scroll-position probe at the
-            // start of the scroll view; only the type-checking boundaries change.
-            GeometryReader { geometry in
-                Color.clear.preference(
-                    key: IumrahHotelsContentOffsetKey.self,
-                    value: geometry.frame(in: .named("iumrah.hotels.content")).minY
-                )
-            }
-            .frame(height: 0)
-            scrollContent(contentWidth: contentWidth, columnWidth: columnWidth, gutter: gutter)
-        }
-        .id(board)
-        .coordinateSpace(name: "iumrah.hotels.content")
-        .onPreferenceChange(IumrahHotelsContentOffsetKey.self) { offset in
-            // Continuous progress avoids jumpy if/else height changes.
-            // The fixed rail never participates in ScrollView refresh/bounce.
-            scrollTop = min(0, offset)
-        }
         .refreshable {
-            if board == .hotels {
-                hotelRefreshNonce += 1
-            } else if board == .flights || board == .sundayClub {
-                await storefront.updateDepartureAirport(journey.trip.originCode)
-                await storefront.refresh()
-            }
+            await storefront.updateDepartureAirport(journey.trip.originCode)
+            await storefront.refresh()
         }
-        .background(Color.iumrahPageBackground)
-    }
-
-    private func scrollContent(contentWidth: CGFloat, columnWidth: CGFloat, gutter: CGFloat) -> some View {
-        LazyVStack(spacing: 0) {
-            activeBoardContent
-                .frame(width: columnWidth, alignment: .leading)
-                .padding(.horizontal, gutter)
-            if board != .summary && board != .sundayClub &&
-                !(board == .hotels && chrome.requestedHotelTabSearch != nil) {
-                nextStageButton
-                    .frame(width: columnWidth, alignment: .leading)
-                    .padding(.horizontal, gutter)
-                    .padding(.top, 22)
-            }
+        .task(id: journey.trip.originCode.uppercased()) {
+            await storefront.prepareIfNeeded()
+            await storefront.updateDepartureAirport(journey.trip.originCode)
         }
-        .frame(width: contentWidth, alignment: .top)
-        .frame(maxWidth: .infinity, alignment: .top)
-        .padding(.top, 14)
-        .padding(.bottom, 64)
-    }
-
-    private func expandedHeader(contentWidth: CGFloat, gutter: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(pageTitle)
-                .font(.system(size: 31, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            stageSelector
+        .onAppear {
+            applyRequestedBoard()
+            openRequestedPackage(chrome.requestedPackageID)
         }
-        .padding(.horizontal, gutter)
-        .padding(.top, 14)
-        .padding(.bottom, 20)
-        .frame(width: contentWidth, alignment: .leading)
-        .background { IumrahWorldDotsHeaderBackground() }
-    }
-
-    @ViewBuilder
-    private var activeBoardContent: some View {
-        switch board {
-        case .flights: flightsBoard
-        case .hotels: hotelsBoard
-        case .visa:
-            IumrahConfiguratorServicesView(draft: visualDraft, scope: .visa)
-        case .transfer:
-            IumrahConfiguratorServicesView(draft: visualDraft, scope: .transfer)
-        case .guide, .services:
-            IumrahConfiguratorServicesView(draft: visualDraft, scope: .guide)
-        case .summary:
-            IumrahConfiguratorSummaryView(draft: visualDraft, onSelectStage: { board = $0 })
-        case .sundayClub: sundayClubBoard
+        .onChange(of: chrome.requestedHotelsBoard) { _, _ in
+            applyRequestedBoard()
         }
-    }
-
-    private var nextStageButton: some View {
-        Button {
-            withAnimation(.snappy(duration: 0.25)) {
-                switch board {
-                case .visa: board = .flights
-                case .flights: board = .hotels
-                case .hotels: board = .transfer
-                case .transfer: board = .guide
-                case .guide, .services: board = .summary
-                default: break
-                }
-            }
-            IumrahHaptics.selection()
-        } label: {
-            HStack {
-                Text(nextStageTitle).font(.system(size: 16, weight: .bold))
-                Spacer()
-                Image(systemName: "arrow.right")
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .frame(height: 55)
-            .background(.black, in: Capsule())
+        .onChange(of: chrome.requestedHotelID) { _, hotelID in
+            openRequestedHotel(hotelID)
         }
-        .buttonStyle(.plain)
-    }
-
-    /// Shared, left-anchored horizontal steps. The exact same selector remains
-    /// visible in the compact pinned header while the enlarged title scrolls away.
-    private var stageSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 9) {
-                boardTile(.visa, icon: "doc.text", title: configCopy("Виза", "Visa", "Viza"))
-                boardTile(.flights, icon: "airplane", title: configCopy("Авиабилеты", "Flights", "Aviachiptalar"))
-                boardTile(.hotels, icon: "building.2", title: configCopy("Отели", "Hotels", "Mehmonxonalar"))
-                boardTile(.transfer, icon: "car.side", title: configCopy("Трансфер", "Transfer", "Transfer"))
-                boardTile(.guide, icon: "person.crop.circle", title: configCopy("Гид и поддержка", "Guide & support", "Gid va yordam"))
-                boardTile(.summary, icon: "checkmark.circle", title: configCopy("Итог", "Summary", "Yakun"))
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        .onChange(of: chrome.requestedPackageID) { _, packageID in
+            openRequestedPackage(packageID)
         }
-        .accessibilityIdentifier("configurator.stageSelector")
-    }
-
-    private func boardTile(_ target: HotelsShowcaseBoard, icon: String, title: String) -> some View {
-        let active = board == target
-        return Button {
-            withAnimation(.snappy(duration: 0.26)) { board = target }
-            IumrahHaptics.selection()
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.66)
-            }
-            .foregroundStyle(active ? Color.iumrahSignatureBlack : Color.white)
-            .padding(.horizontal, 13)
-            .frame(height: 40)
-            .background(active ? Color.white : Color.clear, in: Capsule())
-            .overlay { Capsule().strokeBorder(Color.white.opacity(active ? 0 : 0.38), lineWidth: 0.9) }
-            .contentShape(Capsule())
+        .onChange(of: storefront.allHotels.map(\.id)) { _, _ in
+            openRequestedHotel(chrome.requestedHotelID)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(active ? .isSelected : [])
+        .navigationDestination(item: $selectedHotel) { hotel in
+            HotelDetailView(
+                hotel: hotel,
+                autoOpenConfigurator: autoOpenConfiguratorHotelID == hotel.id,
+                configuratorDeepLink: autoOpenConfiguratorDeepLink?.hotelID == hotel.id ? autoOpenConfiguratorDeepLink : nil,
+                initialPackageID: selectedHotelPackageID
+            )
+        }
+        .navigationDestination(item: $selectedFlightPackage) { preview in
+            StorefrontUmrahPackageDetailView(preview: preview)
+        }
+        .sheet(isPresented: $carePresented) {
+            HotelCareContactSheet()
+                .environmentObject(settings)
+        }
+        .sheet(item: $packageShareArtifacts) { artifacts in
+            IumrahPackageActivitySheet(artifacts: artifacts)
+        }
+        .alert(packageShareErrorTitle, isPresented: Binding(
+            get: { packageShareError != nil },
+            set: { if !$0 { packageShareError = nil } }
+        )) {
+            Button(packageShareErrorDismiss, role: .cancel) { packageShareError = nil }
+        } message: {
+            Text(packageShareError ?? "")
+        }
     }
 
     private func applyRequestedBoard() {
@@ -301,42 +139,54 @@ struct HotelsHomeView: View {
         case .hotels: return L10n.text("tab_hotels", settings.language)
         case .flights: return L10n.text("hotel_storefront_flights", settings.language)
         case .sundayClub: return "Sunday Umrah Club"
-        case .services: return configCopy("Услуги", "Services", "Xizmatlar")
-        case .visa: return configCopy("Виза", "Visa", "Viza")
-        case .transfer: return configCopy("Трансфер", "Transfer", "Transfer")
-        case .guide: return configCopy("Гид и поддержка", "Guide & support", "Gid va yordam")
-        case .summary: return configCopy("Итог умры", "Umrah summary", "Umra yakuni")
-        }
-    }
-
-    private func configCopy(_ ru: String, _ en: String, _ uz: String) -> String {
-        switch settings.language {
-        case .russian: return ru
-        case .uzbek: return uz
-        case .uzbekCyrillic: return ru
-        default: return en
-        }
-    }
-
-    private var nextStageTitle: String {
-        switch board {
-        case .visa: return configCopy("Далее · Авиабилеты", "Next · Flights", "Keyingi · Aviachiptalar")
-        case .flights: return configCopy("Далее · Отели", "Next · Hotels", "Keyingi · Mehmonxonalar")
-        case .hotels: return configCopy("Далее · Трансфер", "Next · Transfer", "Keyingi · Transfer")
-        case .transfer: return configCopy("Далее · Гид", "Next · Guide", "Keyingi · Gid")
-        case .guide, .services: return configCopy("Посмотреть итог", "View summary", "Yakunini ko‘rish")
-        default: return configCopy("Продолжить", "Continue", "Davom etish")
         }
     }
 
     // MARK: - Hotels
 
-    // Nuitee V1 changes only the Hotels tab. Existing Flights and Sunday Club
-    // maintain their original sources and navigation behind the unified header.
     private var hotelsBoard: some View {
-        NuiteeHotelsCatalogView(refreshSignal: hotelRefreshNonce)
-            .environmentObject(settings)
-            .environmentObject(chrome)
+        VStack(alignment: .leading, spacing: 24) {
+            ShowcaseHero(
+                asset: "IumrahHotelsShowcaseHero",
+                title: "iumrah Hotels",
+                description: L10n.text("hotel_storefront_hero_body", settings.language),
+                note: nil
+            )
+
+            IumrahFriendsCalculatorCard()
+                .environmentObject(settings)
+                .environmentObject(storefront)
+
+            hotelCitySection(
+                title: L10n.text("hotels_makkah", settings.language),
+                hotels: storefront.makkahHotels
+            )
+            hotelCitySection(
+                title: L10n.text("hotels_madinah", settings.language),
+                hotels: storefront.madinahHotels
+            )
+
+            if storefront.isLoading && storefront.allHotels.isEmpty {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(L10n.text("hotel_storefront_loading", settings.language))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 92)
+            }
+
+            if let error = storefront.errorMessage, storefront.allHotels.isEmpty {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .iumrahCard()
+            }
+
+            HotelCareShowcaseCard(language: settings.language) {
+                carePresented = true
+            }
+        }
     }
 
     private func hotelCitySection(title: String, hotels: [HotelSummary]) -> some View {
@@ -421,10 +271,6 @@ struct HotelsHomeView: View {
     private var readyPackagesTitle: String {
         switch settings.language {
         case .russian: return "Готовые пакеты"
-        case .indonesian: return IndonesianLocalization.phrase("Ready packages")
-        case .malay: return MalayLocalization.phrase("Ready packages")
-        case .turkish: return TurkishLocalization.phrase("Ready packages")
-        case .arabic: return ArabicLocalization.phrase("Ready packages")
         case .english: return "Ready packages"
         case .uzbek: return "Tayyor paketlar"
         case .uzbekCyrillic: return "Тайёр пакетлар"
@@ -434,10 +280,6 @@ struct HotelsHomeView: View {
     private var readyPackagesEyebrow: String {
         switch settings.language {
         case .russian: return "FLIGHT FIRST"
-        case .indonesian: return IndonesianLocalization.phrase("FLIGHT FIRST")
-        case .malay: return MalayLocalization.phrase("FLIGHT FIRST")
-        case .turkish: return TurkishLocalization.phrase("FLIGHT FIRST")
-        case .arabic: return ArabicLocalization.phrase("FLIGHT FIRST")
         case .english: return "FLIGHT FIRST"
         case .uzbek: return "FLIGHT FIRST"
         case .uzbekCyrillic: return "FLIGHT FIRST"
@@ -447,10 +289,6 @@ struct HotelsHomeView: View {
     private var readyPackagesSubtitle: String {
         switch settings.language {
         case .russian: return "Только полностью собранные пакеты iumrah с рейсами, отелями и сервисами."
-        case .indonesian: return IndonesianLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
-        case .malay: return MalayLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
-        case .turkish: return TurkishLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
-        case .arabic: return ArabicLocalization.phrase("Only fully assembled iumrah packages with flights, hotels and services.")
         case .english: return "Only fully assembled iumrah packages with flights, hotels and services."
         case .uzbek: return "Faqat reyslar, mehmonxonalar va xizmatlar bilan to‘liq yig‘ilgan iumrah paketlari."
         case .uzbekCyrillic: return "Фақат рейслар, меҳмонхоналар ва хизматлар билан тўлиқ йиғилган iumrah пакетлари."
@@ -460,10 +298,6 @@ struct HotelsHomeView: View {
     private var readyPackagesLoadingText: String {
         switch settings.language {
         case .russian: return "Обновляем готовые пакеты…"
-        case .indonesian: return IndonesianLocalization.phrase("Refreshing ready packages…")
-        case .malay: return MalayLocalization.phrase("Refreshing ready packages…")
-        case .turkish: return TurkishLocalization.phrase("Refreshing ready packages…")
-        case .arabic: return ArabicLocalization.phrase("Refreshing ready packages…")
         case .english: return "Refreshing ready packages…"
         case .uzbek: return "Tayyor paketlar yangilanmoqda…"
         case .uzbekCyrillic: return "Тайёр пакетлар янгиланмоқда…"
@@ -524,9 +358,9 @@ struct HotelsHomeView: View {
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(red: 1.0, green: 0.61, blue: 0.18), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .background(Color(red: 1.0, green: 0.61, blue: 0.18), in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.8)
         }
         .shadow(color: Color.orange.opacity(0.14), radius: 18, y: 9)
@@ -535,10 +369,6 @@ struct HotelsHomeView: View {
     private var sundayClubSoonBadge: String {
         switch settings.language {
         case .russian: return "Скоро"
-        case .indonesian: return IndonesianLocalization.phrase("Coming soon")
-        case .malay: return MalayLocalization.phrase("Coming soon")
-        case .turkish: return TurkishLocalization.phrase("Coming soon")
-        case .arabic: return ArabicLocalization.phrase("Coming soon")
         case .english: return "Coming soon"
         case .uzbek: return "Tez orada"
         case .uzbekCyrillic: return "Тез орада"
@@ -548,10 +378,6 @@ struct HotelsHomeView: View {
     private var sundayClubSoonTitle: String {
         switch settings.language {
         case .russian: return "Умра для выходных"
-        case .indonesian: return IndonesianLocalization.phrase("Umrah for the weekend")
-        case .malay: return MalayLocalization.phrase("Umrah for the weekend")
-        case .turkish: return TurkishLocalization.phrase("Umrah for the weekend")
-        case .arabic: return ArabicLocalization.phrase("Umrah for the weekend")
         case .english: return "Umrah for the weekend"
         case .uzbek: return "Dam olish kunlari uchun Umra"
         case .uzbekCyrillic: return "Дам олиш кунлари учун Умра"
@@ -561,10 +387,6 @@ struct HotelsHomeView: View {
     private var sundayClubSoonBody: String {
         switch settings.language {
         case .russian: return "Скоро здесь появятся готовые пакеты Sunday Umrah Club — короткие поездки на выходные с уже собранными датами и маршрутом."
-        case .indonesian: return IndonesianLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
-        case .malay: return MalayLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
-        case .turkish: return TurkishLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
-        case .arabic: return ArabicLocalization.phrase("Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared.")
         case .english: return "Ready Sunday Umrah Club packages are coming here soon — short weekend trips with dates and route already prepared."
         case .uzbek: return "Tez orada bu yerda Sunday Umrah Club tayyor paketlari paydo bo‘ladi — dam olish kunlariga mos, sanalari va yo‘nalishi oldindan tuzilgan qisqa safarlar."
         case .uzbekCyrillic: return "Тез орада бу ерда Sunday Umrah Club тайёр пакетлари пайдо бўлади — дам олиш кунларига мос, саналари ва йўналиши олдиндан тузилган қисқа сафарлар."
@@ -594,10 +416,6 @@ struct HotelsHomeView: View {
     private var packageShareUnavailableText: String {
         switch settings.language {
         case .russian: return "Не удалось подготовить пакет для отправки. Обновите цены и попробуйте ещё раз."
-        case .indonesian: return IndonesianLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
-        case .malay: return MalayLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
-        case .turkish: return TurkishLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
-        case .arabic: return ArabicLocalization.phrase("The package could not be prepared for sharing. Refresh pricing and try again.")
         case .english: return "The package could not be prepared for sharing. Refresh pricing and try again."
         case .uzbek: return "Paketni ulashish uchun tayyorlab bo‘lmadi. Narxlarni yangilang va qayta urinib ko‘ring."
         case .uzbekCyrillic: return "Пакетни улашиш учун тайёрлаб бўлмади. Нархларни янгиланг ва қайта уриниб кўринг."
@@ -607,10 +425,6 @@ struct HotelsHomeView: View {
     private var packageShareErrorTitle: String {
         switch settings.language {
         case .russian: return "Не удалось поделиться"
-        case .indonesian: return IndonesianLocalization.phrase("Could not share")
-        case .malay: return MalayLocalization.phrase("Could not share")
-        case .turkish: return TurkishLocalization.phrase("Could not share")
-        case .arabic: return ArabicLocalization.phrase("Could not share")
         case .english: return "Could not share"
         case .uzbek: return "Ulashib bo‘lmadi"
         case .uzbekCyrillic: return "Улашиб бўлмади"
@@ -620,10 +434,6 @@ struct HotelsHomeView: View {
     private var packageShareErrorDismiss: String {
         switch settings.language {
         case .russian: return "Понятно"
-        case .indonesian: return IndonesianLocalization.phrase("OK")
-        case .malay: return MalayLocalization.phrase("OK")
-        case .turkish: return TurkishLocalization.phrase("OK")
-        case .arabic: return ArabicLocalization.phrase("OK")
         case .english: return "OK"
         case .uzbek: return "Tushunarli"
         case .uzbekCyrillic: return "Тушунарли"
@@ -895,10 +705,6 @@ private struct IumrahPackageAssemblyBar: View {
         let f = DateFormatter()
         switch language {
         case .russian: f.locale = Locale(identifier: "ru_RU")
-        case .indonesian: f.locale = Locale(identifier: "id_ID")
-        case .malay: f.locale = Locale(identifier: "ms_MY")
-        case .turkish: f.locale = Locale(identifier: "tr_TR")
-        case .arabic: f.locale = Locale(identifier: "ar_SA")
         case .english: f.locale = Locale(identifier: "en_US")
         case .uzbek: f.locale = Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: f.locale = Locale(identifier: "uz_Cyrl_UZ")
@@ -910,10 +716,6 @@ private struct IumrahPackageAssemblyBar: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .malay: return MalayLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
@@ -976,10 +778,6 @@ private struct IumrahFriendsShowcaseCard: View {
     private var bodyText: String {
         switch language {
         case .russian: return "Соберите друзей или близких и сразу посмотрите итоговую стоимость Umrah-пакета для всей группы — от 1 до 16 человек."
-        case .indonesian: return IndonesianLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
-        case .malay: return MalayLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
-        case .turkish: return TurkishLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
-        case .arabic: return ArabicLocalization.phrase("Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers.")
         case .english: return "Bring friends or family together and instantly see the total Umrah package price for a group of 1 to 16 travelers."
         case .uzbek: return "Do‘stlar yoki yaqinlaringizni yig‘ing va 1 dan 16 kishigacha bo‘lgan guruh uchun Umra paketining umumiy narxini darhol ko‘ring."
         case .uzbekCyrillic: return "Дўстлар ёки яқинларингизни йиғинг ва 1 дан 16 кишигача бўлган гуруҳ учун Умра пакетининг умумий нархини дарҳол кўринг."
@@ -989,10 +787,6 @@ private struct IumrahFriendsShowcaseCard: View {
     private var groupText: String {
         switch language {
         case .russian: return "1–16 человек"
-        case .indonesian: return IndonesianLocalization.phrase("1–16 travelers")
-        case .malay: return MalayLocalization.phrase("1–16 travelers")
-        case .turkish: return TurkishLocalization.phrase("1–16 travelers")
-        case .arabic: return ArabicLocalization.phrase("1–16 travelers")
         case .english: return "1–16 travelers"
         case .uzbek: return "1–16 kishi"
         case .uzbekCyrillic: return "1–16 киши"
@@ -1002,10 +796,6 @@ private struct IumrahFriendsShowcaseCard: View {
     private var calculateText: String {
         switch language {
         case .russian: return "Рассчитать"
-        case .indonesian: return IndonesianLocalization.phrase("Calculate")
-        case .malay: return MalayLocalization.phrase("Calculate")
-        case .turkish: return TurkishLocalization.phrase("Calculate")
-        case .arabic: return ArabicLocalization.phrase("Calculate")
         case .english: return "Calculate"
         case .uzbek: return "Hisoblash"
         case .uzbekCyrillic: return "Ҳисоблаш"
@@ -1027,7 +817,6 @@ private struct IumrahFriendsCalculatorCard: View {
     @State private var isCalculating = false
     @State private var errorText: String?
     @State private var includesPresented = false
-    @State private var calculationToken = UUID()
 
     private var totalTravelers: Int { adults + children }
     private var rooms: Int { min(4, max(1, Int(ceil(Double(max(1, totalTravelers)) / 4.0)))) }
@@ -1035,19 +824,14 @@ private struct IumrahFriendsCalculatorCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // The source artwork is very wide. Giving scaledToFill an
-            // unbounded intrinsic width forced the ancestor ScrollView wider
-            // than the iPhone, shifting every hotel card horizontally.
-            GeometryReader { imageViewport in
-                Image("IumrahFriendsHotelsCover")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: imageViewport.size.width, height: 124)
-                    .clipped()
-            }
-            .frame(height: 124)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            Image("IumrahFriendsHotelsCover")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 124)
+                .clipped()
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
 
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -1103,9 +887,9 @@ private struct IumrahFriendsCalculatorCard: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
         }
     }
@@ -1197,12 +981,6 @@ private struct IumrahFriendsCalculatorCard: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
-                if let usedPreview {
-                    Text("\(usedPreview.outbound.origin) → \(usedPreview.outbound.destination) · \(String(usedPreview.outbound.departureAt.prefix(10))) · \(durationText(usedPreview.durationDays))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
             } else {
                 Text(errorText ?? unavailableText)
@@ -1235,7 +1013,7 @@ private struct IumrahFriendsCalculatorCard: View {
                     Text(includedSubtitle).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Image(systemName: "chevron.forward")
+                Image(systemName: "chevron.right")
                     .foregroundStyle(.secondary)
             }
             .padding(17)
@@ -1244,150 +1022,80 @@ private struct IumrahFriendsCalculatorCard: View {
         .buttonStyle(.plain)
     }
 
-    // This is only the candidate selection policy. The Package Engine remains
-    // authoritative for the final public price (including all services/fees).
-    // Quotes shown here MUST never be computed by adding published package prices.
     @MainActor
     private func calculate() async {
         guard totalTravelers >= 1 && totalTravelers <= 16 else { return }
-        let token = UUID()
-        calculationToken = token
-        let startingKey = calculationKey
-        let selectedStars = stars
-        let selectedAdults = adults
-        let selectedChildren = children
-        let selectedRooms = rooms
-
         isCalculating = true
         errorText = nil
         quote = nil
-        usedPreview = nil
-        usedMakkahHotel = nil
-        usedMadinahHotel = nil
-        defer {
-            if calculationToken == token { isCalculating = false }
-        }
+        defer { isCalculating = false }
 
-        // The server publishes departures no earlier than D+3 in Tashkent.
-        // The local cache may still contain older snapshots, so apply the same
-        // boundary to the calculator rather than silently repricing old dates.
-        var tashkentCalendar = Calendar(identifier: .gregorian)
-        tashkentCalendar.timeZone = TimeZone(identifier: "Asia/Tashkent") ?? .current
-        guard let earliestDay = tashkentCalendar.date(byAdding: .day, value: 3, to: tashkentCalendar.startOfDay(for: Date())) else {
-            errorText = unavailableText
-            return
-        }
-        let validPreviews = Dictionary(
-            storefront.flightPackagePreviews.values.map { ($0.packageID, $0) },
-            uniquingKeysWith: { first, _ in first }
-        ).values.filter { preview in
-            guard preview.outbound.stops == 0,
-                  preview.inbound.stops == 0,
-                  preview.madinahNights > 0,
-                  preview.pricePerPerson > 0,
-                  preview.packageQuote.currency.uppercased() == "USD",
-                  let departure = parseISO(preview.outbound.departureAt) else { return false }
-            return tashkentCalendar.startOfDay(for: departure) >= earliestDay
-        }
+        let direct = storefront.flightPackagePreviews.values
+            .filter { $0.outbound.stops == 0 && $0.inbound.stops == 0 && $0.madinahNights > 0 }
+            .sorted {
+                let l = abs($0.durationDays - 10)
+                let r = abs($1.durationDays - 10)
+                if l != r { return l < r }
+                return $0.outbound.departureAt < $1.outbound.departureAt
+            }
 
-        // Preserve the traditional week-or-two trip when one is available, but
-        // no longer prioritize an arbitrary ~10-day flight over a cheaper one.
-        let ordinaryTrips = validPreviews.filter { (7...14).contains($0.durationDays) }
-        let availableTrips = ordinaryTrips.isEmpty ? validPreviews : ordinaryTrips
-        let flights = availableTrips.sorted { lhs, rhs in
-            let l = lhs.flightFarePerPersonUSD > 0 ? lhs.flightFarePerPersonUSD : lhs.pricePerPerson
-            let r = rhs.flightFarePerPersonUSD > 0 ? rhs.flightFarePerPersonUSD : rhs.pricePerPerson
-            if l != r { return l < r }
-            if lhs.pricePerPerson != rhs.pricePerPerson { return lhs.pricePerPerson < rhs.pricePerPerson }
-            return lhs.outbound.departureAt < rhs.outbound.departureAt
-        }
-        guard let firstFlight = flights.first else {
+        guard let preview = direct.first else {
             errorText = noDirectFlightText
             return
         }
-
-        // Published Hotel First quotes are used only to rank hotels. Their
-        // package totals describe different trips, so they are NEVER added to
-        // this quote or displayed as a calculation for the chosen flight.
-        let selectedTier = tier(for: selectedStars)
-        func rankedHotels(_ hotels: [HotelSummary]) -> [HotelSummary] {
-            hotels.filter { ($0.stars ?? 0) == selectedStars }.sorted { lhs, rhs in
-                let l = storefront.quote(for: lhs, tier: selectedTier)?.packageQuote.pricePerPerson
-                let r = storefront.quote(for: rhs, tier: selectedTier)?.packageQuote.pricePerPerson
-                if let l, let r, l != r { return l < r }
-                if l != nil && r == nil { return true }
-                if l == nil && r != nil { return false }
-                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
-            }
-        }
-        let makkahOptions = rankedHotels(storefront.makkahHotels)
-        let madinahOptions = rankedHotels(storefront.madinahHotels)
-        guard let makkah = makkahOptions.first, let madinah = madinahOptions.first else {
+        guard let makkah = storefront.makkahHotels.first(where: { ($0.stars ?? 0) == stars }) else {
             errorText = noHotelText
             return
         }
-
-        // Compare a bounded number of *server-confirmed* alternatives. This
-        // prevents a large quote storm while avoiding the old first-row rule.
-        var candidates: [(StorefrontFlightPackagePreview, HotelSummary, HotelSummary)] = []
-        for preview in flights.prefix(2) { candidates.append((preview, makkah, madinah)) }
-        if let other = makkahOptions.dropFirst().first { candidates.append((firstFlight, other, madinah)) }
-        if let other = madinahOptions.dropFirst().first { candidates.append((firstFlight, makkah, other)) }
-
-        var best: (PackageQuote, StorefrontFlightPackagePreview, HotelSummary, HotelSummary)?
-        for (preview, makkahOption, madinahOption) in candidates {
-            guard !Task.isCancelled && calculationToken == token && calculationKey == startingKey else { return }
-            guard let departure = parseISO(preview.outbound.departureAt),
-                  let arrival = parseISO(preview.outbound.arrivalAt),
-                  let inbound = parseISO(preview.inbound.departureAt) else { continue }
-
-            var trip = TripDraft()
-            trip.origin = preview.outbound.origin.uppercased()
-            trip.originAirport = nil
-            trip.arrivalAirport = preview.outbound.destination.uppercased() == "MED" ? .madinah : .jeddah
-            trip.departureDate = Calendar.current.startOfDay(for: departure)
-            trip.saudiArrivalDate = Calendar.current.startOfDay(for: arrival)
-            trip.returnDate = Calendar.current.startOfDay(for: inbound)
-            trip.flexibility = .exact
-            trip.adults = selectedAdults
-            trip.children = selectedChildren
-            trip.infants = 0
-            trip.rooms = selectedRooms
-            trip.hotelStars = selectedStars
-            trip.packageTier = selectedTier
-            trip.scope = .makkahAndMadinah
-            trip.flightTripType = .roundTrip
-            trip.mealSelection = .defaultSelection
-
-            guard let candidateQuote = await storefront.checkoutQuote(
-                for: preview,
-                trip: trip,
-                makkahHotel: makkahOption,
-                madinahHotel: madinahOption,
-                makkahRoomID: nil,
-                madinahRoomID: nil,
-                transferVehicle: .carnival,
-                includeHaramainTrain: false,
-                haramainFareClass: .economy,
-                haramainTicketCount: 0
-            ) else { continue }
-            guard !Task.isCancelled && calculationToken == token && calculationKey == startingKey else { return }
-            guard candidateQuote.currency.uppercased() == "USD",
-                  candidateQuote.totalPackagePrice > 0,
-                  candidateQuote.pricePerPerson > 0 else { continue }
-            if let previous = best, previous.0.totalPackagePrice <= candidateQuote.totalPackagePrice { continue }
-            best = (candidateQuote, preview, makkahOption, madinahOption)
+        guard let madinah = storefront.madinahHotels.first(where: { ($0.stars ?? 0) == stars }) else {
+            errorText = noHotelText
+            return
         }
-
-        guard !Task.isCancelled && calculationToken == token && calculationKey == startingKey else { return }
-        guard let best else {
+        guard let departure = parseISO(preview.outbound.departureAt),
+              let arrival = parseISO(preview.outbound.arrivalAt),
+              let inbound = parseISO(preview.inbound.departureAt) else {
             errorText = unavailableText
             return
         }
-        usedPreview = best.1
-        usedMakkahHotel = best.2
-        usedMadinahHotel = best.3
-        quote = best.0
+
+        var trip = TripDraft()
+        trip.origin = preview.outbound.origin.uppercased()
+        trip.originAirport = nil
+        trip.arrivalAirport = preview.outbound.destination.uppercased() == "MED" ? .madinah : .jeddah
+        trip.departureDate = Calendar.current.startOfDay(for: departure)
+        trip.saudiArrivalDate = Calendar.current.startOfDay(for: arrival)
+        trip.returnDate = Calendar.current.startOfDay(for: inbound)
+        trip.flexibility = .exact
+        trip.adults = adults
+        trip.children = children
+        trip.infants = 0
+        trip.rooms = rooms
+        trip.hotelStars = stars
+        trip.packageTier = tier(for: stars)
+        trip.scope = .makkahAndMadinah
+        trip.flightTripType = .roundTrip
+        trip.mealSelection = .defaultSelection
+
+        guard let freshQuote = await storefront.checkoutQuote(
+            for: preview,
+            trip: trip,
+            makkahHotel: makkah,
+            madinahHotel: madinah,
+            makkahRoomID: nil,
+            madinahRoomID: nil,
+            transferVehicle: .carnival,
+            includeHaramainTrain: false,
+            haramainFareClass: .economy,
+            haramainTicketCount: 0
+        ) else {
+            errorText = unavailableText
+            return
+        }
+
+        usedPreview = preview
+        usedMakkahHotel = makkah
+        usedMadinahHotel = madinah
+        quote = freshQuote
     }
 
     private func tier(for stars: Int) -> PackageTier {
@@ -1418,10 +1126,6 @@ private struct IumrahFriendsCalculatorCard: View {
         let formatted = money(value)
         switch settings.language {
         case .russian: return "\(formatted) / чел."
-        case .indonesian: return IndonesianLocalization.phrase("\(formatted) / person")
-        case .malay: return MalayLocalization.phrase("\(formatted) / person")
-        case .turkish: return TurkishLocalization.phrase("\(formatted) / person")
-        case .arabic: return ArabicLocalization.phrase("\(formatted) / person")
         case .english: return "\(formatted) / person"
         case .uzbek: return "\(formatted) / kishi"
         case .uzbekCyrillic: return "\(formatted) / киши"
@@ -1431,10 +1135,6 @@ private struct IumrahFriendsCalculatorCard: View {
     private func durationText(_ days: Int) -> String {
         switch settings.language {
         case .russian: return "Прямые опубликованные рейсы · \(days) дней"
-        case .indonesian: return IndonesianLocalization.phrase("Published direct flights · \(days) days")
-        case .malay: return MalayLocalization.phrase("Published direct flights · \(days) days")
-        case .turkish: return TurkishLocalization.phrase("Published direct flights · \(days) days")
-        case .arabic: return ArabicLocalization.phrase("Published direct flights · \(days) days")
         case .english: return "Published direct flights · \(days) days"
         case .uzbek: return "E’lon qilingan to‘g‘ridan-to‘g‘ri reyslar · \(days) kun"
         case .uzbekCyrillic: return "Эълон қилинган тўғридан-тўғри рейслар · \(days) кун"
@@ -1462,10 +1162,6 @@ private struct IumrahFriendsCalculatorCard: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .malay: return MalayLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -1532,10 +1228,6 @@ private struct IumrahFriendsIncludedSheet: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .malay: return MalayLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
@@ -1552,15 +1244,6 @@ struct HotelStorefrontCard: View {
     let onOpen: () -> Void
     let onFavorite: () -> Void
     let onShare: () -> Void
-    // Optional selection mode reuses the *same card* in the configurator.
-    // Only the bottom price/action area changes; geometry, collage, corners,
-    // and text typography stay identical to the hotel storefront.
-    var selectionRole: HotelSelectionRole? = nil
-    var isSelectedInConfigurator = false
-    var pendingPriceLabel = ""
-    var selectHotelLabel = ""
-    var selectedHotelLabel = ""
-    var onSelectHotel: (() -> Void)? = nil
 
     private let cardHeight: CGFloat = 204
 
@@ -1573,8 +1256,7 @@ struct HotelStorefrontCard: View {
                     HotelStorefrontCollage(images: images, fallback: hotel.coverImageURL)
                         .frame(width: mediaWidth, height: cardHeight)
 
-                    if selectionRole == nil {
-                        HStack(spacing: 6) {
+                    HStack(spacing: 6) {
                         Button(action: onFavorite) {
                             Image(systemName: isFavorite ? "heart.fill" : "heart")
                                 .font(.system(size: 14, weight: .semibold))
@@ -1597,8 +1279,7 @@ struct HotelStorefrontCard: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel(L10n.text("hotel_storefront_share", language))
                     }
-                        .padding(9)
-                    }
+                    .padding(9)
                 }
                 .frame(width: mediaWidth, height: cardHeight)
                 .clipped()
@@ -1630,31 +1311,7 @@ struct HotelStorefrontCard: View {
 
                     Spacer(minLength: 2)
 
-                    if let selectionRole {
-                        HotelPackageDeltaText(
-                            hotel: hotel,
-                            city: selectionRole,
-                            isSelected: isSelectedInConfigurator,
-                            emptyLabel: pendingPriceLabel
-                        )
-                        .font(.headline.monospacedDigit())
-                        Spacer(minLength: 0)
-                        if isSelectedInConfigurator {
-                            Label(selectedHotelLabel, systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(Color(red: 0.18, green: 0.71, blue: 0.40))
-                                .font(.caption.weight(.bold))
-                        } else if let onSelectHotel {
-                            Button(action: onSelectHotel) {
-                                Text(selectHotelLabel)
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(Color(red: 0.18, green: 0.56, blue: 0.32))
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 35)
-                                    .background(Color.green.opacity(0.10), in: Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    } else if let quote {
+                    if let quote {
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
                             Text(money(quote.packageQuote.pricePerPerson))
                                 .font(.system(size: 25, weight: .bold, design: .rounded))
@@ -1685,18 +1342,16 @@ struct HotelStorefrontCard: View {
                         .frame(minHeight: 38, alignment: .leading)
                     }
 
-                    if selectionRole == nil {
-                        HStack(spacing: 5) {
-                            Text(L10n.text("hotel_storefront_includes", language))
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.68)
-                            Spacer(minLength: 2)
-                            Image(systemName: "chevron.forward")
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(.tertiary)
-                        }
+                    HStack(spacing: 5) {
+                        Text(L10n.text("hotel_storefront_includes", language))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.68)
+                        Spacer(minLength: 2)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.tertiary)
                     }
                 }
                 .padding(.horizontal, 14)
@@ -1707,12 +1362,12 @@ struct HotelStorefrontCard: View {
         }
         .frame(height: cardHeight)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.6)
         }
-        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .onTapGesture {
             IumrahHaptics.selection()
             onOpen()
@@ -1822,7 +1477,7 @@ private struct StorefrontFlightOptionCard: View {
 
                     Spacer(minLength: 4)
                     if packagePreview != nil {
-                        Image(systemName: "chevron.forward")
+                        Image(systemName: "chevron.right")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.tertiary)
                     }
@@ -1831,13 +1486,13 @@ private struct StorefrontFlightOptionCard: View {
             .padding(16)
         }
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
+            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
         }
         .shadow(color: .black.opacity(0.035), radius: 14, y: 6)
-        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
         .onTapGesture {
             if packagePreview != nil { onOpen() }
         }
@@ -1958,10 +1613,6 @@ private struct StorefrontFlightOptionCard: View {
         let route = "\(preview.outbound.origin) → \(preview.outbound.destination) + \(preview.inbound.origin) → \(preview.inbound.destination)"
         switch language {
         case .russian: return "\(route) · \(preview.durationDays) дн. · \(packageScopeText(preview))"
-        case .indonesian: return IndonesianLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
-        case .malay: return MalayLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
-        case .turkish: return TurkishLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
-        case .arabic: return ArabicLocalization.phrase("\(route) · \(preview.durationDays) days · \(packageScopeText(preview))")
         case .english: return "\(route) · \(preview.durationDays) days · \(packageScopeText(preview))"
         case .uzbek: return "\(route) · \(preview.durationDays) kun · \(packageScopeText(preview))"
         case .uzbekCyrillic: return "\(route) · \(preview.durationDays) кун · \(packageScopeText(preview))"
@@ -1975,18 +1626,10 @@ private struct StorefrontFlightOptionCard: View {
     private func packageScopeText(_ preview: StorefrontFlightPackagePreview) -> String {
         switch (preview.kind, language) {
         case (.makkahComfortShort, .russian), (.hotelFirstMakkah, .russian): return "Только Мекка"
-        case (.makkahComfortShort, .indonesian), (.hotelFirstMakkah, .indonesian): return IndonesianLocalization.phrase("Makkah only")
-        case (.makkahComfortShort, .malay), (.hotelFirstMakkah, .malay): return MalayLocalization.phrase("Makkah only")
-        case (.makkahComfortShort, .turkish), (.hotelFirstMakkah, .turkish): return TurkishLocalization.phrase("Makkah only")
-        case (.makkahComfortShort, .arabic), (.hotelFirstMakkah, .arabic): return ArabicLocalization.phrase("Makkah only")
         case (.makkahComfortShort, .english), (.hotelFirstMakkah, .english): return "Makkah only"
         case (.makkahComfortShort, .uzbek), (.hotelFirstMakkah, .uzbek): return "Faqat Makka"
         case (.makkahComfortShort, .uzbekCyrillic), (.hotelFirstMakkah, .uzbekCyrillic): return "Фақат Макка"
         case (.makkahMadinahStandard, .russian): return "Мекка + Медина"
-        case (.makkahMadinahStandard, .indonesian): return IndonesianLocalization.phrase("Makkah + Madinah")
-        case (.makkahMadinahStandard, .malay): return MalayLocalization.phrase("Makkah + Madinah")
-        case (.makkahMadinahStandard, .turkish): return TurkishLocalization.phrase("Makkah + Madinah")
-        case (.makkahMadinahStandard, .arabic): return ArabicLocalization.phrase("Makkah + Madinah")
         case (.makkahMadinahStandard, .english): return "Makkah + Madinah"
         case (.makkahMadinahStandard, .uzbek): return "Makka + Madina"
         case (.makkahMadinahStandard, .uzbekCyrillic): return "Макка + Мадина"
@@ -1996,10 +1639,6 @@ private struct StorefrontFlightOptionCard: View {
     private var generatedStampText: String {
         switch language {
         case .russian: return packagePreview == nil ? "iumrah Flights Scanner" : "Сгенерировано iumrah Configurator"
-        case .indonesian: return packagePreview == nil ? "iumrah Flights Scanner" : "Dibuat oleh iumrah Configurator"
-        case .malay: return packagePreview == nil ? "iumrah Flights Scanner" : "Dibuat oleh iumrah Configurator"
-        case .turkish: return packagePreview == nil ? "iumrah Flights Scanner" : "iumrah Configurator tarafından oluşturuldu"
-        case .arabic: return packagePreview == nil ? "ماسح رحلات iumrah" : "أُنشئت بواسطة مُكوّن iumrah"
         case .english: return packagePreview == nil ? "iumrah Flights Scanner" : "Generated by iumrah Configurator"
         case .uzbek: return packagePreview == nil ? "iumrah Flights Scanner" : "iumrah Configurator yaratdi"
         case .uzbekCyrillic: return packagePreview == nil ? "iumrah Flights Scanner" : "iumrah Configurator яратди"
@@ -2009,10 +1648,6 @@ private struct StorefrontFlightOptionCard: View {
     private var packagePerPersonText: String {
         switch language {
         case .russian: return "пакет · 1 человек"
-        case .indonesian: return IndonesianLocalization.phrase("package · 1 person")
-        case .malay: return MalayLocalization.phrase("package · 1 person")
-        case .turkish: return TurkishLocalization.phrase("package · 1 person")
-        case .arabic: return ArabicLocalization.phrase("package · 1 person")
         case .english: return "package · 1 person"
         case .uzbek: return "paket · 1 kishi"
         case .uzbekCyrillic: return "пакет · 1 киши"
@@ -2022,10 +1657,6 @@ private struct StorefrontFlightOptionCard: View {
     private var calculatingPackageText: String {
         switch language {
         case .russian: return "Считаем пакет"
-        case .indonesian: return IndonesianLocalization.phrase("Calculating package")
-        case .malay: return MalayLocalization.phrase("Calculating package")
-        case .turkish: return TurkishLocalization.phrase("Calculating package")
-        case .arabic: return ArabicLocalization.phrase("Calculating package")
         case .english: return "Calculating package"
         case .uzbek: return "Paket hisoblanmoqda"
         case .uzbekCyrillic: return "Пакет ҳисобланмоқда"
@@ -2035,10 +1666,6 @@ private struct StorefrontFlightOptionCard: View {
     private var packageUnavailableText: String {
         switch language {
         case .russian: return "нет пары 2–15 дней"
-        case .indonesian: return IndonesianLocalization.phrase("no 2–15 day pair")
-        case .malay: return MalayLocalization.phrase("no 2–15 day pair")
-        case .turkish: return TurkishLocalization.phrase("no 2–15 day pair")
-        case .arabic: return ArabicLocalization.phrase("no 2–15 day pair")
         case .english: return "no 2–15 day pair"
         case .uzbek: return "2–15 kunlik juftlik yo‘q"
         case .uzbekCyrillic: return "2–15 кунлик жуфтлик йўқ"
@@ -2183,7 +1810,7 @@ struct StorefrontUmrahPackageDetailView: View {
                         .foregroundStyle(IumrahIconRole.umrah.color)
                     let displayedPackageID = activePackageID ?? preview.packageID
                     if displayedPackageID.range(of: "^\\d{10}$", options: .regularExpression) != nil {
-                        Text("\(L10n.text("hotel_detail_package_id", settings.language)) · \(displayedPackageID)")
+                        Text("Package ID · \(displayedPackageID)")
                             .font(.caption2.monospacedDigit().weight(.medium))
                             .foregroundStyle(.secondary)
                     }
@@ -2192,7 +1819,7 @@ struct StorefrontUmrahPackageDetailView: View {
                 .padding(.bottom, 12)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
+            .padding(.top, 0)
             .padding(.bottom, 34)
         }
         .background(Color.iumrahPageBackground)
@@ -2245,10 +1872,11 @@ struct StorefrontUmrahPackageDetailView: View {
                 preview: preview
             )
         }
-        .navigationDestination(isPresented: $isProfileSheetPresented) {
-            IumrahBookingConfirmationView(createBooking: { profile in
-                try await createBooking(profile: profile)
-            })
+        .sheet(isPresented: $isProfileSheetPresented) {
+            BookingProfileCaptureSheet {
+                Task { await createBooking() }
+            }
+            .environmentObject(settings)
         }
         .sheet(item: $shareArtifacts) { artifacts in
             IumrahPackageActivitySheet(artifacts: artifacts)
@@ -2478,7 +2106,7 @@ struct StorefrontUmrahPackageDetailView: View {
                         Text(addMadinahTitle)
                             .font(.headline)
                         Spacer()
-                        Image(systemName: "chevron.forward")
+                        Image(systemName: "chevron.right")
                             .font(.caption.weight(.bold))
                     }
                 }
@@ -2640,7 +2268,7 @@ struct StorefrontUmrahPackageDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.forward")
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -2768,20 +2396,8 @@ struct StorefrontUmrahPackageDetailView: View {
         case (.russian, .breakfast): return "Завтрак"
         case (.russian, .lunch): return "Обед"
         case (.russian, .dinner): return "Ужин"
-        case (.indonesian, .breakfast): return IndonesianLocalization.phrase("Breakfast")
-        case (.malay, .breakfast): return MalayLocalization.phrase("Breakfast")
-        case (.turkish, .breakfast): return TurkishLocalization.phrase("Breakfast")
-        case (.arabic, .breakfast): return ArabicLocalization.phrase("Breakfast")
         case (.english, .breakfast): return "Breakfast"
-        case (.indonesian, .lunch): return IndonesianLocalization.phrase("Lunch")
-        case (.malay, .lunch): return MalayLocalization.phrase("Lunch")
-        case (.turkish, .lunch): return TurkishLocalization.phrase("Lunch")
-        case (.arabic, .lunch): return ArabicLocalization.phrase("Lunch")
         case (.english, .lunch): return "Lunch"
-        case (.indonesian, .dinner): return IndonesianLocalization.phrase("Dinner")
-        case (.malay, .dinner): return MalayLocalization.phrase("Dinner")
-        case (.turkish, .dinner): return TurkishLocalization.phrase("Dinner")
-        case (.arabic, .dinner): return ArabicLocalization.phrase("Dinner")
         case (.english, .dinner): return "Dinner"
         case (.uzbek, .breakfast): return "Nonushta"
         case (.uzbek, .lunch): return "Tushlik"
@@ -2971,7 +2587,7 @@ struct StorefrontUmrahPackageDetailView: View {
                 }
                 Spacer(minLength: 8)
                 if !isSubmitting {
-                    Image(systemName: "arrow.forward")
+                    Image(systemName: "arrow.right")
                 }
             }
             .frame(maxWidth: .infinity)
@@ -3788,37 +3404,56 @@ struct StorefrontUmrahPackageDetailView: View {
     }
 
     @MainActor
-    private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
-        guard let hotel = journey.selectedHotel,
+    private func createBooking() async {
+        guard !isSubmitting,
+              let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
               let inbound = journey.selectedInbound,
-              let quote = journey.quote,
-              journey.trip.scope != .makkahAndMadinah || journey.selectedMadinahHotel != nil else {
-            throw BookingStoreError.authoritativeQuoteRequired
-        }
-        let session = try await bookings.create(
-            trip: journey.trip,
-            hotel: hotel,
-            madinahHotel: journey.selectedMadinahHotel,
-            room: journey.selectedRoom,
-            roomCategory: journey.selectedRoomCategory,
-            madinahRoom: journey.selectedMadinahRoom,
-            madinahRoomCategory: journey.selectedMadinahRoomCategory,
-            intercityTransport: journey.trip.scope == .makkahAndMadinah
-                ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil,
-            transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
-            outbound: outbound,
-            inbound: inbound,
-            quote: quote,
-            language: settings.language,
-            pilgrimProfile: profile
-        )
-        if let deviceToken = push.deviceToken {
-            await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
-        }
-        return session
-    }
+              let quote = journey.quote else { return }
 
+        if journey.trip.scope == .makkahAndMadinah, journey.selectedMadinahHotel == nil { return }
+
+        isSubmitting = true
+        bookingError = nil
+        defer { isSubmitting = false }
+
+        do {
+            let profile = BookingPilgrimProfile(
+                firstName: settings.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
+                lastName: settings.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
+                telegram: settings.telegram.trimmingCharacters(in: .whitespacesAndNewlines),
+                whatsapp: settings.whatsapp.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+
+            let session = try await bookings.create(
+                trip: journey.trip,
+                hotel: hotel,
+                madinahHotel: journey.selectedMadinahHotel,
+                room: journey.selectedRoom,
+                roomCategory: journey.selectedRoomCategory,
+                madinahRoom: journey.selectedMadinahRoom,
+                madinahRoomCategory: journey.selectedMadinahRoomCategory,
+                intercityTransport: journey.trip.scope == .makkahAndMadinah
+                    ? (journey.haramainTrainSelected ? .haramainTrain : .road)
+                    : nil,
+                transferVehicle: journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle(),
+                outbound: outbound,
+                inbound: inbound,
+                quote: quote,
+                language: settings.language,
+                pilgrimProfile: profile
+            )
+
+            if let deviceToken = push.deviceToken {
+                await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
+            }
+            IumrahHaptics.success()
+            createdBookingID = session.id
+        } catch {
+            bookingError = L10n.error(error, settings.language)
+            IumrahHaptics.error()
+        }
+    }
 
     private func money(_ value: Decimal) -> String {
         String(format: "$%.0f", NSDecimalNumber(decimal: value).doubleValue)
@@ -3827,10 +3462,6 @@ struct StorefrontUmrahPackageDetailView: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .malay: return MalayLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -3997,7 +3628,7 @@ private struct PackageFlightPickerSheet: View {
                     }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 12)
+                .padding(.top, 0)
                 .padding(.bottom, 34)
             }
             .background(Color.iumrahPageBackground)
@@ -4117,10 +3748,6 @@ private struct PackageFlightPickerSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .malay: return MalayLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -4206,10 +3833,6 @@ private struct PackageFlightChoiceCard: View {
     private var directTitle: String {
         switch language {
         case .russian: return "прямой"
-        case .indonesian: return IndonesianLocalization.phrase("direct")
-        case .malay: return MalayLocalization.phrase("direct")
-        case .turkish: return TurkishLocalization.phrase("direct")
-        case .arabic: return ArabicLocalization.phrase("direct")
         case .english: return "direct"
         case .uzbek: return "to‘g‘ri"
         case .uzbekCyrillic: return "тўғри"
@@ -4355,10 +3978,6 @@ private struct PackageFlightLegDetailCard: View {
     private var directText: String {
         switch language {
         case .russian: return leg.stops == 0 ? "прямой" : "\(leg.stops) пересад."
-        case .indonesian: return leg.stops == 0 ? "Langsung" : "\(leg.stops) transit"
-        case .malay: return leg.stops == 0 ? "Terus" : "\(leg.stops) transit"
-        case .turkish: return leg.stops == 0 ? "direkt" : "\(leg.stops) aktarma"
-        case .arabic: return leg.stops == 0 ? "مباشر" : "\(leg.stops) توقفات"
         case .english: return leg.stops == 0 ? "direct" : "\(leg.stops) stops"
         case .uzbek: return leg.stops == 0 ? "to‘g‘ridan-to‘g‘ri" : "\(leg.stops) ulanish"
         case .uzbekCyrillic: return leg.stops == 0 ? "тўғридан-тўғри" : "\(leg.stops) уланиш"
@@ -4376,10 +3995,6 @@ private struct PackageFlightLegDetailCard: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .malay: return MalayLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -4446,7 +4061,7 @@ private struct PackageHotelDetailCard: View {
                                 .font(.caption.weight(.semibold))
                                 .lineLimit(1)
                             Spacer(minLength: 4)
-                            Image(systemName: "chevron.forward")
+                            Image(systemName: "chevron.right")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(.tertiary)
                         }
@@ -4472,10 +4087,6 @@ private struct PackageHotelDetailCard: View {
     private var nightsText: String {
         switch language {
         case .russian: return "\(hotel.nights) ноч."
-        case .indonesian: return IndonesianLocalization.phrase("\(hotel.nights) nights")
-        case .malay: return MalayLocalization.phrase("\(hotel.nights) nights")
-        case .turkish: return TurkishLocalization.phrase("\(hotel.nights) nights")
-        case .arabic: return ArabicLocalization.phrase("\(hotel.nights) nights")
         case .english: return "\(hotel.nights) nights"
         case .uzbek: return "\(hotel.nights) tun"
         case .uzbekCyrillic: return "\(hotel.nights) тун"
@@ -4504,7 +4115,7 @@ private struct PackagePurchaseTrustCard: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: "chevron.forward")
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(.tertiary)
             }
@@ -4522,10 +4133,6 @@ private struct PackagePurchaseTrustCard: View {
     private var title: String {
         switch language {
         case .russian: return "Доверие и подтверждение бронирования"
-        case .indonesian: return IndonesianLocalization.phrase("Booking trust and confirmation")
-        case .malay: return MalayLocalization.phrase("Booking trust and confirmation")
-        case .turkish: return TurkishLocalization.phrase("Booking trust and confirmation")
-        case .arabic: return ArabicLocalization.phrase("Booking trust and confirmation")
         case .english: return "Booking trust and confirmation"
         case .uzbek: return "Bron ishonchi va tasdig‘i"
         case .uzbekCyrillic: return "Брон ишончи ва тасдиғи"
@@ -4535,10 +4142,6 @@ private struct PackagePurchaseTrustCard: View {
     private var subtitle: String {
         switch language {
         case .russian: return "Прямой контакт с основателем · инвойс и чек · ответственность iumrah за отель и iumrah Services"
-        case .indonesian: return IndonesianLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
-        case .malay: return MalayLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
-        case .turkish: return TurkishLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
-        case .arabic: return ArabicLocalization.phrase("Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services")
         case .english: return "Direct founder contact · invoice and receipt · iumrah responsibility for the hotel and iumrah Services"
         case .uzbek: return "Asoschi bilan bevosita aloqa · invoice va chek · mehmonxona hamda iumrah Services uchun iumrah javobgarligi"
         case .uzbekCyrillic: return "Асосчи билан бевосита алоқа · invoice ва чек · меҳмонхона ҳамда iumrah Services учун iumrah жавобгарлиги"
@@ -4766,8 +4369,7 @@ private struct StorefrontPackageInformationSheet: View {
 
             Link(destination: URL(string: "https://t.me/saudiclub966")!) {
                 HStack {
-                    IumrahTelegramMark(size: 23)
-                    Text(tr("Написать Абдулазизу", "Message Abdulaziz", "Abdulazizga yozish", "Абдулазизга ёзиш"))
+                    Label(tr("Написать Абдулазизу", "Message Abdulaziz", "Abdulazizga yozish", "Абдулазизга ёзиш"), systemImage: "paperplane.fill")
                     Spacer()
                     Text("Telegram")
                         .font(.caption.weight(.semibold))
@@ -4833,7 +4435,7 @@ private struct StorefrontPackageInformationSheet: View {
                     HStack {
                         Label(tr("Открыть политику возврата", "Open refund policy", "Qaytarish siyosatini ochish", "Қайтариш сиёсатини очиш"), systemImage: "arrow.uturn.backward.circle.fill")
                         Spacer()
-                        Image(systemName: "chevron.forward")
+                        Image(systemName: "chevron.right")
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -4916,10 +4518,6 @@ private struct StorefrontPackageInformationSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch language {
         case .russian: return ru
-        case .indonesian: return IndonesianLocalization.phrase(en)
-        case .malay: return MalayLocalization.phrase(en)
-        case .turkish: return TurkishLocalization.phrase(en)
-        case .arabic: return ArabicLocalization.phrase(en)
         case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
@@ -5003,8 +4601,7 @@ struct HotelCareContactSheet: View {
 
     private func contactRow(icon: String, title: String, value: String) -> some View {
         HStack(spacing: 14) {
-            if icon == "paperplane.fill" { IumrahTelegramMark(size: 42).frame(width: 46, height: 46) }
-            else { IumrahIconBadge(systemName: icon, role: .care, size: 46, symbolSize: 18, cornerRadius: 15) }
+            IumrahIconBadge(systemName: icon, role: .care, size: 46, symbolSize: 18, cornerRadius: 15)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline).foregroundStyle(.primary)
                 Text(value).font(.subheadline).foregroundStyle(.secondary)

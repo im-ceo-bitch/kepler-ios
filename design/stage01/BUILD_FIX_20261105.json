@@ -1,0 +1,17 @@
+{
+  "patch": "iumrah-beta-update-20261105-onboarding-compile-fix-v1",
+  "base_file_sha256": "72e3e1d37c19aa37c23ff9e3f9e33475ace75a670d4763f8e0e047bfeb7dbe5b",
+  "patched_file_sha256": "5ac0a03e65d3d37039d385c98a3568f5751d6103f6dd231bf17c458c80def3eb",
+  "files_changed": [
+    "Sources/Views/Onboarding/OnboardingFlowView.swift"
+  ],
+  "reason": "Fix Xcode 26.6 CompileSwift cannot find priceSpotlight in scope; spring is a cascaded error",
+  "requires_real_macos_build": true,
+  "does_not_change": [
+    "API",
+    "business logic",
+    "signing",
+    "workflow",
+    "onboarding flow sequence"
+  ]
+}

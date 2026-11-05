@@ -349,7 +349,11 @@ struct OnboardingFlowView: View {
                 .shadow(color: .black.opacity(0.30), radius: 34, y: 18)
                 .animation(.spring(response: 0.62, dampingFraction: 0.84), value: isActive)
 
-            priceSpotlight
+            OnboardingGlassPill(
+                title: L10n.text("final_price", settings.language),
+                icon: "checkmark.seal.fill",
+                lightText: true
+            )
                 .offset(x: isActive && !reduceMotion ? -96 : -70, y: isActive && !reduceMotion ? -88 : -60)
                 .scaleEffect(isActive || reduceMotion ? 1 : 0.92)
                 .opacity(isActive ? 1 : 0.68)

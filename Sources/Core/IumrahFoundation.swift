@@ -195,20 +195,22 @@ struct IumrahFoundationHomeHero: View {
     private let symbols = ["airplane", "building.2", "person.2"]
 
     var body: some View {
-        IumrahFoundationCard {
+        IumrahFoundationCard(inset: 22) {
             VStack(alignment: .leading, spacing: IumrahFoundation.Space.md) {
-                HStack(spacing: 8) {
-                    Image(systemName: "circle.hexagongrid.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                    Text("iumrah · " + kicker)
-                        .font(IumrahFoundation.TypeStyle.eyebrow)
-                        .tracking(1.1)
+                HStack(spacing: 10) {
+                    Rectangle()
+                        .fill(Color.secondary.opacity(0.7))
+                        .frame(width: 21, height: 1)
+                        .accessibilityHidden(true)
+                    Text(kicker)
+                        .font(.system(.caption2, design: .default, weight: .bold))
+                        .tracking(1.5)
                 }
                 .foregroundStyle(.secondary)
 
                 Text(title)
-                    .font(IumrahFoundation.TypeStyle.hero)
-                    .tracking(-0.95)
+                    .font(.system(.largeTitle, design: .default, weight: .bold))
+                    .tracking(-1.15)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
 
@@ -218,17 +220,18 @@ struct IumrahFoundationHomeHero: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 16) { features }
-                    VStack(alignment: .leading, spacing: 10) { features }
+                    HStack(spacing: 6) { featureChips }
+                    VStack(alignment: .leading, spacing: 7) { featureChips }
                 }
                 .padding(.vertical, 4)
 
                 Button(action: action) {
-                    HStack {
+                    HStack(spacing: 12) {
                         Text(actionTitle)
-                        Spacer()
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 8)
                         Image(systemName: "arrow.right")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
@@ -237,9 +240,24 @@ struct IumrahFoundationHomeHero: View {
         }
     }
 
-    @ViewBuilder private var features: some View {
+    @ViewBuilder private var featureChips: some View {
         ForEach(0..<min(featureTitles.count, symbols.count), id: \.self) { index in
-            IumrahFoundationFeature(symbol: symbols[index], title: featureTitles[index])
+            HStack(spacing: 5) {
+                Image(systemName: symbols[index])
+                    .font(.system(size: 11, weight: .medium))
+                    .accessibilityHidden(true)
+                Text(featureTitles[index])
+                    .font(.system(.caption, design: .default, weight: .semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .background(
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.13), lineWidth: 0.8)
+            )
+            .accessibilityElement(children: .combine)
         }
     }
 }

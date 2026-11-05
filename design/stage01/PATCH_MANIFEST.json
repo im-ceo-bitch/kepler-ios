@@ -1,0 +1,41 @@
+{
+  "name": "iumrah-beta-update-20261105-design-evolution-stage01-v1",
+  "base_archive": "kepler-ios-main 3.zip",
+  "patch_type": "cumulative full-file overlay",
+  "behavior": "extract repo-relative paths; no root wrapper folder",
+  "ui_changes": [
+    "Home hero refined in variant A direction",
+    "Home audience carousel marketing cards use neutral monochrome palette"
+  ],
+  "business_logic_changes": false,
+  "xcode_build_verified": false,
+  "modified_source_files": [
+    {
+      "path": "Sources/Core/IumrahFoundation.swift",
+      "source_sha256": "d33c44c798905b1adbcca2c3b8a1defa6ab62f555d55ecbe0ae4fecb5599a4fb",
+      "patch_sha256": "d755271bceba955ff7a5112184a05949ac3982a8de2606b5c08536be2a63094a"
+    },
+    {
+      "path": "Sources/Views/Home/HomeAppleStoreSections.swift",
+      "source_sha256": "3856a557966c1c9d2ab33187251066ba29d5ff024b3f38fd6f663a1fcf84fbdb",
+      "patch_sha256": "9d75a26b5513f460a7083c512f678d9e19a45d61d293c7ccb4b1da49e2acd845"
+    }
+  ],
+  "files": [
+    "Sources/Core/IumrahFoundation.swift",
+    "Sources/Views/Home/HomeAppleStoreSections.swift",
+    "design/DESIGN_RULES.md",
+    "design/README.md",
+    "design/stage01/AUDIT.md",
+    "design/stage01/INSTALL.md",
+    "design/stage01/prototypes/assets/hotels.jpeg",
+    "design/stage01/prototypes/assets/iumrah-wordmark.png",
+    "design/stage01/prototypes/assets/makkah-background.jpg",
+    "design/stage01/prototypes/assets/umrah-configurator.jpeg",
+    "design/stage01/prototypes/assets/world-dots.png",
+    "design/stage01/prototypes/comparison.png",
+    "design/stage01/prototypes/concept-a.png",
+    "design/stage01/prototypes/concept-b.png",
+    "design/stage01/prototypes/index.html"
+  ]
+}

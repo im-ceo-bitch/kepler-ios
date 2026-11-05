@@ -84,23 +84,23 @@ struct IumrahHomeAudienceSection: View {
             Spacer(minLength: 14)
 
             Text(item.title)
-                .font(.system(size: 23, weight: .bold, design: .rounded))
+                .font(.system(size: 23, weight: .bold, design: .default))
                 .tracking(-0.5)
                 .foregroundStyle(item.foreground)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(item.body)
-                .font(.system(size: 14, weight: .regular, design: .rounded))
-                .foregroundStyle(item.foreground.opacity(0.68))
+                .font(.system(size: 14, weight: .regular, design: .default))
+                .foregroundStyle(item.foreground.opacity(0.72))
                 .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 7)
         }
         .padding(20)
         .background(item.background)
-        .clipShape(RoundedRectangle(cornerRadius: 31, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 31, style: .continuous)
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(item.foreground.opacity(0.06), lineWidth: 0.8)
         }
     }
@@ -125,55 +125,55 @@ struct IumrahHomeAudienceSection: View {
                     icon: "slider.horizontal.3",
                     title: "Соберите поездку сами",
                     body: "Перелёт, отели, трансфер и сервисы — один персональный пакет Умры, который Вы собираете под себя.",
-                    background: Color(red: 0.91, green: 0.95, blue: 1.00),
-                    foreground: Color(red: 0.05, green: 0.16, blue: 0.34)
+                    background: Color(red: 0.965, green: 0.965, blue: 0.955),
+                    foreground: Color(red: 0.10, green: 0.10, blue: 0.10)
                 ),
                 Item(
                     id: "family",
                     icon: "person.3.fill",
                     title: "Семья и близкие",
                     body: "Организуйте Умру для семьи или друзей вместе, сохраняя приватность и удобный темп поездки.",
-                    background: Color(red: 0.94, green: 0.98, blue: 0.92),
-                    foreground: Color(red: 0.10, green: 0.28, blue: 0.13)
+                    background: Color(red: 0.945, green: 0.945, blue: 0.935),
+                    foreground: Color(red: 0.10, green: 0.10, blue: 0.10)
                 ),
                 Item(
                     id: "vip",
                     icon: "sparkles",
                     title: "Индивидуальный и VIP",
                     body: "Премиальные отели, приватный транспорт, индивидуальный сервис и максимум личного пространства.",
-                    background: Color(red: 0.98, green: 0.94, blue: 0.89),
-                    foreground: Color(red: 0.31, green: 0.18, blue: 0.07)
+                    background: Color(red: 0.925, green: 0.925, blue: 0.915),
+                    foreground: Color(red: 0.10, green: 0.10, blue: 0.10)
                 ),
             ]
         case .turkish:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Kendi istediğiniz gibi planlayın", body: "Uçuş, otel, transfer ve hizmetleri kendinize özel tek bir umre paketinde birleştirin.", background: Color(red: 0.91, green: 0.95, blue: 1.00), foreground: Color(red: 0.05, green: 0.16, blue: 0.34)),
-                Item(id: "family", icon: "person.3.fill", title: "Aile ve arkadaşlar", body: "Umrenizi aileniz veya arkadaşlarınızla, kendi grubunuza uygun rahat ve özel bir tempoda düzenleyin.", background: Color(red: 0.94, green: 0.98, blue: 0.92), foreground: Color(red: 0.10, green: 0.28, blue: 0.13)),
-                Item(id: "vip", icon: "sparkles", title: "Özel ve VIP", body: "Premium oteller, özel ulaşım, kişisel hizmet ve yolculuk boyunca daha fazla mahremiyet.", background: Color(red: 0.98, green: 0.94, blue: 0.89), foreground: Color(red: 0.31, green: 0.18, blue: 0.07)),
+                Item(id: "self", icon: "slider.horizontal.3", title: "Kendi istediğiniz gibi planlayın", body: "Uçuş, otel, transfer ve hizmetleri kendinize özel tek bir umre paketinde birleştirin.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "family", icon: "person.3.fill", title: "Aile ve arkadaşlar", body: "Umrenizi aileniz veya arkadaşlarınızla, kendi grubunuza uygun rahat ve özel bir tempoda düzenleyin.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "vip", icon: "sparkles", title: "Özel ve VIP", body: "Premium oteller, özel ulaşım, kişisel hizmet ve yolculuk boyunca daha fazla mahremiyet.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
             ]
         case .arabic:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: ArabicLocalization.phrase("Build it your way"), body: ArabicLocalization.phrase("Flights, hotels, transfer and services in one personal Umrah package you configure for yourself."), background: Color(red: 0.91, green: 0.95, blue: 1.00), foreground: Color(red: 0.05, green: 0.16, blue: 0.34)),
-                Item(id: "family", icon: "person.3.fill", title: ArabicLocalization.phrase("Family & friends"), body: ArabicLocalization.phrase("Organize Umrah together while keeping the journey private, comfortable and paced around your group."), background: Color(red: 0.94, green: 0.98, blue: 0.92), foreground: Color(red: 0.10, green: 0.28, blue: 0.13)),
-                Item(id: "vip", icon: "sparkles", title: ArabicLocalization.phrase("Private & VIP"), body: ArabicLocalization.phrase("Premium hotels, private transport, individual service and more personal space throughout the journey."), background: Color(red: 0.98, green: 0.94, blue: 0.89), foreground: Color(red: 0.31, green: 0.18, blue: 0.07)),
+                Item(id: "self", icon: "slider.horizontal.3", title: ArabicLocalization.phrase("Build it your way"), body: ArabicLocalization.phrase("Flights, hotels, transfer and services in one personal Umrah package you configure for yourself."), background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "family", icon: "person.3.fill", title: ArabicLocalization.phrase("Family & friends"), body: ArabicLocalization.phrase("Organize Umrah together while keeping the journey private, comfortable and paced around your group."), background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "vip", icon: "sparkles", title: ArabicLocalization.phrase("Private & VIP"), body: ArabicLocalization.phrase("Premium hotels, private transport, individual service and more personal space throughout the journey."), background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
             ]
 case .indonesian, .malay, .english:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Build it your way", body: "Flights, hotels, transfer and services in one personal Umrah package you configure for yourself.", background: Color(red: 0.91, green: 0.95, blue: 1.00), foreground: Color(red: 0.05, green: 0.16, blue: 0.34)),
-                Item(id: "family", icon: "person.3.fill", title: "Family & friends", body: "Organize Umrah together while keeping the journey private, comfortable and paced around your group.", background: Color(red: 0.94, green: 0.98, blue: 0.92), foreground: Color(red: 0.10, green: 0.28, blue: 0.13)),
-                Item(id: "vip", icon: "sparkles", title: "Private & VIP", body: "Premium hotels, private transport, individual service and more personal space throughout the journey.", background: Color(red: 0.98, green: 0.94, blue: 0.89), foreground: Color(red: 0.31, green: 0.18, blue: 0.07)),
+                Item(id: "self", icon: "slider.horizontal.3", title: "Build it your way", body: "Flights, hotels, transfer and services in one personal Umrah package you configure for yourself.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "family", icon: "person.3.fill", title: "Family & friends", body: "Organize Umrah together while keeping the journey private, comfortable and paced around your group.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "vip", icon: "sparkles", title: "Private & VIP", body: "Premium hotels, private transport, individual service and more personal space throughout the journey.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
             ]
         case .uzbek:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Safarni o‘zingiz tuzing", body: "Parvoz, mehmonxona, transfer va servislar — o‘zingizga mos bitta shaxsiy Umra paketi.", background: Color(red: 0.91, green: 0.95, blue: 1.00), foreground: Color(red: 0.05, green: 0.16, blue: 0.34)),
-                Item(id: "family", icon: "person.3.fill", title: "Oila va yaqinlar", body: "Oila yoki do‘stlar bilan guruhingizga mos, qulay va xususiy tempda Umra safarini tashkil qiling.", background: Color(red: 0.94, green: 0.98, blue: 0.92), foreground: Color(red: 0.10, green: 0.28, blue: 0.13)),
-                Item(id: "vip", icon: "sparkles", title: "Individual va VIP", body: "Premium mehmonxonalar, xususiy transport, individual servis va safar davomida maksimal maxfiylik.", background: Color(red: 0.98, green: 0.94, blue: 0.89), foreground: Color(red: 0.31, green: 0.18, blue: 0.07)),
+                Item(id: "self", icon: "slider.horizontal.3", title: "Safarni o‘zingiz tuzing", body: "Parvoz, mehmonxona, transfer va servislar — o‘zingizga mos bitta shaxsiy Umra paketi.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "family", icon: "person.3.fill", title: "Oila va yaqinlar", body: "Oila yoki do‘stlar bilan guruhingizga mos, qulay va xususiy tempda Umra safarini tashkil qiling.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "vip", icon: "sparkles", title: "Individual va VIP", body: "Premium mehmonxonalar, xususiy transport, individual servis va safar davomida maksimal maxfiylik.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
             ]
         case .uzbekCyrillic:
             return [
-                Item(id: "self", icon: "slider.horizontal.3", title: "Сафарни ўзингиз тузинг", body: "Парвоз, меҳмонхона, трансфер ва сервислар — ўзингизга мос битта шахсий Умра пакети.", background: Color(red: 0.91, green: 0.95, blue: 1.00), foreground: Color(red: 0.05, green: 0.16, blue: 0.34)),
-                Item(id: "family", icon: "person.3.fill", title: "Оила ва яқинлар", body: "Оила ёки дўстлар билан гуруҳингизга мос, қулай ва хусусий темпда Умра сафарини ташкил қилинг.", background: Color(red: 0.94, green: 0.98, blue: 0.92), foreground: Color(red: 0.10, green: 0.28, blue: 0.13)),
-                Item(id: "vip", icon: "sparkles", title: "Индивидуал ва VIP", body: "Премиум меҳмонхоналар, хусусий транспорт, индивидуал сервис ва сафар давомида максимал махфийлик.", background: Color(red: 0.98, green: 0.94, blue: 0.89), foreground: Color(red: 0.31, green: 0.18, blue: 0.07)),
+                Item(id: "self", icon: "slider.horizontal.3", title: "Сафарни ўзингиз тузинг", body: "Парвоз, меҳмонхона, трансфер ва сервислар — ўзингизга мос битта шахсий Умра пакети.", background: Color(red: 0.965, green: 0.965, blue: 0.955), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "family", icon: "person.3.fill", title: "Оила ва яқинлар", body: "Оила ёки дўстлар билан гуруҳингизга мос, қулай ва хусусий темпда Умра сафарини ташкил қилинг.", background: Color(red: 0.945, green: 0.945, blue: 0.935), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
+                Item(id: "vip", icon: "sparkles", title: "Индивидуал ва VIP", body: "Премиум меҳмонхоналар, хусусий транспорт, индивидуал сервис ва сафар давомида максимал махфийлик.", background: Color(red: 0.925, green: 0.925, blue: 0.915), foreground: Color(red: 0.10, green: 0.10, blue: 0.10)),
             ]
         }
     }
@@ -338,7 +338,7 @@ case .indonesian, .malay, .english:
                     .background(Color.white)
                 }
                 .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 31, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 31, style: .continuous)
                         .strokeBorder(Color.black.opacity(0.055), lineWidth: 0.8)

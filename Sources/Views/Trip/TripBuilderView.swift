@@ -418,7 +418,7 @@ struct TripBuilderView: View {
     private var dateExactTitle: String {
         switch settings.language {
         case .russian: return "Точно"
-        case .english: return "Exact"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Exact"
         case .uzbek: return "Aniq"
         case .uzbekCyrillic: return "Аниқ"
         }
@@ -427,7 +427,7 @@ struct TripBuilderView: View {
     private var dateCalendarTitle: String {
         switch settings.language {
         case .russian: return "Даты"
-        case .english: return "Dates"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Dates"
         case .uzbek: return "Sanalar"
         case .uzbekCyrillic: return "Саналар"
         }
@@ -436,7 +436,7 @@ struct TripBuilderView: View {
     private var flightChoiceTitle: String {
         switch settings.language {
         case .russian: return "Сначала выберите перелёт"
-        case .english: return "Choose your flight first"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Choose your flight first"
         case .uzbek: return "Avval parvozni tanlang"
         case .uzbekCyrillic: return "Аввал парвозни танланг"
         }
@@ -445,7 +445,7 @@ struct TripBuilderView: View {
     private var flightChoiceBody: String {
         switch settings.language {
         case .russian: return "Выберите прямой рейс с подходящими датами. Если даты важнее рейса, используйте гибкий календарь."
-        case .english: return "Choose a direct flight with suitable dates. If your dates matter more than the flight, use the flexible calendar."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Choose a direct flight with suitable dates. If your dates matter more than the flight, use the flexible calendar."
         case .uzbek: return "Mos sanali to‘g‘ridan-to‘g‘ri reysni tanlang. Agar sana muhimroq bo‘lsa, moslashuvchan kalendardan foydalaning."
         case .uzbekCyrillic: return "Мос санали тўғридан-тўғри рейсни танланг. Агар сана муҳимроқ бўлса, мослашувчан календардан фойдаланинг."
         }
@@ -454,7 +454,7 @@ struct TripBuilderView: View {
     private var directFlightsModeTitle: String {
         switch settings.language {
         case .russian: return "Прямые"
-        case .english: return "Direct"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Direct"
         case .uzbek: return "To‘g‘ri"
         case .uzbekCyrillic: return "Тўғри"
         }
@@ -463,7 +463,7 @@ struct TripBuilderView: View {
     private var flexibleDatesModeTitle: String {
         switch settings.language {
         case .russian: return "Гибкие даты"
-        case .english: return "Flexible"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Flexible"
         case .uzbek: return "Moslashuvchan"
         case .uzbekCyrillic: return "Мослашувчан"
         }
@@ -472,7 +472,7 @@ struct TripBuilderView: View {
     private var publishedDirectHint: String {
         switch settings.language {
         case .russian: return "Рейсы ниже найдены iumrah Scanner. Выберите билет туда и обратно — цену авиабилета отдельно не показываем; она войдёт в итоговую цену вашего личного пакета."
-        case .english: return "The flights below were found by iumrah Scanner. Choose your outbound and return; the airfare is not shown separately and will be included in your personal package total."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "The flights below were found by iumrah Scanner. Choose your outbound and return; the airfare is not shown separately and will be included in your personal package total."
         case .uzbek: return "Quyidagi reyslar iumrah Scanner yordamida topilgan. Borish va qaytish reysini tanlang — aviachipta narxi alohida ko‘rsatilmaydi, u shaxsiy paketingiz yakuniy narxiga kiradi."
         case .uzbekCyrillic: return "Қуйидаги рейслар iumrah Scanner ёрдамида топилган. Бориш ва қайтиш рейсини танланг — авиачипта нархи алоҳида кўрсатилмайди, у шахсий пакетингиз якуний нархига киради."
         }
@@ -481,7 +481,7 @@ struct TripBuilderView: View {
     private var flexibleDatesHint: String {
         switch settings.language {
         case .russian: return "Зелёные дни в календаре — даты прямых рейсов, найденных iumrah AI. Выбор других дат запустит гибкий поиск после выбора отеля."
-        case .english: return "Green calendar days are direct-flight dates found by iumrah AI. Choosing other dates starts flexible flight search after your hotel is selected."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Green calendar days are direct-flight dates found by iumrah AI. Choosing other dates starts flexible flight search after your hotel is selected."
         case .uzbek: return "Kalendardagi yashil kunlar — iumrah AI topgan to‘g‘ridan-to‘g‘ri reys sanalari. Boshqa sanalar mehmonxona tanlangach moslashuvchan qidiruvni ishga tushiradi."
         case .uzbekCyrillic: return "Календардаги яшил кунлар — iumrah AI топган тўғридан-тўғри рейс саналари. Бошқа саналар меҳмонхона танлангач мослашувчан қидирувни ишга туширади."
         }
@@ -490,7 +490,7 @@ struct TripBuilderView: View {
     private var dateWeekendTitle: String {
         switch settings.language {
         case .russian: return "Выходные"
-        case .english: return "Weekend"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Weekend"
         case .uzbek: return "Dam olish"
         case .uzbekCyrillic: return "Дам олиш"
         }
@@ -499,7 +499,7 @@ struct TripBuilderView: View {
     private var dateCalendarHint: String {
         switch settings.language {
         case .russian: return "Откройте календарь актуальных дат: он заполняется реальными поисками и помогает выбрать подходящее окно поездки до запуска нового поиска."
-        case .english: return "Open the current-date calendar: it grows from real searches and helps choose a suitable travel window before a new flight search starts."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Open the current-date calendar: it grows from real searches and helps choose a suitable travel window before a new flight search starts."
         case .uzbek: return "Dolzarb sanalar kalendarini oching: u haqiqiy qidiruvlar bilan to‘lib boradi va yangi qidiruvdan oldin mos safar oynasini tanlashga yordam beradi."
         case .uzbekCyrillic: return "Долзарб саналар календарини очинг: у ҳақиқий қидирувлар билан тўлиб боради ва янги қидирувдан олдин мос сафар оралиғини танлашга ёрдам беради."
         }
@@ -635,7 +635,7 @@ struct TripBuilderView: View {
 
     private var locale: Locale {
         switch settings.language {
-        case .english: return Locale(identifier: "en_US")
+        case .english, .turkish, .indonesian, .malay, .arabic: return Locale(identifier: "en_US")
         case .russian: return Locale(identifier: "ru_RU")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
@@ -652,7 +652,7 @@ struct TripBuilderView: View {
     private var tripEndDateTitle: String {
         switch settings.language {
         case .russian: return "Завершение поездки"
-        case .english: return "Trip end date"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Trip end date"
         case .uzbek: return "Safar tugash sanasi"
         case .uzbekCyrillic: return "Сафар тугаш санаси"
         }
@@ -1183,7 +1183,7 @@ struct TripBuilderView: View {
     private var curatedFlightsTitle: String {
         switch settings.language {
         case .russian: return "Найденные прямые рейсы"
-        case .english: return "Found direct flights"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Found direct flights"
         case .uzbek: return "Topilgan to‘g‘ridan-to‘g‘ri reyslar"
         case .uzbekCyrillic: return "Топилган тўғридан-тўғри рейслар"
         }
@@ -1192,7 +1192,7 @@ struct TripBuilderView: View {
     private var curatedFlightsSubtitle: String {
         switch settings.language {
         case .russian: return "Найдено с помощью iumrah Scanner"
-        case .english: return "Found with iumrah Scanner"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Found with iumrah Scanner"
         case .uzbek: return "iumrah Scanner yordamida topildi"
         case .uzbekCyrillic: return "iumrah Scanner ёрдамида топилди"
         }
@@ -1201,7 +1201,7 @@ struct TripBuilderView: View {
     private var curatedModePickerLabel: String {
         switch settings.language {
         case .russian: return "Тип билета"
-        case .english: return "Ticket type"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Ticket type"
         case .uzbek: return "Chipta turi"
         case .uzbekCyrillic: return "Чипта тури"
         }
@@ -1210,7 +1210,7 @@ struct TripBuilderView: View {
     private var curatedSeparateModeLabel: String {
         switch settings.language {
         case .russian: return "В одну сторону"
-        case .english: return "One way"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "One way"
         case .uzbek: return "Bir tomonlama"
         case .uzbekCyrillic: return "Бир томонлама"
         }
@@ -1219,7 +1219,7 @@ struct TripBuilderView: View {
     private var curatedRoundTripModeLabel: String {
         switch settings.language {
         case .russian: return "Туда-обратно"
-        case .english: return "Round trip"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Round trip"
         case .uzbek: return "Borib-kelish"
         case .uzbekCyrillic: return "Бориб-келиш"
         }
@@ -1228,7 +1228,7 @@ struct TripBuilderView: View {
     private var curatedOutboundRowTitle: String {
         switch settings.language {
         case .russian: return "Туда"
-        case .english: return "Outbound"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Outbound"
         case .uzbek: return "Borish"
         case .uzbekCyrillic: return "Бориш"
         }
@@ -1237,7 +1237,7 @@ struct TripBuilderView: View {
     private var curatedReturnRowTitle: String {
         switch settings.language {
         case .russian: return "Обратно"
-        case .english: return "Return"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Return"
         case .uzbek: return "Qaytish"
         case .uzbekCyrillic: return "Қайтиш"
         }
@@ -1246,7 +1246,7 @@ struct TripBuilderView: View {
     private var curatedRoundTripRowTitle: String {
         switch settings.language {
         case .russian: return "Билеты туда-обратно"
-        case .english: return "Round-trip tickets"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Round-trip tickets"
         case .uzbek: return "Borib-kelish chiptalari"
         case .uzbekCyrillic: return "Бориб-келиш чипталари"
         }
@@ -1255,7 +1255,7 @@ struct TripBuilderView: View {
     private var curatedDirectLabel: String {
         switch settings.language {
         case .russian: return "ПРЯМОЙ"
-        case .english: return "DIRECT"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "DIRECT"
         case .uzbek: return "TO‘G‘RI"
         case .uzbekCyrillic: return "ТЎҒРИ"
         }
@@ -1264,7 +1264,7 @@ struct TripBuilderView: View {
     private var curatedRoundTripBadgeLabel: String {
         switch settings.language {
         case .russian: return "ТУДА-ОБРАТНО"
-        case .english: return "ROUND TRIP"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "ROUND TRIP"
         case .uzbek: return "BORIB-KELISH"
         case .uzbekCyrillic: return "БОРИБ-КЕЛИШ"
         }
@@ -1273,7 +1273,7 @@ struct TripBuilderView: View {
     private var curatedChooseFlightLabel: String {
         switch settings.language {
         case .russian: return "Выбрать рейс"
-        case .english: return "Choose flight"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Choose flight"
         case .uzbek: return "Reysni tanlash"
         case .uzbekCyrillic: return "Рейсни танлаш"
         }
@@ -1282,7 +1282,7 @@ struct TripBuilderView: View {
     private var curatedSelectDatesLabel: String {
         switch settings.language {
         case .russian: return "Выбрать эти даты"
-        case .english: return "Choose these dates"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Choose these dates"
         case .uzbek: return "Shu sanalarni tanlash"
         case .uzbekCyrillic: return "Шу саналарни танлаш"
         }
@@ -1291,7 +1291,7 @@ struct TripBuilderView: View {
     private var curatedLoadingLabel: String {
         switch settings.language {
         case .russian: return "Ищем рейсы через iumrah Scanner…"
-        case .english: return "Searching flights with iumrah Scanner…"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Searching flights with iumrah Scanner…"
         case .uzbek: return "iumrah Scanner orqali reyslar qidirilmoqda…"
         case .uzbekCyrillic: return "iumrah Scanner орқали рейслар қидирилмоқда…"
         }
@@ -1300,7 +1300,7 @@ struct TripBuilderView: View {
     private var curatedEmptyRowLabel: String {
         switch settings.language {
         case .russian: return "Для этого направления пока не найдено подходящих прямых рейсов."
-        case .english: return "No suitable direct flights found for this route yet."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "No suitable direct flights found for this route yet."
         case .uzbek: return "Bu yo‘nalish uchun hozircha mos to‘g‘ridan-to‘g‘ri reys topilmadi."
         case .uzbekCyrillic: return "Бу йўналиш учун ҳозирча мос тўғридан-тўғри рейс топилмади."
         }
@@ -1313,7 +1313,7 @@ struct TripBuilderView: View {
                 return "Для текущего open-jaw маршрута аэропорт прилёта и аэропорт обратного вылета разные. Используйте вкладку «В одну сторону» — там можно выбрать рейс туда и обратно отдельно."
             }
             return "Пока нет подходящей пары рейсов туда и обратно для этого маршрута."
-        case .english:
+        case .english, .turkish, .indonesian, .malay, .arabic:
             return journey.trip.returnOriginCode != journey.trip.outboundDestinationCode
                 ? "This is an open-jaw route. Use One way to choose outbound and return flights separately."
                 : "No suitable outbound and return pair found for this route yet."
@@ -1331,7 +1331,7 @@ struct TripBuilderView: View {
     private var curatedAirlineFallback: String {
         switch settings.language {
         case .russian: return "Авиакомпания"
-        case .english: return "Airline"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Airline"
         case .uzbek: return "Aviakompaniya"
         case .uzbekCyrillic: return "Авиакомпания"
         }
@@ -1741,7 +1741,7 @@ struct TripBuilderView: View {
     private func groupSavingsText(ru: String, en: String, uz: String, uzCy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
         }

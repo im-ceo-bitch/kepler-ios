@@ -239,7 +239,7 @@ struct IumrahSignatureThreeTabs: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(tabs) { tab in
+                ForEach(tabs, id: \.id) { tab in
                     let active = selectedID == tab.id
                     Button { onSelect(tab.id) } label: {
                         Text(tab.title)

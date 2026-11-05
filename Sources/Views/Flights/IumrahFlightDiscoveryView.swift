@@ -1124,7 +1124,7 @@ struct IumrahFlightDiscoveryView: View {
         let count = adults + children + infants
         switch settings.language {
         case .russian: return "\(count), эконом"
-        case .english: return "\(count), economy"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "\(count), economy"
         case .uzbek: return "\(count), ekonom"
         case .uzbekCyrillic: return "\(count), эконом"
         }
@@ -1620,6 +1620,10 @@ struct IumrahFlightDiscoveryView: View {
         case .english: return Locale(identifier: "en_US")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
+        case .turkish: return Locale(identifier: "tr_TR")
+        case .arabic: return Locale(identifier: "ar_SA")
+        case .indonesian: return Locale(identifier: "id_ID")
+        case .malay: return Locale(identifier: "ms_MY")
         }
     }
 
@@ -1645,7 +1649,7 @@ struct IumrahFlightDiscoveryView: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
         }
@@ -1811,7 +1815,7 @@ private struct IumrahRecommendedFlightCard: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
-        case .english: return Locale(identifier: "en_US")
+        case .english, .turkish, .indonesian, .malay, .arabic: return Locale(identifier: "en_US")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
         }
@@ -1820,7 +1824,7 @@ private struct IumrahRecommendedFlightCard: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -2063,7 +2067,7 @@ private struct FlightDiscoveryTicketCard: View {
         let m = minutes % 60
         switch language {
         case .russian: return m == 0 ? "\(h) ч" : "\(h) ч \(m) мин"
-        case .english: return m == 0 ? "\(h)h" : "\(h)h \(m)m"
+        case .english, .turkish, .indonesian, .malay, .arabic: return m == 0 ? "\(h)h" : "\(h)h \(m)m"
         case .uzbek: return m == 0 ? "\(h) soat" : "\(h) soat \(m) daq"
         case .uzbekCyrillic: return m == 0 ? "\(h) соат" : "\(h) соат \(m) дақ"
         }
@@ -2075,7 +2079,7 @@ private struct FlightDiscoveryTicketCard: View {
         }
         switch language {
         case .russian: return transfers == 0 ? "Прямой" : "\(transfers) перес."
-        case .english: return transfers == 0 ? "Non-stop" : "\(transfers) stop(s)"
+        case .english, .turkish, .indonesian, .malay, .arabic: return transfers == 0 ? "Non-stop" : "\(transfers) stop(s)"
         case .uzbek: return transfers == 0 ? "To‘g‘ridan-to‘g‘ri" : "\(transfers) almashish"
         case .uzbekCyrillic: return transfers == 0 ? "Тўғридан-тўғри" : "\(transfers) алмашиш"
         }
@@ -2121,7 +2125,7 @@ private struct FlightDiscoveryTicketCard: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
-        case .english: return Locale(identifier: "en_US")
+        case .english, .turkish, .indonesian, .malay, .arabic: return Locale(identifier: "en_US")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
         }
@@ -2138,7 +2142,7 @@ private struct FlightDiscoveryTicketCard: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -2276,7 +2280,7 @@ private struct FlightDiscoveryPassengersSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -2346,7 +2350,7 @@ private struct FlightDiscoveryFiltersSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -2422,7 +2426,7 @@ private struct FlightDiscoveryAirlinesSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -2509,7 +2513,7 @@ private struct FlightDiscoveryFavoritesSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -2645,7 +2649,7 @@ private struct FlightDiscoveryCalendarSheet: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
-        case .english: return Locale(identifier: "en_US")
+        case .english, .turkish, .indonesian, .malay, .arabic: return Locale(identifier: "en_US")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
         }
@@ -2654,7 +2658,7 @@ private struct FlightDiscoveryCalendarSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -2744,7 +2748,7 @@ private struct FlightDiscoveryMonthGrid: View {
         let base: [String]
         switch language {
         case .russian: base = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
-        case .english: base = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+        case .english, .turkish, .indonesian, .malay, .arabic: base = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
         case .uzbek: base = ["Ya", "Du", "Se", "Ch", "Pa", "Ju", "Sh"]
         case .uzbekCyrillic: base = ["Як", "Ду", "Се", "Чо", "Па", "Жу", "Ша"]
         }
@@ -2761,7 +2765,7 @@ private struct FlightDiscoveryMonthGrid: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
-        case .english: return Locale(identifier: "en_US")
+        case .english, .turkish, .indonesian, .malay, .arabic: return Locale(identifier: "en_US")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
         }
@@ -3026,7 +3030,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -3923,7 +3927,7 @@ private struct FlightDiscoveryOfferDetailView: View {
         }
         switch language {
         case .russian: return transfers == 0 ? "Прямой рейс" : "\(transfers) пересадка"
-        case .english: return transfers == 0 ? "Non-stop" : "\(transfers) stop(s)"
+        case .english, .turkish, .indonesian, .malay, .arabic: return transfers == 0 ? "Non-stop" : "\(transfers) stop(s)"
         case .uzbek: return transfers == 0 ? "To‘g‘ridan-to‘g‘ri" : "\(transfers) almashish"
         case .uzbekCyrillic: return transfers == 0 ? "Тўғридан-тўғри" : "\(transfers) алмашиш"
         }
@@ -3935,7 +3939,7 @@ private struct FlightDiscoveryOfferDetailView: View {
         let m = minutes % 60
         switch language {
         case .russian: return m == 0 ? "\(h) ч" : "\(h) ч \(m) мин"
-        case .english: return m == 0 ? "\(h)h" : "\(h)h \(m)m"
+        case .english, .turkish, .indonesian, .malay, .arabic: return m == 0 ? "\(h)h" : "\(h)h \(m)m"
         case .uzbek: return m == 0 ? "\(h) soat" : "\(h) soat \(m) daq"
         case .uzbekCyrillic: return m == 0 ? "\(h) соат" : "\(h) соат \(m) дақ"
         }
@@ -3990,7 +3994,7 @@ private struct FlightDiscoveryOfferDetailView: View {
     private var locale: Locale {
         switch language {
         case .russian: return Locale(identifier: "ru_RU")
-        case .english: return Locale(identifier: "en_US")
+        case .english, .turkish, .indonesian, .malay, .arabic: return Locale(identifier: "en_US")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
         }
@@ -4007,7 +4011,7 @@ private struct FlightDiscoveryOfferDetailView: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }

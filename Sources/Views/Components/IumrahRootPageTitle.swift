@@ -164,7 +164,7 @@ struct IumrahRootPageTitle: View {
     private var notificationAccessibilityLabel: String {
         switch settings.language {
         case .russian: return "Уведомления"
-        case .english: return "Notifications"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Notifications"
         case .uzbek: return "Bildirishnomalar"
         case .uzbekCyrillic: return "Билдиришномалар"
         }
@@ -173,7 +173,7 @@ struct IumrahRootPageTitle: View {
     private var menuAccessibilityLabel: String {
         switch settings.language {
         case .russian: return "Меню"
-        case .english: return "Menu"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Menu"
         case .uzbek: return "Menyu"
         case .uzbekCyrillic: return "Меню"
         }

@@ -66,7 +66,7 @@ struct PrimaryHotelView: View {
                 // Keep one native glass generator header outside the ScrollView.
                 // This preserves the animated stage, live total and back action
                 // while the user scrolls through the hotel catalogue.
-                IumrahGeneratorHeader(stage: .hotel, currentPriceText: visibleTotal, isPriceLoading: isUpdatingPrice)
+                IumrahGeneratorHeader(stage: .hotel, currentPriceText: visibleTotal)
                     .frame(width: contentWidth)
                     .padding(.horizontal, IumrahDesign.pagePadding)
                     .padding(.top, 9)

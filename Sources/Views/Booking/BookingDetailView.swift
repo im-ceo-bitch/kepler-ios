@@ -293,7 +293,7 @@ struct BookingDetailView: View {
     private func localizedDetail(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -581,7 +581,7 @@ struct BookingDetailView: View {
     private func localized(_ ru: String, _ en: String, _ uz: String, _ uzCyr: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCyr
         }
@@ -622,7 +622,7 @@ struct BookingDetailView: View {
     private var securityConfirmationTitle: String {
         switch settings.language {
         case .russian: return "Подтвердить личность"
-        case .english: return "Confirm identity"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Confirm identity"
         case .uzbek: return "Shaxsni tasdiqlash"
         case .uzbekCyrillic: return "Шахсни тасдиқлаш"
         }
@@ -631,7 +631,7 @@ struct BookingDetailView: View {
     private var securityConfirmationPendingTitle: String {
         switch settings.language {
         case .russian: return "Проверка безопасности"
-        case .english: return "Security verification"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Security verification"
         case .uzbek: return "Xavfsizlik tekshiruvi"
         case .uzbekCyrillic: return "Хавфсизлик текшируви"
         }
@@ -640,7 +640,7 @@ struct BookingDetailView: View {
     private var securityConfirmationDoneTitle: String {
         switch settings.language {
         case .russian: return "Личность подтверждена"
-        case .english: return "Identity confirmed"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Identity confirmed"
         case .uzbek: return "Shaxs tasdiqlandi"
         case .uzbekCyrillic: return "Шахс тасдиқланди"
         }
@@ -652,7 +652,7 @@ struct BookingDetailView: View {
         if securityConfirmation?.needsResubmission == true {
             switch settings.language {
             case .russian: return "Исправить данные iUmrah Security"
-            case .english: return "Correct iUmrah Security details"
+            case .english, .turkish, .indonesian, .malay, .arabic: return "Correct iUmrah Security details"
             case .uzbek: return "iUmrah Security ma’lumotlarini tuzatish"
             case .uzbekCyrillic: return "iUmrah Security маълумотларини тузатиш"
             }
@@ -670,7 +670,7 @@ struct BookingDetailView: View {
     private var securityConfirmationSubtitle: String {
         switch settings.language {
         case .russian: return "iUmrah Security · защищённое бронирование"
-        case .english: return "iUmrah Security · protected booking"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "iUmrah Security · protected booking"
         case .uzbek: return "iUmrah Security · himoyalangan bron"
         case .uzbekCyrillic: return "iUmrah Security · ҳимояланган брон"
         }
@@ -690,7 +690,7 @@ struct BookingDetailView: View {
     private var checkoutCTA: String {
         switch settings.language {
         case .russian: return "Заполнить данные и оплатить"
-        case .english: return "Complete details and pay"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Complete details and pay"
         case .uzbek: return "Ma’lumotlarni to‘ldirish va to‘lash"
         case .uzbekCyrillic: return "Маълумотларни тўлдириш ва тўлаш"
         }
@@ -699,7 +699,7 @@ struct BookingDetailView: View {
     private var checkoutCTASubtitle: String {
         switch settings.language {
         case .russian: return "iumrah ID · анкеты · реквизиты · чек"
-        case .english: return "iumrah ID · pilgrim forms · payment · receipt"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "iumrah ID · pilgrim forms · payment · receipt"
         case .uzbek: return "iumrah ID · anketalar · to‘lov · chek"
         case .uzbekCyrillic: return "iumrah ID · анкеталар · тўлов · чек"
         }
@@ -708,7 +708,7 @@ struct BookingDetailView: View {
     private var tripDocumentsTitle: String {
         switch settings.language {
         case .russian: return "Данные и документы поездки"
-        case .english: return "Trip details and documents"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Trip details and documents"
         case .uzbek: return "Safar ma’lumotlari va hujjatlar"
         case .uzbekCyrillic: return "Сафар маълумотлари ва ҳужжатлар"
         }
@@ -1007,7 +1007,7 @@ struct BookingDetailView: View {
     private var esimBody: String {
         switch settings.language {
         case .russian: return "Интернет для поездки в Саудовской Аравии. После подготовки бронирования активация появится прямо в приложении."
-        case .english: return "Connectivity for your trip in Saudi Arabia. Activation appears in the app once the booking is prepared."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Connectivity for your trip in Saudi Arabia. Activation appears in the app once the booking is prepared."
         case .uzbek: return "Saudiya Arabistonidagi safaringiz uchun internet. Bron tayyor bo‘lgach, faollashtirish ilovada paydo bo‘ladi."
         case .uzbekCyrillic: return "Саудия Арабистонидаги сафарингиз учун интернет. Брон тайёр бўлгач, фаоллаштириш иловада пайдо бўлади."
         }
@@ -1016,7 +1016,7 @@ struct BookingDetailView: View {
     private var esimToggleTitle: String {
         switch settings.language {
         case .russian: return "Включить eSIM в поездку"
-        case .english: return "Include eSIM in this trip"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Include eSIM in this trip"
         case .uzbek: return "eSIM’ni safarga qo‘shish"
         case .uzbekCyrillic: return "eSIM’ни сафарга қўшиш"
         }
@@ -1025,7 +1025,7 @@ struct BookingDetailView: View {
     private var esimToggleSubtitle: String {
         switch settings.language {
         case .russian: return esimIncluded ? "Включена в пакет" : "Будет исключена после подтверждения"
-        case .english: return esimIncluded ? "Included in your package" : "Will be removed after confirmation"
+        case .english, .turkish, .indonesian, .malay, .arabic: return esimIncluded ? "Included in your package" : "Will be removed after confirmation"
         case .uzbek: return esimIncluded ? "Paketga kiritilgan" : "Tasdiqdan keyin olib tashlanadi"
         case .uzbekCyrillic: return esimIncluded ? "Пакетга киритилган" : "Тасдиқдан кейин олиб ташланади"
         }
@@ -1034,7 +1034,7 @@ struct BookingDetailView: View {
     private var esimConfirmationNote: String {
         switch settings.language {
         case .russian: return "После сохранения изменения потребуется отправить запрос на подтверждение — так же, как при изменении зияратов."
-        case .english: return "After saving, this change must be submitted for confirmation just like a ziyarat change."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "After saving, this change must be submitted for confirmation just like a ziyarat change."
         case .uzbek: return "Saqlagandan keyin bu o‘zgarish ziyoratdagi kabi tasdiqlash uchun yuboriladi."
         case .uzbekCyrillic: return "Сақлагандан кейин бу ўзгариш зиёратдаги каби тасдиқлаш учун юборилади."
         }
@@ -1221,7 +1221,7 @@ struct BookingDetailView: View {
     private var bookingCareBalanceTitle: String {
         switch settings.language {
         case .russian: return "iumrah Care проверит баланс вашей поездки"
-        case .english: return "iumrah Care will review your journey balance"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "iumrah Care will review your journey balance"
         case .uzbek: return "iumrah Care safaringiz muvozanatini tekshiradi"
         case .uzbekCyrillic: return "iumrah Care сафарингиз мувозанатини текширади"
         }
@@ -1230,7 +1230,7 @@ struct BookingDetailView: View {
     private var bookingCareBalanceBody: String {
         switch settings.language {
         case .russian: return "Цена этой поездки выше обычного ориентира. До окончательного оформления мы дополнительно проверим более удобные рейсы, распределение ночей и сопоставимые отели, чтобы стабилизировать поездку без потери качества."
-        case .english: return "This trip is above our usual reference range. Before final ticketing we will review more convenient flights, night allocation and comparable hotels to stabilize the journey without compromising quality."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "This trip is above our usual reference range. Before final ticketing we will review more convenient flights, night allocation and comparable hotels to stabilize the journey without compromising quality."
         case .uzbek: return "Bu safar odatiy mo‘ljaldan yuqoriroq. Yakuniy rasmiylashtirishdan oldin qulayroq reyslar, tunlar taqsimoti va mos mehmonxonalar yana tekshiriladi."
         case .uzbekCyrillic: return "Бу сафар одатий мўлжалдан юқорироқ. Якуний расмийлаштиришдан олдин қулайроқ рейслар, тунлар тақсимоти ва мос меҳмонхоналар яна текширилади."
         }

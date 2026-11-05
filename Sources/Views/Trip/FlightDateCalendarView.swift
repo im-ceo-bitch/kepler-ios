@@ -575,7 +575,7 @@ struct FlightDateCalendarView: View {
 
     private var locale: Locale {
         switch settings.language {
-        case .english: return Locale(identifier: "en_US")
+        case .english, .turkish, .indonesian, .malay, .arabic: return Locale(identifier: "en_US")
         case .russian: return Locale(identifier: "ru_RU")
         case .uzbek: return Locale(identifier: "uz_Latn_UZ")
         case .uzbekCyrillic: return Locale(identifier: "uz_Cyrl_UZ")
@@ -585,7 +585,7 @@ struct FlightDateCalendarView: View {
     private var closeLabel: String {
         switch settings.language {
         case .russian: return "Закрыть"
-        case .english: return "Close"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Close"
         case .uzbek: return "Yopish"
         case .uzbekCyrillic: return "Ёпиш"
         }
@@ -662,6 +662,66 @@ struct FlightDateCalendarView: View {
         case (.uzbekCyrillic, .chooseDirectDates): return "Тўғри рейсли саналарни танлаш"
         case (.uzbekCyrillic, .continueFlexible): return "Мослашувчан саналар билан давом этиш"
         case (.uzbekCyrillic, .directAccessibility): return "Эълон қилинган тўғридан-тўғри рейс"
+                case (.turkish, .title): return "Tarihlerinizi seçin"
+        case (.turkish, .subtitle): return "Yeşil günler iumrah tarafından yayımlanan direkt uçuşlardır"
+        case (.turkish, .recommendedDirect): return "iumrah AI öneriyor"
+        case (.turkish, .loading): return "Yayımlanan direkt uçuşlar kontrol ediliyor…"
+        case (.turkish, .directHint): return "Yeşil günlerde iumrah envanterinde direkt uçuş vardır. Bu uçuşlar genellikle aktarmalı seçeneklerden daha kolay ve uygun fiyatlıdır."
+        case (.turkish, .retry): return "Yenile"
+        case (.turkish, .noDirectTitle): return "Bu tarihlerde direkt uçuş yok"
+        case (.turkish, .noDirectInlineBody): return "Esnek tarihlerle devam edebilirsiniz. Sistem, daha yüksek fiyatlı bir veya iki aktarmalı uçuş önerebilir. Bu durum paketinizin toplamını etkiler."
+        case (.turkish, .noDirectPopupBody): return "iumrah envanterinde seçtiğiniz tarihler için yayımlanmış direkt gidiş-dönüş uçuş çifti yok. Esnek arama, paketinizin fiyatını artırabilecek bir veya iki aktarmalı seçenekler bulabilir."
+        case (.turkish, .inventoryNote): return "Yeşil günler yalnızca iumrah veri tabanında yayımlanan uçuşlardan alınır. Diğer günler otomatik olarak direkt uçuş sayılmaz."
+        case (.turkish, .reset): return "Sıfırla"
+        case (.turkish, .chooseDates): return "Devam et"
+        case (.turkish, .chooseDirectDates): return "Direkt uçuş tarihlerini seç"
+        case (.turkish, .continueFlexible): return "Esnek tarihlerle devam et"
+        case (.turkish, .directAccessibility): return "Yayımlanmış direkt uçuş"
+        case (.indonesian, .title): return "Pilih tanggal Anda"
+        case (.indonesian, .subtitle): return "Hari hijau menunjukkan penerbangan langsung yang diterbitkan iumrah"
+        case (.indonesian, .recommendedDirect): return "Direkomendasikan iumrah AI"
+        case (.indonesian, .loading): return "Memeriksa penerbangan langsung yang tersedia…"
+        case (.indonesian, .directHint): return "Hari hijau memiliki penerbangan langsung di inventaris iumrah. Biasanya lebih nyaman dan terjangkau dibanding penerbangan transit."
+        case (.indonesian, .retry): return "Muat ulang"
+        case (.indonesian, .noDirectTitle): return "Tidak ada penerbangan langsung pada tanggal ini"
+        case (.indonesian, .noDirectInlineBody): return "Anda dapat melanjutkan dengan tanggal fleksibel, tetapi sistem mungkin menawarkan penerbangan dengan satu atau dua transit dan harga lebih tinggi. Ini memengaruhi total paket Anda."
+        case (.indonesian, .noDirectPopupBody): return "Saat ini tidak ada pasangan penerbangan langsung yang diterbitkan iumrah untuk tanggal pilihan Anda. Pencarian fleksibel dapat menemukan opsi satu atau dua transit dengan tarif lebih tinggi, sehingga menaikkan total paket."
+        case (.indonesian, .inventoryNote): return "Hari hijau hanya berasal dari penerbangan yang diterbitkan di basis data iumrah. Hari lain tidak otomatis ditandai sebagai penerbangan langsung."
+        case (.indonesian, .reset): return "Atur ulang"
+        case (.indonesian, .chooseDates): return "Lanjutkan"
+        case (.indonesian, .chooseDirectDates): return "Pilih tanggal penerbangan langsung"
+        case (.indonesian, .continueFlexible): return "Lanjutkan dengan tanggal fleksibel"
+        case (.indonesian, .directAccessibility): return "Penerbangan langsung yang diterbitkan"
+        case (.malay, .title): return "Pilih tarikh anda"
+        case (.malay, .subtitle): return "Hari hijau menunjukkan penerbangan terus yang diterbitkan iumrah"
+        case (.malay, .recommendedDirect): return "Disyorkan oleh iumrah AI"
+        case (.malay, .loading): return "Menyemak penerbangan terus yang diterbitkan…"
+        case (.malay, .directHint): return "Hari hijau mempunyai penerbangan terus dalam inventori iumrah. Biasanya lebih mudah dan berbaloi berbanding penerbangan transit."
+        case (.malay, .retry): return "Muat semula"
+        case (.malay, .noDirectTitle): return "Tiada penerbangan terus pada tarikh ini"
+        case (.malay, .noDirectInlineBody): return "Anda boleh meneruskan dengan tarikh fleksibel, tetapi sistem mungkin menawarkan penerbangan dengan satu atau dua transit pada harga lebih tinggi. Ini menjejaskan jumlah pakej anda."
+        case (.malay, .noDirectPopupBody): return "Tiada pasangan penerbangan terus yang diterbitkan iumrah untuk tarikh pilihan anda. Carian fleksibel mungkin menemui penerbangan dengan satu atau dua transit pada harga lebih tinggi dan meningkatkan jumlah pakej."
+        case (.malay, .inventoryNote): return "Hari hijau hanya berdasarkan penerbangan yang diterbitkan dalam pangkalan data iumrah. Hari lain tidak ditandakan sebagai penerbangan terus secara automatik."
+        case (.malay, .reset): return "Tetapkan semula"
+        case (.malay, .chooseDates): return "Teruskan"
+        case (.malay, .chooseDirectDates): return "Pilih tarikh penerbangan terus"
+        case (.malay, .continueFlexible): return "Teruskan dengan tarikh fleksibel"
+        case (.malay, .directAccessibility): return "Penerbangan terus yang diterbitkan"
+        case (.arabic, .title): return "اختر تواريخك"
+        case (.arabic, .subtitle): return "الأيام الخضراء تشير إلى رحلات مباشرة منشورة في iumrah"
+        case (.arabic, .recommendedDirect): return "موصى بها من iumrah AI"
+        case (.arabic, .loading): return "جارٍ التحقق من الرحلات المباشرة المنشورة…"
+        case (.arabic, .directHint): return "الأيام الخضراء لديها رحلات مباشرة في قاعدة iumrah، وهي عادةً أسهل وأفضل قيمة من رحلات الترانزيت."
+        case (.arabic, .retry): return "تحديث"
+        case (.arabic, .noDirectTitle): return "لا توجد رحلات مباشرة في هذه التواريخ"
+        case (.arabic, .noDirectInlineBody): return "يمكنك المتابعة بتواريخ مرنة، لكن قد يعرض النظام رحلات بتوقف واحد أو توقفين بسعر أعلى، ما يؤثر على السعر النهائي للباقة."
+        case (.arabic, .noDirectPopupBody): return "لا تتوفر حاليًا في iumrah رحلتا ذهاب وعودة مباشرتان منشورتان للتواريخ المختارة. قد يجد البحث المرن خيارات بتوقف أو توقفين بسعر أعلى، ما يزيد إجمالي الباقة."
+        case (.arabic, .inventoryNote): return "تُحدد الأيام الخضراء فقط من الرحلات المنشورة في قاعدة بيانات iumrah. لا تُصنّف الأيام الأخرى تلقائيًا على أنها رحلات مباشرة."
+        case (.arabic, .reset): return "إعادة ضبط"
+        case (.arabic, .chooseDates): return "متابعة"
+        case (.arabic, .chooseDirectDates): return "اختر تواريخ الرحلات المباشرة"
+        case (.arabic, .continueFlexible): return "المتابعة بتواريخ مرنة"
+        case (.arabic, .directAccessibility): return "رحلة مباشرة منشورة"
         }
     }
 }

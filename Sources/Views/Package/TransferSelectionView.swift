@@ -948,7 +948,7 @@ struct TransferSelectionView: View {
         case .indonesian: return "id_ID"
         case .turkish: return TurkishLocalization.phrase("en_US")
         case .arabic: return "ar_SA"
-        case .english: return "en_US"
+        case .english, .malay: return "en_US"
             case .malay: return "ms_MY"
         case .uzbek: return "uz_Latn_UZ"
         case .uzbekCyrillic: return "uz_Cyrl_UZ"

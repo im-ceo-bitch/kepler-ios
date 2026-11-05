@@ -1,5 +1,10 @@
 import SwiftUI
 
+// Semantic graphite token used by root chrome and navigation.
+extension Color {
+    static let iumrahSignatureBlack = Color(red: 17.0 / 255.0, green: 17.0 / 255.0, blue: 17.0 / 255.0)
+}
+
 // MARK: - iumrah Design Foundation v1
 // Single source of truth for customer-facing screen geometry and motion.
 // No package, pricing, authentication or booking state is stored here.

@@ -2163,7 +2163,6 @@ struct IumrahAccountView: View {
             let profile = try await account.confirmPhoneRegistration(
                 challengeID: registrationSMSChallengeID,
                 code: registrationSMSCode,
-                password: registrationPassword,
                 locale: settings.language.rawValue
             )
             await completeAuthenticatedLogin(profile)
@@ -2213,18 +2212,13 @@ struct IumrahAccountView: View {
             let response = try await IumrahAccountActivationBridge().confirmEmailRegistration(
                 challengeID: registrationEmailChallengeID,
                 code: registrationEmailCode,
-                password: registrationPassword,
                 firstName: registrationFirstName.trimmingCharacters(in: .whitespacesAndNewlines),
                 lastName: registrationLastName.trimmingCharacters(in: .whitespacesAndNewlines),
                 locale: settings.language.rawValue
             )
             // Establish the normal app session through IumrahAccountStore so Keychain,
             // push registration and trip restore follow the same path as every login.
-            let profile = try await account.login(
-                identifier: response.account.iumrahID,
-                password: registrationPassword,
-                locale: settings.language.rawValue
-            )
+            let profile = await account.acceptVerifiedSession(response, locale: settings.language.rawValue)
             await completeAuthenticatedLogin(profile)
             registrationPassword = ""
             registrationPasswordConfirm = ""
@@ -2779,7 +2773,7 @@ struct IumrahAccountView: View {
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl
         }

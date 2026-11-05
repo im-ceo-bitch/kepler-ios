@@ -34,32 +34,11 @@ def content(path: Path) -> str:
 def repo(path: str) -> Path:
     return ROOT / path
 
-# This is an explicitly logged, fail-closed repair of the 2026-11-05
-# localization regression. It modifies checkout copies before parsing/Xcode,
-# but does NOT modify or commit source on the remote branch.
-repair = repo("scripts/iumrah_preflight_repair_20261105.py")
-if not repair.is_file():
-    print("PREFLIGHT FAILED: missing required source localization repair script")
-    sys.exit(1)
-repair_result = subprocess.run([sys.executable, str(repair), "--apply"],
-                               cwd=ROOT, capture_output=True, text=True, check=False)
-print("iumrah preflight source repair:\n" + repair_result.stdout)
-if repair_result.returncode != 0:
-    print("PREFLIGHT FAILED: automatic source repair aborted:\n" + repair_result.stderr)
-    sys.exit(repair_result.returncode)
-
-# Cover older four-language flat switches with explicit English fallbacks,
-# preserving existing copy for all previously supported languages.
-flat_repair = repo("scripts/iumrah_language_switch_compat_20261105.py")
-if not flat_repair.is_file():
-    print("PREFLIGHT FAILED: missing flat language-switch compatibility script")
-    sys.exit(1)
-flat_result = subprocess.run([sys.executable, str(flat_repair), "--apply"],
-                             cwd=ROOT, capture_output=True, text=True, check=False)
-print("iumrah flat-language compatibility:\n" + flat_result.stdout)
-if flat_result.returncode != 0:
-    print("PREFLIGHT FAILED: language-switch compatibility aborted:\n" + flat_result.stderr)
-    sys.exit(flat_result.returncode)
+# IMPORTANT: preflight is deliberately read-only. The old 2026-11-05
+# localization/compile repair helpers modified checkout sources during CI and
+# could abort when a legitimate Swift view gained another matching method.
+# Localization and API-compatibility fixes are now committed directly in Sources.
+# Do not execute source-rewriting scripts as part of build validation.
 
 swift_files = sorted(repo("Sources").rglob("*.swift")) + sorted(repo("WidgetExtension").rglob("*.swift"))
 check(len(swift_files) >= 250, f"Unexpected number of Swift sources: {len(swift_files)}")

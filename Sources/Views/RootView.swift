@@ -19,6 +19,7 @@ struct RootView: View {
             rootContent
         }
             .preferredColorScheme(settings.appearance.colorScheme)
+            .environment(\.layoutDirection, settings.language.isRightToLeft ? .rightToLeft : .leftToRight)
             .environmentObject(settings)
             .environmentObject(chrome)
             .environmentObject(journey)
@@ -236,7 +237,8 @@ struct RootView: View {
         IumrahWidgetSyncService.sync(
             bookings: bookings.sessions,
             account: account.account,
-            plannedTrip: UmrahPlanStore.shared.trip
+            plannedTrip: UmrahPlanStore.shared.trip,
+            languageCode: settings.language.rawValue
         )
     }
 

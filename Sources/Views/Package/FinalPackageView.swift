@@ -21,6 +21,7 @@ private enum FinalPackageSupportSheet: String, Identifiable {
 }
 
 struct FinalPackageView: View {
+    var familyFlow = false
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
@@ -129,10 +130,12 @@ struct FinalPackageView: View {
             await push.refreshAndRegisterIfAllowed()
         }
         .sheet(isPresented: $isProfileSheetPresented) {
-            BookingProfileCaptureSheet {
-                Task { await createBooking() }
+            NavigationStack {
+                IumrahBookingConfirmationView(createBooking: { profile in
+                    try await createBooking(profile: profile)
+                })
+                .environmentObject(settings)
             }
-            .environmentObject(settings)
         }
         .sheet(isPresented: $showCareExplanation) {
             UmrahCarePackageExplanationView()
@@ -249,7 +252,7 @@ struct FinalPackageView: View {
     private var calculatingPriceTitle: String {
         switch settings.language {
         case .russian: return "Рассчитываем цену пакета"
-        case .english: return "Calculating your package price"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Calculating your package price"
         case .uzbek: return "Paket narxi hisoblanmoqda"
         case .uzbekCyrillic: return "Пакет нархи ҳисобланмоқда"
         }
@@ -258,7 +261,7 @@ struct FinalPackageView: View {
     private var calculatingPriceBody: String {
         switch settings.language {
         case .russian: return "Собираем выбранные перелёты, отели и услуги в одну итоговую цену поездки."
-        case .english: return "Combining your selected flights, hotels and services into one trip price."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Combining your selected flights, hotels and services into one trip price."
         case .uzbek: return "Tanlangan reyslar, mehmonxonalar va xizmatlarni safarning yagona narxiga birlashtiramiz."
         case .uzbekCyrillic: return "Танланган рейслар, меҳмонхоналар ва хизматларни сафарнинг ягона нархига бирлаштирамиз."
         }
@@ -267,7 +270,7 @@ struct FinalPackageView: View {
     private var pricingUnavailableTitle: String {
         switch settings.language {
         case .russian: return "Не удалось обновить пакет"
-        case .english: return "The package could not be refreshed"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "The package could not be refreshed"
         case .uzbek: return "Paketni yangilab bo‘lmadi"
         case .uzbekCyrillic: return "Пакетни янгилаб бўлмади"
         }
@@ -276,7 +279,7 @@ struct FinalPackageView: View {
     private var pricingUnavailableBody: String {
         switch settings.language {
         case .russian: return "Ваш выбор сохранён. Повторная проверка обновит доступность выбранных отелей и пересчитает поездку без потери маршрута."
-        case .english: return "Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Your selections are preserved. Retry will refresh hotel availability and recalculate the trip without losing your route."
         case .uzbek: return "Tanlovlaringiz saqlanadi. Qayta tekshirish mehmonxona mavjudligini yangilaydi va yo‘nalishni yo‘qotmasdan safarni qayta hisoblaydi."
         case .uzbekCyrillic: return "Танловларингиз сақланади. Қайта текшириш меҳмонхона мавжудлигини янгилайди ва йўналишни йўқотмасдан сафарни қайта ҳисоблайди."
         }
@@ -289,7 +292,7 @@ struct FinalPackageView: View {
     private var changeHotelTitle: String {
         switch settings.language {
         case .russian: return "Изменить отель"
-        case .english: return "Change hotel"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Change hotel"
         case .uzbek: return "Mehmonxonani o‘zgartirish"
         case .uzbekCyrillic: return "Меҳмонхонани ўзгартириш"
         }
@@ -298,7 +301,7 @@ struct FinalPackageView: View {
     private var retryPricingTitle: String {
         switch settings.language {
         case .russian: return "Повторно проверить пакет"
-        case .english: return "Recheck package"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Recheck package"
         case .uzbek: return "Narxni qayta olish"
         case .uzbekCyrillic: return "Нархни қайта олиш"
         }
@@ -686,7 +689,7 @@ struct FinalPackageView: View {
     private var continueBelowTitle: String {
         switch settings.language {
         case .russian: return "Продолжение — внизу страницы"
-        case .english: return "Continue below on this page"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Continue below on this page"
         case .uzbek: return "Davomi sahifa pastida"
         case .uzbekCyrillic: return "Давоми саҳифа пастида"
         }
@@ -695,7 +698,7 @@ struct FinalPackageView: View {
     private var changePackageBelowTitle: String {
         switch settings.language {
         case .russian: return "Выбор пакета — кнопкой внизу"
-        case .english: return "Choose this package with the button below"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Choose this package with the button below"
         case .uzbek: return "Paketni pastdagi tugma bilan tanlang"
         case .uzbekCyrillic: return "Пакетни пастдаги тугма билан танланг"
         }
@@ -1651,6 +1654,14 @@ struct FinalPackageView: View {
         case (.uzbek, .madinah): return "Madina"
         case (.uzbekCyrillic, .makkah): return "Макка"
         case (.uzbekCyrillic, .madinah): return "Мадина"
+                case (.turkish, .makkah): return "Mekke"
+        case (.turkish, .madinah): return "Medine"
+        case (.indonesian, .makkah): return "Makkah"
+        case (.indonesian, .madinah): return "Madinah"
+        case (.malay, .makkah): return "Makkah"
+        case (.malay, .madinah): return "Madinah"
+        case (.arabic, .makkah): return "مكة"
+        case (.arabic, .madinah): return "المدينة المنورة"
         }
     }
 
@@ -1702,7 +1713,7 @@ struct FinalPackageView: View {
     private func localizedFinal(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
         }
@@ -1793,7 +1804,7 @@ struct FinalPackageView: View {
     private var careCardTitle: String {
         switch settings.language {
         case .russian: return "Мы проверим баланс цены и маршрута"
-        case .english: return "We review the balance between price and itinerary"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "We review the balance between price and itinerary"
         case .uzbek: return "Narx va yo‘nalish muvozanatini tekshiramiz"
         case .uzbekCyrillic: return "Нарх ва йўналиш мувозанатини текширамиз"
         }
@@ -1802,7 +1813,7 @@ struct FinalPackageView: View {
     private var careCardBody: String {
         switch settings.language {
         case .russian: return "Если текущая цена выше ожидаемой или даты гибкие, специалисты iumrah Care дополнительно проверят более удобные прямые рейсы, логичное распределение ночей и отели ближе к ключевым местам — без потери качества поездки."
-        case .english: return "If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "If the current price is higher than expected or your dates are flexible, iumrah Care will review more convenient direct flights, sensible night allocation and closer hotels without compromising the journey."
         case .uzbek: return "Agar joriy narx kutilganidan yuqori bo‘lsa yoki sanalaringiz moslashuvchan bo‘lsa, iumrah Care qulayroq to‘g‘ridan-to‘g‘ri reyslar, tunlarning mantiqiy taqsimoti va yaqinroq mehmonxonalarni qo‘shimcha tekshiradi."
         case .uzbekCyrillic: return "Агар жорий нарх кутилганидан юқори бўлса ёки саналарингиз мослашувчан бўлса, iumrah Care қулайроқ тўғридан-тўғри рейслар, тунларнинг мантиқий тақсимоти ва яқинроқ меҳмонхоналарни қўшимча текширади."
         }
@@ -1811,7 +1822,7 @@ struct FinalPackageView: View {
     private var careHowItWorks: String {
         switch settings.language {
         case .russian: return "Как это работает"
-        case .english: return "How it works"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "How it works"
         case .uzbek: return "Qanday ishlaydi"
         case .uzbekCyrillic: return "Қандай ишлайди"
         }
@@ -1903,31 +1914,25 @@ struct FinalPackageView: View {
     }
 
     @MainActor
-    private func createBooking() async {
+    private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
         guard !isSubmitting,
               let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
-              let quote = journey.quote else { return }
+              let quote = journey.quote else { throw BookingStoreError.authoritativeQuoteRequired }
         let inbound = journey.selectedInbound
         guard outbound.isVerifiedForBooking,
               (!journey.trip.isRoundTripFlight || inbound?.isVerifiedForBooking == true) else {
             errorMessage = invalidFlightSelectionMessage
             IumrahHaptics.error()
-            return
+            throw BookingStoreError.authoritativeQuoteRequired
         }
-        if needsMadinah && journey.selectedMadinahHotel == nil { return }
-
+        if needsMadinah && journey.selectedMadinahHotel == nil {
+            throw BookingStoreError.authoritativeQuoteRequired
+        }
         isSubmitting = true
         errorMessage = nil
         defer { isSubmitting = false }
-
         do {
-            let profile = BookingPilgrimProfile(
-                firstName: settings.firstName.trimmingCharacters(in: .whitespacesAndNewlines),
-                lastName: settings.lastName.trimmingCharacters(in: .whitespacesAndNewlines),
-                telegram: settings.telegram.trimmingCharacters(in: .whitespacesAndNewlines),
-                whatsapp: settings.whatsapp.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
             let session = try await bookings.create(
                 trip: journey.trip,
                 hotel: hotel,
@@ -1949,17 +1954,18 @@ struct FinalPackageView: View {
                 await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
             }
             IumrahHaptics.success()
+            return session
         } catch {
             errorMessage = L10n.error(error, settings.language)
             IumrahHaptics.error()
+            throw error
         }
     }
-
 
     private var invalidFlightSelectionMessage: String {
         switch settings.language {
         case .russian: return "Выберите актуальный маршрут. Система автоматически свяжет его с вашим Umrah-пакетом."
-        case .english: return "Select a current itinerary. The system will automatically connect it to your Umrah package."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Select a current itinerary. The system will automatically connect it to your Umrah package."
         case .uzbek: return "Joriy yo‘nalishni tanlang. Tizim uni Umra paketingiz bilan avtomatik bog‘laydi."
         case .uzbekCyrillic: return "Жорий йўналишни танланг. Тизим уни Умра пакетингиз билан автоматик боғлайди."
         }
@@ -1968,7 +1974,7 @@ struct FinalPackageView: View {
     private var indicativePriceTitle: String {
         switch settings.language {
         case .russian: return "Цена вашего Umrah-пакета"
-        case .english: return "Your Umrah package price"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Your Umrah package price"
         case .uzbek: return "Umra paketingiz narxi"
         case .uzbekCyrillic: return "Умра пакетингиз нархи"
         }
@@ -2089,7 +2095,7 @@ private struct FinalPackageInformationSheet: View {
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return uzCy
         }

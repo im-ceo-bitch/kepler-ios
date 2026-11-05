@@ -179,7 +179,7 @@ struct HotelDetailView: View {
     private var packageShareUnavailableText: String {
         switch settings.language {
         case .russian: return "Не удалось подготовить пакет для отправки. Обновите цены и попробуйте ещё раз."
-        case .english: return "The package could not be prepared for sharing. Refresh pricing and try again."
+        case .english, .turkish, .indonesian, .malay, .arabic: return "The package could not be prepared for sharing. Refresh pricing and try again."
         case .uzbek: return "Paketni ulashish uchun tayyorlab bo‘lmadi. Narxlarni yangilang va qayta urinib ko‘ring."
         case .uzbekCyrillic: return "Пакетни улашиш учун тайёрлаб бўлмади. Нархларни янгиланг ва қайта уриниб кўринг."
         }
@@ -188,7 +188,7 @@ struct HotelDetailView: View {
     private var packageShareErrorTitle: String {
         switch settings.language {
         case .russian: return "Не удалось поделиться"
-        case .english: return "Could not share"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "Could not share"
         case .uzbek: return "Ulashib bo‘lmadi"
         case .uzbekCyrillic: return "Улашиб бўлмади"
         }
@@ -197,7 +197,7 @@ struct HotelDetailView: View {
     private var packageShareErrorDismiss: String {
         switch settings.language {
         case .russian: return "Понятно"
-        case .english: return "OK"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "OK"
         case .uzbek: return "Tushunarli"
         case .uzbekCyrillic: return "Тушунарли"
         }
@@ -524,7 +524,7 @@ struct HotelDetailView: View {
     private var packageTravelersLabel: String {
         switch settings.language {
         case .russian: return "паломников"
-        case .english: return "travelers"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "travelers"
         case .uzbek: return "ziyoratchi"
         case .uzbekCyrillic: return "зиёратчи"
         }
@@ -556,7 +556,7 @@ struct HotelDetailView: View {
     private var durationFocusLabel: String {
         switch settings.language {
         case .russian: return "ДЛИТЕЛЬНОСТЬ"
-        case .english: return "DURATION"
+        case .english, .turkish, .indonesian, .malay, .arabic: return "DURATION"
         case .uzbek: return "DAVOMIYLIGI"
         case .uzbekCyrillic: return "ДАВОМИЙЛИГИ"
         }
@@ -1075,7 +1075,7 @@ struct HotelDetailView: View {
         let normalized = normalize(raw)
         if normalized.contains("twin") && normalized.contains("city view") {
             switch settings.language {
-            case .english: return "Twin Room · City View"
+            case .english, .turkish, .indonesian, .malay, .arabic: return "Twin Room · City View"
             case .russian: return "Twin · Вид на город"
             case .uzbek: return "Twin xona · Shahar manzarasi"
             case .uzbekCyrillic: return "Twin хона · Шаҳар манзараси"
@@ -1083,7 +1083,7 @@ struct HotelDetailView: View {
         }
         if normalized.contains("king") && normalized.contains("city view") {
             switch settings.language {
-            case .english: return "King Room · City View"
+            case .english, .turkish, .indonesian, .malay, .arabic: return "King Room · City View"
             case .russian: return "King · Вид на город"
             case .uzbek: return "King xona · Shahar manzarasi"
             case .uzbekCyrillic: return "King хона · Шаҳар манзараси"
@@ -1091,7 +1091,7 @@ struct HotelDetailView: View {
         }
         if normalized.contains("double") && normalized.contains("city view") {
             switch settings.language {
-            case .english: return "Double Room · City View"
+            case .english, .turkish, .indonesian, .malay, .arabic: return "Double Room · City View"
             case .russian: return "Двухместный · Вид на город"
             case .uzbek: return "Ikki kishilik xona · Shahar manzarasi"
             case .uzbekCyrillic: return "Икки кишилик хона · Шаҳар манзараси"

@@ -147,7 +147,7 @@ struct CareChatMessageRow: View {
 
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch language {
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .russian: return ru
         case .uzbek: return uz
         case .uzbekCyrillic: return cyrl

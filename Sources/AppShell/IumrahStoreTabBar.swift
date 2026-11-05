@@ -15,33 +15,12 @@ struct IumrahStoreTabBar: View {
             ForEach(tabs, id: \.self) { tab in
                 let active = selection == tab
                 Button {
-                    guard selection != tab else { return }
+                    guard !active else { return }
                     IumrahHaptics.selection()
-                    if reduceMotion {
-                        selection = tab
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.18)) { selection = tab }
-                    }
+                    if reduceMotion { selection = tab }
+                    else { withAnimation(.easeInOut(duration: 0.18)) { selection = tab } }
                 } label: {
-                    VStack(spacing: 5) {
-                        Image(systemName: tab.systemImage)
-                            .font(.system(size: 21, weight: active ? .semibold : .regular))
-                            .frame(height: 25)
-                        Text(tab.title(for: settings.language))
-                            .font(.system(size: 10.5, weight: active ? .semibold : .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                    }
-                    .foregroundStyle(active ? Color.white : Color.black.opacity(0.75))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 65)
-                    .background {
-                        if active {
-                            RoundedRectangle(cornerRadius: 25, style: .continuous)
-                                .fill(Color.iumrahSignatureBlack)
-                        }
-                    }
-                    .contentShape(Rectangle())
+                    tabLabel(tab, active: active)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tab.title(for: settings.language))
@@ -57,4 +36,26 @@ struct IumrahStoreTabBar: View {
         .padding(.bottom, 2)
         .environment(\.colorScheme, .light)
     }
+    private func tabLabel(_ tab: AppTab, active: Bool) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: tab.systemImage)
+                .font(.system(size: 21, weight: active ? .semibold : .regular))
+                .frame(height: 25)
+            Text(tab.title(for: settings.language))
+                .font(.system(size: 10.5, weight: active ? .semibold : .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .foregroundStyle(active ? Color.white : Color.black.opacity(0.75))
+        .frame(maxWidth: .infinity)
+        .frame(height: 65)
+        .background {
+            if active {
+                RoundedRectangle(cornerRadius: 25, style: .continuous)
+                    .fill(Color.iumrahSignatureBlack)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
 }

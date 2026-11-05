@@ -1568,7 +1568,8 @@ struct IumrahFlightDiscoveryView: View {
             case "NMA": return "Наманган"
             default: return reference.city
             }
-        case .english: return reference.city
+        case .english, .arabic, .turkish, .indonesian, .malay:
+            return reference.city
         case .uzbek:
             switch code.uppercased() {
             case "TAS": return "Toshkent"

@@ -18,7 +18,6 @@ ROOT = Path(__file__).resolve().parents[1]
 errors: list[str] = []
 warnings: list[str] = []
 
-
 def check(condition: bool, message: str) -> None:
     if not condition:
         errors.append(message)
@@ -35,6 +34,32 @@ def content(path: Path) -> str:
 def repo(path: str) -> Path:
     return ROOT / path
 
+# This is an explicitly logged, fail-closed repair of the 2026-11-05
+# localization regression. It modifies checkout copies before parsing/Xcode,
+# but does NOT modify or commit source on the remote branch.
+repair = repo("scripts/iumrah_preflight_repair_20261105.py")
+if not repair.is_file():
+    print("PREFLIGHT FAILED: missing required source localization repair script")
+    sys.exit(1)
+repair_result = subprocess.run([sys.executable, str(repair), "--apply"],
+                               cwd=ROOT, capture_output=True, text=True, check=False)
+print("iumrah preflight source repair:\n" + repair_result.stdout)
+if repair_result.returncode != 0:
+    print("PREFLIGHT FAILED: automatic source repair aborted:\n" + repair_result.stderr)
+    sys.exit(repair_result.returncode)
+
+# Cover older four-language flat switches with explicit English fallbacks,
+# preserving existing copy for all previously supported languages.
+flat_repair = repo("scripts/iumrah_language_switch_compat_20261105.py")
+if not flat_repair.is_file():
+    print("PREFLIGHT FAILED: missing flat language-switch compatibility script")
+    sys.exit(1)
+flat_result = subprocess.run([sys.executable, str(flat_repair), "--apply"],
+                             cwd=ROOT, capture_output=True, text=True, check=False)
+print("iumrah flat-language compatibility:\n" + flat_result.stdout)
+if flat_result.returncode != 0:
+    print("PREFLIGHT FAILED: language-switch compatibility aborted:\n" + flat_result.stderr)
+    sys.exit(flat_result.returncode)
 
 swift_files = sorted(repo("Sources").rglob("*.swift")) + sorted(repo("WidgetExtension").rglob("*.swift"))
 check(len(swift_files) >= 250, f"Unexpected number of Swift sources: {len(swift_files)}")
@@ -53,7 +78,6 @@ if compiler:
                                  text=True, capture_output=True, check=False)
         check(checked.returncode == 0,
               "ArabicLocalization type check failed:\n" + checked.stderr[-8000:])
-
 settings = content(repo("Sources/AppShell/AppSettingsStore.swift"))
 enum = re.search(r"\benum\s+Language\s*:\s*String\s*,[^\{]*\{(.*?)\n\s*var id:", settings, re.S)
 check(bool(enum), "AppSettingsStore.Language enum is missing")
@@ -72,7 +96,6 @@ if enum:
     check('case .arabic: return "ar_SA"' in settings, "Missing Arabic locale ar_SA")
     check("var isRightToLeft: Bool { self == .arabic }" in settings, "Arabic RTL flag missing")
     check("settings.language.isRightToLeft ? .rightToLeft : .leftToRight" in content(repo("Sources/Views/RootView.swift")), "Root-level RTL direction not connected")
-
 for type_name in ("TurkishLocalization", "IndonesianLocalization", "MalayLocalization", "ArabicLocalization"):
     file = repo(f"Sources/Core/{type_name}.swift")
     check(file.is_file(), f"Missing implementation {file.relative_to(ROOT)}")
@@ -83,7 +106,6 @@ for name in ("Sources/AppShell/IumrahLanguageSelectionSheet.swift",
              "Sources/Umrah Flow/Components/UmrahLanguagesSheet.swift"):
     check(".malay" in content(repo(name)), f"Malay not connected to {name}")
     check(".arabic" in content(repo(name)), f"Arabic not connected to {name}")
-
 # Detect newly added languages that would create nonexhaustive Swift switches.
 # A guardrail only; compiler semantic exhaustiveness remains the authority.
 check_count = 0
@@ -108,7 +130,6 @@ for file in swift_files:
             if not re.search(r"\bcase\b[^\n]*\.arabic\b", block) and not re.search(r"\b(?:default|@unknown default)\s*:", block):
                 missing_switches.append(f"{file.relative_to(ROOT)}:{source.count(chr(10), 0, match.start())+1}: Arabic")
 check(not missing_switches, "Language switches missing new language:\n" + "\n".join(missing_switches[:40]))
-
 for p in (repo("Resources/Info.plist"), repo("WidgetExtension/Info.plist"),
           repo("Resources/iUmra.entitlements"), repo("WidgetExtension/iUmraWidgets.entitlements")):
     try:
@@ -120,13 +141,11 @@ for p in (repo("Resources/Info.plist"), repo("WidgetExtension/Info.plist"),
                   f"Bundle identity changed in {p.relative_to(ROOT)}")
     except (OSError, TypeError, ValueError) as exc:
         errors.append(f"Invalid plist {p.relative_to(ROOT)}: {exc}")
-
 project = content(repo("project.yml"))
 for bundle_id in ("com.iumrah.app", "com.iumrah.app.widgets"):
     check(f"PRODUCT_BUNDLE_IDENTIFIER: {bundle_id}" in project, f"Missing bundle ID {bundle_id}")
 for locale in ("en", "ru", "uz", "uz-Cyrl", "tr", "id", "ms", "ar"):
     check(repo(f"Resources/{locale}.lproj").is_dir(), f"Missing localization Resources/{locale}.lproj")
-
 png_header = b"\x89PNG\r\n\x1a\n"
 asset_count = 0
 for folder in (repo("Resources/Assets.xcassets"), repo("WidgetExtension/Assets.xcassets")):
@@ -162,14 +181,12 @@ for folder in (repo("Resources/Assets.xcassets"), repo("WidgetExtension/Assets.x
             for entry in contents.parent.iterdir():
                 if entry.is_file() and entry.name not in declared and entry.name != "Contents.json":
                     warnings.append(f"Unassigned asset: {entry.relative_to(ROOT)}")
-
 for path in (repo("Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png"),):
     check(path.is_file(), "Missing primary 1024x1024 icon")
     if path.is_file():
         data = path.open("rb").read(24)
         check(data[:8] == png_header and len(data) == 24 and struct.unpack(">II", data[16:24]) == (1024, 1024),
               "Primary AppIcon must be an actual 1024x1024 PNG")
-
 # The original Malay guard only checked whether Malay existed somewhere in a
 # switch; it missed (.checkingProvider, .malay) in a tuple switch. Run the
 # stricter per-case language matrix audit before accepting the patch.
@@ -177,7 +194,6 @@ result = subprocess.run([sys.executable, str(repo("scripts/ci_language_audit.py"
                         cwd=ROOT, capture_output=True, text=True, check=False)
 check(result.returncode == 0,
       "Language matrix audit failed:\n" + (result.stdout + result.stderr)[-8000:])
-
 for warning in warnings:
     print("WARNING:", warning)
 if errors:

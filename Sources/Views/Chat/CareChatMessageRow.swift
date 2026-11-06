@@ -72,10 +72,13 @@ struct CareChatMessageRow: View {
                 } else {
                     // Messages-style incoming bubble: always an opaque system surface.
                     // Wallpaper never bleeds through the text, so contrast stays stable.
-                    shape.fill(Color.iumrahCardBackground.opacity(wallpaperActive ? 0.98 : 1))
+                    shape.fill(Color(uiColor: .secondarySystemBackground).opacity(wallpaperActive ? 0.98 : 1))
                 }
             }
-
+            .overlay {
+                shape.stroke(incomingStrokeColor, lineWidth: isMine ? 0 : 0.55)
+            }
+            .shadow(color: bubbleShadow, radius: 1.2, y: 0.6)
             .contentShape(shape)
             .accessibilityElement(children: .combine)
     }
@@ -92,7 +95,7 @@ struct CareChatMessageRow: View {
             let trimmed = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty {
                 Text(message.body)
-                    .font(IumrahType.body)
+                    .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(isMine ? Color.white : Color.primary)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -122,7 +125,7 @@ struct CareChatMessageRow: View {
     }
 
     private var outgoingBubbleColor: Color {
-        Color.iumrahInk
+        Color(uiColor: .systemBlue)
     }
 
     private var incomingStrokeColor: Color {

@@ -24,13 +24,14 @@ struct FlightCard: View {
             Divider().opacity(0.55)
             bottomMeta
         }
-        .padding(IumrahDesign.Space.md)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .padding(18)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
-                .strokeBorder(isSelected ? Color.iumrahInk : Color.clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(isSelected ? Color.primary : Color.primary.opacity(0.08), lineWidth: isSelected ? 1.7 : 0.8)
         }
-        .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .shadow(color: Color.primary.opacity(0.045), radius: 14, x: 0, y: 6)
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 
     private var header: some View {
@@ -39,7 +40,7 @@ struct FlightCard: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(offer.airlinesSummary)
-                    .font(IumrahType.cardTitle)
+                    .font(.headline.weight(.bold))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -58,7 +59,7 @@ struct FlightCard: View {
                     ProgressView().controlSize(.small)
                 } else {
                     Text(deltaDisplay)
-                        .font(IumrahType.sectionTitle)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)

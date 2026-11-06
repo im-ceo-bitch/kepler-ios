@@ -79,7 +79,7 @@ struct IumrahAppearanceView: View {
                             if settings.appearance == appearance {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 21, weight: .semibold))
-                                    .foregroundStyle(Color.iumrahInk)
+                                    .foregroundStyle(Color.iumrahCareLight)
                                     .transition(.scale.combined(with: .opacity))
                             }
                         }
@@ -147,7 +147,7 @@ struct IumrahAppearanceView: View {
                         if currentAlternateIconName == nil {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.iumrahInk)
+                                .foregroundStyle(Color.iumrahCareLight)
                         } else if iconBeingChanged == nil {
                             Image(systemName: "chevron.right")
                                 .font(.caption.weight(.bold))

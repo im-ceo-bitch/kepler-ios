@@ -10,9 +10,9 @@ struct CounterRow: View {
     var body: some View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(IumrahType.bold(16, relativeTo: .body))
+                Text(title).font(.body.weight(.semibold))
                 if let subtitle {
-                    Text(subtitle).font(IumrahType.caption).foregroundStyle(.secondary)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
@@ -21,7 +21,7 @@ struct CounterRow: View {
                     value = max(minimum, value - 1)
                 } label: {
                     Image(systemName: "minus")
-                        .frame(width: 44, height: 44)
+                        .frame(width: 32, height: 32)
                         .contentShape(Circle())
                         .iumrahGlass(in: Circle(), interactive: true)
                 }
@@ -36,7 +36,7 @@ struct CounterRow: View {
                     value = min(maximum, value + 1)
                 } label: {
                     Image(systemName: "plus")
-                        .frame(width: 44, height: 44)
+                        .frame(width: 32, height: 32)
                         .contentShape(Circle())
                         .iumrahGlass(in: Circle(), interactive: true)
                 }

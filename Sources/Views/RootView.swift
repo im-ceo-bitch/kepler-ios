@@ -386,15 +386,12 @@ struct RootView: View {
                 .tag(AppTab.care)
 
             tabScreen(for: .account) { IumrahAccountView() }
-                .tabItem { Label(AppTab.account.title(for: settings.language), systemImage: "person.crop.circle") }
+                .tabItem { Label("Account", systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
         // Navigation chrome uses one restrained app accent; content icons carry
         // the richer semantic palette. This keeps the native tab bar adult and legible.
-        .tint(Color.iumrahInk)
-        .toolbarBackground(Color.iumrahHeaderBackground, for: .tabBar)
-        .toolbarBackground(.visible, for: .tabBar)
-        .onAppear { IumrahTabBarAppearance.configure() }
+        .tint(IumrahIconRole.umrah.color)
         .toolbar((chrome.isImmersiveMode || chrome.isInternalNavigationActive) ? .hidden : .visible, for: .tabBar)
     }
 

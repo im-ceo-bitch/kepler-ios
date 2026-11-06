@@ -87,16 +87,28 @@ struct FlightDateCalendarView: View {
     }
 
     private var calendarBackground: some View {
-        Color.iumrahPageBackground.ignoresSafeArea()
+        ZStack {
+            Color.iumrahPageBackground
+            LinearGradient(
+                colors: [
+                    Color.primary.opacity(colorScheme == .dark ? 0.025 : 0.018),
+                    Color.clear,
+                    Color.green.opacity(colorScheme == .dark ? 0.035 : 0.055)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea()
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(copy(.title))
-                .font(IumrahType.screenTitle)
+                .font(.system(size: 32, weight: .bold, design: .rounded))
                 .tracking(-0.5)
             Text(copy(.subtitle))
-                .font(IumrahType.body)
+                .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -134,11 +146,11 @@ struct FlightDateCalendarView: View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.iumrahInk.opacity(0.14))
+                    .fill(Color.green.opacity(0.14))
                     .frame(width: 42, height: 42)
                 Image(systemName: "sparkles")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.iumrahInk)
+                    .foregroundStyle(Color.green)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -162,10 +174,10 @@ struct FlightDateCalendarView: View {
             }
         }
         .padding(14)
-        .background(Color.iumrahInk.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.green.opacity(0.075), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.iumrahInk.opacity(0.16), lineWidth: 1)
+                .strokeBorder(Color.green.opacity(0.16), lineWidth: 1)
         }
     }
 
@@ -217,8 +229,7 @@ struct FlightDateCalendarView: View {
             }
         }
         .padding(16)
-        .background(Color.iumrahCardBackground,
-                    in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .iumrahGlass(in: RoundedRectangle(cornerRadius: 30, style: .continuous))
     }
 
     private func dayCell(_ date: Date) -> some View {
@@ -241,24 +252,24 @@ struct FlightDateCalendarView: View {
                 .background {
                     if isDeparture || isReturn {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(directPair ? Color.iumrahInk : Color.primary)
+                            .fill(directPair ? Color.green : Color.primary)
                     } else if inRange {
                         Rectangle()
-                            .fill(directPair ? Color.iumrahInk.opacity(0.15) : Color.primary.opacity(0.055))
+                            .fill(directPair ? Color.green.opacity(0.15) : Color.primary.opacity(0.055))
                     } else if directDay {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.iumrahInk.opacity(0.14))
+                            .fill(Color.green.opacity(0.14))
                     }
                 }
                 .foregroundStyle(
                     disabled
                         ? Color.secondary.opacity(0.36)
-                        : ((isDeparture || isReturn) ? Color.iumrahCardBackground : (directDay ? Color.iumrahInk : Color.primary))
+                        : ((isDeparture || isReturn) ? Color.iumrahCardBackground : (directDay ? Color.green : Color.primary))
                 )
                 .overlay {
                     if directDay && !isDeparture && !isReturn {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.iumrahInk.opacity(0.24), lineWidth: 0.8)
+                            .strokeBorder(Color.green.opacity(0.24), lineWidth: 0.8)
                     }
                 }
                 .contentShape(Rectangle())
@@ -366,7 +377,7 @@ struct FlightDateCalendarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(Color.iumrahCardBackground)
-                .background(Color.iumrahInk, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+                .background(Color.green, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
 
                 Button {
                     guard let departure, let returnDate else { return }

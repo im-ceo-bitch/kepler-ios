@@ -330,7 +330,7 @@ struct HotelDetailView: View {
                 }
                 .padding(18)
                 .background(Color.iumrahCardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             } else {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     VStack(alignment: .leading, spacing: 3) {
@@ -726,8 +726,8 @@ struct HotelDetailView: View {
         }
         .padding(18)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
     }
 
     @ViewBuilder
@@ -847,9 +847,9 @@ struct HotelDetailView: View {
         .padding(18)
         .frame(minHeight: canSelectRooms ? 214 : 168, alignment: .topLeading)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(selected ? Color.iumrahCareLight.opacity(0.55) : Color.primary.opacity(0.055), lineWidth: selected ? 1.2 : 0.6)
         }
     }
@@ -1168,7 +1168,7 @@ struct HotelDetailView: View {
                     Marker(hotel.name, coordinate: CLLocationCoordinate2D(latitude: latitude, longitude: longitude))
                 }
                 .frame(height: 245)
-                .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
                 if let url = AppConfig.absoluteURL(detail.googleMapsURL) {
                     Link(destination: url) {

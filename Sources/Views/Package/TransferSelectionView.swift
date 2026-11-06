@@ -279,6 +279,10 @@ struct TransferSelectionView: View {
                         currentPriceText: currentPackagePriceTitle
                     )
 
+                    if !familyFlow {
+                        IumrahJourneyFlowSteps(activeStep: 3)
+                    }
+
                     if familyFlow {
                         IumrahFoundationCompactSteps(total: 8, current: 6, language: settings.language)
                         Text(localized("Услуги вашей семьи","Services for your family","Oilangiz uchun xizmatlar","Оилангиз учун хизматлар")).font(.title.bold())

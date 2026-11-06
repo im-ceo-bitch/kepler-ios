@@ -78,6 +78,9 @@ struct FinalPackageView: View {
                                     .frame(width: 0, height: 0)
 
                                 IumrahGeneratorHeader(stage: .ready)
+                                if !familyFlow {
+                                    IumrahJourneyFlowSteps(activeStep: 4)
+                                }
                                 packageHeader
                                 if journey.quote != nil, journey.hasFinalGeneratorQuote {
                                     packageTierCarousel
@@ -744,9 +747,9 @@ struct FinalPackageView: View {
                 endPoint: .bottomTrailing
             )
         )
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.56), lineWidth: 0.9)
         }
     }
@@ -878,9 +881,9 @@ struct FinalPackageView: View {
             }
             .padding(18)
             .background(Color.iumrahCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.7)
             }
         }
@@ -1218,8 +1221,8 @@ struct FinalPackageView: View {
         }
         .padding(20)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
-        .overlay { RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color.primary.opacity(0.05), lineWidth: 0.5) }
     }
 
     @ViewBuilder
@@ -1794,9 +1797,9 @@ struct FinalPackageView: View {
             .padding(18)
         }
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
         }
     }

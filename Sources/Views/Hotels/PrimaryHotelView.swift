@@ -77,6 +77,7 @@ struct PrimaryHotelView: View {
                         if familyFlow { IumrahFoundationCompactSteps(total: 8, current: 5, language: settings.language) }
                         heading
                         if entryMode == .flightFirst {
+                            IumrahJourneyFlowSteps(activeStep: 2)
                             flightFirstContextCard
                             flightFirstTierSelector
                         }
@@ -225,7 +226,7 @@ struct PrimaryHotelView: View {
             HStack(spacing: 10) {
                 Image(systemName: "airplane.circle.fill")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.iumrahRoyalViolet)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(flightFirstTitle)
                         .font(.headline)

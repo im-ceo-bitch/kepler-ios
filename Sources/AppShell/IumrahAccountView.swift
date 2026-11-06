@@ -297,7 +297,7 @@ struct IumrahAccountView: View {
             }
             .rotation3DEffect(.degrees(identityCardFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0), perspective: 0.72)
             .animation(.spring(response: 0.52, dampingFraction: 0.82), value: identityCardFlipped)
-            .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
             .onTapGesture {
                 IumrahHaptics.selection()
                 identityCardFlipped.toggle()
@@ -339,7 +339,7 @@ struct IumrahAccountView: View {
         let first = fullName.first.map(String.init) ?? profile.firstName
         let last = fullName.dropFirst().first.map(String.init) ?? profile.lastName
         return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(Color.white)
 
             LinearGradient(
@@ -347,7 +347,7 @@ struct IumrahAccountView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
 
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .top) {
@@ -399,9 +399,9 @@ struct IumrahAccountView: View {
             }
             .padding(22)
         }
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .strokeBorder(Color.black.opacity(0.07), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.08), radius: 22, y: 12)
@@ -409,7 +409,7 @@ struct IumrahAccountView: View {
 
     private func identityBack(_ profile: IumrahAccountProfile) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(Color.white)
 
             LinearGradient(
@@ -417,7 +417,7 @@ struct IumrahAccountView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
 
             HStack(spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -451,9 +451,9 @@ struct IumrahAccountView: View {
             }
             .padding(22)
         }
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .strokeBorder(Color.black.opacity(0.07), lineWidth: 1)
         }
         .shadow(color: .black.opacity(0.08), radius: 22, y: 12)
@@ -833,10 +833,10 @@ struct IumrahAccountView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
-                in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                in: RoundedRectangle(cornerRadius: 28, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
             }
             .shadow(color: .black.opacity(0.12), radius: 20, y: 10)
@@ -897,10 +897,10 @@ struct IumrahAccountView: View {
                 }
                 .padding(16)
             }
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
-            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
             }
             .shadow(color: .black.opacity(0.045), radius: 18, y: 8)

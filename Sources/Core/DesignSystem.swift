@@ -1,63 +1,78 @@
 import SwiftUI
 import UIKit
 
-// MARK: - iumrah Pure White / Soft Gray / Black
-// Centralized semantic tokens. iOS appearance variants are monochrome in both
-// modes; the approved light appearance is exact #FFFFFF / #F2F3F5 / #111111.
 enum IumrahDesign {
-    static let pagePadding: CGFloat = 20
-    static let cardRadius: CGFloat = 20
-    static let heroRadius: CGFloat = 20
-    static let compactRadius: CGFloat = 16
-    static let controlHeight: CGFloat = 52
-    static let glassIconSize: CGFloat = 44
-
-    enum Space {
-        static let xxs: CGFloat = 4
-        static let xs: CGFloat = 8
-        static let sm: CGFloat = 12
-        static let md: CGFloat = 16
-        static let lg: CGFloat = 24
-        static let xl: CGFloat = 32
-    }
+    // Keep the same compact geometry discipline as the AutoSale Umar reference:
+    // system surfaces, rounded continuous corners and restrained spacing.
+    static let pagePadding: CGFloat = 18
+    static let cardRadius: CGFloat = 28
+    static let heroRadius: CGFloat = 34
+    static let compactRadius: CGFloat = 19
+    static let controlHeight: CGFloat = 56
+    static let glassIconSize: CGFloat = 46
 }
 
 private extension UIColor {
-    static func iumrahAdaptive(light: UInt, dark: UInt) -> UIColor {
-        UIColor { traits in
-            let rgb = traits.userInterfaceStyle == .dark ? dark : light
-            return UIColor(red: CGFloat((rgb >> 16) & 0xFF) / 255,
-                           green: CGFloat((rgb >> 8) & 0xFF) / 255,
-                           blue: CGFloat(rgb & 0xFF) / 255, alpha: 1)
-        }
+    static let iumrahPage = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .systemBackground
+            : .systemGroupedBackground
     }
 
-    static let iumrahHeader = iumrahAdaptive(light: 0xFFFFFF, dark: 0x111111)
-    static let iumrahPage = iumrahAdaptive(light: 0xF2F3F5, dark: 0x161719)
-    static let iumrahCard = iumrahAdaptive(light: 0xFFFFFF, dark: 0x232427)
-    static let iumrahRaised = iumrahAdaptive(light: 0xF7F8FA, dark: 0x303136)
-    static let iumrahInk = iumrahAdaptive(light: 0x111111, dark: 0xF8F8F8)
-    static let iumrahMuted = iumrahAdaptive(light: 0x6E727A, dark: 0xADB0B8)
-    static let iumrahDivider = iumrahAdaptive(light: 0xE7E9ED, dark: 0x35373A)
-    static let iumrahPrimaryButton = iumrahAdaptive(light: 0x111111, dark: 0xFFFFFF)
-    static let iumrahPrimaryButtonText = iumrahAdaptive(light: 0xFFFFFF, dark: 0x111111)
-    static let iumrahCareDark = iumrahAdaptive(light: 0x111111, dark: 0x111111)
-    static let iumrahCareLight = iumrahAdaptive(light: 0x6E727A, dark: 0xADB0B8)
-    static let iumrahPhotoCard = iumrahAdaptive(light: 0xFFFFFF, dark: 0x232427)
-    static let iumrahPhotoRaised = iumrahAdaptive(light: 0xF7F8FA, dark: 0x303136)
+    static let iumrahCard = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .secondarySystemBackground
+            : .secondarySystemGroupedBackground
+    }
+
+    static let iumrahRaised = UIColor { _ in
+        .tertiarySystemGroupedBackground
+    }
+
+    static let iumrahPrimaryButton = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0.96, alpha: 1)
+            : UIColor.black
+    }
+
+    static let iumrahPrimaryButtonText = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.07, green: 0.075, blue: 0.085, alpha: 1)
+            : UIColor.white
+    }
+
+    static let iumrahCareDark = UIColor(red: 14/255, green: 36/255, blue: 34/255, alpha: 1)
+    static let iumrahCareLight = UIColor(red: 116/255, green: 161/255, blue: 135/255, alpha: 1)
+
+    // Adaptive opaque/translucent content surface used over photography.
+    // Unlike Liquid Glass this is a content card, so its contrast is deterministic
+    // in both appearances and semantic text remains readable.
+    static let iumrahPhotoCard = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0.105, alpha: 0.975)
+            : UIColor(white: 1.0, alpha: 0.975)
+    }
+
+    static let iumrahPhotoRaised = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(white: 0.16, alpha: 0.96)
+            : UIColor(white: 0.95, alpha: 0.96)
+    }
 }
 
 extension Color {
-    static let iumrahHeaderBackground = Color(uiColor: .iumrahHeader)
     static let iumrahPageBackground = Color(uiColor: .iumrahPage)
     static let iumrahCardBackground = Color(uiColor: .iumrahCard)
     static let iumrahRaisedBackground = Color(uiColor: .iumrahRaised)
-    static let iumrahInk = Color(uiColor: .iumrahInk)
-    static let iumrahMuted = Color(uiColor: .iumrahMuted)
-    static let iumrahDivider = Color(uiColor: .iumrahDivider)
     static let iumrahPrimaryButtonBackground = Color(uiColor: .iumrahPrimaryButton)
     static let iumrahPrimaryButtonText = Color(uiColor: .iumrahPrimaryButtonText)
-    static let iumrahGraphite = Color.iumrahInk
+    static let iumrahGraphite = Color(red: 0.09, green: 0.10, blue: 0.115)
+    // Compatibility roles for the new Flight-First journey UI. These do not
+    // change the original shared header, card, button or tab appearances.
+    static let iumrahRoyalViolet = Color(red: 102.0 / 255, green: 54.0 / 255, blue: 217.0 / 255)
+    static let iumrahInk = Color.primary
+    static let iumrahMuted = Color.secondary
+
     static let iumrahCareDark = Color(uiColor: .iumrahCareDark)
     static let iumrahCareLight = Color(uiColor: .iumrahCareLight)
     static let iumrahPhotoCardBackground = Color(uiColor: .iumrahPhotoCard)
@@ -133,12 +148,43 @@ enum IumrahIconRole: Hashable {
 
     var color: Color {
         switch self {
-        // Semantics only: danger, pending, and confirmed states must remain
-        // distinguishable without depending on hue alone (paired with symbols).
-        case .warning, .waiting, .paymentPending: return Color(red: 0.69, green: 0.39, blue: 0.08)
-        case .destructive: return Color(red: 0.72, green: 0.16, blue: 0.18)
-        case .success, .confirmed, .ready, .inTrip, .completed: return Color(red: 0.13, green: 0.43, blue: 0.32)
-        default: return .iumrahInk
+        case .accent: return Color(uiColor: .systemBlue)
+        case .travel: return Color(uiColor: .systemBlue)
+        case .hotel: return Color(uiColor: .systemIndigo)
+        case .booking: return Color(uiColor: .systemOrange)
+        case .umrah: return Color(uiColor: .systemTeal)
+        case .care: return Color(uiColor: .systemPink)
+        case .profile: return Color(uiColor: .systemCyan)
+        case .phone: return Color(uiColor: .systemGreen)
+        case .mail: return Color(uiColor: .systemBlue)
+        case .message: return Color(uiColor: .systemTeal)
+        case .connectivity: return Color(uiColor: .systemBlue)
+        case .device: return Color(uiColor: .systemBlue)
+        case .gift: return Color(uiColor: .systemPurple)
+        case .search: return Color(uiColor: .systemBlue)
+        case .rating: return Color(uiColor: .systemYellow)
+        case .calendar: return Color(uiColor: .systemOrange)
+        case .location: return Color(uiColor: .systemRed)
+        case .security: return Color(uiColor: .systemGreen)
+        case .notification: return Color(uiColor: .systemRed)
+        case .appearance: return Color(uiColor: .systemPurple)
+        case .language: return Color(uiColor: .systemBlue)
+        case .settings: return Color(uiColor: .systemGray)
+        case .document: return Color(uiColor: .systemCyan)
+        case .payment: return Color(uiColor: .systemGreen)
+        case .waiting: return Color(uiColor: .systemYellow)
+        case .paymentPending: return Color(uiColor: .systemOrange)
+        case .confirmed: return Color(uiColor: .systemGreen)
+        case .ready: return Color(uiColor: .systemTeal)
+        case .inTrip: return Color(uiColor: .systemBlue)
+        case .completed: return Color(uiColor: .systemIndigo)
+        case .telegram: return Color(uiColor: .systemBlue)
+        case .whatsapp: return Color(uiColor: .systemGreen)
+        case .transfer: return Color(uiColor: .systemCyan)
+        case .success: return Color(uiColor: .systemGreen)
+        case .warning: return Color(uiColor: .systemYellow)
+        case .destructive: return Color(uiColor: .systemRed)
+        case .neutral: return Color(uiColor: .systemGray)
         }
     }
 
@@ -229,18 +275,16 @@ struct IumrahIconBadge: View {
         role ?? IumrahIconRole.inferred(from: systemName)
     }
 
-    private var resolvedColor: Color {
-        if let tint { return tint }
+    private var resolvedColor: Color { tint ?? resolvedRole.color }
+
+    private var symbolColor: Color {
         switch resolvedRole {
-        case .warning, .waiting, .paymentPending, .destructive,
-             .success, .confirmed, .ready, .inTrip, .completed:
-            return resolvedRole.color.opacity(0.12)
+        case .waiting, .warning, .rating:
+            return Color.black.opacity(0.78)
         default:
-            return .iumrahRaisedBackground
+            return .white
         }
     }
-
-    private var symbolColor: Color { tint == nil ? resolvedRole.color : .white }
 
     @ViewBuilder
     var body: some View {
@@ -280,9 +324,14 @@ struct IumrahCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(IumrahDesign.Space.md)
-            .background(Color.iumrahCardBackground,
-                        in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .padding(18)
+            .background(Color.iumrahCardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.095), lineWidth: 0.75)
+            }
+            .shadow(color: .black.opacity(0.045), radius: 18, y: 8)
     }
 }
 
@@ -291,9 +340,20 @@ struct IumrahMarketingCardModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .padding(IumrahDesign.Space.lg)
-            .background(dark ? Color.iumrahCareDark : Color.iumrahCardBackground,
-                        in: RoundedRectangle(cornerRadius: IumrahDesign.heroRadius, style: .continuous))
+            .padding(22)
+            .background {
+                RoundedRectangle(cornerRadius: IumrahDesign.heroRadius, style: .continuous)
+                    .fill(
+                        dark
+                        ? LinearGradient(colors: [Color.iumrahCareDark, Color.iumrahGraphite], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        : LinearGradient(colors: [Color.iumrahCardBackground, Color.iumrahCardBackground], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: IumrahDesign.heroRadius, style: .continuous)
+                    .strokeBorder(dark ? Color.white.opacity(0.08) : Color.primary.opacity(0.075), lineWidth: 0.7)
+            }
+            .shadow(color: .black.opacity(dark ? 0.14 : 0.045), radius: 20, y: 9)
     }
 }
 
@@ -305,38 +365,38 @@ extension View {
 /// Primary call-to-action follows the AutoSale Umar reference: a crisp system
 /// primary surface. Liquid Glass is reserved for floating / secondary controls.
 struct IumrahPrimaryButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(IumrahType.bold(16, relativeTo: .body))
-            .multilineTextAlignment(.center)
+            .font(.system(size: 16, weight: .semibold, design: .rounded))
             .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, minHeight: IumrahDesign.controlHeight)
+            .frame(maxWidth: .infinity)
+            .frame(height: IumrahDesign.controlHeight)
             .foregroundStyle(Color.iumrahPrimaryButtonText)
-            .background(Color.iumrahPrimaryButtonBackground.opacity(configuration.isPressed ? 0.88 : 1),
-                        in: RoundedRectangle(cornerRadius: IumrahDesign.compactRadius, style: .continuous))
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.99 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: configuration.isPressed)
+            .background(
+                Color.iumrahPrimaryButtonBackground.opacity(configuration.isPressed ? 0.84 : 1),
+                in: RoundedRectangle(cornerRadius: IumrahDesign.compactRadius, style: .continuous)
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 
 struct IumrahSecondaryButtonStyle: ButtonStyle {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(IumrahType.bold(16, relativeTo: .body))
-            .multilineTextAlignment(.center)
+            .font(.system(size: 16, weight: .semibold, design: .rounded))
             .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, minHeight: IumrahDesign.controlHeight)
-            .foregroundStyle(Color.iumrahInk)
-            .background(Color.iumrahRaisedBackground,
-                        in: RoundedRectangle(cornerRadius: IumrahDesign.compactRadius, style: .continuous))
-            .opacity(configuration.isPressed ? 0.8 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: configuration.isPressed)
+            .frame(maxWidth: .infinity)
+            .frame(height: IumrahDesign.controlHeight)
+            .foregroundStyle(.primary)
+            .iumrahGlass(
+                in: RoundedRectangle(cornerRadius: IumrahDesign.compactRadius, style: .continuous),
+                interactive: true,
+                chrome: true
+            )
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.90 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 
@@ -493,81 +553,54 @@ struct IumrahGlassGroup<Content: View>: View {
     }
 }
 
-// MARK: - Native tab bar
-/// UIKit appearance is configured once and affects only iumrah's shared tab chrome.
-@MainActor
-enum IumrahTabBarAppearance {
-    private static var configured = false
+// MARK: - Flight-first journey progress
+/// 1 Flights → 2 Hotels → 3 Transfer → 4 Package. This is presentation
+/// only; the existing JourneyStore and booking services own actual state.
+struct IumrahJourneyFlowSteps: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    let activeStep: Int
 
-    static func configure() {
-        guard !configured else { return }
-        configured = true
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .iumrahHeader
-        appearance.shadowColor = .iumrahDivider
-        for item in [appearance.stackedLayoutAppearance,
-                     appearance.inlineLayoutAppearance,
-                     appearance.compactInlineLayoutAppearance] {
-            item.normal.iconColor = .iumrahMuted
-            item.normal.titleTextAttributes = [.foregroundColor: UIColor.iumrahMuted]
-            item.selected.iconColor = .iumrahInk
-            item.selected.titleTextAttributes = [.foregroundColor: UIColor.iumrahInk]
-        }
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
-    }
-}
-
-// MARK: - Reusable empty/loading/error/success state view
-struct IumrahStateSurface: View {
-    enum Kind { case loading, empty, error, success }
-    let kind: Kind
-    let title: String
-    let detail: String
-    var actionTitle: String? = nil
-    var action: (() -> Void)? = nil
-
-    private var symbol: String {
-        switch kind {
-        case .loading: return "clock"
-        case .empty: return "tray"
-        case .error: return "exclamationmark.circle"
-        case .success: return "checkmark.circle"
+    private var titles: [String] {
+        switch settings.language {
+        case .russian: return ["Рейсы", "Отели", "Трансфер", "Итог"]
+        case .uzbek: return ["Reyslar", "Mehmonxona", "Transfer", "Yakun"]
+        case .uzbekCyrillic: return ["Рейслар", "Меҳмонхона", "Трансфер", "Якун"]
+        default: return ["Flights", "Hotels", "Transfer", "Review"]
         }
     }
 
     var body: some View {
-        VStack(spacing: IumrahDesign.Space.sm) {
-            Image(systemName: symbol)
-                .font(.system(size: 28, weight: .regular))
-                .foregroundStyle(Color.iumrahInk)
-                .frame(width: 56, height: 56)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .accessibilityHidden(true)
-            Text(title)
-                .font(IumrahType.cardTitle)
-                .foregroundStyle(Color.iumrahInk)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(detail)
-                .font(IumrahType.secondary)
-                .foregroundStyle(Color.iumrahMuted)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            if let actionTitle, let action {
-                Button(actionTitle, action: action)
-                    .buttonStyle(IumrahPrimaryButtonStyle())
-                    .padding(.top, IumrahDesign.Space.xs)
-            } else if kind == .loading {
-                ProgressView()
-                    .tint(Color.iumrahInk)
-                    .padding(.top, IumrahDesign.Space.xs)
+        HStack(alignment: .top, spacing: 4) {
+            ForEach(1...4, id: \.self) { step in
+                VStack(spacing: 5) {
+                    ZStack {
+                        Circle()
+                            .fill(step <= activeStep ? Color.iumrahRoyalViolet : Color.iumrahRaisedBackground)
+                            .frame(width: 30, height: 30)
+                        if step < activeStep {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.white)
+                                .font(.system(size: 12, weight: .bold))
+                        } else {
+                            Text(String(step))
+                                .foregroundStyle(step == activeStep ? Color.white : Color.iumrahMuted)
+                                .font(IumrahType.bold(12, relativeTo: .caption))
+                        }
+                    }
+                    Text(titles[step-1])
+                        .font(IumrahType.regular(11, relativeTo: .caption2))
+                        .foregroundStyle(step == activeStep ? Color.iumrahInk : Color.iumrahMuted)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(step == activeStep ? .isSelected : [])
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(IumrahDesign.Space.lg)
-        .background(Color.iumrahCardBackground,
-                    in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 13)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
+

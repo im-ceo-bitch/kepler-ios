@@ -861,7 +861,7 @@ struct TripBuilderView: View {
 
                     Text(curatedDirectLabel)
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(Color.iumrahInk)
+                        .foregroundStyle(Color.orange)
                         .padding(.horizontal, 8)
                         .frame(height: 24)
                         .background(Color.orange.opacity(0.10), in: Capsule())
@@ -877,21 +877,21 @@ struct TripBuilderView: View {
                 HStack {
                     Text(curatedChooseFlightLabel)
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(isSelected ? Color.iumrahInk : Color.primary)
+                        .foregroundStyle(isSelected ? Color.orange : Color.primary)
                     Spacer()
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "arrow.right.circle.fill")
-                        .foregroundStyle(isSelected ? Color.iumrahInk : Color.primary)
+                        .foregroundStyle(isSelected ? Color.orange : Color.primary)
                 }
             }
             .padding(14)
             .frame(minWidth: 274, maxWidth: 274, minHeight: 154, alignment: .leading)
             .background(
-                isSelected ? Color.iumrahInk.opacity(0.065) : Color.iumrahRaisedBackground,
+                isSelected ? Color.orange.opacity(0.075) : Color.iumrahRaisedBackground,
                 in: RoundedRectangle(cornerRadius: 21, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 21, style: .continuous)
-                    .strokeBorder(isSelected ? Color.iumrahInk.opacity(0.35) : Color.primary.opacity(0.055), lineWidth: 1)
+                    .strokeBorder(isSelected ? Color.orange.opacity(0.35) : Color.primary.opacity(0.055), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
@@ -953,22 +953,22 @@ struct TripBuilderView: View {
                 HStack {
                     Text(curatedSelectDatesLabel)
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(isSelected ? Color.iumrahInk : Color.primary)
+                        .foregroundStyle(isSelected ? Color.orange : Color.primary)
                     Spacer()
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "arrow.right.circle.fill")
                         .font(.title3)
-                        .foregroundStyle(isSelected ? Color.iumrahInk : Color.primary)
+                        .foregroundStyle(isSelected ? Color.orange : Color.primary)
                 }
             }
             .padding(15)
             .frame(minWidth: 292, maxWidth: 292, minHeight: 204, alignment: .leading)
             .background(
-                isSelected ? Color.iumrahInk.opacity(0.065) : Color.iumrahRaisedBackground,
+                isSelected ? Color.orange.opacity(0.075) : Color.iumrahRaisedBackground,
                 in: RoundedRectangle(cornerRadius: 22, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(isSelected ? Color.iumrahInk.opacity(0.35) : Color.primary.opacity(0.055), lineWidth: 1)
+                    .strokeBorder(isSelected ? Color.orange.opacity(0.35) : Color.primary.opacity(0.055), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
@@ -1394,7 +1394,7 @@ struct TripBuilderView: View {
 
     private func packageTierSelectionCard(_ tier: PackageTier) -> some View {
         let selected = journey.trip.packageTier == tier
-        let tierSurface = packageTierSurface(tier)
+        let gradient = packageTierGradient(tier)
         let badgeTint = packageTierAccentColor(tier)
 
         return Button {
@@ -1486,28 +1486,36 @@ struct TripBuilderView: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(tierSurface, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .background(gradient, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .strokeBorder(Color.white.opacity(selected ? 0.22 : 0.10), lineWidth: 1)
             }
-
+            .shadow(color: badgeTint.opacity(selected ? 0.26 : 0.16), radius: selected ? 18 : 12, y: 8)
         }
         .buttonStyle(.plain)
     }
 
-    private func packageTierSurface(_ tier: PackageTier) -> Color {
-        // Category differentiation comes from titles and badges, never arbitrary hues.
+    private func packageTierGradient(_ tier: PackageTier) -> LinearGradient {
         switch tier {
-        case .economy: return Color(white: 0.17)
-        case .standard: return Color(white: 0.14)
-        case .comfort: return Color(white: 0.11)
-        case .luxury: return Color(white: 0.08)
+        case .economy:
+            return LinearGradient(colors: [Color(red: 0.32, green: 0.56, blue: 0.34), Color(red: 0.13, green: 0.25, blue: 0.16)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .standard:
+            return LinearGradient(colors: [Color(red: 0.31, green: 0.37, blue: 0.83), Color(red: 0.13, green: 0.18, blue: 0.43)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .comfort:
+            return LinearGradient(colors: [Color(red: 0.11, green: 0.60, blue: 0.62), Color(red: 0.03, green: 0.18, blue: 0.24)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        case .luxury:
+            return LinearGradient(colors: [Color(red: 0.81, green: 0.63, blue: 0.24), Color(red: 0.29, green: 0.18, blue: 0.05)], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
 
     private func packageTierAccentColor(_ tier: PackageTier) -> Color {
-        .iumrahInk
+        switch tier {
+        case .economy: return Color(red: 0.62, green: 0.91, blue: 0.69)
+        case .standard: return Color(red: 0.76, green: 0.80, blue: 1.0)
+        case .comfort: return Color(red: 0.69, green: 0.95, blue: 0.94)
+        case .luxury: return Color(red: 1.0, green: 0.91, blue: 0.68)
+        }
     }
 
     private func packageTierSymbol(_ tier: PackageTier) -> String {

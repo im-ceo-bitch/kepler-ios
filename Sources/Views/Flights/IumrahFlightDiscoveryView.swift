@@ -449,7 +449,7 @@ struct IumrahFlightDiscoveryView: View {
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.blue)
                 .frame(width: 34, height: 34)
-                .background(Color.iumrahInk.opacity(0.07), in: Circle())
+                .background(Color.blue.opacity(0.1), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(eyebrow.uppercased())
                     .font(.caption2.weight(.bold))
@@ -1717,11 +1717,11 @@ private struct IumrahRecommendedFlightCard: View {
                     Spacer()
                 }
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(selected ? Color.iumrahInk : Color.iumrahPrimaryButtonText)
+                .foregroundStyle(selected ? Color.green : Color.iumrahPrimaryButtonText)
                 .padding(.horizontal, 15)
                 .frame(height: 48)
                 .background(
-                    selected ? Color.iumrahInk.opacity(0.08) : Color.iumrahPrimaryButtonBackground,
+                    selected ? Color.green.opacity(0.1) : Color.iumrahPrimaryButtonBackground,
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
             }
@@ -1731,7 +1731,7 @@ private struct IumrahRecommendedFlightCard: View {
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(selected ? Color.iumrahInk.opacity(0.4) : Color.primary.opacity(0.06), lineWidth: selected ? 1.2 : 0.8)
+                .strokeBorder(selected ? Color.green.opacity(0.4) : Color.primary.opacity(0.06), lineWidth: selected ? 1.2 : 0.8)
         }
     }
 
@@ -2267,7 +2267,7 @@ private struct FlightDiscoveryPassengersSheet: View {
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(width: 38, height: 38)
-                    .background(Color.iumrahInk, in: Circle())
+                    .background(Color.blue, in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(total >= 9)
@@ -2401,7 +2401,7 @@ private struct FlightDiscoveryAirlinesSheet: View {
                                 }
                                 Spacer()
                                 Image(systemName: selectedCodes.contains(airline.code) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selectedCodes.contains(airline.code) ? Color.iumrahInk : Color.secondary)
+                                    .foregroundStyle(selectedCodes.contains(airline.code) ? Color.blue : Color.secondary)
                             }
                         }
                         .buttonStyle(.plain)
@@ -2726,7 +2726,7 @@ private struct FlightDiscoveryMonthGrid: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 52)
-            .background(isSelected ? Color.iumrahInk.opacity(0.08) : Color.clear, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .background(isSelected ? Color.blue.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isPast)
@@ -2871,7 +2871,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 55)
                             .foregroundStyle(.white)
-                            .background(Color.iumrahInk, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                            .background(Color.blue, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -2970,7 +2970,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                 if selected || cheapest {
                     Text("$\(Int(day.price.rounded()))")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(selected ? Color.iumrahInk : Color.iumrahMuted)
+                        .foregroundStyle(selected ? Color.blue : Color.green)
                         .lineLimit(1)
                 } else {
                     Text(" ")
@@ -2983,7 +2983,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
 
                 Text(dayNumber(day.date))
                     .font(.caption2.weight(selected ? .bold : .medium))
-                    .foregroundStyle(selected ? Color.iumrahInk : Color.secondary)
+                    .foregroundStyle(selected ? Color.blue : Color.secondary)
             }
             .frame(width: 52)
         }
@@ -3354,7 +3354,7 @@ private struct FlightDiscoveryOfferDetailView: View {
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.blue)
                 .frame(width: 36, height: 36)
-                .background(Color.iumrahInk.opacity(0.07), in: Circle())
+                .background(Color.blue.opacity(0.1), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(route)
                     .font(.headline.monospaced())
@@ -3452,7 +3452,7 @@ private struct FlightDiscoveryOfferDetailView: View {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.blue)
                         .frame(width: 44, height: 44)
-                        .background(Color.iumrahInk.opacity(0.07), in: Circle())
+                        .background(Color.blue.opacity(0.1), in: Circle())
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(airlineName)

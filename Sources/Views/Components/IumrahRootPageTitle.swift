@@ -23,20 +23,14 @@ struct IumrahRootPageTitle: View {
             if usesBrandLogo && showsConnectivityStatus {
                 ViewThatFits(in: .horizontal) {
                     connectedBrandHeader(brandWidth: 132, controlSize: 44, spacing: 8)
-                    connectedBrandHeader(brandWidth: 110, controlSize: 44, spacing: 7)
-                    connectedBrandHeader(brandWidth: 96, controlSize: 44, spacing: 6)
+                    connectedBrandHeader(brandWidth: 110, controlSize: 40, spacing: 7)
+                    connectedBrandHeader(brandWidth: 96, controlSize: 38, spacing: 6)
                 }
             } else {
                 standardHeader
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, lightStyle ? 0 : IumrahDesign.pagePadding)
-        .padding(.top, lightStyle ? 0 : 12)
-        .padding(.bottom, lightStyle ? 0 : 16)
-        .background(lightStyle ? Color.clear : Color.iumrahHeaderBackground)
-        .padding(.horizontal, lightStyle ? 0 : -IumrahDesign.pagePadding)
-        .accessibilityElement(children: .contain)
     }
 
     private var standardHeader: some View {
@@ -46,11 +40,11 @@ struct IumrahRootPageTitle: View {
                     brandImage(width: 180 * brandScale)
                 } else {
                     Text(title)
-                        .font(IumrahType.screenTitle)
+                        .font(.system(size: 38, weight: .bold, design: .rounded))
                         .tracking(-1.0)
                         .foregroundStyle(lightStyle ? Color.white : Color.primary)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                 }
             }
 

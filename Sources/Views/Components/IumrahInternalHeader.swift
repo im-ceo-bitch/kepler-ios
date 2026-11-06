@@ -56,7 +56,7 @@ struct IumrahFlowProgress: View {
         )
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .iumrahGlass(in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -119,7 +119,7 @@ private struct GeneratorProgressStrip: View {
     }
 
     private func segmentColor(_ item: TripProgressStage) -> Color {
-        if item.rawValue < stage.rawValue { return Color.iumrahInk }
+        if item.rawValue < stage.rawValue { return Color.iumrahCareLight }
         if item == stage { return Color.primary }
         return Color.secondary.opacity(0.18)
     }

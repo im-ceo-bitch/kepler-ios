@@ -16,6 +16,7 @@ struct HotelsHomeView: View {
     @State private var packageShareArtifacts: IumrahPackageShareArtifacts?
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
+    @State private var showInTabFlightFirstFlow = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -24,6 +25,10 @@ struct HotelsHomeView: View {
 
                 if board != .flights {
                     AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
+                }
+
+                if board == .flights {
+                    IumrahJourneyFlowSteps(activeStep: 1)
                 }
 
                 Picker(L10n.text("hotel_storefront_section", settings.language), selection: $board) {
@@ -50,7 +55,7 @@ struct HotelsHomeView: View {
             // The iOS floating tab bar covers more of the scroll viewport than a
             // classic bar: reserve scroll clearance without moving any card.
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 0)
+            .padding(.top, 10)
             .padding(.bottom, board == .hotels ? 112 : 42)
         }
         .background(Color.iumrahPageBackground)
@@ -71,7 +76,7 @@ struct HotelsHomeView: View {
                         }
                         IumrahHaptics.selection()
                         journey.prepareFlightFirstHotelStage()
-                        chrome.startFlightFirstTrip()
+                        showInTabFlightFirstFlow = true
                     }
                 )
                 .padding(.horizontal, IumrahDesign.pagePadding)
@@ -101,6 +106,9 @@ struct HotelsHomeView: View {
         }
         .onChange(of: storefront.allHotels.map(\.id)) { _, _ in
             openRequestedHotel(chrome.requestedHotelID)
+        }
+        .navigationDestination(isPresented: $showInTabFlightFirstFlow) {
+            FlightFirstPackageFlowView()
         }
         .navigationDestination(item: $selectedHotel) { hotel in
             HotelDetailView(
@@ -362,9 +370,9 @@ struct HotelsHomeView: View {
         }
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(red: 1.0, green: 0.61, blue: 0.18), in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .background(Color(red: 1.0, green: 0.61, blue: 0.18), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.8)
         }
         .shadow(color: Color.orange.opacity(0.14), radius: 18, y: 9)
@@ -891,9 +899,9 @@ private struct IumrahFriendsCalculatorCard: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
         }
     }
@@ -1373,12 +1381,12 @@ struct HotelStorefrontCard: View {
         }
         .frame(height: cardHeight)
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.6)
         }
-        .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .onTapGesture {
             IumrahHaptics.selection()
             onOpen()
@@ -1512,13 +1520,13 @@ private struct StorefrontFlightOptionCard: View {
             .padding(16)
         }
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
         }
         .shadow(color: .black.opacity(0.035), radius: 14, y: 6)
-        .contentShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .onTapGesture {
             if packagePreview != nil { onOpen() }
         }
@@ -1857,7 +1865,7 @@ struct StorefrontUmrahPackageDetailView: View {
                 .padding(.bottom, 12)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 0)
+            .padding(.top, 10)
             .padding(.bottom, 34)
         }
         .background(Color.iumrahPageBackground)
@@ -3672,7 +3680,7 @@ private struct PackageFlightPickerSheet: View {
                     }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 0)
+                .padding(.top, 12)
                 .padding(.bottom, 34)
             }
             .background(Color.iumrahPageBackground)

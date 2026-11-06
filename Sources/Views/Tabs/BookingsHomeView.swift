@@ -185,7 +185,7 @@ struct BookingsHomeView: View {
                 .padding(.top, 28)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 0)
+            .padding(.top, 10)
             .padding(.bottom, 44)
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea())
@@ -197,11 +197,11 @@ struct BookingsHomeView: View {
     private func bookingIdentity(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 17) {
             ZStack {
-                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .fill(Color.iumrahRaisedBackground)
                     .frame(width: 94, height: 94)
                     .overlay {
-                        RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .strokeBorder(Color.primary.opacity(0.065), lineWidth: 0.7)
                     }
 
@@ -1007,7 +1007,7 @@ struct BookingsHomeView: View {
         }
         .padding(18)
         .background {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color.iumrahCardBackground)
                 .overlay {
                     LinearGradient(
@@ -1015,11 +1015,11 @@ struct BookingsHomeView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
                 }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(tint.opacity(0.22), lineWidth: 0.8)
         }
     }
@@ -1656,18 +1656,45 @@ struct BookingsHomeView: View {
                 emptyCareCard
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 0)
+            .padding(.top, 10)
             .padding(.bottom, 42)
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea())
     }
 
     private var bookingEmptyStatusCard: some View {
-        IumrahStateSurface(
-            kind: .empty,
-            title: emptyBookingTitle,
-            detail: emptyBookingNote
-        )
+        HStack(spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .fill(Color.primary.opacity(0.055))
+                    .frame(width: 58, height: 58)
+
+                Image(systemName: "tray.fill")
+                    .font(.system(size: 23, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(Color.primary)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(emptyBookingTitle)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(.primary)
+
+                Text(emptyBookingNote)
+                    .font(.system(size: 14.5, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
+        }
     }
 
 

@@ -1106,9 +1106,9 @@ struct BookingDetailView: View {
         }
         .padding(18)
         .background(Color.iumrahCareLight.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.iumrahCareLight.opacity(0.28), lineWidth: 1)
         }
     }
@@ -1177,9 +1177,9 @@ struct BookingDetailView: View {
             .padding(17)
         }
         .background(Color.iumrahCardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
         }
         .shadow(color: .black.opacity(0.035), radius: 14, y: 6)
@@ -1275,9 +1275,9 @@ struct BookingDetailView: View {
                 )
             )
             .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous)
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
                     .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
             }
         }

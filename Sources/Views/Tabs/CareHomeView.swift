@@ -54,7 +54,7 @@ struct CareHomeView: View {
                 }
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 0)
+            .padding(.top, 10)
             .padding(.bottom, 112)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
@@ -79,7 +79,7 @@ struct CareHomeView: View {
                 "Umra safaringizni yig‘ish va rasmiylashtirishga yordam beramiz",
                 "Умра сафарингизни тузиш ва расмийлаштиришга ёрдам берамиз"
             ))
-            .font(IumrahType.screenTitle)
+            .font(.system(size: 27, weight: .bold, design: .rounded))
             .tracking(-0.5)
             .fixedSize(horizontal: false, vertical: true)
 
@@ -89,7 +89,7 @@ struct CareHomeView: View {
                 "Agar barcha tafsilotlarni o‘zingiz hal qilishni istamasangiz, iumrah Care yo‘nalish, mehmonxona va xizmatlarni tanlashga, tafsilotlarni tekshirishga va bronni tayyor safargacha olib borishga yordam beradi.",
                 "Агар барча тафсилотларни ўзингиз ҳал қилишни истамасангиз, iumrah Care йўналиш, меҳмонхона ва хизматларни танлашга, тафсилотларни текширишга ва бронни тайёр сафаргача олиб боришга ёрдам беради."
             ))
-            .font(IumrahType.body)
+            .font(.system(size: 16, weight: .regular))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -109,7 +109,7 @@ struct CareHomeView: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("iumrah Care")
-                        .font(IumrahType.screenTitle)
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .tracking(-0.65)
 
                     Text(tr(

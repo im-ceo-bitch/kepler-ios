@@ -153,7 +153,7 @@ private struct IumrahLargeScreenSidebar: View {
     private var connectionFooter: some View {
         HStack(spacing: 9) {
             Circle()
-                .fill(Color.iumrahInk)
+                .fill(Color.green)
                 .frame(width: 7, height: 7)
             Text(footerTitle)
                 .font(.caption)

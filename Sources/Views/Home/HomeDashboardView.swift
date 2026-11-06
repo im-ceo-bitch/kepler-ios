@@ -2589,7 +2589,7 @@ private struct IumrahHomeJourneySearchHero: View {
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.iumrahDivider, lineWidth: 0.8)
+                .strokeBorder(Color(uiColor: .separator), lineWidth: 0.8)
         }
     }
 

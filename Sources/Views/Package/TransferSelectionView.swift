@@ -14,7 +14,7 @@ struct TransferSelectionView: View {
     @Environment(\.colorScheme) private var inheritedColorScheme
     @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
 
-    @State private var discoveryPhase: TransferDiscoveryPhase = .searching
+    @State private var discoveryPhase: TransferDiscoveryPhase = .matched
     @State private var searchSecond = 0
     @State private var selectedIndex = 1
     @State private var dragOffset: CGFloat = 0
@@ -23,7 +23,7 @@ struct TransferSelectionView: View {
     @State private var isConfirming = false
     @State private var confirmationError: String?
 
-    @State private var searchDuration = Int.random(in: 20...40)
+    @State private var searchDuration = 0 // Retained only for legacy unused map view.
     private let vehicles = TransferVehicleKind.allCases
 
     private var selectedVehicle: TransferVehicleKind {
@@ -52,16 +52,8 @@ struct TransferSelectionView: View {
     var body: some View {
         Group {
             if familyFlow && reviewing { familyReview } else {
-            switch discoveryPhase {
-            case .searching:
-                searchExperience
-                    .transition(.opacity)
-                    .environment(\.colorScheme, inheritedColorScheme)
-            case .matched:
-                matchedExperience
-                    .transition(.opacity.combined(with: .scale(scale: 0.985)))
-                    .environment(\.colorScheme, isVIP ? .dark : .light)
-            }
+            matchedExperience
+                .environment(\.colorScheme, isVIP ? .dark : .light)
         }
         }
         .animation(.easeInOut(duration: 0.58), value: isVIP)
@@ -334,7 +326,7 @@ struct TransferSelectionView: View {
                     .foregroundStyle(isVIP ? .white : .green)
                 Text(isVIP
                      ? localized("VIP TRANSFER", "VIP TRANSFER", "VIP TRANSFER", "VIP TRANSFER")
-                     : localized("ТРАНСФЕР НАЙДЕН", "TRANSFER MATCHED", "TRANSFER TOPILDI", "ТРАНСФЕР ТОПИЛДИ"))
+                     : localized("ВЫБОР ТРАНСФЕРА", "CHOOSE TRANSFER", "TRANSFERNI TANLANG", "ТРАНСФЕРНИ ТАНЛАНГ"))
                     .font(.caption.weight(.bold))
                     .tracking(1.0)
                     .foregroundStyle(.secondary)
@@ -349,7 +341,7 @@ struct TransferSelectionView: View {
 
             Text(isVIP
                  ? localized("VIP трансфер", "VIP transfer", "VIP transfer", "VIP трансфер")
-                 : localized("Мы нашли свободный автомобиль", "We found an available vehicle", "Bo‘sh avtomobil topildi", "Бўш автомобиль топилди"))
+                 : localized("Выберите подходящий трансфер", "Choose your transfer class", "Transfer turini tanlang", "Трансфер турини танланг"))
                 .font(.system(size: isVIP ? 38 : 32, weight: .bold, design: .rounded))
                 .tracking(-0.9)
 
@@ -706,40 +698,13 @@ struct TransferSelectionView: View {
         let selected = journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle()
         selectedIndex = vehicles.firstIndex(of: selected) ?? 1
         if journey.selectedTransferVehicle == nil {
-            journey.chooseTransferVehicle(.carnival)
-            selectedIndex = vehicles.firstIndex(of: .carnival) ?? 1
+            journey.chooseTransferVehicle(selected)
         }
 
-        let pricingTask = Task { @MainActor in
-            await refreshBasePackagePrice()
-        }
-
-        if journey.transferSelectionConfirmed {
-            await pricingTask.value
-            discoveryPhase = .matched
-            return
-        }
-
-        searchDuration = Int.random(in: 20...40)
-        searchSecond = 0
-        for second in 1...searchDuration {
-            try? await Task.sleep(for: .seconds(1))
-            guard !Task.isCancelled else { return }
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.24)) {
-                searchSecond = second
-            }
-            if second == 6 || second == 13 || second == 21 || second == 30 {
-                IumrahHaptics.soft()
-            }
-        }
-
-        guard !Task.isCancelled else { return }
-        journey.chooseTransferVehicle(.carnival)
-        selectedIndex = vehicles.firstIndex(of: .carnival) ?? 1
-        withAnimation(reduceMotion ? nil : .spring(response: 0.58, dampingFraction: 0.90)) {
-            discoveryPhase = .matched
-        }
-        IumrahHaptics.success()
+        // Vehicle classes are package options, not GPS-matched nearby drivers.
+        // Show them immediately and update the server quote asynchronously.
+        discoveryPhase = .matched
+        await refreshBasePackagePrice()
     }
 
     @MainActor
@@ -917,7 +882,7 @@ struct TransferSelectionView: View {
     private var luggageMetric: String { "≤ \(selectedVehicle.luggageCapacity)" }
 
     private var availabilityTitle: String {
-        localized("Свободен на ваши даты", "Available for your dates", "Sanalaringizda bo‘sh", "Саналарингизда бўш")
+        localized("Класс трансфера", "Transfer class", "Transfer toifasi", "Трансфер тоифаси")
     }
 
     private var vehicleAddOnTitle: String {
@@ -952,8 +917,8 @@ struct TransferSelectionView: View {
         case .indonesian: return "id_ID"
         case .turkish: return TurkishLocalization.phrase("en_US")
         case .arabic: return "ar_SA"
-        case .english, .malay: return "en_US"
-            case .malay: return "ms_MY"
+        case .english: return "en_US"
+        case .malay: return "ms_MY"
         case .uzbek: return "uz_Latn_UZ"
         case .uzbekCyrillic: return "uz_Cyrl_UZ"
         }

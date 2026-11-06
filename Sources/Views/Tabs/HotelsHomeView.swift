@@ -16,12 +16,30 @@ struct HotelsHomeView: View {
     @State private var packageShareArtifacts: IumrahPackageShareArtifacts?
     @State private var packageShareError: String?
     @State private var packageAssemblyExpanded = false
+    @State private var guidedFlightBooking = false
     @State private var showInTabFlightFirstFlow = false
+    @State private var hotelCatalogRefreshSignal = 0
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                IumrahRootPageTitle(title: pageTitle)
+                IumrahRootPageTitle(title: guidedFlightBooking && board == .flights
+                    ? guidedFlowTitle : pageTitle)
+
+                if guidedFlightBooking && board == .flights {
+                    HStack(spacing: 12) {
+                        Text(guidedFlowSubtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 4)
+                        Button(guidedExitTitle) {
+                            guidedFlightBooking = false
+                            chrome.closeGuidedUmrahSearch()
+                            board = .hotels
+                        }
+                        .font(.subheadline.weight(.semibold))
+                    }
+                }
 
                 if board != .flights {
                     AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
@@ -31,6 +49,7 @@ struct HotelsHomeView: View {
                     IumrahJourneyFlowSteps(activeStep: 1)
                 }
 
+                if !guidedFlightBooking {
                 Picker(L10n.text("hotel_storefront_section", settings.language), selection: $board) {
                     Text(L10n.text("tab_hotels", settings.language)).tag(HotelsShowcaseBoard.hotels)
                     Text(L10n.text("hotel_storefront_flights", settings.language)).tag(HotelsShowcaseBoard.flights)
@@ -38,14 +57,13 @@ struct HotelsHomeView: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: board) { _, _ in IumrahHaptics.selection() }
+                }
 
                 switch board {
                 case .hotels:
                     hotelsBoard
-                case .flights:
-                    flightsBoard
-                case .sundayClub:
-                    sundayClubBoard
+                case .flights: flightsBoard
+                case .sundayClub: sundayClubBoard
                 case .services, .visa, .transfer, .guide, .summary:
                     hotelsBoard // Legacy non-visible deep-link targets stay in the storefront.
                 }
@@ -75,8 +93,7 @@ struct HotelsHomeView: View {
                             return
                         }
                         IumrahHaptics.selection()
-                        journey.prepareFlightFirstHotelStage()
-                        showInTabFlightFirstFlow = true
+                        startFlightFirstTrip()
                     }
                 )
                 .padding(.horizontal, IumrahDesign.pagePadding)
@@ -84,6 +101,7 @@ struct HotelsHomeView: View {
             }
         }
         .refreshable {
+            hotelCatalogRefreshSignal += 1
             await storefront.updateDepartureAirport(journey.trip.originCode)
             await storefront.refresh()
         }
@@ -138,10 +156,31 @@ struct HotelsHomeView: View {
         }
     }
 
+    // Complete the flight selection and continue to hotels inside the same tab.
+    private func startFlightFirstTrip() {
+        guard journey.hasCompleteStagedFlightSelection else { return }
+        journey.prepareFlightFirstHotelStage()
+        showInTabFlightFirstFlow = true
+    }
+
     private func applyRequestedBoard() {
         guard let requested = chrome.requestedHotelsBoard else { return }
         board = requested
+        guidedFlightBooking = requested == .flights && chrome.isGuidedUmrahSearch
+        packageAssemblyExpanded = false
         chrome.requestedHotelsBoard = nil
+    }
+
+    private var guidedFlowTitle: String { guidedCopy("Соберите умру", "Build your Umrah", "Umrani yig‘ing", "Умрани йиғинг") }
+    private var guidedFlowSubtitle: String { guidedCopy("Шаг 1 из 4 · Авиабилеты", "Step 1 of 4 · Flights", "1/4 · Reyslar", "1/4 · Рейслар") }
+    private var guidedExitTitle: String { guidedCopy("Закрыть", "Close", "Yopish", "Ёпиш") }
+    private func guidedCopy(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
+        switch settings.language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return cy
+        default: return en
+        }
     }
 
     private var pageTitle: String {
@@ -158,6 +197,8 @@ struct HotelsHomeView: View {
 
     private var hotelsBoard: some View {
         VStack(alignment: .leading, spacing: 24) {
+            NuiteeHotelsCatalogView(refreshSignal: hotelCatalogRefreshSignal)
+
             ShowcaseHero(
                 asset: "IumrahHotelsShowcaseHero",
                 title: "iumrah Hotels",
@@ -238,12 +279,21 @@ struct HotelsHomeView: View {
 
     private var flightsBoard: some View {
         VStack(alignment: .leading, spacing: 28) {
-            IumrahFlightDiscoveryView()
-                .environmentObject(settings)
-                .environmentObject(journey)
-                .environmentObject(chrome)
+            if guidedFlightBooking {
+                IumrahFlightDiscoveryView(guidedUmrah: true)
+                    .id(chrome.guidedUmrahSearchRevision)
+                    .environmentObject(settings)
+                    .environmentObject(journey)
+                    .environmentObject(chrome)
+            } else {
+                // The unrestricted Aviasales discovery remains a separate storefront feature.
+                IumrahFlightDiscoveryView()
+                    .environmentObject(settings)
+                    .environmentObject(journey)
+                    .environmentObject(chrome)
+            }
 
-            if !readyFlightOptions.isEmpty {
+            if !guidedFlightBooking && !readyFlightOptions.isEmpty {
                 VStack(alignment: .leading, spacing: 14) {
                     SectionHeader(
                         readyPackagesTitle,
@@ -268,7 +318,7 @@ struct HotelsHomeView: View {
                         }
                     }
                 }
-            } else if storefront.isLoading {
+            } else if !guidedFlightBooking && storefront.isLoading {
                 HStack(spacing: 10) {
                     ProgressView()
                     Text(readyPackagesLoadingText)
@@ -573,23 +623,9 @@ private struct IumrahPackageAssemblyBar: View {
                             flightRow(selection)
                         }
 
-                        Button(action: onContinue) {
-                            HStack {
-                                Text(continueTitle)
-                                Spacer()
-                                Image(systemName: canContinue ? "arrow.right" : "airplane.arrival")
-                            }
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(canContinue ? Color.iumrahPrimaryButtonText : Color.secondary)
-                            .padding(.horizontal, 15)
-                            .frame(height: 48)
-                            .background(
-                                canContinue ? Color.iumrahPrimaryButtonBackground : Color.primary.opacity(0.06),
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canContinue)
+                        Text(summaryText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -630,8 +666,30 @@ private struct IumrahPackageAssemblyBar: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            Button(action: onContinue) {
+                HStack(spacing: 10) {
+                    Image(systemName: canContinue ? "checkmark.circle.fill" : "info.circle")
+                    Text(continueTitle)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    if canContinue { Image(systemName: "arrow.right") }
+                }
+                .font(.subheadline.weight(.bold))
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .padding(.horizontal, 14)
+                .foregroundStyle(canContinue ? Color.iumrahPrimaryButtonText : Color.secondary)
+                .background(canContinue ? Color.iumrahPrimaryButtonBackground : Color.primary.opacity(0.06),
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canContinue)
+            .accessibilityHint(canContinue ? "" : continueTitle)
+            .padding(.horizontal, 9)
+            .padding(.bottom, 9)
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.8)
@@ -1918,13 +1976,11 @@ struct StorefrontUmrahPackageDetailView: View {
                 preview: preview
             )
         }
-        .sheet(isPresented: $isProfileSheetPresented) {
-            NavigationStack {
-                IumrahBookingConfirmationView(createBooking: { profile in
-                    try await createBooking(profile: profile)
-                })
-                .environmentObject(settings)
-            }
+        .navigationDestination(isPresented: $isProfileSheetPresented) {
+            IumrahBookingConfirmationView(createBooking: { profile in
+                try await createBooking(profile: profile)
+            })
+            .environmentObject(settings)
         }
         .sheet(item: $shareArtifacts) { artifacts in
             IumrahPackageActivitySheet(artifacts: artifacts)

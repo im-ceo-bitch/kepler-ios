@@ -41,6 +41,9 @@ final class AppChromeStore: ObservableObject {
     @Published var requestedHotelConfiguratorID: String?
     @Published var requestedHotelConfiguratorDeepLink: HotelConfiguratorDeepLink?
     @Published var requestedHotelsBoard: HotelsShowcaseBoard?
+    /// A new guided journey is distinct from ordinary browsing of the Flights board.
+    @Published private(set) var guidedUmrahSearchRevision = 0
+    @Published private(set) var isGuidedUmrahSearch = false
     @Published var requestedHotelTabSearch: IumrahHotelTabSearch?
     @Published var requestedPackageID: String?
     @Published var isImmersiveMode = false
@@ -86,10 +89,25 @@ final class AppChromeStore: ObservableObject {
     }
 
     func openHotels(board: HotelsShowcaseBoard) {
+        isGuidedUmrahSearch = false
         requestedHotelsBoard = board
         currentTab = .hotels
         requestedTab = .hotels
         IumrahHaptics.selection()
+    }
+
+    func openGuidedUmrahSearch() {
+        guidedUmrahSearchRevision &+= 1
+        isGuidedUmrahSearch = true
+        requestedHotelsBoard = .flights
+        currentTab = .hotels
+        requestedTab = .hotels
+        IumrahHaptics.selection()
+    }
+
+    func closeGuidedUmrahSearch() {
+        isGuidedUmrahSearch = false
+        requestedHotelsBoard = .hotels
     }
 
     func openPackage(id: String) {
@@ -100,11 +118,11 @@ final class AppChromeStore: ObservableObject {
     }
 
     func startNewTrip() {
-        shouldStartTripBuilder = true
+        // Every public “start a trip” entry point opens the same Home search.
+        // Keep the legacy TripBuilder view for existing deep links, not new sessions.
+        shouldStartTripBuilder = false
         shouldStartFlightFirstBuilder = false
-        currentTab = .booking
-        requestedTab = .booking
-        IumrahHaptics.selection()
+        openUmrahPlan()
     }
 
     func startFlightFirstTrip() {

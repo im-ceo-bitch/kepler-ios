@@ -82,6 +82,9 @@ struct PrimaryHotelView: View {
                             flightFirstTierSelector
                         }
                         hotelContent
+                        if entryMode == .flightFirst {
+                            hotelCompletionStatus
+                        }
                         cityAndStarNavigation
                         availableHotels
                     }
@@ -137,6 +140,21 @@ struct PrimaryHotelView: View {
     }
 
     private var pinnedContinueButton: some View {
+        VStack(spacing: 8) {
+            if !canContinue {
+                HStack(spacing: 9) {
+                    Image(systemName: "info.circle")
+                    Text(missingHotelReason)
+                        .font(.footnote.weight(.medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    if journey.selectedHotel != nil && requiresMadinah && journey.selectedMadinahHotel == nil {
+                        Button(localizedMadinah) { activeHotelCity = .madinah }
+                            .font(.footnote.weight(.semibold))
+                    }
+                }
+                .foregroundStyle(.secondary)
+            }
         Group {
             if journey.packageFlightPath == .publishedDirect || journey.packageFlightPath == .aviasalesSelected {
                 Button {
@@ -156,11 +174,39 @@ struct PrimaryHotelView: View {
         }
         .buttonStyle(IumrahPrimaryButtonStyle())
         .opacity(canContinue && !isPreparingPublishedPackage ? 1 : 0.46)
+        }
         .padding(.horizontal, IumrahDesign.pagePadding)
         .padding(.top, 10)
         .padding(.bottom, 8)
         // No opaque safe-area shelf. The button floats over the existing page.
         .background(Color.clear)
+    }
+
+    private var missingHotelReason: String {
+        if journey.selectedHotel == nil {
+            return stepText("Выберите отель в Мекке", "Choose a Makkah hotel", "Makkada mehmonxona tanlang", "Маккада меҳмонхона танланг", "Mekke otelini seçin", "اختر فندقًا في مكة", "Pilih hotel di Makkah", "Pilih hotel di Makkah")
+        }
+        if requiresMadinah && journey.selectedMadinahHotel == nil {
+            return stepText("Осталось выбрать отель в Медине", "Choose your Madinah hotel next", "Madinada mehmonxona tanlang", "Мадинада меҳмонхона танланг", "Medine otelini seçin", "اختر فندقًا في المدينة", "Pilih hotel di Madinah", "Pilih hotel di Madinah")
+        }
+        return ""
+    }
+
+    private var hotelCompletionStatus: some View {
+        HStack(spacing: 12) {
+            Label(stepText("Мекка", "Makkah", "Makka", "Макка", "Mekke", "مكة", "Makkah", "Makkah"),
+                  systemImage: journey.selectedHotel == nil ? "circle" : "checkmark.circle.fill")
+            if requiresMadinah {
+                Spacer(minLength: 4)
+                Label(stepText("Медина", "Madinah", "Madina", "Мадина", "Medine", "المدينة", "Madinah", "Madinah"),
+                      systemImage: journey.selectedMadinahHotel == nil ? "circle" : "checkmark.circle.fill")
+            }
+        }
+        .font(.subheadline.weight(.semibold))
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .combine)
     }
 
     private func continueLabel(_ text: String) -> some View {
@@ -533,7 +579,24 @@ struct PrimaryHotelView: View {
     private var availableHotels: some View {
         LazyVStack(spacing: 12) {
             if orderedHotels.isEmpty {
-                ContentUnavailableView(emptyHotelsTitle, systemImage: "building.2.crop.circle")
+                VStack(spacing: 12) {
+                    ContentUnavailableView(emptyHotelsTitle, systemImage: "building.2.crop.circle",
+                        description: Text(journey.errorMessage ?? emptyHotelHelp))
+                    HStack(spacing: 12) {
+                        Button(stepText("Повторить", "Retry", "Qayta urinish", "Қайта уриниш", "Tekrar dene", "أعد المحاولة", "Coba lagi", "Cuba lagi")) {
+                            Task {
+                                if activeHotelCity == .makkah { await journey.loadMakkahHotels() }
+                                else { await journey.loadMadinahHotels() }
+                            }
+                        }
+                        .buttonStyle(IumrahSecondaryButtonStyle())
+                        Button(stepText("Все категории", "All categories", "Barcha toifalar", "Барча тоифалар", "Tüm kategoriler", "كل الفئات", "Semua kategori", "Semua kategori")) {
+                            starFilter = nil
+                        }
+                        .buttonStyle(IumrahSecondaryButtonStyle())
+                        .disabled(starFilter == nil)
+                    }
+                }
             } else {
                 ForEach(orderedHotels) { hotel in
                     alternativeHotelRow(hotel)
@@ -569,6 +632,7 @@ struct PrimaryHotelView: View {
 
     private var allHotelsTitle: String { stepText("Все", "All", "Barchasi", "Барчаси", "Tümü", "الكل", "Semua", "Semua") }
     private var emptyHotelsTitle: String { stepText("Нет доступных отелей", "No hotels available", "Mehmonxona topilmadi", "Меҳмонхона топилмади", "Otel bulunamadı", "لا توجد فنادق", "Tidak ada hotel tersedia", "Tiada hotel tersedia") }
+    private var emptyHotelHelp: String { stepText("Измените категорию или повторите загрузку. Ваши рейсы сохранены.", "Change category or retry. Your flights are saved.", "Toifani o‘zgartiring yoki qayta urinib ko‘ring. Reyslar saqlangan.", "Тоифани ўзгартиринг ёки қайта уриниб кўринг. Рейслар сақланган.", "Kategoriyi değiştirin veya yeniden deneyin.", "غيّر الفئة أو أعد المحاولة.", "Ubah kategori atau coba lagi.", "Tukar kategori atau cuba lagi.") }
     private var selectHotelTitle: String { stepText("Выбрать", "Select", "Tanlash", "Танлаш", "Seç", "اختيار", "Pilih", "Pilih") }
     private var selectedHotelTitle: String { stepText("Выбран", "Selected", "Tanlandi", "Танланди", "Seçildi", "تم الاختيار", "Dipilih", "Dipilih") }
     private var priceLoadingText: String { stepText("Расчёт…", "Calculating…", "Hisoblanmoqda…", "Ҳисобланмоқда…", "Hesaplanıyor…", "جارٍ الحساب…", "Menghitung…", "Mengira…") }

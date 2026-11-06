@@ -104,11 +104,11 @@ struct FinalPackageView: View {
                                         .padding(.horizontal, 4)
                                 }
 
-                                packagePrimaryActionButton
+                                // The booking action lives in the persistent bottom bar.
                             }
                             .padding(.horizontal, IumrahDesign.pagePadding)
                             .padding(.top, 10)
-                            .padding(.bottom, 32)
+                            .padding(.bottom, 200) // Scroll clearance for the fixed booking summary.
                             // The complete page is constrained to the physical viewport.
                             // No child can enlarge the vertical ScrollView's content width,
                             // which removes the browser-like horizontal drift.
@@ -123,6 +123,11 @@ struct FinalPackageView: View {
                 }
             }
         }
+        .overlay(alignment: .bottom) {
+            if createdSession == nil {
+                pinnedBookingSummary
+            }
+        }
         .iumrahInternalNavigation(progress: .ready, showsGeneratorAmbient: true)
         .task {
             if !journey.hasFinalGeneratorQuote {
@@ -132,13 +137,11 @@ struct FinalPackageView: View {
             }
             await push.refreshAndRegisterIfAllowed()
         }
-        .sheet(isPresented: $isProfileSheetPresented) {
-            NavigationStack {
-                IumrahBookingConfirmationView(createBooking: { profile in
-                    try await createBooking(profile: profile)
-                })
-                .environmentObject(settings)
-            }
+        .navigationDestination(isPresented: $isProfileSheetPresented) {
+            IumrahBookingConfirmationView(createBooking: { profile in
+                try await createBooking(profile: profile)
+            })
+            .environmentObject(settings)
         }
         .sheet(isPresented: $showCareExplanation) {
             UmrahCarePackageExplanationView()
@@ -152,6 +155,72 @@ struct FinalPackageView: View {
                 BookingDetailView(bookingID: createdSession.id)
             }
         }
+    }
+
+    private var pinnedBookingSummary: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(localizedFinal("Итого за пакет", "Package total", "Paket jami", "Пакет жами"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let quote = focusedComparisonOption?.quote ?? journey.quote, journey.hasFinalGeneratorQuote {
+                        Text(NSDecimalNumber(decimal: quote.totalPackagePrice).doubleValue
+                            .formatted(.currency(code: quote.currency).precision(.fractionLength(0))))
+                            .font(.title2.bold())
+                            .monospacedDigit()
+                    } else {
+                        Text(isCalculatingPrice ? calculatingPriceTitle : pricingUnavailableTitle)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
+                Spacer(minLength: 0)
+                Text(packageForTravelersTitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if !canBook && !isCalculatingPrice {
+                Text(bookingBlockerText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if journey.hasFinalGeneratorQuote {
+                packagePrimaryActionButton
+            } else {
+                Button(retryPricingTitle) {
+                    Task { await recalculatePrice(forceHotelRefresh: true) }
+                }
+                .buttonStyle(IumrahPrimaryButtonStyle())
+                .disabled(isCalculatingPrice)
+            }
+        }
+        .padding(.horizontal, IumrahDesign.pagePadding)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+        .background(.regularMaterial)
+    }
+
+    private var bookingBlockerText: String {
+        if journey.selectedOutbound?.isVerifiedForBooking != true {
+            return localizedFinal("Не подтверждён выбранный рейс туда. Вернитесь к авиабилетам.",
+                "Outbound flight is not verified. Return to flights.",
+                "Borish reysi tasdiqlanmagan. Reyslarga qayting.",
+                "Бориш рейси тасдиқланмаган. Рейсларга қайтинг.")
+        }
+        if journey.trip.isRoundTripFlight && journey.selectedInbound?.isVerifiedForBooking != true {
+            return localizedFinal("Не подтверждён обратный рейс. Вернитесь к авиабилетам.",
+                "Return flight is not verified. Return to flights.",
+                "Qaytish reysi tasdiqlanmagan.", "Қайтиш рейси тасдиқланмаган.")
+        }
+        if journey.selectedHotel == nil || (needsMadinah && journey.selectedMadinahHotel == nil) {
+            return localizedFinal("Нужно выбрать отели для всех городов маршрута.",
+                "Choose a hotel for each city on your route.",
+                "Yo‘nalishdagi barcha shaharlarda mehmonxona tanlang.",
+                "Йўналишдаги барча шаҳарларда меҳмонхона танланг.")
+        }
+        return localizedFinal("Проверяем актуальную стоимость у поставщиков.",
+            "Checking current supplier prices.", "Joriy narx tekshirilmoqda.", "Жорий нарх текширилмоқда.")
     }
 
     private var pricingStatusCard: some View {

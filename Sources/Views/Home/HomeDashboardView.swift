@@ -2425,7 +2425,8 @@ private struct IumrahHomeJourneySearchHero: View {
             FlightDateCalendarView(
                 trip: journey.trip,
                 initialDeparture: journey.trip.departureDate,
-                initialReturn: journey.trip.returnDate
+                initialReturn: journey.trip.returnDate,
+                publishedOnly: true
             ) { selection in
                 journey.resetAfterTripChange()
                 journey.clearStagedUmrahFlights()
@@ -2523,6 +2524,16 @@ private struct IumrahHomeJourneySearchHero: View {
                     .frame(minHeight: 46)
             }
 
+            VStack(alignment: .leading, spacing: 7) {
+                fieldCaption(tr("Маршрут умры", "Your Umrah route", "Umra yo‘nalishi", "Умра йўналиши"))
+                HStack(spacing: 9) {
+                    routeOption(.makkahOnly,
+                        title: tr("Только Мекка", "Makkah only", "Faqat Makka", "Фақат Макка"))
+                    routeOption(.makkahAndMadinah,
+                        title: tr("Мекка + Медина", "Makkah + Madinah", "Makka + Madina", "Макка + Мадина"))
+                }
+            }
+
             Button { showingCalendar = true } label: {
                 HStack(spacing: 8) {
                     dateColumn(title: tr("Вылет", "Departure", "Uchish", "Учиш"), date: journey.trip.departureDate)
@@ -2578,6 +2589,13 @@ private struct IumrahHomeJourneySearchHero: View {
             .disabled(!isValidSearch)
             .opacity(isValidSearch ? 1 : 0.5)
 
+            Text(tr("Сначала покажем опубликованные рейсы. На другие даты прямые рейсы могут отсутствовать.",
+                    "We'll show published flights first. Direct flights may not be available on every date.",
+                    "Avval e’lon qilingan reyslar ko‘rsatiladi. Barcha sanalarda to‘g‘ridan-to‘g‘ri reys bo‘lmasligi mumkin.",
+                    "Аввал эълон қилинган рейслар кўрсатилади. Ҳамма санада тўғридан-тўғри рейс бўлмаслиги мумкин."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(tr("Рейс → Отель → Трансфер → Итог", "Flight → Hotel → Transfer → Review",
                     "Reys → Mehmonxona → Transfer → Yakun", "Рейс → Меҳмонхона → Трансфер → Якун"))
                 .font(IumrahType.regular(12, relativeTo: .caption))
@@ -2591,6 +2609,32 @@ private struct IumrahHomeJourneySearchHero: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color(uiColor: .separator), lineWidth: 0.8)
         }
+    }
+
+    private func routeOption(_ scope: JourneyScope, title: String) -> some View {
+        let selected = journey.trip.scope == scope
+        return Button {
+            guard !selected else { return }
+            journey.resetAfterTripChange()
+            journey.clearStagedUmrahFlights()
+            journey.trip.scope = scope
+            if scope == .makkahOnly {
+                journey.trip.arrivalAirport = .jeddah
+                journey.trip.selectedReturnAirport = .jeddah
+            } else {
+                journey.trip.selectedReturnAirport = nil
+            }
+            IumrahHaptics.selection()
+        } label: {
+            Text(title)
+                .font(IumrahType.bold(13, relativeTo: .subheadline))
+                .foregroundStyle(selected ? Color.white : Color.iumrahInk)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(selected ? Color.iumrahRoyalViolet : Color.iumrahRaisedBackground,
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func dateColumn(title: String, date: Date) -> some View {
@@ -2627,7 +2671,7 @@ private struct IumrahHomeJourneySearchHero: View {
         journey.trip.flightTripType = .roundTrip
         journey.trip.flexibility = .exact
         journey.packageFlightPath = .publishedDirect
-        chrome.openHotels(board: .flights)
+        chrome.openGuidedUmrahSearch()
     }
 }
 

@@ -11,6 +11,16 @@ struct FlightDateCalendarView: View {
     let initialDeparture: Date
     let initialReturn: Date
     let onApply: (FlightDateCalendarResult) -> Void
+    let publishedOnly: Bool
+
+    init(trip: TripDraft, initialDeparture: Date, initialReturn: Date,
+         publishedOnly: Bool = false, onApply: @escaping (FlightDateCalendarResult) -> Void) {
+        self.trip = trip
+        self.initialDeparture = initialDeparture
+        self.initialReturn = initialReturn
+        self.publishedOnly = publishedOnly
+        self.onApply = onApply
+    }
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -234,11 +244,13 @@ struct FlightDateCalendarView: View {
 
     private func dayCell(_ date: Date) -> some View {
         let day = calendar.startOfDay(for: date)
-        let disabled = day < calendar.startOfDay(for: Date())
+        // Guided Umrah accepts only dates backed by published direct flights.
+        // The independent flexible-flight calendar retains its original behavior.
+        let directDay = isRecommendedDay(day)
+        let disabled = day < calendar.startOfDay(for: Date()) || (publishedOnly && !directDay)
         let isDeparture = departure.map { calendar.isDate($0, inSameDayAs: day) } ?? false
         let isReturn = returnDate.map { calendar.isDate($0, inSameDayAs: day) } ?? false
         let inRange = isInsideSelectedRange(day)
-        let directDay = isRecommendedDay(day)
         let directPair = selectedPublishedSelection != nil
 
         return Button {
@@ -379,24 +391,26 @@ struct FlightDateCalendarView: View {
                 .foregroundStyle(Color.iumrahCardBackground)
                 .background(Color.green, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
 
-                Button {
-                    guard let departure, let returnDate else { return }
-                    IumrahHaptics.success()
-                    onApply(FlightDateCalendarResult(
-                        departure: departure,
-                        returnDate: returnDate,
-                        publishedSelection: nil
-                    ))
-                    dismiss()
-                } label: {
-                    Text(copy(.continueFlexible))
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
+                if !publishedOnly {
+                    Button {
+                        guard let departure, let returnDate else { return }
+                        IumrahHaptics.success()
+                        onApply(FlightDateCalendarResult(
+                            departure: departure,
+                            returnDate: returnDate,
+                            publishedSelection: nil
+                        ))
+                        dismiss()
+                    } label: {
+                        Text(copy(.continueFlexible))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
+                    .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.primary)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
             }
             .padding(22)
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))

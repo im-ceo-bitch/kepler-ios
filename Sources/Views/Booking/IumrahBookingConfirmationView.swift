@@ -394,7 +394,7 @@ struct IumrahBookingConfirmationView: View {
                     .symbolEffect(.bounce, value: successPulse)
             }
             .padding(.top, 48)
-            Text(copy("Ваше бронирование Umrah-пакета подтверждено", "Your Umrah package booking is confirmed", "Umra paketingiz bron qilingani tasdiqlandi", "Умра пакетингиз брон қилингани тасдиқланди", "تم تأكيد طلب الحجز"))
+            Text(copy("Заявка создана. Проверяем наличие", "Request created. Checking availability", "Ariza yaratildi. Mavjudlik tekshirilmoqda", "Ариза яратилди. Мавжудлик текширилмоқда", "تم إنشاء الطلب. نتحقق من التوفر"))
                 .font(.system(size: 28, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
             Text(copy("Подождите повторной проверки наличия отелей, авиабилетов и остальных услуг: цены могут меняться несколько раз в день. Сейчас вы ничего не оплачиваете. Оплата откроется после подтверждения наличия.",

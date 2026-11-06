@@ -15,6 +15,11 @@ private enum FlightDiscoverySearchMode: String, CaseIterable, Identifiable {
 }
 
 struct IumrahFlightDiscoveryView: View {
+    let guidedUmrah: Bool
+
+    init(guidedUmrah: Bool = false) {
+        self.guidedUmrah = guidedUmrah
+    }
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var chrome: AppChromeStore
@@ -54,6 +59,10 @@ struct IumrahFlightDiscoveryView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
+            if guidedUmrah {
+                guidedSearchContext
+                recommendedFlightsSection
+            } else {
             searchModePicker
             flightSearchConfigurationCard
 
@@ -69,21 +78,24 @@ struct IumrahFlightDiscoveryView: View {
             } else {
                 recommendedFlightsSection
             }
+            }
         }
         .task {
             seedFromJourneyIfNeeded()
-            syncSearchConfigurationToJourney()
+            // The home form is authoritative in guided mode. Do not write stale
+            // locally seeded search values back into JourneyStore on entry.
+            if !guidedUmrah { syncSearchConfigurationToJourney() }
             await favorites.refreshAllFavorites(language: settings.language)
         }
         .task(id: automaticGlobalSearchKey) {
-            guard seededFromJourney, searchMode == .globalSearch else { return }
+            guard seededFromJourney, !guidedUmrah, searchMode == .globalSearch else { return }
             try? await Task.sleep(for: .milliseconds(320))
             guard !Task.isCancelled else { return }
             performGlobalSearch()
         }
         .task(id: recommendedRefreshKey) {
-            guard searchMode == .iumrahRecommended else { return }
-            syncSearchConfigurationToJourney()
+            guard seededFromJourney, guidedUmrah || searchMode == .iumrahRecommended else { return }
+            if !guidedUmrah { syncSearchConfigurationToJourney() }
             await loadRecommendedFlights()
         }
         .sheet(isPresented: $originPickerPresented) {
@@ -177,6 +189,39 @@ struct IumrahFlightDiscoveryView: View {
         .onChange(of: store.offers) { _, offers in
             favorites.reconcile(offers: offers, currency: store.currency, language: settings.language)
         }
+    }
+
+    private var guidedSearchContext: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Ваша поездка", "Your journey", "Safaringiz", "Сафарингиз"))
+                        .font(.headline)
+                    Text("\(journey.trip.originCode) · \(shortDate(journey.trip.departureDate)) – \(shortDate(journey.trip.returnDate))")
+                        .font(.subheadline.monospacedDigit())
+                    Text("\(journey.trip.travelerCount) · \(journey.trip.scope.title(settings.language))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    chrome.navigate(to: .home)
+                } label: {
+                    Label(tr("Изменить", "Edit", "O‘zgartirish", "Ўзгартириш"), systemImage: "pencil")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.iumrahRoyalViolet)
+            }
+            Text(tr("Выберите прямой рейс туда и обратно. Продолжение появится внизу экрана.",
+                    "Select a published outbound and return flight. Continue below.",
+                    "Borish va qaytish reyslarini tanlang. Davom etish tugmasi pastda.",
+                    "Бориш ва қайтиш рейсларини танланг. Давом этиш тугмаси пастда."))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var searchModePicker: some View {
@@ -296,9 +341,30 @@ struct IumrahFlightDiscoveryView: View {
             )
 
             if let recommendedError, recommendedOutboundFlights.isEmpty && recommendedReturnFlights.isEmpty {
-                Text(recommendedError)
-                    .font(.caption)
+                Label(recommendedError, systemImage: "wifi.exclamationmark")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
+            }
+            if guidedUmrah && !recommendedLoading &&
+                (recommendedError != nil || recommendedOutboundFlights.isEmpty || recommendedReturnFlights.isEmpty) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(tr("На выбранные даты опубликованы не все необходимые рейсы. Вы можете выбрать другие даты или повторить запрос.",
+                            "Some required published flights are unavailable for these dates. Change your dates or retry.",
+                            "Tanlangan sanalarda barcha kerakli reyslar yo‘q. Sanalarni o‘zgartiring yoki takrorlang.",
+                            "Танланган саналарда барча керакли рейслар йўқ. Санани ўзгартиринг ёки такрорланг."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 12) {
+                        Button(tr("Изменить даты", "Change dates", "Sanani o‘zgartirish", "Санани ўзгартириш")) {
+                            chrome.navigate(to: .home)
+                        }
+                        .buttonStyle(IumrahSecondaryButtonStyle())
+                        Button(tr("Повторить", "Retry", "Qayta urinish", "Қайта уриниш")) {
+                            Task { await loadRecommendedFlights() }
+                        }
+                        .buttonStyle(IumrahSecondaryButtonStyle())
+                    }
+                }
             }
         }
     }
@@ -1215,10 +1281,12 @@ struct IumrahFlightDiscoveryView: View {
 
     private var recommendedRefreshKey: String {
         [
-            searchMode.rawValue, originCode, destinationCode.uppercased(), recommendedReturnOriginCode,
+            seededFromJourney ? "seeded" : "unseeded", guidedUmrah ? "guided" : searchMode.rawValue,
+            originCode, destinationCode.uppercased(), recommendedReturnOriginCode,
             IumrahFlightDiscoveryStore.dayFormatter.string(from: departureDate),
             IumrahFlightDiscoveryStore.dayFormatter.string(from: returnDate),
-            journey.trip.scope.rawValue
+            journey.trip.scope.rawValue,
+            String(journey.trip.adults), String(journey.trip.children), String(journey.trip.infants)
         ].joined(separator: "|")
     }
 
@@ -1405,8 +1473,11 @@ struct IumrahFlightDiscoveryView: View {
         trip.origin = originCode
         trip.originAirport = journey.trip.originAirport
         do {
-            recommendedFlights = try await CuratedFlightRecommendationService.shared.load(trip: trip)
+            let flights = try await CuratedFlightRecommendationService.shared.load(trip: trip)
+            guard !Task.isCancelled else { return }
+            recommendedFlights = flights
         } catch {
+            guard !Task.isCancelled else { return }
             recommendedFlights = []
             recommendedError = error.localizedDescription
         }

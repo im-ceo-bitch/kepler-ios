@@ -133,7 +133,18 @@ struct OnboardingFlowView: View {
     }
 
     private func topBar(topInset: CGFloat) -> some View {
-        HStack {
+        HStack(spacing: 12) {
+            Button {
+                finishOnboarding()
+            } label: {
+                Text(settings.language == .russian ? "Пропустить" :
+                     settings.language == .uzbek ? "O‘tkazib yuborish" :
+                     settings.language == .uzbekCyrillic ? "Ўтказиб юбориш" : "Skip")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(headerForeground)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityHint(settings.language == .russian ? "Перейти к выбору поездки" : "Go to trip planning")
             Spacer()
 
             Menu {

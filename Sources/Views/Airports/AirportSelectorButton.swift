@@ -4,6 +4,8 @@ struct AirportSelectorButton: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Binding var airport: Airport?
     @Binding var fallbackCode: String
+    var cornerRadius: CGFloat = 17
+    var monochrome: Bool = false
     @State private var isPresented = false
     @StateObject private var locator = DepartureAirportLocationResolver()
 
@@ -14,13 +16,21 @@ struct AirportSelectorButton: View {
                 IumrahHaptics.soft()
             } label: {
                 HStack(spacing: 13) {
-                    IumrahIconBadge(
-                        systemName: "airplane.departure",
-                        role: .travel,
-                        size: 38,
-                        symbolSize: 17,
-                        shape: .circle
-                    )
+                    if monochrome {
+                        Image(systemName: "airplane.departure")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.iumrahSignatureBlack)
+                            .frame(width: 42, height: 42)
+                            .background(Color.iumrahRaisedBackground, in: Circle())
+                    } else {
+                        IumrahIconBadge(
+                            systemName: "airplane.departure",
+                            role: .travel,
+                            size: 38,
+                            symbolSize: 17,
+                            shape: .circle
+                        )
+                    }
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L10n.text("airport_title", settings.language))
@@ -65,7 +75,7 @@ struct AirportSelectorButton: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .iumrahGlass(in: RoundedRectangle(cornerRadius: 17, style: .continuous), interactive: true)
+        .iumrahGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous), interactive: true)
         .sheet(isPresented: $isPresented) {
             AirportPickerView(selection: $airport, fallbackCode: $fallbackCode)
         }

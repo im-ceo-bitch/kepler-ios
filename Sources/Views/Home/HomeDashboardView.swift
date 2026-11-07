@@ -144,16 +144,29 @@ struct HomeDashboardView: View {
             // Same adaptive page-column rule as Account/Gear. Padding is part of
             // the column first; the outer frame then clamps the whole tree to the viewport.
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 12)
+            // The first hero starts flush below the iPhone status-bar safe area.
+            // A top gap exposes the page background between the status bar and hero.
             .padding(.bottom, 46)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .background(Color.iumrahPageBackground)
+            // Only the page content is gray. Do not extend this surface into the
+            // TOP safe area or it paints a pale strip behind the iPhone status bar.
+            .background {
+                Color.iumrahPageBackground
+                    .ignoresSafeArea(edges: .bottom)
+            }
             .onChange(of: focusJourneySearchRevision) { _, _ in
                 withAnimation(.easeInOut(duration: 0.28)) {
                     scrollProxy.scrollTo("journey-search", anchor: .top)
                 }
             }
+        }
+        // The header's background must be owned by the page, outside the
+        // ScrollView. Its black surface extends into the TOP safe area while
+        // the actual controls remain inside the safe area, below the status bar.
+        .background {
+            Color.iumrahSignatureBlack
+                .ignoresSafeArea(edges: .top)
         }
     }
 
@@ -2415,10 +2428,10 @@ private struct IumrahHomeJourneySearchHero: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            violetTop
+            blackTop
             searchCard
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, -56)
+                .padding(.top, -39)
                 .padding(.bottom, 2)
         }
         .sheet(isPresented: $showingCalendar) {
@@ -2455,64 +2468,108 @@ private struct IumrahHomeJourneySearchHero: View {
         }
     }
 
-    private var violetTop: some View {
-        VStack(alignment: .leading, spacing: 20) {
+    // Main-page-only identity: the existing monochrome world atlas and the
+    // existing light wordmark, without changing other tabs or global tokens.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var headlineIndex = 0
+
+    private var headlineOptions: [String] {
+        [
+            tr("Ваша умра. Ваш путь.", "Your Umrah. Your way.", "Umrangiz. O‘z yo‘lingiz.", "Умрангиз. Ўз йўлингиз."),
+            tr("Вместе с близкими.", "Together with those you love.", "Yaqinlaringiz bilan birga.", "Яқинларингиз билан бирга."),
+            tr("Всё путешествие — в одном месте.", "Your entire journey. One place.", "Butun safar bir joyda.", "Бутун сафар бир жойда.")
+        ]
+    }
+
+    private var blackTop: some View {
+        VStack(alignment: .leading, spacing: 27) {
             HStack(spacing: 12) {
+                Button { chrome.openNotifications() } label: {
+                    Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
+                        .frame(width: 46, height: 46)
+                        .background(.white.opacity(0.11), in: Circle())
+                }
+                .accessibilityLabel(tr("Уведомления", "Notifications", "Bildirishnomalar", "Билдиришномалар"))
+
+                Spacer(minLength: 0)
                 Image("HeaderWordmarkLight")
                     .resizable()
                     .renderingMode(.template)
                     .scaledToFit()
                     .foregroundStyle(.white)
-                    .frame(width: 136, height: 39, alignment: .leading)
+                    .frame(width: 160, height: 49)
                     .accessibilityLabel("iumrah")
                 Spacer(minLength: 0)
-                Button { chrome.openNotifications() } label: {
-                    Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                        .frame(width: 44, height: 44)
-                        .background(.white.opacity(0.15), in: Circle())
-                }
-                .accessibilityLabel(tr("Уведомления", "Notifications", "Bildirishnomalar", "Билдиришномалар"))
+
                 if navigationChromeStyle == .drawer {
                     Button { chrome.openSidebar() } label: {
                         Image(systemName: "line.3.horizontal")
-                            .frame(width: 44, height: 44)
-                            .background(.white.opacity(0.15), in: Circle())
+                            .frame(width: 46, height: 46)
+                            .background(.white.opacity(0.11), in: Circle())
                     }
                     .accessibilityLabel(tr("Меню", "Menu", "Menyu", "Меню"))
+                } else {
+                    Color.clear.frame(width: 46, height: 46)
+                        .accessibilityHidden(true)
                 }
             }
-            .font(.system(size: 17, weight: .semibold))
+            .font(.system(size: 18, weight: .medium))
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text(tr("Ваша умра. Ваш путь.", "Your Umrah. Your way.", "Umrangiz. O‘z yo‘lingiz.", "Умрангиз. Ўз йўлингиз."))
-                    .font(IumrahType.bold(34, relativeTo: .largeTitle))
-                    .tracking(-0.9)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-                Text(tr("Выберите даты и семью — мы поможем собрать поездку по шагам.",
-                        "Choose your dates and travelers. Build your trip step by step.",
-                        "Sana va yo‘lovchilarni tanlang. Safarni bosqichma-bosqich tuzing.",
-                        "Сана ва йўловчиларни танланг. Сафарни босқичма-босқич тузинг."))
+            VStack(alignment: .leading, spacing: 13) {
+                ZStack(alignment: .leading) {
+                    ForEach(headlineOptions.indices, id: \.self) { index in
+                        if index == headlineIndex {
+                            Text(headlineOptions[index])
+                                .id(index)
+                                .font(IumrahType.bold(32, relativeTo: .largeTitle))
+                                .tracking(-0.7)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .transition(reduceMotion ? .opacity : .modifier(
+                                    active: IumrahHomeVaporPhase(amount: 1),
+                                    identity: IumrahHomeVaporPhase(amount: 0)
+                                ))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 91, alignment: .leading)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityElement(children: .combine)
+
+                Text(tr("Выберите даты и состав семьи — остальное соберём по шагам.",
+                        "Choose your dates and travelers. We'll guide you through the rest.",
+                        "Sana va sayohatchilarni tanlang. Qolganini birga tuzamiz.",
+                        "Сана ва саёҳатчиларни танланг. Қолганини бирга тузамиз."))
                     .font(IumrahType.regular(15, relativeTo: .subheadline))
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(.white.opacity(0.78))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
         .foregroundStyle(.white)
         .padding(.horizontal, IumrahDesign.pagePadding)
-        .padding(.top, 18)
-        .padding(.bottom, 88)
-        .frame(maxWidth: .infinity, minHeight: 370, alignment: .topLeading)
+        .padding(.top, 16)
+        .padding(.bottom, 62)
+        .frame(maxWidth: .infinity, minHeight: 290, alignment: .topLeading)
         .background {
-            UnevenRoundedRectangle(bottomLeadingRadius: 28, bottomTrailingRadius: 28)
-                .fill(Color.iumrahRoyalViolet)
+            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33, waveSpeed: 0.55, waveIntensity: 0.7)
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 15, bottomTrailingRadius: 15))
                 .ignoresSafeArea(edges: .top)
+        }
+        .task(id: scenePhase == .active && !reduceMotion) {
+            guard scenePhase == .active && !reduceMotion else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { break }
+                withAnimation(.easeInOut(duration: 0.7)) {
+                    headlineIndex = (headlineIndex + 1) % headlineOptions.count
+                }
+            }
         }
     }
 
     private var searchCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 16) {
             Text(tr("Начните путешествие", "Plan your journey", "Safarni boshlang", "Сафарни бошланг"))
                 .font(IumrahType.bold(18, relativeTo: .headline))
                 .foregroundStyle(Color.iumrahInk)
@@ -2520,7 +2577,9 @@ private struct IumrahHomeJourneySearchHero: View {
             VStack(alignment: .leading, spacing: 5) {
                 fieldCaption(tr("Город вылета", "Departure city", "Jo‘nash shahri", "Жўнаш шаҳри"))
                 AirportSelectorButton(airport: $journey.trip.originAirport,
-                                      fallbackCode: $journey.trip.origin)
+                                      fallbackCode: $journey.trip.origin,
+                                      cornerRadius: 26,
+                                      monochrome: true)
                     .frame(minHeight: 46)
             }
 
@@ -2542,11 +2601,12 @@ private struct IumrahHomeJourneySearchHero: View {
                     dateColumn(title: tr("Обратно", "Return", "Qaytish", "Қайтиш"), date: journey.trip.returnDate)
                     Spacer(minLength: 0)
                     Image(systemName: "calendar")
-                        .foregroundStyle(Color.iumrahRoyalViolet)
+                        .foregroundStyle(Color.iumrahSignatureBlack)
                 }
-                .padding(13)
-                .frame(minHeight: 66)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 17)
+                .padding(.vertical, 12)
+                .frame(minHeight: 74)
+                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(tr("Выбрать даты поездки", "Choose travel dates", "Safar sanalarini tanlash", "Сафар саналарини танлаш"))
@@ -2554,7 +2614,7 @@ private struct IumrahHomeJourneySearchHero: View {
             Button { showingPassengers = true } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "person.2")
-                        .foregroundStyle(Color.iumrahRoyalViolet)
+                        .foregroundStyle(Color.iumrahSignatureBlack)
                     VStack(alignment: .leading, spacing: 3) {
                         fieldCaption(tr("Паломники", "Travelers", "Ziyoratchilar", "Зиёратчилар"))
                         Text(passengerSummary)
@@ -2565,9 +2625,10 @@ private struct IumrahHomeJourneySearchHero: View {
                     Image(systemName: "chevron.right")
                         .foregroundStyle(Color.iumrahMuted)
                 }
-                .padding(13)
-                .frame(minHeight: 66)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 17)
+                .padding(.vertical, 12)
+                .frame(minHeight: 74)
+                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
             }
             .buttonStyle(.plain)
 
@@ -2581,9 +2642,9 @@ private struct IumrahHomeJourneySearchHero: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 18)
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 54)
+                .frame(minHeight: 58)
                 .background(Color.iumrahSignatureBlack,
-                            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             }
             .buttonStyle(.plain)
             .disabled(!isValidSearch)
@@ -2603,10 +2664,10 @@ private struct IumrahHomeJourneySearchHero: View {
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
         }
-        .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(20)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .strokeBorder(Color(uiColor: .separator), lineWidth: 0.8)
         }
     }
@@ -2630,8 +2691,8 @@ private struct IumrahHomeJourneySearchHero: View {
                 .font(IumrahType.bold(13, relativeTo: .subheadline))
                 .foregroundStyle(selected ? Color.white : Color.iumrahInk)
                 .frame(maxWidth: .infinity, minHeight: 48)
-                .background(selected ? Color.iumrahRoyalViolet : Color.iumrahRaisedBackground,
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(selected ? Color.iumrahSignatureBlack : Color.iumrahRaisedBackground,
+                            in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -2672,6 +2733,23 @@ private struct IumrahHomeJourneySearchHero: View {
         journey.trip.flexibility = .exact
         journey.packageFlightPath = .publishedDirect
         chrome.openGuidedUmrahSearch()
+    }
+}
+
+/// A restrained, native SwiftUI dissolve: opacity, a small vertical drift,
+/// and animated blur. Disabled when Reduce Motion is enabled.
+private struct IumrahHomeVaporPhase: AnimatableModifier {
+    var amount: CGFloat
+    var animatableData: CGFloat {
+        get { amount }
+        set { amount = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(Double(max(0, 1 - amount)))
+            .blur(radius: max(0, amount) * 10)
+            .offset(y: -amount * 9)
     }
 }
 
@@ -2741,7 +2819,7 @@ private struct IumrahHomeJourneyPassengersSheet: View {
                 } label: {
                     Text(tr("Готово", "Done", "Tayyor", "Тайёр"))
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 52)
+                        .frame(minHeight: 58)
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
                 .padding(.horizontal, 20)
@@ -2770,7 +2848,7 @@ private struct IumrahHomeJourneyPassengersSheet: View {
             Spacer(minLength: 4)
             Button(action: decrease) {
                 Image(systemName: "minus")
-                    .frame(width: 42, height: 44)
+                    .frame(width: 46, height: 46)
                     .background(Color.iumrahRaisedBackground, in: Circle())
             }
             .disabled(!canDecrease)
@@ -2778,10 +2856,10 @@ private struct IumrahHomeJourneyPassengersSheet: View {
             Text(String(value))
                 .font(IumrahType.bold(17, relativeTo: .headline))
                 .monospacedDigit()
-                .frame(width: 24)
+                .frame(width: 30)
             Button(action: increase) {
                 Image(systemName: "plus")
-                    .frame(width: 42, height: 44)
+                    .frame(width: 46, height: 46)
                     .background(Color.iumrahRaisedBackground, in: Circle())
             }
             .disabled(!canIncrease)
@@ -2789,6 +2867,6 @@ private struct IumrahHomeJourneyPassengersSheet: View {
         }
         .buttonStyle(.plain)
         .padding(15)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }

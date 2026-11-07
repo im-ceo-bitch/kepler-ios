@@ -27,6 +27,8 @@ struct GeneratorGroupSavingsQuoteSet: Hashable {
 @MainActor
 final class JourneyStore: ObservableObject {
     @Published var trip = TripDraft()
+    /// User-facing ±0…4-day discovery window. Does not change the booked dates.
+    @Published var flightSearchFlexDays: Int = 0
 
     /// Controls the three package-generation paths without changing the persisted
     /// TripDraft contract. Weekend keeps its existing DateFlexibility behavior;

@@ -11,6 +11,7 @@ struct FlightDateCalendarView: View {
     let initialDeparture: Date
     let initialReturn: Date
     let publishedOnly: Bool
+    @Binding private var flexibilityDays: Int
     let onApply: (FlightDateCalendarResult) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -37,12 +38,14 @@ struct FlightDateCalendarView: View {
         initialDeparture: Date,
         initialReturn: Date,
         publishedOnly: Bool = false,
+        flexibilityDays: Binding<Int> = .constant(0),
         onApply: @escaping (FlightDateCalendarResult) -> Void
     ) {
         self.trip = trip
         self.initialDeparture = initialDeparture
         self.initialReturn = initialReturn
         self.publishedOnly = publishedOnly
+        self._flexibilityDays = flexibilityDays
         self.onApply = onApply
     }
 
@@ -55,6 +58,7 @@ struct FlightDateCalendarView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         header
                         stageSwitcher
+                        if publishedOnly { flexibilityPicker }
                         routeSummary
                         availabilityCard
                         selectionSummary
@@ -156,6 +160,50 @@ struct FlightDateCalendarView: View {
             .opacity(disabled ? 0.45 : 1)
         }
         .buttonStyle(.plain)
+    }
+
+    private var flexibilityPicker: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(flexibilityLabel)
+                .font(IumrahType.regular(12, relativeTo: .caption))
+                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                ForEach(0...4, id: \.self) { days in
+                    Button {
+                        flexibilityDays = days
+                        IumrahHaptics.selection()
+                    } label: {
+                        Text(days == 0 ? "0" : "±\(days)")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 42)
+                            .foregroundStyle(flexibilityDays == days ? Color.white : Color.iumrahInk)
+                            .background(flexibilityDays == days ? Color.iumrahSignatureBlack : Color.iumrahRaisedBackground,
+                                        in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(days == 0 ? exactLabel : "±\(days)")
+                }
+            }
+        }
+    }
+
+    private var flexibilityLabel: String {
+        switch settings.language {
+        case .russian: return "Гибкость дат для поиска рейсов"
+        case .uzbek: return "Parvoz qidiruvi uchun moslashuvchan kunlar"
+        case .uzbekCyrillic: return "Парвоз қидируви учун мос кунлар"
+        default: return "Flexible search dates"
+        }
+    }
+
+    private var exactLabel: String {
+        switch settings.language {
+        case .russian: return "Точная дата"
+        case .uzbek: return "Aniq sana"
+        case .uzbekCyrillic: return "Аниқ сана"
+        default: return "Exact date"
+        }
     }
 
     private var routeSummary: some View {

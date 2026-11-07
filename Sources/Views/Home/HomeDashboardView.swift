@@ -24,6 +24,7 @@ struct HomeDashboardView: View {
     @State private var integrationCarouselID: String? = "plan"
     @State private var expandedHomeFAQID: String?
     @State private var showAboutProject = false
+    @State private var showGuidedFlightSelection = false
     @State private var focusJourneySearchRevision = 0
 
     private struct ReadyPackageItem: Identifiable {
@@ -81,6 +82,9 @@ struct HomeDashboardView: View {
                     initialPackageID: selectedHotelPackageID
                 )
             }
+            .navigationDestination(isPresented: $showGuidedFlightSelection) {
+                IumrahGuidedFlightSelectionView()
+            }
             .navigationDestination(isPresented: $showAboutProject) {
                 IumrahStoryView()
             }
@@ -101,7 +105,7 @@ struct HomeDashboardView: View {
         ScrollViewReader { scrollProxy in
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 30) {
-                    IumrahHomeJourneySearchHero()
+                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true })
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
                 if !clientNotifications.homeNotifications.isEmpty {
@@ -2409,6 +2413,7 @@ private extension View {
 /// This search is only a handoff to the live flights catalogue in Hotels.
 /// Nothing is priced, booked or marked available by this view.
 private struct IumrahHomeJourneySearchHero: View {
+    let onSearch: () -> Void
     @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var journey: JourneyStore
@@ -2445,7 +2450,8 @@ private struct IumrahHomeJourneySearchHero: View {
                 trip: journey.trip,
                 initialDeparture: journey.trip.departureDate,
                 initialReturn: journey.trip.returnDate,
-                publishedOnly: true
+                publishedOnly: true,
+                flexibilityDays: $journey.flightSearchFlexDays
             ) { selection in
                 journey.resetAfterTripChange()
                 journey.clearStagedUmrahFlights()
@@ -2625,6 +2631,43 @@ private struct IumrahHomeJourneySearchHero: View {
             .buttonStyle(.plain)
             .accessibilityLabel(tr("Выбрать даты поездки", "Choose travel dates", "Safar sanalarini tanlash", "Сафар саналарини танлаш"))
 
+            Menu {
+                ForEach(FlightCabinClass.allCases) { cabin in
+                    Button {
+                        guard journey.trip.effectiveFlightFilters.cabinClass != cabin else { return }
+                        journey.resetAfterTripChange()
+                        journey.clearStagedUmrahFlights()
+                        var filters = journey.trip.effectiveFlightFilters
+                        filters.cabinClass = cabin
+                        journey.trip.flightFilters = filters
+                        IumrahHaptics.selection()
+                    } label: {
+                        if journey.trip.effectiveFlightFilters.cabinClass == cabin {
+                            Label(cabinTitle(cabin), systemImage: "checkmark")
+                        } else {
+                            Text(cabinTitle(cabin))
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "airplane")
+                        .foregroundStyle(Color.iumrahSignatureBlack)
+                    VStack(alignment: .leading, spacing: 3) {
+                        fieldCaption(tr("Класс перелёта", "Cabin class", "Parvoz klassi", "Парвоз класси"))
+                        Text(cabinTitle(journey.trip.effectiveFlightFilters.cabinClass))
+                            .font(IumrahType.bold(14, relativeTo: .subheadline))
+                            .foregroundStyle(Color.iumrahInk)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .foregroundStyle(Color.iumrahMuted)
+                }
+                .padding(.horizontal, 17)
+                .frame(minHeight: 60)
+                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
+            }
+
             Button { showingPassengers = true } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "person.2")
@@ -2683,6 +2726,15 @@ private struct IumrahHomeJourneySearchHero: View {
         .overlay {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .strokeBorder(Color(uiColor: .separator), lineWidth: 0.8)
+        }
+    }
+
+    private func cabinTitle(_ cabin: FlightCabinClass) -> String {
+        switch cabin {
+        case .economy: return tr("Эконом", "Economy", "Ekonom", "Эконом")
+        case .premiumEconomy: return tr("Премиум-эконом", "Premium economy", "Premium ekonom", "Премиум эконом")
+        case .business: return tr("Бизнес", "Business", "Biznes", "Бизнес")
+        case .first: return tr("Первый", "First", "Birinchi klass", "Биринчи класс")
         }
     }
 
@@ -2746,7 +2798,7 @@ private struct IumrahHomeJourneySearchHero: View {
         journey.trip.flightTripType = .roundTrip
         journey.trip.flexibility = .exact
         journey.packageFlightPath = .publishedDirect
-        chrome.startFlightFirstTrip()
+        onSearch()
     }
 }
 

@@ -1,0 +1,274 @@
+name: iumrah — Audit OLD Cloudflare D1 (no hotel data)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    name: Read-only D1 schema and counts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OLD_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.OLD_CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+      OLD_CLOUDFLARE_API_TOKEN: ${{ secrets.OLD_CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+      OUTDIR: ${{ runner.temp }}/iumrah-d1-audit
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect every old D1 schema without downloading customer records
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/iumrah_d1_audit.py" <<'PYTHON_AUDIT'
+          #!/usr/bin/env python3
+          """Read-only D1 structural inventory for moving iumrah off an old Cloudflare account.
+
+          No customer records, PII or credentials are written to artifact. Works in any repo.
+          """
+          from __future__ import annotations
+          import json
+          import os
+          import re
+          import sys
+          import time
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from urllib.error import HTTPError, URLError
+          from urllib.parse import urlencode, quote
+          from urllib.request import Request, urlopen
+
+          BASE = 'https://api.cloudflare.com/client/v4'
+          SYSTEM_TABLES = {'d1_migrations', '_cf_kv'}
+
+
+          def kind_of_table(name: str) -> str:
+              n = name.lower().strip()
+              if n in SYSTEM_TABLES or n.startswith(('sqlite_', '_cf_')):
+                  return 'system'
+              # Exclude only hotel-specific tables, not general operations or pilgrimage tables.
+              # This list is intentionally conservative; a human must review before restore.
+              hotel_terms = re.compile(r'(^|_)(hotel|hotels|hotelroom|hotelrooms|lodging|accommodation)(_|$)')
+              if hotel_terms.search(n) or n.startswith(('primaryhotel', 'hotelprice')):
+                  return 'hotel_excluded'
+              return 'core_candidate'
+
+
+          def safe_name(name: str) -> str:
+              return re.sub(r'[^A-Za-z0-9_-]+', '_', name).strip('_') or 'unknown'
+
+
+          def quote_sql_identifier(name: str) -> str:
+              return '"' + name.replace('"', '""') + '"'
+
+
+          class CF:
+              def __init__(self, account_id: str, token: str):
+                  self.account_id = account_id
+                  self.token = token
+                  self.root = f'{BASE}/accounts/{quote(account_id, safe="")}/d1/database'
+
+              def request(self, method: str, url: str, payload: dict | None = None):
+                  raw = json.dumps(payload).encode('utf-8') if payload is not None else None
+                  for attempt in range(4):
+                      req = Request(url, method=method, data=raw, headers={
+                          'Authorization': 'Bearer ' + self.token,
+                          'Accept': 'application/json',
+                          'Content-Type': 'application/json',
+                          'User-Agent': 'iumrah-private-d1-audit/1.0',
+                      })
+                      try:
+                          with urlopen(req, timeout=40) as response:
+                              body = json.load(response)
+                          if not body.get('success'):
+                              raise RuntimeError('Cloudflare API rejected request: ' +
+                                                 str([(e.get('code'), e.get('message')) for e in body.get('errors', [])]))
+                          return body
+                      except HTTPError as error:
+                          if error.code in (429, 500, 502, 503, 504) and attempt < 3:
+                              time.sleep(2 ** attempt)
+                              continue
+                          raise RuntimeError(f'Cloudflare API HTTP {error.code}. Check old account credentials and D1 Read permission.') from None
+                      except (TimeoutError, URLError):
+                          if attempt == 3:
+                              raise RuntimeError('Could not connect to Cloudflare API.') from None
+                          time.sleep(2 ** attempt)
+                  raise AssertionError('unreachable')
+
+              def databases(self):
+                  found = []
+                  for page in range(1, 201):
+                      query = urlencode({'page': page, 'per_page': 100})
+                      response = self.request('GET', self.root + '?' + query)
+                      chunk = response.get('result') or []
+                      found.extend(chunk)
+                      info = response.get('result_info') or {}
+                      total = info.get('total_count')
+                      if (total is not None and len(found) >= total) or len(chunk) < 100:
+                          return found
+                  raise RuntimeError('Too many D1 pagination pages; inventory incomplete')
+
+              def query(self, database_id: str, sql: str) -> list[dict]:
+                  url = self.root + '/' + quote(database_id, safe='') + '/query'
+                  response = self.request('POST', url, {'sql': sql})
+                  result = response.get('result', [])
+                  if not isinstance(result, list) or not result:
+                      raise RuntimeError('Unexpected D1 query response. The inventory was not completed.')
+                  first = result[0]
+                  if not first.get('success', True):
+                      raise RuntimeError('D1 SQL query failed')
+                  rows = first.get('results', [])
+                  if not isinstance(rows, list):
+                      raise RuntimeError('Unexpected D1 results shape')
+                  return rows
+
+
+          def inspect_database(cf: CF, db: dict, out: Path):
+              db_id = str(db.get('uuid') or db.get('id') or '')
+              db_name = str(db.get('name') or '')
+              if not db_id or not db_name:
+                  raise RuntimeError('D1 list response did not contain name/uuid')
+              records = cf.query(db_id, "SELECT type,name,tbl_name,sql FROM sqlite_master "
+                                  "WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' "
+                                  "ORDER BY type,name")
+              tables = [r for r in records if r.get('type') == 'table']
+              details = []
+              categories = {}
+              for row in tables:
+                  name = str(row['name'])
+                  category = kind_of_table(name)
+                  categories[name] = category
+                  # Counts only; never query actual row contents.
+                  count = None
+                  if category == 'core_candidate':
+                      rows = cf.query(db_id, f'SELECT COUNT(*) AS n FROM {quote_sql_identifier(name)}')
+                      count = int(rows[0]['n']) if rows else None
+                  foreign_keys = []
+                  if category == 'core_candidate':
+                      rows = cf.query(db_id, f'PRAGMA foreign_key_list({quote_sql_identifier(name)})')
+                      for fk in rows:
+                          foreign_keys.append({'table': fk.get('table'), 'from': fk.get('from'), 'to': fk.get('to')})
+                  details.append({'table': name, 'classification': category, 'row_count': count,
+                                  'foreign_keys': foreign_keys, 'create_sql': row.get('sql')})
+
+              blockers = []
+              for row in details:
+                  if row['classification'] != 'core_candidate':
+                      continue
+                  for fk in row['foreign_keys']:
+                      target = str(fk['table'])
+                      if categories.get(target) != 'core_candidate':
+                          blockers.append({'table': row['table'], 'references': target,
+                                           'referenced_classification': categories.get(target, 'missing')})
+
+              # Never auto-run this DDL: source schema may have cross-table constraints.
+              sql = [f'-- Inspection only: {db_name}. Not an executable production migration.',
+                     '-- Includes no INSERT statements or customer records.']
+              for row in records:
+                  if row['type'] == 'table' and categories.get(row['name']) == 'core_candidate':
+                      sql.append(row['sql'].rstrip(';') + ';')
+              for row in records:
+                  if row['type'] in ('index', 'trigger') and categories.get(row.get('tbl_name')) == 'core_candidate':
+                      sql.append((row['sql'] or '').rstrip(';') + ';')
+              filename = f'{safe_name(db_name)}_{db_id[:8]}'
+              (out / f'{filename}.inspection.sql').write_text('\n\n'.join(sql) + '\n', encoding='utf-8')
+              info = {
+                  'database': db_name, 'database_uuid': db_id, 'old_account_id': cf.account_id,
+                  'table_count': len(details),
+                  'core_candidate_count': sum(x['classification'] == 'core_candidate' for x in details),
+                  'hotel_excluded_count': sum(x['classification'] == 'hotel_excluded' for x in details),
+                  'system_count': sum(x['classification'] == 'system' for x in details),
+                  'row_count_core_candidate_total': sum((x['row_count'] or 0) for x in details if x['classification'] == 'core_candidate'),
+                  'tables': details, 'foreign_key_blockers': blockers,
+                  'inspection_sql_filename': f'{filename}.inspection.sql',
+                  'ready_for_automatic_import': False,
+              }
+              return info
+
+
+          def main():
+              account = os.environ.get('OLD_CLOUDFLARE_ACCOUNT_ID', '').strip()
+              token = os.environ.get('OLD_CLOUDFLARE_API_TOKEN', '').strip()
+              if not account or not token:
+                  raise SystemExit('Missing old account GitHub secrets: CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN. '
+                                   'This action is read-only; do not replace them with new-account credentials.')
+              out = Path(os.environ.get('OUTDIR', 'd1-audit'))
+              out.mkdir(parents=True, exist_ok=True)
+              cf = CF(account, token)
+              databases = cf.databases()
+              if not databases:
+                  raise SystemExit('No D1 databases in OLD account. Check account ID; refusing empty inventory.')
+              inventory = {
+                  'version': 1,
+                  'generated_at_utc': datetime.now(timezone.utc).isoformat(),
+                  'scope': 'D1 only; data values excluded; old account read-only',
+                  'hotel_policy': 'Hotel tables excluded from proposed schema, but mixed database is still inventoried.',
+                  'databases': [],
+              }
+              for db in databases:
+                  name = db.get('name') or '<unnamed>'
+                  print(f'Inspecting D1: {name}', flush=True)
+                  try:
+                      inventory['databases'].append(inspect_database(cf, db, out))
+                  except Exception as exc:
+                      # Fail closed: no partial archive that could appear complete.
+                      import shutil
+                      shutil.rmtree(out)
+                      raise RuntimeError(f'Audit failed on {name}: {exc}; no partial artifact created') from exc
+
+              # Detect collisions if moving many D1 databases into one `iumrah-core`.
+              owners = {}
+              for db in inventory['databases']:
+                  for t in db['tables']:
+                      if t['classification'] == 'core_candidate':
+                          owners.setdefault(t['table'], []).append(db['database'])
+              inventory['table_name_collisions'] = {table: names for table, names in owners.items() if len(names) > 1}
+              (out / 'inventory.json').write_text(json.dumps(inventory, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+              lines = [
+                  '# iumrah — old Cloudflare D1 audit',
+                  '',
+                  '**Schema and aggregate counts only. No customer records, hotels, or tokens are included.**',
+                  '',
+                  '| D1 source | Candidate tables | Excluded hotel tables | Candidate rows | FK blockers |',
+                  '|---|---:|---:|---:|---:|',
+              ]
+              for d in inventory['databases']:
+                  lines.append(f"| `{d['database']}` | {d['core_candidate_count']} | {d['hotel_excluded_count']} | "
+                               f"{d['row_count_core_candidate_total']} | {len(d['foreign_key_blockers'])} |")
+                  lines.append('')
+                  lines.append(f"### {d['database']}")
+                  lines.append('')
+                  for t in d['tables']:
+                      suffix = f" — {t['row_count']} records" if t['row_count'] is not None else ''
+                      lines.append(f"- `{t['table']}` — {t['classification']}{suffix}")
+                  if d['foreign_key_blockers']:
+                      lines.append('')
+                      lines.append('**Cross-table foreign keys needing migration design:**')
+                      for b in d['foreign_key_blockers']:
+                          lines.append(f"- `{b['table']}` → `{b['references']}` ({b['referenced_classification']})")
+                  lines.append('')
+              if inventory['table_name_collisions']:
+                  lines += ['### Table-name collisions across D1 databases', '']
+                  for k, v in inventory['table_name_collisions'].items():
+                      lines.append(f'- `{k}` in {", ".join(v)}')
+              lines += ['', '## Next step',
+                        'Share this audit artifact to design precise non-hotel migrations. Do not run inspection SQL on production.',
+                        'Private records must later be migrated inside protected CI directly from the OLD to the NEW Cloudflare account.',
+                        'D1 does not cover KV, R2, Worker secrets, cron or Durable Objects. Audit those separately before cutover.', '']
+              (out / 'inventory.md').write_text('\n'.join(lines), encoding='utf-8')
+              print(f"Completed inventory for {len(databases)} databases; wrote schema-only artifact to {out}")
+
+          if __name__ == '__main__':
+              main()
+          PYTHON_AUDIT
+          python "$RUNNER_TEMP/iumrah_d1_audit.py"
+      - name: Upload schema-only diagnostic artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iumrah-old-cloudflare-d1-audit
+          path: ${{ runner.temp }}/iumrah-d1-audit/
+          retention-days: 2
+          if-no-files-found: error
+      - name: Summary
+        shell: bash
+        if: success()
+        run: |
+          cat "$OUTDIR/inventory.md" >> "$GITHUB_STEP_SUMMARY"

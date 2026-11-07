@@ -11,7 +11,7 @@ jobs:
     env:
       OLD_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.OLD_CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
       OLD_CLOUDFLARE_API_TOKEN: ${{ secrets.OLD_CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
-      OUTDIR: ${{ runner.temp }}/iumrah-d1-audit
+      OUTDIR: /tmp/iumrah-d1-audit
     steps:
       - uses: actions/checkout@v4
       - name: Inspect every old D1 schema without downloading customer records
@@ -264,7 +264,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: iumrah-old-cloudflare-d1-audit
-          path: ${{ runner.temp }}/iumrah-d1-audit/
+          path: /tmp/iumrah-d1-audit/
           retention-days: 2
           if-no-files-found: error
       - name: Summary

@@ -11,6 +11,7 @@ struct PrimaryHotelView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
     @State private var showTransfer = false
+    @State private var showFinalPackage = false
     @State private var isPreparingPublishedPackage = false
     @State private var publishedPackageError: String?
     @State private var activeHotelCity: HotelSelectionRole = .makkah
@@ -48,6 +49,7 @@ struct PrimaryHotelView: View {
 
     var familyFlow = false
     var entryMode: PrimaryHotelEntryMode = .standard
+    var transferAlreadySelected = false
 
     private var requiresMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
     private var canContinue: Bool {
@@ -125,6 +127,9 @@ struct PrimaryHotelView: View {
         }
         .navigationDestination(isPresented: $showTransfer) {
             TransferSelectionView(familyFlow: familyFlow)
+        }
+        .navigationDestination(isPresented: $showFinalPackage) {
+            FinalPackageView(familyFlow: familyFlow)
         }
         .navigationDestination(item: $hotelForDetails) { hotel in
             HotelDetailView(hotel: hotel, selectionFlow: true, selectionRole: activeHotelCity)
@@ -259,7 +264,14 @@ struct PrimaryHotelView: View {
         }
         if ready {
             IumrahHaptics.success()
-            showTransfer = true
+            if transferAlreadySelected, journey.selectedTransferVehicle != nil {
+                // A Flight First traveler already chose the vehicle before hotels.
+                // The server quote above includes that vehicle. Do not ask twice.
+                journey.confirmTransferSelection()
+                showFinalPackage = true
+            } else {
+                showTransfer = true
+            }
         } else {
             IumrahHaptics.error()
             publishedPackageError = journey.errorMessage ?? publishedFallbackError

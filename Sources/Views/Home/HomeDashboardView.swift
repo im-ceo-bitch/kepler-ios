@@ -26,6 +26,7 @@ struct HomeDashboardView: View {
     @State private var showAboutProject = false
     @State private var showGuidedFlightSelection = false
     @State private var focusJourneySearchRevision = 0
+    @State private var isHomeHeaderVisible = true
 
     private struct ReadyPackageItem: Identifiable {
         let option: StorefrontFlightOption
@@ -106,6 +107,12 @@ struct HomeDashboardView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(spacing: 30) {
                     IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true })
+                        .background {
+                            GeometryReader { geo in
+                                Color.clear.preference(key: IumrahScrollingHeroBottomKey.self,
+                                    value: geo.frame(in: .named("homeMarketingScroll")).maxY)
+                            }
+                        }
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
                 if !clientNotifications.homeNotifications.isEmpty {
@@ -152,6 +159,7 @@ struct HomeDashboardView: View {
             // A top gap exposes the page background between the status bar and hero.
             .padding(.bottom, 46)
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .background(IumrahNoVerticalBounce())
             }
             // Only the page content is gray. Do not extend this surface into the
             // TOP safe area or it paints a pale strip behind the iPhone status bar.
@@ -160,10 +168,8 @@ struct HomeDashboardView: View {
                     .ignoresSafeArea(edges: .bottom)
             }
             .coordinateSpace(name: "homeMarketingScroll")
-            .background(alignment: .top) {
-                Color.iumrahSignatureBlack
-                    .frame(height: 420)
-                    .ignoresSafeArea(edges: .top)
+            .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
+                isHomeHeaderVisible = bottom > 35
             }
             .onChange(of: focusJourneySearchRevision) { _, _ in
                 withAnimation(.easeInOut(duration: 0.28)) {
@@ -175,7 +181,7 @@ struct HomeDashboardView: View {
         // ScrollView. Its black surface extends into the TOP safe area while
         // the actual controls remain inside the safe area, below the status bar.
         .background {
-            Color.iumrahSignatureBlack
+            (isHomeHeaderVisible ? Color.iumrahSignatureBlack : Color.iumrahPageBackground)
                 .ignoresSafeArea(edges: .top)
         }
     }
@@ -2469,13 +2475,18 @@ private struct IumrahHomeJourneySearchHero: View {
             IumrahHomeJourneyPassengersSheet(language: settings.language,
                                               initialAdults: journey.trip.adults,
                                               initialChildren: journey.trip.children,
-                                              initialInfants: journey.trip.infants) { adults, children, infants in
-                guard (adults, children, infants) != (journey.trip.adults, journey.trip.children, journey.trip.infants) else { return }
+                                              initialInfants: journey.trip.infants,
+                                              initialCabin: journey.trip.effectiveFlightFilters.cabinClass) { adults, children, infants, cabin in
+                guard (adults, children, infants, cabin) != (journey.trip.adults, journey.trip.children,
+                                                           journey.trip.infants, journey.trip.effectiveFlightFilters.cabinClass) else { return }
                 journey.resetAfterTripChange()
                 journey.clearStagedUmrahFlights()
                 journey.trip.adults = adults
                 journey.trip.children = children
                 journey.trip.infants = infants
+                var filters = journey.trip.effectiveFlightFilters
+                filters.cabinClass = cabin
+                journey.trip.flightFilters = filters
             }
         }
     }
@@ -2572,7 +2583,6 @@ private struct IumrahHomeJourneySearchHero: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 268 + stretch)
                     .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 15, bottomTrailingRadius: 15))
-                    .ignoresSafeArea(edges: .top)
             }
         }
         .frame(height: 268)
@@ -2605,12 +2615,10 @@ private struct IumrahHomeJourneySearchHero: View {
 
             VStack(alignment: .leading, spacing: 7) {
                 fieldCaption(tr("Маршрут умры", "Your Umrah route", "Umra yo‘nalishi", "Умра йўналиши"))
-                HStack(spacing: 9) {
-                    routeOption(.makkahOnly,
-                        title: tr("Только Мекка", "Makkah only", "Faqat Makka", "Фақат Макка"))
-                    routeOption(.makkahAndMadinah,
-                        title: tr("Мекка + Медина", "Makkah + Madinah", "Makka + Madina", "Макка + Мадина"))
-                }
+                IumrahGlassPillSelector(options: [
+                    .init(.makkahOnly, tr("Только Мекка", "Makkah only", "Faqat Makka", "Фақат Макка")),
+                    .init(.makkahAndMadinah, tr("Мекка + Медина", "Makkah + Madinah", "Makka + Madina", "Макка + Мадина"))
+                ], selection: journey.trip.scope, onSelect: changeRoute, height: 54)
             }
 
             Button { showingCalendar = true } label: {
@@ -2630,43 +2638,6 @@ private struct IumrahHomeJourneySearchHero: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(tr("Выбрать даты поездки", "Choose travel dates", "Safar sanalarini tanlash", "Сафар саналарини танлаш"))
-
-            Menu {
-                ForEach(FlightCabinClass.allCases) { cabin in
-                    Button {
-                        guard journey.trip.effectiveFlightFilters.cabinClass != cabin else { return }
-                        journey.resetAfterTripChange()
-                        journey.clearStagedUmrahFlights()
-                        var filters = journey.trip.effectiveFlightFilters
-                        filters.cabinClass = cabin
-                        journey.trip.flightFilters = filters
-                        IumrahHaptics.selection()
-                    } label: {
-                        if journey.trip.effectiveFlightFilters.cabinClass == cabin {
-                            Label(cabinTitle(cabin), systemImage: "checkmark")
-                        } else {
-                            Text(cabinTitle(cabin))
-                        }
-                    }
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "airplane")
-                        .foregroundStyle(Color.iumrahSignatureBlack)
-                    VStack(alignment: .leading, spacing: 3) {
-                        fieldCaption(tr("Класс перелёта", "Cabin class", "Parvoz klassi", "Парвоз класси"))
-                        Text(cabinTitle(journey.trip.effectiveFlightFilters.cabinClass))
-                            .font(IumrahType.bold(14, relativeTo: .subheadline))
-                            .foregroundStyle(Color.iumrahInk)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .foregroundStyle(Color.iumrahMuted)
-                }
-                .padding(.horizontal, 17)
-                .frame(minHeight: 60)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
-            }
 
             Button { showingPassengers = true } label: {
                 HStack(spacing: 10) {
@@ -2738,30 +2709,17 @@ private struct IumrahHomeJourneySearchHero: View {
         }
     }
 
-    private func routeOption(_ scope: JourneyScope, title: String) -> some View {
-        let selected = journey.trip.scope == scope
-        return Button {
-            guard !selected else { return }
-            journey.resetAfterTripChange()
-            journey.clearStagedUmrahFlights()
-            journey.trip.scope = scope
-            if scope == .makkahOnly {
-                journey.trip.arrivalAirport = .jeddah
-                journey.trip.selectedReturnAirport = .jeddah
-            } else {
-                journey.trip.selectedReturnAirport = nil
-            }
-            IumrahHaptics.selection()
-        } label: {
-            Text(title)
-                .font(IumrahType.bold(13, relativeTo: .subheadline))
-                .foregroundStyle(selected ? Color.white : Color.iumrahInk)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(selected ? Color.iumrahSignatureBlack : Color.iumrahRaisedBackground,
-                            in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    private func changeRoute(_ scope: JourneyScope) {
+        guard journey.trip.scope != scope else { return }
+        journey.resetAfterTripChange()
+        journey.clearStagedUmrahFlights()
+        journey.trip.scope = scope
+        if scope == .makkahOnly {
+            journey.trip.arrivalAirport = .jeddah
+            journey.trip.selectedReturnAirport = .jeddah
+        } else {
+            journey.trip.selectedReturnAirport = nil
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func dateColumn(title: String, date: Date) -> some View {
@@ -2822,18 +2780,21 @@ private struct IumrahHomeVaporPhase: AnimatableModifier {
 private struct IumrahHomeJourneyPassengersSheet: View {
     @Environment(\.dismiss) private var dismiss
     let language: AppSettingsStore.Language
-    let onSave: (Int, Int, Int) -> Void
+    let onSave: (Int, Int, Int, FlightCabinClass) -> Void
     @State private var adults: Int
     @State private var children: Int
     @State private var infants: Int
+    @State private var cabin: FlightCabinClass
 
     init(language: AppSettingsStore.Language, initialAdults: Int, initialChildren: Int,
-         initialInfants: Int, onSave: @escaping (Int, Int, Int) -> Void) {
+         initialInfants: Int, initialCabin: FlightCabinClass,
+         onSave: @escaping (Int, Int, Int, FlightCabinClass) -> Void) {
         self.language = language
         self.onSave = onSave
         _adults = State(initialValue: initialAdults)
         _children = State(initialValue: initialChildren)
         _infants = State(initialValue: initialInfants)
+        _cabin = State(initialValue: initialCabin)
     }
 
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCyrl: String) -> String {
@@ -2868,6 +2829,20 @@ private struct IumrahHomeJourneyPassengersSheet: View {
                     value: infants, canDecrease: infants > 0, canIncrease: total < 9 && infants < adults,
                     decrease: { infants -= 1 }, increase: { infants += 1 }
                 )
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Класс перелёта", "Cabin class", "Parvoz klassi", "Парвоз класси"))
+                        .font(IumrahType.bold(16, relativeTo: .headline))
+                    IumrahGlassPillSelector(options: [
+                        .init(.economy, tr("Эконом", "Economy", "Ekonom", "Эконом")),
+                        .init(.premiumEconomy, tr("Премиум", "Premium", "Premium", "Премиум"))
+                    ], selection: cabin, onSelect: { cabin = $0 }, height: 52)
+                    IumrahGlassPillSelector(options: [
+                        .init(.business, tr("Бизнес", "Business", "Biznes", "Бизнес")),
+                        .init(.first, tr("Первый", "First", "Birinchi", "Биринчи"))
+                    ], selection: cabin, onSelect: { cabin = $0 }, height: 52)
+                }
+                .padding(16)
+                .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
                 Text(tr("Максимум 9 путешественников в одной заявке.",
                         "Maximum 9 travelers per search.",
                         "Bir qidiruvda ko‘pi bilan 9 nafar yo‘lovchi.",
@@ -2880,7 +2855,7 @@ private struct IumrahHomeJourneyPassengersSheet: View {
             .background(Color.iumrahPageBackground)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Button {
-                    onSave(adults, children, infants)
+                    onSave(adults, children, infants, cabin)
                     dismiss()
                 } label: {
                     Text(tr("Готово", "Done", "Tayyor", "Тайёр"))
@@ -2896,7 +2871,7 @@ private struct IumrahHomeJourneyPassengersSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(tr("Закрыть", "Close", "Yopish", "Ёпиш")) { dismiss() } } }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
     }
 
     private var total: Int { adults + children + infants }

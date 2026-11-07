@@ -75,7 +75,8 @@ struct AirportSelectorButton: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .iumrahGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous), interactive: true)
+        .iumrahGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
+                     interactive: true, chrome: monochrome)
         .sheet(isPresented: $isPresented) {
             AirportPickerView(selection: $airport, fallbackCode: $fallbackCode)
         }

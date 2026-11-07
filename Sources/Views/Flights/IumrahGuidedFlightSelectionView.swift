@@ -6,8 +6,6 @@ struct IumrahGuidedFlightSelectionView: View {
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.scenePhase) private var scenePhase
 
     @State private var step: LegStep = .outbound
     @State private var published: [CuratedFlightRecommendation] = []
@@ -17,14 +15,15 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var inbound: FlightChoice?
     @State private var isLoading = false
     @State private var loadError: String?
-    @State private var showHotels = false
-    @State private var headlineIndex = 0
+    @State private var selectedDetail: FlightChoice?
+    @State private var showTransferPicker = false
+    @State private var isFlightHeaderVisible = true
     @State private var isShowingSourceHelp = false
 
     private enum LegStep: Hashable { case outbound, inbound }
-    private enum Source: Hashable { case published, dataAPI }
+    fileprivate enum Source: Hashable { case published, dataAPI }
 
-    private enum FlightChoice: Hashable, Identifiable {
+    fileprivate enum FlightChoice: Hashable, Identifiable {
         case published(CuratedFlightRecommendation, isReturn: Bool)
         case dataAPI(FlightDiscoveryOffer)
 
@@ -71,6 +70,14 @@ struct IumrahGuidedFlightSelectionView: View {
             switch self {
             case .published(let item, let isReturn): return isReturn ? (item.inbound?.departureAt ?? item.outbound.departureAt) : item.outbound.departureAt
             case .dataAPI(let offer): return offer.departureAt
+            }
+        }
+        var arrivalAt: String? {
+            switch self {
+            case .published(let item, let isReturn):
+                return isReturn ? (item.inbound?.arrivalAt ?? item.outbound.arrivalAt) : item.outbound.arrivalAt
+            case .dataAPI:
+                return nil
             }
         }
         var stops: Int {
@@ -126,6 +133,12 @@ struct IumrahGuidedFlightSelectionView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     blackHero
+                        .background {
+                            GeometryReader { geo in
+                                Color.clear.preference(key: IumrahScrollingHeroBottomKey.self,
+                                    value: geo.frame(in: .named("flightFirstScroll")).maxY)
+                            }
+                        }
                     VStack(alignment: .leading, spacing: 16) {
                         searchSummary
                         stepSelector
@@ -134,30 +147,48 @@ struct IumrahGuidedFlightSelectionView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
-                    .padding(.bottom, 112)
+                    .padding(.bottom, 50)
                 }
+                .background(IumrahNoVerticalBounce())
+            }
+            .coordinateSpace(name: "flightFirstScroll")
+            .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
+                isFlightHeaderVisible = bottom > 35
             }
             .onChange(of: step) { _, _ in
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(.easeInOut(duration: 0.28)) {
                     proxy.scrollTo("flight-results", anchor: .top)
                 }
             }
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
-        .background(Color.iumrahSignatureBlack.ignoresSafeArea(edges: .top))
-        .toolbar(.hidden, for: .navigationBar)
-        .navigationDestination(isPresented: $showHotels) {
-            PrimaryHotelView(entryMode: .flightFirst)
+        .background {
+            (isFlightHeaderVisible ? Color.iumrahSignatureBlack : Color.iumrahPageBackground)
+                .ignoresSafeArea()
         }
-        .task { await loadFlights() }
-        .task(id: scenePhase == .active && !reduceMotion) {
-            guard scenePhase == .active && !reduceMotion else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard !Task.isCancelled else { break }
-                withAnimation(.easeInOut(duration: 0.68)) { headlineIndex = (headlineIndex + 1) % 3 }
+        .overlay(alignment: .top) {
+            if !isFlightHeaderVisible {
+                compactStickyHeader
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            stageContinueButton
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationDestination(item: $selectedDetail) { choice in
+            IumrahGuidedFlightDetailView(
+                choice: choice,
+                language: settings.language,
+                adults: journey.trip.adults,
+                children: journey.trip.children,
+                infants: journey.trip.infants,
+                onChoose: { choose(choice) }
+            )
+        }
+        .navigationDestination(isPresented: $showTransferPicker) {
+            IumrahFlightFirstTransferPickerView()
+        }
+        .task { await loadFlights() }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
             Button(tr("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
         } message: {
@@ -168,8 +199,58 @@ struct IumrahGuidedFlightSelectionView: View {
         }
     }
 
+    private var compactStickyHeader: some View {
+        HStack(spacing: 12) {
+            Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"))
+                .font(.subheadline.bold())
+            Spacer(minLength: 0)
+            Text(step == .outbound ? tr("Туда", "Outbound", "Borish", "Бориш") : tr("Обратно", "Return", "Qaytish", "Қайтиш"))
+                .font(.caption.weight(.semibold))
+            Image(systemName: "airplane")
+                .font(.caption)
+        }
+        .foregroundStyle(Color.iumrahInk)
+        .padding(.horizontal, 20)
+        .frame(height: 50)
+        .background(.regularMaterial)
+        .overlay(alignment: .bottom) { Divider().opacity(0.3) }
+    }
+
+    @ViewBuilder
+    private var stageContinueButton: some View {
+        if step == .outbound, outbound != nil {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { step = .inbound }
+            } label: {
+                HStack {
+                    Text(tr("Выбрать обратный перелёт", "Choose return flight", "Qaytish reysini tanlash", "Қайтиш рейсини танлаш"))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .frame(height: 58)
+            }
+            .buttonStyle(IumrahPrimaryButtonStyle())
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background(Color.clear)
+        } else if step == .inbound, hasSelection {
+            Button(action: commitSelection) {
+                HStack {
+                    Text(tr("Выбрать трансфер", "Choose transfer", "Transfer tanlash", "Трансфер танлаш"))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .frame(height: 58)
+            }
+            .buttonStyle(IumrahPrimaryButtonStyle())
+            .padding(.horizontal, 20)
+            .padding(.vertical, 8)
+            .background(Color.clear)
+        }
+    }
+
     private var blackHero: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Button { dismiss() } label: {
                     Image(systemName: "chevron.left")
@@ -187,39 +268,21 @@ struct IumrahGuidedFlightSelectionView: View {
                 Spacer()
                 Color.clear.frame(width: 44, height: 44)
             }
-            ZStack(alignment: .leading) {
-                ForEach(0..<3, id: \.self) { index in
-                    if headlineIndex == index {
-                        Text(headlines[index])
-                            .id(index)
-                            .font(IumrahType.bold(28, relativeTo: .largeTitle))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .transition(reduceMotion ? .opacity : .modifier(
-                                active: IumrahFlightVaporPhase(amount: 1),
-                                identity: IumrahFlightVaporPhase(amount: 0)))
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
-            Text(tr("Выберите перелёт туда, затем обратно.", "Choose outbound, then return.",
-                    "Avval borish, keyin qaytish reysini tanlang.", "Аввал бориш, кейин қайтиш рейсини танланг."))
+            Text(tr("Выберите авиабилет", "Choose your flight", "Aviachiptani tanlang", "Авиачиптани танланг"))
+                .font(IumrahType.bold(28, relativeTo: .largeTitle))
+                .accessibilityAddTraits(.isHeader)
+            Text(tr("Сначала туда, затем обратно.", "Outbound first, then return.",
+                    "Avval borish, keyin qaytish.", "Аввал бориш, кейин қайтиш."))
                 .font(IumrahType.regular(15, relativeTo: .subheadline))
                 .foregroundStyle(.white.opacity(0.78))
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 20)
         .padding(.top, 10)
-        .padding(.bottom, 22)
+        .padding(.bottom, 20)
         .background {
             IumrahWorldDotsHeaderBackground(mapOpacity: 0.30, waveSpeed: 0.55, waveIntensity: 0.7)
-                .ignoresSafeArea(edges: .top)
         }
-    }
-
-    private var headlines: [String] {
-        [tr("Ваш перелёт. Ваш выбор.", "Your flights. Your choice.", "Reysingiz. Tanlovingiz.", "Рейсингиз. Танловингиз."),
-         tr("Вместе с близкими.", "Together with loved ones.", "Yaqinlaringiz bilan.", "Яқинларингиз билан."),
-         tr("На шаг ближе к умре.", "One step closer to Umrah.", "Umraga yana bir qadam.", "Умрага яна бир қадам.")]
     }
 
     private var searchSummary: some View {
@@ -260,35 +323,10 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private var stepSelector: some View {
-        HStack(spacing: 8) {
-            stepButton(.outbound, title: tr("Туда", "Outbound", "Borish", "Бориш"), date: journey.trip.departureDate)
-            stepButton(.inbound, title: tr("Обратно", "Return", "Qaytish", "Қайтиш"), date: journey.trip.returnDate)
-        }
-    }
-
-    private func stepButton(_ value: LegStep, title: String, date: Date) -> some View {
-        Button {
-            guard value == .outbound || outbound != nil else { return }
-            withAnimation(.easeInOut(duration: 0.20)) { step = value }
-        } label: {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title).font(.subheadline.weight(.bold))
-                    Text(dayText(date)).font(.caption)
-                }
-                Spacer(minLength: 0)
-                if (value == .outbound && outbound != nil) || (value == .inbound && inbound != nil) {
-                    Image(systemName: "checkmark.circle.fill")
-                }
-            }
-            .foregroundStyle(step == value ? Color.white : Color.iumrahInk)
-            .padding(.horizontal, 13)
-            .frame(height: 61)
-            .background(step == value ? Color.iumrahSignatureBlack : Color.iumrahCardBackground,
-                        in: RoundedRectangle(cornerRadius: 22))
-            .opacity(value == .inbound && outbound == nil ? 0.45 : 1)
-        }
-        .buttonStyle(.plain)
+        IumrahGlassPillSelector(options: [
+            .init(LegStep.outbound, tr("Туда", "Outbound", "Borish", "Бориш") + " · " + dayText(journey.trip.departureDate)),
+            .init(LegStep.inbound, tr("Обратно", "Return", "Qaytish", "Қайтиш") + " · " + dayText(journey.trip.returnDate), enabled: outbound != nil)
+        ], selection: step, onSelect: { step = $0 }, height: 58)
     }
 
     private var resultsSection: some View {
@@ -347,24 +385,6 @@ struct IumrahGuidedFlightSelectionView: View {
             flightGroup(directNearby, title: tr("Прямые · соседние даты", "Non-stop · nearby dates", "To‘g‘ri · yaqin sanalar", "Тўғри · яқин саналар"))
             flightGroup(connecting, title: tr("С пересадкой · Data API", "Connecting · Data API", "Transferli · Data API", "Трансферли · Data API"))
 
-            if hasSelection {
-                Button {
-                    commitSelection()
-                } label: {
-                    HStack {
-                        Text(tr("Далее: отели", "Next: hotels", "Keyingi: mehmonxonalar", "Кейинги: меҳмонхоналар"))
-                        Spacer()
-                        Image(systemName: "arrow.right")
-                    }
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 20)
-                    .frame(height: 56)
-                    .background(Color.iumrahSignatureBlack, in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-
             Text(tr("Цены Data API — предварительные. Наличие и окончательная стоимость проверяются перед бронированием.",
                     "Data API fares are indicative. Availability and final price are checked before booking.",
                     "Data API narxlari taxminiy. Mavjudlik va yakuniy narx buyurtmadan oldin tekshiriladi.",
@@ -391,80 +411,114 @@ struct IumrahGuidedFlightSelectionView: View {
         let selected = (step == .outbound ? outbound?.id : inbound?.id) == choice.id
         let offset = abs(dayOffset(for: choice))
         return Button {
-            choose(choice)
+            selectedDetail = choice
+            IumrahHaptics.soft()
         } label: {
-            VStack(alignment: .leading, spacing: 13) {
-                HStack(spacing: 12) {
-                    AirlineLogoView(airlineCode: choice.airlineCode, size: 42)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(choice.airlineName).font(.headline).lineLimit(1)
+            VStack(alignment: .leading, spacing: 17) {
+                HStack(spacing: 14) {
+                    AirlineLogoView(airlineCode: choice.airlineCode, size: 52)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(choice.airlineName)
+                            .font(IumrahType.bold(19, relativeTo: .title3))
+                            .lineLimit(1)
                         Text([choice.airlineCode, choice.flightNumber].filter { !$0.isEmpty }.joined(separator: " "))
-                            .font(.caption.monospaced())
+                            .font(.subheadline.monospaced())
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 4)
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    Image(systemName: selected ? "checkmark.circle.fill" : "chevron.right")
+                        .font(.system(size: selected ? 22 : 16, weight: .semibold))
                         .foregroundStyle(selected ? Color.iumrahInk : Color.iumrahMuted)
                 }
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(timeText(choice.departureAt)).font(.title3.weight(.bold))
-                        Text(choice.origin).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    VStack(spacing: 4) {
-                        Text(choice.stops == 0
-                             ? tr("Без пересадок", "Non-stop", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри")
-                             : tr("Пересадок: \(choice.stops)", "Stops: \(choice.stops)", "Transfer: \(choice.stops)", "Трансфер: \(choice.stops)"))
-                            .font(.caption2)
+
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(timeText(choice.departureAt))
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                        Text(choice.origin)
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
-                        Image(systemName: "arrow.right")
-                        if choice.duration > 0 {
-                            Text("\(choice.duration / 60)h \(choice.duration % 60)m")
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(.secondary)
-                        }
                     }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 3) {
-                        Text(dayTextFromISO(choice.departureAt)).font(.subheadline.weight(.semibold))
-                        Text(choice.destination).font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    flightRouteGraphic(stops: choice.stops)
+                    Spacer(minLength: 4)
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(dayTextFromISO(choice.departureAt))
+                            .font(.title3.weight(.bold))
+                        Text(choice.destination)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                HStack {
-                    Text(choice.source == .published ? "iumrah" : "Data API")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    if choice.source == .dataAPI {
-                        Text(tr("Класс уточняется", "Cabin unverified", "Klass tekshiriladi", "Класс текширилади"))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+
+                HStack(spacing: 9) {
+                    if choice.stops == 0 {
+                        Label(tr("Прямой рейс", "Non-stop", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри"), systemImage: "airplane")
+                            .foregroundStyle(Color.green)
+                    } else {
+                        Label(tr("С пересадкой", "Connecting", "Transferli", "Трансферли"), systemImage: "arrow.triangle.branch")
+                            .foregroundStyle(Color.iumrahInk)
                     }
+                    if choice.duration > 0 {
+                        Text("·  \(choice.duration / 60)h \(choice.duration % 60)m")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .font(.subheadline.weight(.semibold))
+
+                HStack(spacing: 10) {
+                    Text(choice.source == .published ? "iumrah" : "Data API")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
                     if offset > 0 {
                         Text("\(dayOffset(for: choice) > 0 ? "+" : "−")\(offset) d")
-                            .font(.caption2.weight(.semibold))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                     if let price = choice.price {
                         Text(price.formatted(.currency(code: "USD").precision(.fractionLength(0))))
-                            .font(.headline)
+                            .font(.title3.weight(.bold))
                     } else {
                         Text(tr("Цена при расчёте", "Price on quote", "Narx hisobda", "Нарх ҳисобда"))
-                            .font(.caption.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                     }
                 }
             }
             .foregroundStyle(Color.iumrahInk)
-            .padding(16)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
+            .padding(20)
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 22)
-                    .strokeBorder(selected ? Color.iumrahInk : Color.primary.opacity(0.06), lineWidth: selected ? 1.5 : 0.8)
+                RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    .strokeBorder(selected ? Color.iumrahInk.opacity(0.64) : Color.primary.opacity(0.05), lineWidth: selected ? 1.2 : 0.8)
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func flightRouteGraphic(stops: Int) -> some View {
+        VStack(spacing: 5) {
+            HStack(spacing: 3) {
+                Capsule().fill(Color.iumrahInk.opacity(0.42)).frame(width: stops == 0 ? 65 : 29, height: 1.5)
+                if stops > 0 {
+                    Circle().fill(Color.iumrahInk).frame(width: 6, height: 6)
+                    Capsule().fill(Color.iumrahInk.opacity(0.42)).frame(width: 29, height: 1.5)
+                }
+                Image(systemName: "airplane")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(stops == 0 ? Color.green : Color.iumrahInk)
+            }
+            if stops > 0 {
+                Text(tr("\(stops) перес.", "\(stops) stop(s)", "\(stops) transfer", "\(stops) трансфер"))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(stops == 0 ? tr("Прямой рейс", "Non-stop flight", "To‘g‘ri reys", "Тўғри рейс") :
+                              tr("\(stops) пересадок", "\(stops) stops", "\(stops) transfer", "\(stops) трансфер"))
     }
 
     private func choose(_ choice: FlightChoice) {
@@ -473,7 +527,7 @@ struct IumrahGuidedFlightSelectionView: View {
         case .outbound:
             outbound = choice
             inbound = nil
-            withAnimation(.easeInOut(duration: 0.20)) { step = .inbound }
+            // The next leg is opened only when the user taps the explicit CTA.
         case .inbound:
             guard let outbound, outbound.source == choice.source else {
                 isShowingSourceHelp = true
@@ -695,7 +749,7 @@ struct IumrahGuidedFlightSelectionView: View {
         guard journey.hasCompleteStagedFlightSelection else { return }
         journey.prepareFlightFirstHotelStage()
         IumrahHaptics.success()
-        showHotels = true
+        showTransferPicker = true
     }
 
     private func makeStaged(_ flight: FlightChoice, kind: StagedUmrahFlightKind,
@@ -710,17 +764,182 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 }
 
-/// Mirrors the Home marketing headline transition without a third-party animation.
-private struct IumrahFlightVaporPhase: AnimatableModifier {
-    var amount: CGFloat
-    var animatableData: CGFloat {
-        get { amount }
-        set { amount = newValue }
+
+/// A real flight-detail destination, rather than a tap-to-select row.
+/// Supplier information is shown only when present in its returned model.
+private struct IumrahGuidedFlightDetailView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    let choice: IumrahGuidedFlightSelectionView.FlightChoice
+    let language: AppSettingsStore.Language
+    let adults: Int
+    let children: Int
+    let infants: Int
+    let onChoose: () -> Void
+
+    private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCyrl: String) -> String {
+        switch language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return uzCyrl
+        default: return en
+        }
     }
-    func body(content: Content) -> some View {
-        content
-            .opacity(Double(max(0, 1 - amount)))
-            .blur(radius: max(0, amount) * 10)
-            .offset(y: -amount * 9)
+
+    private var ticketURL: URL? {
+        if case .dataAPI(let offer) = choice,
+           let raw = offer.bookingUrl,
+           let url = URL(string: raw),
+           ["https", "http"].contains(url.scheme?.lowercased() ?? ""),
+           url.host != nil {
+            return url
+        }
+        return AviasalesSearchLinkBuilder.searchURL(
+            origin: choice.origin,
+            destination: choice.destination,
+            departureAt: choice.departureAt,
+            returnAt: nil,
+            adults: adults,
+            children: children,
+            infants: infants
+        )
+    }
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 19) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(tr("Авиабилет", "Flight details", "Aviachipta", "Авиачипта"))
+                        .font(IumrahType.bold(30, relativeTo: .largeTitle))
+                    Text("\(choice.origin) → \(choice.destination)")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack(spacing: 14) {
+                        AirlineLogoView(airlineCode: choice.airlineCode, size: 58)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(choice.airlineName).font(.title3.weight(.bold))
+                            Text([choice.airlineCode, choice.flightNumber].filter { !$0.isEmpty }.joined(separator: " "))
+                                .font(.subheadline.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                    }
+                    Divider()
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(String(choice.departureAt.prefix(10)))
+                                .font(.subheadline.weight(.semibold))
+                            Text(timeText(choice.departureAt))
+                                .font(.system(size: 34, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                            Text(choice.origin).font(.headline)
+                        }
+                        Spacer()
+                        Image(systemName: "airplane")
+                            .font(.title2)
+                            .foregroundStyle(choice.stops == 0 ? Color.green : Color.iumrahInk)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 5) {
+                            Text(tr("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш"))
+                                .font(.subheadline.weight(.semibold))
+                            if let actual = choice.arrivalAt {
+                                Text(timeText(actual))
+                                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                            } else {
+                                Text("—").font(.system(size: 34, weight: .bold, design: .rounded))
+                            }
+                            Text(choice.destination).font(.headline)
+                        }
+                    }
+                    Label(
+                        choice.stops == 0
+                            ? tr("Прямой рейс", "Non-stop flight", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри")
+                            : tr("Пересадок: \(choice.stops)", "Stops: \(choice.stops)",
+                                 "Transfer: \(choice.stops)", "Трансфер: \(choice.stops)"),
+                        systemImage: choice.stops == 0 ? "airplane" : "arrow.triangle.branch"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(choice.stops == 0 ? Color.green : Color.iumrahInk)
+                    if choice.duration > 0 {
+                        Label("\(choice.duration / 60)h \(choice.duration % 60)m", systemImage: "clock")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    if case .dataAPI(let offer) = choice,
+                       let segments = offer.outboundSegments, !segments.isEmpty {
+                        Divider()
+                        Text(tr("Участки перелёта", "Flight segments", "Parvoz qismlari", "Парвоз қисмлари"))
+                            .font(.headline)
+                        ForEach(segments.indices, id: \.self) { index in
+                            let segment = segments[index]
+                            Text("\(index + 1). \(segment.originAirport) → \(segment.destinationAirport)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    } else if choice.stops > 0 {
+                        Text(tr("Аэропорт и время пересадки уточняйте на Aviasales перед покупкой.",
+                                "Check the layover airport and times on Aviasales before buying.",
+                                "Transfer aeroporti va vaqtini Aviasales’da tekshiring.",
+                                "Трансфер аэропорти ва вақтини Aviasales’да текширинг."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(22)
+                .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30))
+
+                Text(tr("Предложения Data API и поиск на Aviasales не гарантируют наличие места или окончательную стоимость.",
+                        "Data API offers and Aviasales searches do not guarantee availability or the final fare.",
+                        "Data API va Aviasales qidiruvi mavjudlik yoki yakuniy narxni kafolatlamaydi.",
+                        "Data API ва Aviasales қидируви мавжудлик ёки якуний нархни кафолатламайди."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(20)
+            .padding(.bottom, 12)
+        }
+        .background(Color.iumrahPageBackground)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 10) {
+                Button {
+                    if let ticketURL { openURL(ticketURL) }
+                } label: {
+                    HStack {
+                        Text(tr("Купить на Aviasales", "Buy on Aviasales", "Aviasales’da sotib olish", "Aviasales’да сотиб олиш"))
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .frame(height: 54)
+                }
+                .disabled(ticketURL == nil)
+                .buttonStyle(IumrahSecondaryButtonStyle())
+                Button {
+                    onChoose()
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(tr("Выбрать авиабилет", "Select flight", "Reysni tanlash", "Рейсни танлаш"))
+                        Spacer()
+                        Image(systemName: "checkmark")
+                    }
+                    .frame(height: 56)
+                }
+                .buttonStyle(IumrahPrimaryButtonStyle())
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(.regularMaterial)
+        }
+        .navigationTitle(tr("Авиабилет", "Flight details", "Aviachipta", "Авиачипта"))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func timeText(_ date: String) -> String {
+        let parts = date.split(separator: "T")
+        return parts.count > 1 ? String(parts[1].prefix(5)) : "—"
     }
 }

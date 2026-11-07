@@ -55,23 +55,33 @@ struct FlightDateCalendarView: View {
                 Color.iumrahPageBackground.ignoresSafeArea()
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 14) {
                         header
                         stageSwitcher
                         if publishedOnly { flexibilityPicker }
-                        routeSummary
-                        availabilityCard
-                        selectionSummary
+                        if isLoading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        } else if loadError {
+                            Button(copy(.retry)) { Task { await loadPublishedFlights() } }
+                                .buttonStyle(.bordered)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
 
+                        if publishedOnly && !isLoading && !loadError && publishedFlights.isEmpty {
+                            Text(copy(.inventoryNote))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
                         ForEach(monthStarts, id: \.self) { month in
                             monthSection(month)
                         }
 
-                        inventoryNote
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 10)
-                    .padding(.bottom, 126)
+                    .padding(.bottom, 22)
                 }
                 .scrollIndicators(.hidden)
 
@@ -105,8 +115,10 @@ struct FlightDateCalendarView: View {
             .task { await loadPublishedFlights() }
         }
         .onAppear {
-            departure = calendar.startOfDay(for: initialDeparture)
-            returnDate = calendar.startOfDay(for: initialReturn)
+            // Never enable Continue from stale dates until the traveler has
+            // explicitly selected both legs in this calendar session.
+            departure = nil
+            returnDate = nil
             stage = .departure
         }
         .presentationDragIndicator(.hidden)
@@ -115,51 +127,23 @@ struct FlightDateCalendarView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(copy(.title))
+            Text(stage == .departure ? copy(.chooseOutboundHintTitle) : copy(.chooseReturnHintTitle))
                 .font(IumrahType.screenTitle)
                 .tracking(-0.5)
+                .accessibilityAddTraits(.isHeader)
             Text(stage == .departure ? copy(.subtitleDeparture) : copy(.subtitleReturn))
-                .font(IumrahType.body)
+                .font(IumrahType.regular(14, relativeTo: .subheadline))
                 .foregroundStyle(.secondary)
+                .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var stageSwitcher: some View {
-        HStack(spacing: 10) {
-            stageButton(.departure, title: copy(.outboundStageTitle), subtitle: departure.map(shortDateText) ?? copy(.notSelected))
-            stageButton(.return, title: copy(.returnStageTitle), subtitle: returnDate.map(shortDateText) ?? copy(.notSelected), disabled: departure == nil)
-        }
-    }
-
-    private func stageButton(_ step: Stage, title: String, subtitle: String, disabled: Bool = false) -> some View {
-        let selected = stage == step
-        return Button {
-            guard !disabled else { return }
-            stage = step
-            IumrahHaptics.selection()
-        } label: {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(IumrahType.regular(12, relativeTo: .caption))
-                    .foregroundStyle(selected ? Color.white.opacity(0.82) : Color.iumrahMuted)
-                Text(subtitle)
-                    .font(IumrahType.bold(15, relativeTo: .subheadline))
-                    .foregroundStyle(selected ? Color.white : Color.iumrahInk)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .frame(height: 62)
-            .background(selected ? Color.iumrahSignatureBlack : Color.iumrahCardBackground,
-                        in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(selected ? Color.clear : Color.primary.opacity(0.06), lineWidth: 1)
-            }
-            .opacity(disabled ? 0.45 : 1)
-        }
-        .buttonStyle(.plain)
+        IumrahGlassPillSelector(options: [
+            .init(Stage.departure, copy(.outboundStageTitle) + (departure.map { " · " + shortDateText($0) } ?? "")),
+            .init(Stage.return, copy(.returnStageTitle) + (returnDate.map { " · " + shortDateText($0) } ?? ""), enabled: departure != nil)
+        ], selection: stage, onSelect: { stage = $0 }, height: 58)
     }
 
     private var flexibilityPicker: some View {
@@ -206,113 +190,12 @@ struct FlightDateCalendarView: View {
         }
     }
 
-    private var routeSummary: some View {
-        HStack(spacing: 10) {
-            routeCode(trip.originCode)
-            Image(systemName: "arrow.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-            routeCode(trip.outboundDestinationCode)
-            Image(systemName: "arrow.left.arrow.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-            routeCode(trip.returnOriginCode)
-            Image(systemName: "arrow.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-            routeCode(trip.originCode)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 60)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-        }
-    }
-
-    private func routeCode(_ value: String) -> some View {
-        Text(value)
-            .font(.system(size: 14, weight: .bold, design: .rounded))
-            .monospaced()
-            .frame(maxWidth: .infinity)
-    }
-
-    private var availabilityCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(Color.iumrahRaisedBackground)
-                    .frame(width: 42, height: 42)
-                Image(systemName: stage == .departure ? "airplane.departure" : "airplane.arrival")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.iumrahSignatureBlack)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(stage == .departure ? copy(.chooseOutboundHintTitle) : copy(.chooseReturnHintTitle))
-                    .font(.subheadline.weight(.bold))
-                Text(isLoading ? copy(.loading) : (stage == .departure ? copy(.chooseOutboundHintBody) : copy(.chooseReturnHintBody)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 4)
-
-            if loadError {
-                Button(copy(.retry)) {
-                    Task { await loadPublishedFlights() }
-                }
-                .font(.caption.weight(.bold))
-                .padding(.horizontal, 11)
-                .frame(height: 34)
-                .background(Color.iumrahRaisedBackground, in: Capsule())
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(14)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-        }
-    }
-
-    private var selectionSummary: some View {
-        HStack(spacing: 12) {
-            selectionBadge(title: copy(.outboundStageTitle), value: departure.map(fullDateText) ?? copy(.notSelected), active: stage == .departure)
-            selectionBadge(title: copy(.returnStageTitle), value: returnDate.map(fullDateText) ?? copy(.notSelected), active: stage == .return)
-        }
-    }
-
-    private func selectionBadge(title: String, value: String, active: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(IumrahType.regular(11, relativeTo: .caption2))
-                .foregroundStyle(Color.iumrahMuted)
-            Text(value)
-                .font(IumrahType.bold(14, relativeTo: .subheadline))
-                .foregroundStyle(Color.iumrahInk)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .frame(height: 58)
-        .background(active ? Color.iumrahRaisedBackground : Color.iumrahCardBackground,
-                    in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.primary.opacity(active ? 0.08 : 0.04), lineWidth: 1)
-        }
-    }
-
     private func monthSection(_ month: Date) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(monthTitle(month))
                 .font(.system(size: 25, weight: .bold, design: .rounded))
 
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 8) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 0) {
                 ForEach(weekdayTitles, id: \.self) { title in
                     Text(title)
                         .font(.caption.weight(.semibold))
@@ -324,14 +207,14 @@ struct FlightDateCalendarView: View {
                     if let date = cell.date {
                         dayCell(date)
                     } else {
-                        Color.clear.frame(height: 54)
+                        Color.clear.frame(height: 48)
                     }
                 }
             }
         }
-        .padding(16)
+        .padding(15)
         .background(Color.iumrahCardBackground,
-                    in: RoundedRectangle(cornerRadius: IumrahDesign.cardRadius, style: .continuous))
+                    in: RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
     private func dayCell(_ date: Date) -> some View {
@@ -348,50 +231,31 @@ struct FlightDateCalendarView: View {
             select(day)
         } label: {
             Text(String(calendar.component(.day, from: day)))
-                .font(.system(size: 17, weight: (isDeparture || isReturn) ? .bold : .medium, design: .rounded))
+                .font(.system(size: 16, weight: (isDeparture || isReturn) ? .bold : .medium, design: .rounded))
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(height: 48)
                 .background {
                     if isDeparture || isReturn {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.iumrahSignatureBlack)
+                        Capsule().fill(Color.iumrahSignatureBlack)
+                            .padding(.horizontal, 1)
+                            .padding(.vertical, 3)
                     } else if inRange {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.iumrahSignatureBlack.opacity(0.10))
+                        Rectangle().fill(Color.iumrahSignatureBlack.opacity(0.12))
+                            .frame(height: 37)
                     } else if selectable {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.iumrahRaisedBackground)
+                        Circle().fill(Color.iumrahRaisedBackground)
+                            .padding(4)
                     }
                 }
                 .foregroundStyle(
-                    disabledByPast || !available
-                    ? Color.secondary.opacity(0.28)
-                    : ((isDeparture || isReturn) ? Color.white : Color.iumrahInk)
+                    !selectable ? Color.secondary.opacity(0.24) :
+                    (isDeparture || isReturn ? Color.white : Color.iumrahInk)
                 )
-                .overlay {
-                    if selectable && !isDeparture && !isReturn && !inRange {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
-                    }
-                }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!selectable)
-        .accessibilityHint(available ? copy(.availableAccessibility) : copy(.unavailableAccessibility))
-    }
-
-    private var inventoryNote: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Text(copy(.inventoryNote))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 4)
+        .accessibilityHint(selectable ? copy(.availableAccessibility) : copy(.unavailableAccessibility))
     }
 
     private var bottomBar: some View {
@@ -404,7 +268,7 @@ struct FlightDateCalendarView: View {
             } label: {
                 Text(copy(.reset))
                     .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .frame(width: 128, height: 58)
+                    .frame(width: 108, height: 56)
             }
             .buttonStyle(.plain)
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -420,7 +284,7 @@ struct FlightDateCalendarView: View {
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.white)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 58)
+                    .frame(height: 56)
                     .background(Color.iumrahSignatureBlack, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
             .buttonStyle(.plain)

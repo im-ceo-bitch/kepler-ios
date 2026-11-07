@@ -112,7 +112,7 @@ struct IumrahGuidedFlightSelectionView: View {
     private var outboundCode: String { journey.trip.originCode.uppercased() }
     private var destinationCode: String { journey.trip.outboundDestinationCode.uppercased() }
     private var returnCode: String { journey.trip.returnOriginCode.uppercased() }
-    private var flexDays: Int { min(max(0, journey.flightSearchFlexDays), 4) }
+    private var flexDays: Int { min(max(3, journey.flightSearchFlexDays), 4) }
     private var selectedCabin: FlightCabinClass { journey.trip.effectiveFlightFilters.cabinClass }
     private var currentTarget: Date { step == .outbound ? journey.trip.departureDate : journey.trip.returnDate }
     private var currentOrigin: String { step == .outbound ? outboundCode : returnCode }
@@ -140,7 +140,6 @@ struct IumrahGuidedFlightSelectionView: View {
                             }
                         }
                     VStack(alignment: .leading, spacing: 16) {
-                        searchSummary
                         stepSelector
                         resultsSection
                             .id("flight-results")
@@ -161,16 +160,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 }
             }
         }
-        .background {
-            (isFlightHeaderVisible ? Color.iumrahSignatureBlack : Color.iumrahPageBackground)
-                .ignoresSafeArea()
-        }
-        .overlay(alignment: .top) {
-            if !isFlightHeaderVisible {
-                compactStickyHeader
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
+        .background(Color.iumrahPageBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             stageContinueButton
         }
@@ -186,7 +176,7 @@ struct IumrahGuidedFlightSelectionView: View {
             )
         }
         .navigationDestination(isPresented: $showTransferPicker) {
-            IumrahFlightFirstTransferPickerView()
+            PrimaryHotelView(entryMode: .flightFirst)
         }
         .task { await loadFlights() }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
@@ -197,23 +187,6 @@ struct IumrahGuidedFlightSelectionView: View {
                     "Bir paketda ikkala reys ham mos manbadan bo‘lishi kerak. Boshqa juftlik tanlang.",
                     "Бир пакетда иккала рейс ҳам мос манбадан бўлиши керак. Бошқа жуфтлик танланг."))
         }
-    }
-
-    private var compactStickyHeader: some View {
-        HStack(spacing: 12) {
-            Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"))
-                .font(.subheadline.bold())
-            Spacer(minLength: 0)
-            Text(step == .outbound ? tr("Туда", "Outbound", "Borish", "Бориш") : tr("Обратно", "Return", "Qaytish", "Қайтиш"))
-                .font(.caption.weight(.semibold))
-            Image(systemName: "airplane")
-                .font(.caption)
-        }
-        .foregroundStyle(Color.iumrahInk)
-        .padding(.horizontal, 20)
-        .frame(height: 50)
-        .background(.regularMaterial)
-        .overlay(alignment: .bottom) { Divider().opacity(0.3) }
     }
 
     @ViewBuilder
@@ -236,7 +209,7 @@ struct IumrahGuidedFlightSelectionView: View {
         } else if step == .inbound, hasSelection {
             Button(action: commitSelection) {
                 HStack {
-                    Text(tr("Выбрать трансфер", "Choose transfer", "Transfer tanlash", "Трансфер танлаш"))
+                    Text(tr("Выбрать отель", "Choose hotel", "Mehmonxona tanlash", "Меҳмонхона танлаш"))
                     Spacer()
                     Image(systemName: "arrow.right")
                 }
@@ -250,38 +223,8 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private var blackHero: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .frame(width: 44, height: 44)
-                        .background(.white.opacity(0.12), in: Circle())
-                }
-                .accessibilityLabel(tr("Назад", "Back", "Orqaga", "Орқага"))
-                Spacer()
-                Image("HeaderWordmarkLight")
-                    .resizable()
-                    .renderingMode(.template)
-                    .scaledToFit()
-                    .frame(width: 174, height: 54)
-                    .accessibilityLabel("iumrah")
-                Spacer()
-                Color.clear.frame(width: 44, height: 44)
-            }
-            Text(tr("Выберите авиабилет", "Choose your flight", "Aviachiptani tanlang", "Авиачиптани танланг"))
-                .font(IumrahType.bold(28, relativeTo: .largeTitle))
-                .accessibilityAddTraits(.isHeader)
-            Text(tr("Сначала туда, затем обратно.", "Outbound first, then return.",
-                    "Avval borish, keyin qaytish.", "Аввал бориш, кейин қайтиш."))
-                .font(IumrahType.regular(15, relativeTo: .subheadline))
-                .foregroundStyle(.white.opacity(0.78))
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 20)
-        .background {
-            IumrahWorldDotsHeaderBackground(mapOpacity: 0.30, waveSpeed: 0.55, waveIntensity: 0.7)
+        IumrahJourneyHeader {
+            searchSummary
         }
     }
 
@@ -311,6 +254,7 @@ struct IumrahGuidedFlightSelectionView: View {
         }
         .padding(15)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.iumrahDesertGold, lineWidth: 1.5))
     }
 
     private var cabinTitle: String {
@@ -382,8 +326,8 @@ struct IumrahGuidedFlightSelectionView: View {
             }
 
             flightGroup(directExact, title: tr("Прямые · выбранная дата", "Non-stop · exact date", "To‘g‘ri · tanlangan sana", "Тўғри · танланган сана"))
-            flightGroup(directNearby, title: tr("Прямые · соседние даты", "Non-stop · nearby dates", "To‘g‘ri · yaqin sanalar", "Тўғри · яқин саналар"))
-            flightGroup(connecting, title: tr("С пересадкой · Data API", "Connecting · Data API", "Transferli · Data API", "Трансферли · Data API"))
+            flightGroup(connecting, title: tr("С пересадкой · выбранная дата", "Connecting · exact date", "Transferli · tanlangan sana", "Трансферли · танланган сана"))
+            flightGroup(directNearby, title: tr("Соседние даты", "Nearby dates", "Yaqin sanalar", "Яқин саналар"))
 
             Text(tr("Цены Data API — предварительные. Наличие и окончательная стоимость проверяются перед бронированием.",
                     "Data API fares are indicative. Availability and final price are checked before booking.",
@@ -609,7 +553,7 @@ struct IumrahGuidedFlightSelectionView: View {
         }.sorted { a, b in
             let aRank = rank(a), bRank = rank(b)
             if aRank != bRank { return aRank < bRank }
-            if aRank == 1 && abs(dayOffset(for: a)) != abs(dayOffset(for: b)) {
+            if dayOffset(for: a) != 0 && dayOffset(for: b) != 0 && abs(dayOffset(for: a)) != abs(dayOffset(for: b)) {
                 return abs(dayOffset(for: a)) < abs(dayOffset(for: b))
             }
             if a.departureAt != b.departureAt { return a.departureAt < b.departureAt }
@@ -618,11 +562,11 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private var directExact: [FlightChoice] { availableCandidates.filter { $0.stops == 0 && dayOffset(for: $0) == 0 } }
-    private var directNearby: [FlightChoice] { availableCandidates.filter { $0.stops == 0 && dayOffset(for: $0) != 0 } }
-    private var connecting: [FlightChoice] { availableCandidates.filter { $0.stops > 0 } }
+    private var directNearby: [FlightChoice] { availableCandidates.filter { dayOffset(for: $0) != 0 } }
+    private var connecting: [FlightChoice] { availableCandidates.filter { $0.stops > 0 && dayOffset(for: $0) == 0 } }
 
     private func rank(_ choice: FlightChoice) -> Int {
-        choice.stops > 0 ? 2 : (dayOffset(for: choice) == 0 ? 0 : 1)
+        dayOffset(for: choice) == 0 ? (choice.stops == 0 ? 0 : 1) : 2
     }
 
     private func publishedCabinMatches(_ item: CuratedFlightRecommendation) -> Bool {
@@ -709,7 +653,7 @@ struct IumrahGuidedFlightSelectionView: View {
         journey.clearStagedUmrahFlights()
         journey.trip.departureDate = outboundDate
         journey.trip.returnDate = inboundDate
-        journey.trip.saudiArrivalDate = nil
+        journey.trip.saudiArrivalDate = outbound.arrivalAt.flatMap { dateFromISODay(dayKey($0)) }
         journey.trip.flightTripType = .roundTrip
         journey.trip.selectedReturnAirport = inbound.origin.uppercased() == "MED" ? .madinah : .jeddah
         journey.trip.arrivalAirport = outbound.destination.uppercased() == "MED" ? .madinah : .jeddah

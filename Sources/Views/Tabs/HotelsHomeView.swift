@@ -1322,15 +1322,16 @@ struct HotelStorefrontCard: View {
     var selectedHotelLabel: String? = nil
     var onSelectHotel: (() -> Void)? = nil
 
-    private let cardHeight: CGFloat = 204
+    @State private var detailImages: [String] = []
+    private let cardHeight: CGFloat = 232
 
     var body: some View {
         GeometryReader { proxy in
-            let mediaWidth = min(max(proxy.size.width * 0.31, 108), 122)
+            let mediaWidth = proxy.size.width * 0.43
 
             HStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    HotelStorefrontCollage(images: images, fallback: hotel.coverImageURL)
+                    HotelStorefrontCollage(images: detailImages.isEmpty ? images : detailImages, fallback: hotel.coverImageURL)
                         .frame(width: mediaWidth, height: cardHeight)
 
                     HStack(spacing: 6) {
@@ -1410,8 +1411,8 @@ struct HotelStorefrontCard: View {
                             .minimumScaleFactor(0.72)
                     } else {
                         HStack(spacing: 7) {
-                            ProgressView().controlSize(.small)
-                            Text(L10n.text("hotel_storefront_calculating", language))
+                            if pendingPriceLabel == nil { ProgressView().controlSize(.small) }
+                            Text(pendingPriceLabel ?? L10n.text("hotel_storefront_calculating", language))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
@@ -1464,6 +1465,11 @@ struct HotelStorefrontCard: View {
                 .padding(9)
             }
         }
+        .task(id: hotel.id) {
+            guard IumrahHotelPhotoIdentity.unique(images).count < 3 else { return }
+            guard let detail = try? await HotelCatalogService().hotelDetail(id: hotel.id), !Task.isCancelled else { return }
+            detailImages = detail.images.sorted { $0.position < $1.position }.map(\.url)
+        }
         .accessibilityAddTraits(.isButton)
     }
 
@@ -1476,36 +1482,26 @@ private struct HotelStorefrontCollage: View {
     let images: [String]
     let fallback: String?
 
-    private var resolved: [String?] {
-        var list = images.map(Optional.some)
-        if list.isEmpty { list.append(fallback) }
-        while list.count < 3 { list.append(list.first ?? fallback) }
-        return Array(list.prefix(3))
+    private var resolved: [String] {
+        IumrahHotelPhotoIdentity.unique(images + [fallback].compactMap { $0 })
     }
 
     var body: some View {
         GeometryReader { proxy in
-            let gap: CGFloat = 3
-            let heroHeight = ((proxy.size.height - gap) * 0.63)
-            let thumbnailHeight = max(0, proxy.size.height - heroHeight - gap)
-            let thumbnailWidth = max(0, (proxy.size.width - gap) / 2)
-
-            VStack(spacing: gap) {
-                HotelCachedImage(rawURL: resolved[0])
-                    .frame(width: proxy.size.width, height: heroHeight)
-                    .clipped()
-
-                HStack(spacing: gap) {
-                    HotelCachedImage(rawURL: resolved[1])
-                        .frame(width: thumbnailWidth, height: thumbnailHeight)
-                        .clipped()
-                    HotelCachedImage(rawURL: resolved[2])
-                        .frame(width: thumbnailWidth, height: thumbnailHeight)
-                        .clipped()
+            if resolved.count < 2 {
+                HotelCachedImage(rawURL: resolved.first)
+                    .frame(width: proxy.size.width, height: proxy.size.height).clipped()
+            } else {
+                VStack(spacing: 3) {
+                    HotelCachedImage(rawURL: resolved[0])
+                        .frame(height: proxy.size.height * 0.62).clipped()
+                    HStack(spacing: 3) {
+                        HotelCachedImage(rawURL: resolved[1])
+                        if resolved.count > 2 { HotelCachedImage(rawURL: resolved[2]) }
+                    }
+                    .frame(height: proxy.size.height * 0.38 - 3).clipped()
                 }
-                .frame(width: proxy.size.width, height: thumbnailHeight)
             }
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
         }
         .clipped()
     }

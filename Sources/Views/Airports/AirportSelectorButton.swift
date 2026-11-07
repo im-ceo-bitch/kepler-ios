@@ -19,7 +19,7 @@ struct AirportSelectorButton: View {
                     if monochrome {
                         Image(systemName: "airplane.departure")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.iumrahSignatureBlack)
+                            .foregroundStyle(Color.iumrahInk)
                             .frame(width: 42, height: 42)
                             .background(Color.iumrahRaisedBackground, in: Circle())
                     } else {
@@ -75,10 +75,10 @@ struct AirportSelectorButton: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .iumrahGlass(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous),
-                     interactive: true, chrome: monochrome)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: cornerRadius))
         .sheet(isPresented: $isPresented) {
             AirportPickerView(selection: $airport, fallbackCode: $fallbackCode)
+                .modifier(IumrahJourneySheetStyle())
         }
         .task {
             // The default TAS value is only a safe fallback. Until a concrete Airport

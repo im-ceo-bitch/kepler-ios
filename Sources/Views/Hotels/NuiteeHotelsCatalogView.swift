@@ -191,24 +191,14 @@ struct NuiteeHotelsCatalogView: View {
             .onChange(of: city) { _, _ in stars = 0; visibleCount = 20; hotelQuery = "" }
 
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+            Picker(NuiteeCopy.text("Звёзды", "Yulduzlar", "Stars", settings.language), selection: $stars) {
                 ForEach([0, 1, 2, 3, 4, 5], id: \.self) { star in
-                    Button {
-                        stars = star
-                        visibleCount = 20
-                    } label: {
-                        Text(star == 0 ? NuiteeCopy.text("Все", "Barchasi", "All", settings.language) : "\(star) ★")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(stars == star ? Color.white : Color.primary)
-                            .padding(.horizontal, 14)
-                            .frame(height: 36)
-                            .background(stars == star ? Color.black : Color.iumrahCardBackground, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
+                    Text(star == 0 ? NuiteeCopy.text("Все", "Barchasi", "All", settings.language) : "\(star) ★").tag(star)
                 }
             }
+            .pickerStyle(.segmented)
+            .frame(minHeight: 44)
+            .onChange(of: stars) { _, _ in visibleCount = 20 }
 
             HStack {
                 Spacer()
@@ -348,11 +338,11 @@ private struct NuiteeHotelListingCard: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let width = min(max(proxy.size.width * 0.31, 108), 122)
+            let width = proxy.size.width * 0.43
             HStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
                     NuiteeCatalogPreviewCollage(hotel: hotel)
-                        .frame(width: width, height: 204)
+                        .frame(width: width, height: 232)
                     HStack(spacing: 5) {
                         Button(action: onFavorite) {
                             Image(systemName: favorite ? "heart.fill" : "heart")
@@ -406,9 +396,9 @@ private struct NuiteeHotelListingCard: View {
                 .padding(.horizontal, 12).padding(.vertical, 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
-            .frame(width: proxy.size.width, height: 204)
+            .frame(width: proxy.size.width, height: 232)
         }
-        .frame(height: 204)
+        .frame(height: 232)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -869,11 +859,11 @@ private struct NuiteeCatalogPreviewCollage: View {
     let hotel: NuiteeHotel
     @State private var enriched: [String] = []
     private var initial: [String] {
-        let values = hotel.previewImages ?? []
+        let values = IumrahHotelPhotoIdentity.unique(hotel.previewImages ?? [])
         return values.isEmpty ? [hotel.coverImageURL].compactMap { $0 } : values
     }
     var body: some View {
-        NuiteeHotelCollage(images: enriched.count >= 3 ? enriched : initial)
+        NuiteeHotelCollage(images: enriched.isEmpty ? initial : enriched)
             .task(id: hotel.id) {
                 guard initial.count < 3 else { return }
                 if let stored = NuiteePreviewCache.shared.get(hotel.id) {
@@ -884,8 +874,7 @@ private struct NuiteeCatalogPreviewCollage: View {
                 defer { Task { await NuiteePreviewGate.shared.release() } }
                 guard !Task.isCancelled else { return }
                 guard let detail = try? await NuiteeHotelService().detail(hotelID: hotel.id) else { return }
-                var seen = Set<String>()
-                let photos = (initial + detail.images).filter { !$0.isEmpty && seen.insert($0).inserted }
+                let photos = IumrahHotelPhotoIdentity.unique(initial + detail.images)
                 NuiteePreviewCache.shared.put(hotel.id, images: photos)
                 enriched = photos
             }

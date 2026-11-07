@@ -15,6 +15,7 @@ struct PrimaryHotelView: View {
     @State private var isPreparingPublishedPackage = false
     @State private var publishedPackageError: String?
     @State private var activeHotelCity: HotelSelectionRole = .makkah
+    @State private var visibleHotelCount = 20
     @State private var starFilter: Int? = nil
     @State private var isUpdatingPrice = false
     @State private var hotelForDetails: HotelSummary?
@@ -64,45 +65,26 @@ struct PrimaryHotelView: View {
         GeometryReader { viewport in
             let contentWidth = max(0, viewport.size.width - (IumrahDesign.pagePadding * 2))
 
-            VStack(spacing: 0) {
-                // Keep one native glass generator header outside the ScrollView.
-                // This preserves the animated stage, live total and back action
-                // while the user scrolls through the hotel catalogue.
-                IumrahGeneratorHeader(stage: .hotel, currentPriceText: visibleTotal)
-                    .frame(width: contentWidth)
-                    .padding(.horizontal, IumrahDesign.pagePadding)
-                    .padding(.top, 9)
-                    .padding(.bottom, 12)
-
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(alignment: .leading, spacing: 21) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    IumrahJourneyHeader { flightFirstContextCard }
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         if familyFlow { IumrahFoundationCompactSteps(total: 8, current: 5, language: settings.language) }
-                        heading
-                        if entryMode == .flightFirst {
-                            IumrahJourneyFlowSteps(activeStep: 2)
-                            flightFirstContextCard
-                            flightFirstTierSelector
-                        }
-                        hotelContent
-                        if entryMode == .flightFirst {
-                            hotelCompletionStatus
-                        }
                         cityAndStarNavigation
                         availableHotels
+                        if canContinue { hotelContent }
                     }
                     .frame(width: contentWidth, alignment: .leading)
                     .padding(.horizontal, IumrahDesign.pagePadding)
-                    .padding(.top, 8)
+                    .padding(.top, 16)
                     .padding(.bottom, 30)
                 }
-                .frame(width: viewport.size.width)
+                .background(IumrahNoVerticalBounce())
             }
         }
         .background(Color.iumrahPageBackground)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            pinnedContinueButton
-        }
-        .iumrahInternalNavigation(progress: .hotel, showsGeneratorAmbient: true)
+        .safeAreaInset(edge: .bottom, spacing: 0) { pinnedContinueButton }
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             if journey.hotels.isEmpty { await journey.loadMakkahHotels() }
             if requiresMadinah, journey.madinahHotels.isEmpty { await journey.loadMadinahHotels() }
@@ -123,8 +105,10 @@ struct PrimaryHotelView: View {
         }
         .onChange(of: activeHotelCity) { _, _ in
             starFilter = nil
+            visibleHotelCount = 20
             IumrahHaptics.selection()
         }
+        .onChange(of: starFilter) { _, _ in visibleHotelCount = 20 }
         .navigationDestination(isPresented: $showTransfer) {
             TransferSelectionView(familyFlow: familyFlow)
         }
@@ -280,73 +264,23 @@ struct PrimaryHotelView: View {
 
 
     private var flightFirstContextCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "airplane.circle.fill")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Color.iumrahRoyalViolet)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(flightFirstTitle)
-                        .font(.headline)
-                    Text(flightFirstSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundStyle(.green)
-            }
-
-            if !journey.stagedUmrahFlights.isEmpty {
-                Divider()
-                ForEach(journey.stagedUmrahFlights) { flight in
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: flight.kind == .roundTrip ? "arrow.left.arrow.right" : "airplane")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(flight.routeTitle)
-                                .font(.subheadline.monospaced().weight(.bold))
-                            Text([flight.airline, flight.flightNumber].filter { !$0.isEmpty }.joined(separator: " · "))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            if let returnAt = flight.returnAt {
-                                Text("↩︎ \(String(returnAt.prefix(10)))" + ((flight.returnAirline ?? flight.returnFlightNumber) == nil ? "" : " · " + [flight.returnAirline, flight.returnFlightNumber].compactMap { $0 }.joined(separator: " · ")))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                    }
-                }
-            }
-
-            if journey.packageFlightPath == .aviasalesSelected,
-               let roundTrip = journey.stagedAviasalesOffers[.roundTrip],
-               (roundTrip.returnAirlineCode?.isEmpty != false || roundTrip.returnFlightNumber?.isEmpty != false) {
-                Label(unverifiedReturnFlightNote, systemImage: "info.circle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Divider()
-            HStack(spacing: 14) {
-                Label("\(max(1, journey.trip.travelerCount))", systemImage: "person.2.fill")
-                Label(journey.trip.scope.title(settings.language), systemImage: "mappin.and.ellipse")
+        VStack(alignment: .leading, spacing: 8) {
+            Text(journey.trip.scope.title(settings.language))
+                .font(.headline)
+            HStack(spacing: 12) {
+                Label("\(journey.trip.travelerCount)", systemImage: "person.2")
+                Label("\(journey.trip.rooms)", systemImage: "bed.double")
                 Spacer(minLength: 0)
             }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .font(.subheadline)
+            Label("\((journey.trip.saudiArrivalDate ?? journey.trip.departureDate).formatted(.dateTime.day().month(.abbreviated))) – \(journey.trip.returnDate.formatted(.dateTime.day().month(.abbreviated)))", systemImage: "calendar")
+                .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.8)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(15)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.iumrahDesertGold, lineWidth: 1.5))
     }
-
 
     private var flightFirstTierSelector: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -533,24 +467,24 @@ struct PrimaryHotelView: View {
     }
 
     private var cityAndStarNavigation: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 9) {
-                cityButton(.makkah)
-                if requiresMadinah { cityButton(.madinah) }
+        VStack(alignment: .leading, spacing: 12) {
+            if requiresMadinah {
+                IumrahGlassPillSelector(options: [
+                    .init(HotelSelectionRole.makkah, localizedMakkah),
+                    .init(HotelSelectionRole.madinah, localizedMadinah)
+                ], selection: activeHotelCity, onSelect: { activeHotelCity = $0 })
+            } else {
+                Text(localizedMakkah).font(.title2.bold())
             }
-            if !activeCatalog.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        starButton(nil)
-                        ForEach(orderedStars.filter { stars in activeCatalog.contains(where: { $0.stars == stars }) }, id: \.self) { stars in
-                            starButton(stars)
-                        }
-                    }
+            Picker(allHotelsTitle, selection: $starFilter) {
+                Text(allHotelsTitle).tag(Int?.none)
+                ForEach(1...5, id: \.self) { stars in
+                    Text("\(stars) ★").tag(Optional(stars))
                 }
-                .contentMargins(.horizontal, 1)
             }
+            .pickerStyle(.segmented)
+            .frame(minHeight: 44)
         }
-        .padding(.top, 8)
     }
 
     private func cityButton(_ city: HotelSelectionRole) -> some View {
@@ -610,8 +544,13 @@ struct PrimaryHotelView: View {
                     }
                 }
             } else {
-                ForEach(orderedHotels) { hotel in
+                ForEach(Array(orderedHotels.prefix(visibleHotelCount))) { hotel in
                     alternativeHotelRow(hotel)
+                        .onAppear {
+                            if hotel.id == orderedHotels.prefix(visibleHotelCount).last?.id {
+                                visibleHotelCount = min(visibleHotelCount + 20, orderedHotels.count)
+                            }
+                        }
                 }
             }
         }

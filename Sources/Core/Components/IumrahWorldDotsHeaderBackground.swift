@@ -18,7 +18,7 @@ struct IumrahWorldDotsHeaderBackground: View {
             let mapWidth = min(max(width * 0.94, 300), 920)
 
             ZStack {
-                Color.iumrahSignatureBlack
+                Color.iumrahHeaderBackground
 
                 // Fixed 2:1 geometry retains geographic proportions. Only the
                 // header viewport clips the atlas, not the country outlines.

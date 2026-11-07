@@ -181,7 +181,7 @@ struct HomeDashboardView: View {
         // ScrollView. Its black surface extends into the TOP safe area while
         // the actual controls remain inside the safe area, below the status bar.
         .background {
-            (isHomeHeaderVisible ? Color.iumrahSignatureBlack : Color.iumrahPageBackground)
+            (isHomeHeaderVisible ? Color.iumrahHeaderBackground : Color.iumrahPageBackground)
                 .ignoresSafeArea(edges: .top)
         }
     }
@@ -2470,6 +2470,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 journey.packageFlightPath = .publishedDirect
             }
             .environmentObject(settings)
+            .modifier(IumrahJourneySheetStyle())
         }
         .sheet(isPresented: $showingPassengers) {
             IumrahHomeJourneyPassengersSheet(language: settings.language,
@@ -2488,6 +2489,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 filters.cabinClass = cabin
                 journey.trip.flightFilters = filters
             }
+            .modifier(IumrahJourneySheetStyle())
         }
     }
 
@@ -2506,17 +2508,15 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var blackTop: some View {
-        GeometryReader { proxy in
-            let stretch = max(0, proxy.frame(in: .named("homeMarketingScroll")).minY)
-
-            VStack(alignment: .leading, spacing: 22) {
+        VStack(spacing: 0) {
                 HStack(spacing: 12) {
                     if navigationChromeStyle == .drawer {
                         Button { chrome.openSidebar() } label: {
                             Image(systemName: "line.3.horizontal")
                                 .frame(width: 48, height: 48)
-                                .background(.white.opacity(0.11), in: Circle())
+
                         }
+                        .modifier(IumrahNativeChromeButton())
                         .accessibilityLabel(tr("Меню", "Menu", "Menyu", "Меню"))
                     } else {
                         Color.clear.frame(width: 48, height: 48)
@@ -2536,62 +2536,28 @@ private struct IumrahHomeJourneySearchHero: View {
                     Button { chrome.openNotifications() } label: {
                         Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
                             .frame(width: 48, height: 48)
-                            .background(.white.opacity(0.11), in: Circle())
+
                     }
+                    .modifier(IumrahNativeChromeButton())
                     .accessibilityLabel(tr("Уведомления", "Notifications", "Bildirishnomalar", "Билдиришномалар"))
                 }
                 .font(.system(size: 18, weight: .medium))
 
-                VStack(alignment: .leading, spacing: 12) {
-                    ZStack(alignment: .leading) {
-                        ForEach(headlineOptions.indices, id: \.self) { index in
-                            if index == headlineIndex {
-                                Text(headlineOptions[index])
-                                    .id(index)
-                                    .font(IumrahType.bold(29, relativeTo: .largeTitle))
-                                    .tracking(-0.7)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .transition(reduceMotion ? .opacity : .modifier(
-                                        active: IumrahHomeVaporPhase(amount: 1),
-                                        identity: IumrahHomeVaporPhase(amount: 0)
-                                    ))
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityElement(children: .combine)
-
-                    Text(tr("Выберите даты и состав семьи — остальное соберём по шагам.",
-                            "Choose your dates and travelers. We'll guide you through the rest.",
-                            "Sana va sayohatchilarni tanlang. Qolganini birga tuzamiz.",
-                            "Сана ва саёҳатчиларни танланг. Қолганини бирга тузамиз."))
-                        .font(IumrahType.regular(15, relativeTo: .subheadline))
-                        .foregroundStyle(.white.opacity(0.78))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 14)
-            .padding(.bottom, 46)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .frame(minHeight: 268 + stretch, alignment: .topLeading)
-            .background(alignment: .top) {
-                IumrahWorldDotsHeaderBackground(mapOpacity: 0.33, waveSpeed: 0.55, waveIntensity: 0.7)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 268 + stretch)
-                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 15, bottomTrailingRadius: 15))
-            }
         }
-        .frame(height: 268)
+        .foregroundStyle(.white)
+        .padding(.horizontal, IumrahDesign.pagePadding)
+        .padding(.top, 14)
+        .padding(.bottom, 60)
+        .background {
+            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+        }
         .task(id: scenePhase == .active && !reduceMotion) {
             guard scenePhase == .active && !reduceMotion else { return }
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .seconds(5))
                 guard !Task.isCancelled else { break }
-                withAnimation(.easeInOut(duration: 0.7)) {
+                withAnimation(.easeInOut(duration: 0.25)) {
                     headlineIndex = (headlineIndex + 1) % headlineOptions.count
                 }
             }
@@ -2599,28 +2565,51 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var searchCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text(tr("Начните путешествие", "Plan your journey", "Safarni boshlang", "Сафарни бошланг"))
+        VStack(alignment: .leading, spacing: 10) {
+            Text(headlineOptions[headlineIndex])
+                .id(headlineIndex)
+                .transition(.opacity)
+                .lineLimit(2)
+                .frame(minHeight: 44, alignment: .leading)
                 .font(IumrahType.bold(18, relativeTo: .headline))
                 .foregroundStyle(Color.iumrahInk)
 
+            Text(tr("Выберите даты и состав семьи — остальное соберём по шагам.",
+                    "Choose dates and travelers. We’ll guide you through the rest.",
+                    "Sana va sayohatchilarni tanlang.", "Сана ва саёҳатчиларни танланг."))
+                .font(.caption).foregroundStyle(.secondary)
+            Divider()
             VStack(alignment: .leading, spacing: 5) {
-                fieldCaption(tr("Город вылета", "Departure city", "Jo‘nash shahri", "Жўнаш шаҳри"))
                 AirportSelectorButton(airport: $journey.trip.originAirport,
                                       fallbackCode: $journey.trip.origin,
-                                      cornerRadius: 26,
+                                      cornerRadius: 0,
                                       monochrome: true)
                     .frame(minHeight: 46)
             }
 
+            Divider()
             VStack(alignment: .leading, spacing: 7) {
-                fieldCaption(tr("Маршрут умры", "Your Umrah route", "Umra yo‘nalishi", "Умра йўналиши"))
                 IumrahGlassPillSelector(options: [
                     .init(.makkahOnly, tr("Только Мекка", "Makkah only", "Faqat Makka", "Фақат Макка")),
                     .init(.makkahAndMadinah, tr("Мекка + Медина", "Makkah + Madinah", "Makka + Madina", "Макка + Мадина"))
-                ], selection: journey.trip.scope, onSelect: changeRoute, height: 54)
+                ], selection: journey.trip.scope, onSelect: changeRoute, height: 44)
+                fieldCaption(tr("Маршрут умры", "Your Umrah route", "Umra yo‘nalishi", "Умра йўналиши"))
             }
 
+            if journey.trip.scope == .makkahAndMadinah {
+                IumrahGlassPillSelector(options: [
+                    .init(SaudiArrivalAirport.jeddah, tr("Джидда", "Jeddah", "Jidda", "Жидда")),
+                    .init(SaudiArrivalAirport.madinah, tr("Медина", "Madinah", "Madina", "Мадина"))
+                ], selection: journey.trip.arrivalAirport, onSelect: { airport in
+                    guard journey.trip.arrivalAirport != airport else { return }
+                    journey.resetAfterTripChange()
+                    journey.clearStagedUmrahFlights()
+                    journey.trip.arrivalAirport = airport
+                    journey.trip.selectedReturnAirport = nil
+                })
+                fieldCaption(tr("Первый аэропорт прилёта", "First arrival airport", "Birinchi kelish aeroporti", "Биринчи келиш аэропорти"))
+            }
+            Divider()
             Button { showingCalendar = true } label: {
                 HStack(spacing: 8) {
                     dateColumn(title: tr("Вылет", "Departure", "Uchish", "Учиш"), date: journey.trip.departureDate)
@@ -2629,23 +2618,24 @@ private struct IumrahHomeJourneySearchHero: View {
                     dateColumn(title: tr("Обратно", "Return", "Qaytish", "Қайтиш"), date: journey.trip.returnDate)
                     Spacer(minLength: 0)
                     Image(systemName: "calendar")
-                        .foregroundStyle(Color.iumrahSignatureBlack)
+                        .foregroundStyle(Color.iumrahInk)
                 }
-                .padding(.horizontal, 17)
-                .padding(.vertical, 12)
-                .frame(minHeight: 70)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+                .frame(minHeight: 52)
+
             }
             .buttonStyle(.plain)
             .accessibilityLabel(tr("Выбрать даты поездки", "Choose travel dates", "Safar sanalarini tanlash", "Сафар саналарини танлаш"))
 
+            Divider()
             Button { showingPassengers = true } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "person.2")
-                        .foregroundStyle(Color.iumrahSignatureBlack)
+                        .foregroundStyle(Color.iumrahInk)
                     VStack(alignment: .leading, spacing: 3) {
                         fieldCaption(tr("Паломники", "Travelers", "Ziyoratchilar", "Зиёратчилар"))
-                        Text(passengerSummary)
+                        Text(passengerSummary + " · " + cabinTitle(journey.trip.effectiveFlightFilters.cabinClass))
                             .font(IumrahType.bold(14, relativeTo: .subheadline))
                             .foregroundStyle(Color.iumrahInk)
                     }
@@ -2653,10 +2643,10 @@ private struct IumrahHomeJourneySearchHero: View {
                     Image(systemName: "chevron.right")
                         .foregroundStyle(Color.iumrahMuted)
                 }
-                .padding(.horizontal, 17)
-                .padding(.vertical, 12)
-                .frame(minHeight: 70)
-                .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+                .frame(minHeight: 52)
+
             }
             .buttonStyle(.plain)
 
@@ -2672,19 +2662,12 @@ private struct IumrahHomeJourneySearchHero: View {
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 58)
                 .background(Color.iumrahSignatureBlack,
-                            in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .buttonStyle(.plain)
             .disabled(!isValidSearch)
             .opacity(isValidSearch ? 1 : 0.5)
 
-            Text(tr("Сначала покажем опубликованные рейсы. На другие даты прямые рейсы могут отсутствовать.",
-                    "We'll show published flights first. Direct flights may not be available on every date.",
-                    "Avval e’lon qilingan reyslar ko‘rsatiladi. Barcha sanalarda to‘g‘ridan-to‘g‘ri reys bo‘lmasligi mumkin.",
-                    "Аввал эълон қилинган рейслар кўрсатилади. Ҳамма санада тўғридан-тўғри рейс бўлмаслиги мумкин."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
             Text(tr("Рейс → Отель → Трансфер → Итог", "Flight → Hotel → Transfer → Review",
                     "Reys → Mehmonxona → Transfer → Yakun", "Рейс → Меҳмонхона → Трансфер → Якун"))
                 .font(IumrahType.regular(12, relativeTo: .caption))
@@ -2693,10 +2676,10 @@ private struct IumrahHomeJourneySearchHero: View {
                 .multilineTextAlignment(.center)
         }
         .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 25.5, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .strokeBorder(Color(uiColor: .separator), lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 25.5, style: .continuous)
+                .strokeBorder(Color.iumrahDesertGold, lineWidth: 2)
         }
     }
 
@@ -2832,14 +2815,14 @@ private struct IumrahHomeJourneyPassengersSheet: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(tr("Класс перелёта", "Cabin class", "Parvoz klassi", "Парвоз класси"))
                         .font(IumrahType.bold(16, relativeTo: .headline))
-                    IumrahGlassPillSelector(options: [
-                        .init(.economy, tr("Эконом", "Economy", "Ekonom", "Эконом")),
-                        .init(.premiumEconomy, tr("Премиум", "Premium", "Premium", "Премиум"))
-                    ], selection: cabin, onSelect: { cabin = $0 }, height: 52)
-                    IumrahGlassPillSelector(options: [
-                        .init(.business, tr("Бизнес", "Business", "Biznes", "Бизнес")),
-                        .init(.first, tr("Первый", "First", "Birinchi", "Биринчи"))
-                    ], selection: cabin, onSelect: { cabin = $0 }, height: 52)
+                    Picker(tr("Класс перелёта", "Cabin class", "Parvoz klassi", "Парвоз класси"), selection: $cabin) {
+                        Text(tr("Эконом", "Economy", "Ekonom", "Эконом")).tag(FlightCabinClass.economy)
+                        Text(tr("Премиум", "Premium", "Premium", "Премиум")).tag(FlightCabinClass.premiumEconomy)
+                        Text(tr("Бизнес", "Business", "Biznes", "Бизнес")).tag(FlightCabinClass.business)
+                        Text(tr("Первый", "First", "Birinchi", "Биринчи")).tag(FlightCabinClass.first)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(minHeight: 44)
                 }
                 .padding(16)
                 .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))

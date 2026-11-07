@@ -62,50 +62,92 @@ struct IumrahGlassPillSelector<Value: Hashable>: View {
     let selection: Value
     let onSelect: (Value) -> Void
     var height: CGFloat = 54
-    @Namespace private var highlightNamespace
-
     var body: some View {
-        IumrahGlassGroup(spacing: 8) {
-            HStack(spacing: 3) {
-                ForEach(options.indices, id: \.self) { index in
-                    let option = options[index]
-                    Button {
-                        guard option.enabled else { return }
-                        if selection != option.value {
-                            IumrahHaptics.selection()
-                            withAnimation(.spring(response: 0.30, dampingFraction: 0.86)) {
-                                onSelect(option.value)
-                            }
-                        }
-                    } label: {
-                        ZStack {
-                            if selection == option.value {
-                                Capsule()
-                                    .fill(Color.white.opacity(0.88))
-                                    .matchedGeometryEffect(id: "selectedPill", in: highlightNamespace)
-                                    .iumrahGlass(in: Capsule(), interactive: true, chrome: true)
-                            }
-                            Text(option.title)
-                                .font(.system(size: 14, weight: selection == option.value ? .bold : .medium))
-                                .foregroundStyle(option.enabled ? Color.iumrahInk : Color.iumrahMuted.opacity(0.5))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.82)
-                                .padding(.horizontal, 6)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: height - 8)
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!option.enabled)
-                    .accessibilityLabel(option.title)
-                    .accessibilityAddTraits(selection == option.value ? .isSelected : [])
-                }
+        Picker("", selection: Binding(get: { selection }, set: { value in
+            guard options.contains(where: { $0.value == value && $0.enabled }) else { return }
+            IumrahHaptics.selection()
+            onSelect(value)
+        })) {
+            ForEach(options.indices, id: \.self) { index in
+                Text(options[index].title)
+                    .tag(options[index].value)
+                    .disabled(!options[index].enabled)
             }
-            .padding(4)
-            .background(Color.iumrahRaisedBackground, in: Capsule())
-            .overlay(Capsule().strokeBorder(Color.iumrahInk.opacity(0.07), lineWidth: 0.8))
         }
-        .frame(height: height)
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(minHeight: 44)
+    }
+}
+
+/// Uses the system button renderer, including its interaction on iOS 26.
+struct IumrahNativeChromeButton: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.buttonStyle(.glass).buttonBorderShape(.circle)
+        } else {
+            content.buttonStyle(.bordered).buttonBorderShape(.circle)
+        }
+    }
+}
+
+struct IumrahJourneySheetStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(28)
+            .presentationBackground(Color.iumrahPageBackground)
+    }
+}
+
+/// Shared compact identity for the flight and hotel selection screens.
+struct IumrahJourneyHeader<Summary: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    let summary: Summary
+    init(@ViewBuilder summary: () -> Summary) { self.summary = summary() }
+    var body: some View {
+        VStack(spacing: 32) {
+            HStack {
+                Button(action: { dismiss() }) {
+                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                }
+                .modifier(IumrahNativeChromeButton())
+                .accessibilityLabel(Text("Back"))
+                Spacer(minLength: 0)
+                Image("HeaderWordmarkLight")
+                    .resizable().renderingMode(.template).scaledToFit()
+                    .frame(width: 208, height: 64)
+                    .accessibilityLabel("iumrah")
+                Spacer(minLength: 0)
+                Color.clear.frame(width: 44, height: 44)
+            }
+            .foregroundStyle(.white)
+            summary
+                .foregroundStyle(Color.iumrahInk)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 14)
+        .padding(.bottom, 24)
+        .background {
+            IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
+                .ignoresSafeArea(edges: .top)
+        }
+        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+    }
+}
+
+/// Resize URLs of the same photo must not occupy multiple collage cells.
+enum IumrahHotelPhotoIdentity {
+    static func unique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { value in
+            guard !value.isEmpty else { return false }
+            guard var url = URLComponents(string: value) else { return seen.insert(value).inserted }
+            let sizing = Set(["width", "height", "w", "h", "size", "quality", "q", "fit"])
+            url.queryItems = url.queryItems?.filter { !sizing.contains($0.name.lowercased()) }
+            if url.queryItems?.isEmpty == true { url.queryItems = nil }
+            return seen.insert(url.string ?? value).inserted
+        }
     }
 }

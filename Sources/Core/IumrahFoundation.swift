@@ -1,7 +1,14 @@
 import SwiftUI
+import UIKit
 
 // Semantic graphite token used by root chrome and navigation.
 extension Color {
+    static let iumrahDesertGold = Color(red: 181.0 / 255, green: 134.0 / 255, blue: 69.0 / 255)
+    static let iumrahHeaderBackground = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0.18, green: 0.18, blue: 0.19, alpha: 1)
+            : UIColor(white: 17.0 / 255, alpha: 1)
+    })
     static let iumrahSignatureBlack = Color(red: 17.0 / 255.0, green: 17.0 / 255.0, blue: 17.0 / 255.0)
 }
 

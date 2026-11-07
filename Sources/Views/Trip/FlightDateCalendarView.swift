@@ -56,7 +56,6 @@ struct FlightDateCalendarView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
-                        header
                         stageSwitcher
                         if publishedOnly { flexibilityPicker }
                         if isLoading {
@@ -90,25 +89,10 @@ struct FlightDateCalendarView: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(copy(.title))
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        IumrahHaptics.selection()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                    .accessibilityLabel(closeLabel)
-                }
-
-                ToolbarItem(placement: .principal) {
-                    Image("IumrahFlightsCalendarLogo")
-                        .resizable()
-                        .renderingMode(.template)
-                        .scaledToFit()
-                        .foregroundStyle(.primary)
-                        .frame(width: 138, height: 30)
-                        .accessibilityLabel("iumrah Flights")
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(closeLabel) { dismiss() }
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
@@ -121,8 +105,7 @@ struct FlightDateCalendarView: View {
             returnDate = nil
             stage = .departure
         }
-        .presentationDragIndicator(.hidden)
-        .presentationCornerRadius(36)
+        .modifier(IumrahJourneySheetStyle())
     }
 
     private var header: some View {

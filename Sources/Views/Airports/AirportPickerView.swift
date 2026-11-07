@@ -96,6 +96,7 @@ struct AirportPickerView: View {
                     }
                 }
             }
+            .background(Color.iumrahPageBackground)
             .navigationTitle(L10n.text("airport_title", settings.language))
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: L10n.text("airport_search_title", settings.language))

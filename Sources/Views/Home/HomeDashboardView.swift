@@ -155,6 +155,12 @@ struct HomeDashboardView: View {
                 Color.iumrahPageBackground
                     .ignoresSafeArea(edges: .bottom)
             }
+            .coordinateSpace(name: "homeMarketingScroll")
+            .background(alignment: .top) {
+                Color.iumrahSignatureBlack
+                    .frame(height: 420)
+                    .ignoresSafeArea(edges: .top)
+            }
             .onChange(of: focusJourneySearchRevision) { _, _ in
                 withAnimation(.easeInOut(duration: 0.28)) {
                     scrollProxy.scrollTo("journey-search", anchor: .top)
@@ -1547,7 +1553,7 @@ struct HomeDashboardView: View {
     }
 
     private var philosophyCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("iumrah")
                 .font(.system(size: 18, weight: .bold, design: .rounded))
                 .padding(.horizontal, 14)
@@ -2431,7 +2437,7 @@ private struct IumrahHomeJourneySearchHero: View {
             blackTop
             searchCard
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, -39)
+                .padding(.top, -28)
                 .padding(.bottom, 2)
         }
         .sheet(isPresented: $showingCalendar) {
@@ -2483,79 +2489,87 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var blackTop: some View {
-        VStack(alignment: .leading, spacing: 27) {
-            HStack(spacing: 12) {
-                Button { chrome.openNotifications() } label: {
-                    Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                        .frame(width: 46, height: 46)
-                        .background(.white.opacity(0.11), in: Circle())
-                }
-                .accessibilityLabel(tr("Уведомления", "Notifications", "Bildirishnomalar", "Билдиришномалар"))
+        GeometryReader { proxy in
+            let stretch = max(0, proxy.frame(in: .named("homeMarketingScroll")).minY)
 
-                Spacer(minLength: 0)
-                Image("HeaderWordmarkLight")
-                    .resizable()
-                    .renderingMode(.template)
-                    .scaledToFit()
-                    .foregroundStyle(.white)
-                    .frame(width: 160, height: 49)
-                    .accessibilityLabel("iumrah")
-                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(spacing: 12) {
+                    if navigationChromeStyle == .drawer {
+                        Button { chrome.openSidebar() } label: {
+                            Image(systemName: "line.3.horizontal")
+                                .frame(width: 48, height: 48)
+                                .background(.white.opacity(0.11), in: Circle())
+                        }
+                        .accessibilityLabel(tr("Меню", "Menu", "Menyu", "Меню"))
+                    } else {
+                        Color.clear.frame(width: 48, height: 48)
+                            .accessibilityHidden(true)
+                    }
 
-                if navigationChromeStyle == .drawer {
-                    Button { chrome.openSidebar() } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .frame(width: 46, height: 46)
+                    Spacer(minLength: 0)
+                    Image("HeaderWordmarkLight")
+                        .resizable()
+                        .renderingMode(.template)
+                        .scaledToFit()
+                        .foregroundStyle(.white)
+                        .frame(width: 208, height: 64)
+                        .accessibilityLabel("iumrah")
+                    Spacer(minLength: 0)
+
+                    Button { chrome.openNotifications() } label: {
+                        Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
+                            .frame(width: 48, height: 48)
                             .background(.white.opacity(0.11), in: Circle())
                     }
-                    .accessibilityLabel(tr("Меню", "Menu", "Menyu", "Меню"))
-                } else {
-                    Color.clear.frame(width: 46, height: 46)
-                        .accessibilityHidden(true)
+                    .accessibilityLabel(tr("Уведомления", "Notifications", "Bildirishnomalar", "Билдиришномалар"))
                 }
-            }
-            .font(.system(size: 18, weight: .medium))
+                .font(.system(size: 18, weight: .medium))
 
-            VStack(alignment: .leading, spacing: 13) {
-                ZStack(alignment: .leading) {
-                    ForEach(headlineOptions.indices, id: \.self) { index in
-                        if index == headlineIndex {
-                            Text(headlineOptions[index])
-                                .id(index)
-                                .font(IumrahType.bold(32, relativeTo: .largeTitle))
-                                .tracking(-0.7)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .transition(reduceMotion ? .opacity : .modifier(
-                                    active: IumrahHomeVaporPhase(amount: 1),
-                                    identity: IumrahHomeVaporPhase(amount: 0)
-                                ))
+                VStack(alignment: .leading, spacing: 12) {
+                    ZStack(alignment: .leading) {
+                        ForEach(headlineOptions.indices, id: \.self) { index in
+                            if index == headlineIndex {
+                                Text(headlineOptions[index])
+                                    .id(index)
+                                    .font(IumrahType.bold(29, relativeTo: .largeTitle))
+                                    .tracking(-0.7)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .transition(reduceMotion ? .opacity : .modifier(
+                                        active: IumrahHomeVaporPhase(amount: 1),
+                                        identity: IumrahHomeVaporPhase(amount: 0)
+                                    ))
+                            }
                         }
                     }
-                }
-                .frame(maxWidth: .infinity, minHeight: 91, alignment: .leading)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityElement(children: .combine)
+                    .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityElement(children: .combine)
 
-                Text(tr("Выберите даты и состав семьи — остальное соберём по шагам.",
-                        "Choose your dates and travelers. We'll guide you through the rest.",
-                        "Sana va sayohatchilarni tanlang. Qolganini birga tuzamiz.",
-                        "Сана ва саёҳатчиларни танланг. Қолганини бирга тузамиз."))
-                    .font(IumrahType.regular(15, relativeTo: .subheadline))
-                    .foregroundStyle(.white.opacity(0.78))
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(tr("Выберите даты и состав семьи — остальное соберём по шагам.",
+                            "Choose your dates and travelers. We'll guide you through the rest.",
+                            "Sana va sayohatchilarni tanlang. Qolganini birga tuzamiz.",
+                            "Сана ва саёҳатчиларни танланг. Қолганини бирга тузамиз."))
+                        .font(IumrahType.regular(15, relativeTo: .subheadline))
+                        .foregroundStyle(.white.opacity(0.78))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .foregroundStyle(.white)
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.top, 14)
+            .padding(.bottom, 46)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .frame(minHeight: 268 + stretch, alignment: .topLeading)
+            .background(alignment: .top) {
+                IumrahWorldDotsHeaderBackground(mapOpacity: 0.33, waveSpeed: 0.55, waveIntensity: 0.7)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 268 + stretch)
+                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 15, bottomTrailingRadius: 15))
+                    .ignoresSafeArea(edges: .top)
+            }
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, IumrahDesign.pagePadding)
-        .padding(.top, 16)
-        .padding(.bottom, 62)
-        .frame(maxWidth: .infinity, minHeight: 290, alignment: .topLeading)
-        .background {
-            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33, waveSpeed: 0.55, waveIntensity: 0.7)
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 15, bottomTrailingRadius: 15))
-                .ignoresSafeArea(edges: .top)
-        }
+        .frame(height: 268)
         .task(id: scenePhase == .active && !reduceMotion) {
             guard scenePhase == .active && !reduceMotion else { return }
             while !Task.isCancelled {
@@ -2605,7 +2619,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 }
                 .padding(.horizontal, 17)
                 .padding(.vertical, 12)
-                .frame(minHeight: 74)
+                .frame(minHeight: 70)
                 .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
             }
             .buttonStyle(.plain)
@@ -2627,7 +2641,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 }
                 .padding(.horizontal, 17)
                 .padding(.vertical, 12)
-                .frame(minHeight: 74)
+                .frame(minHeight: 70)
                 .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 26))
             }
             .buttonStyle(.plain)
@@ -2664,7 +2678,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
         }
-        .padding(20)
+        .padding(18)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
@@ -2732,7 +2746,7 @@ private struct IumrahHomeJourneySearchHero: View {
         journey.trip.flightTripType = .roundTrip
         journey.trip.flexibility = .exact
         journey.packageFlightPath = .publishedDirect
-        chrome.openGuidedUmrahSearch()
+        chrome.startFlightFirstTrip()
     }
 }
 

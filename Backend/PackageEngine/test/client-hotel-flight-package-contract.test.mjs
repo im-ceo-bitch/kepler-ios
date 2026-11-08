@@ -87,7 +87,9 @@ test("panoramic hotel photos are constrained by the card viewport and the meal U
   assert.match(primary, /mealPlanCard\(role: role\)/);
   assert.match(primary, /frame\(maxWidth: \.infinity, alignment: \.leading\)/);
   assert.match(hotelCard, /HotelCachedImage\(rawURL: hotel\.coverImageURL\)/);
-  assert.match(finalPackage, /HotelCachedImage\(rawURL: hotel\.coverImageURL/);
+  assert.match(finalPackage, /PackageHotelDetailCard\(/);
+  assert.match(home, /HotelCachedImage\(rawURL: imageURL\)/);
   assert.match(bookingDetail, /HotelCachedImage\(/);
-  assert.doesNotMatch(finalPackage.slice(finalPackage.indexOf("private func hotelExpandedContent"), finalPackage.indexOf("private var transferExpandedContent")), /AsyncImage/);
+  assert.match(finalPackage, /mealCount\(\.makkah\)/);
+  assert.match(finalPackage, /mealCount\(\.madinah\)/);
 });

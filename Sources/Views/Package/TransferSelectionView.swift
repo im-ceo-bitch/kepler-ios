@@ -1,11 +1,5 @@
 import SwiftUI
 import Foundation
-import MapKit
-
-private enum TransferDiscoveryPhase {
-    case searching
-    case matched
-}
 
 struct TransferSelectionView: View {
     @EnvironmentObject private var journey: JourneyStore
@@ -14,8 +8,6 @@ struct TransferSelectionView: View {
     @Environment(\.colorScheme) private var inheritedColorScheme
     @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
 
-    @State private var discoveryPhase: TransferDiscoveryPhase = .matched
-    @State private var searchSecond = 0
     @State private var selectedIndex = 1
     @State private var dragOffset: CGFloat = 0
     @State private var basePackagePriceUsd: Decimal?
@@ -23,7 +15,6 @@ struct TransferSelectionView: View {
     @State private var isConfirming = false
     @State private var confirmationError: String?
 
-    @State private var searchDuration = 0 // Retained only for legacy unused map view.
     private let vehicles = TransferVehicleKind.allCases
 
     private var selectedVehicle: TransferVehicleKind {
@@ -57,11 +48,7 @@ struct TransferSelectionView: View {
         }
         }
         .animation(.easeInOut(duration: 0.58), value: isVIP)
-        .iumrahInternalNavigation(
-            progress: .transfer,
-            showsGeneratorAmbient: true,
-            currentPriceText: currentPackagePriceTitle
-        )
+        .toolbar(.hidden, for: .navigationBar)
         .background(transferPageBackground)
         .navigationDestination(isPresented: $showFinalPackage) {
             FinalPackageView(familyFlow: familyFlow)
@@ -74,7 +61,7 @@ struct TransferSelectionView: View {
         } message: {
             Text(confirmationError ?? "")
         }
-        .task { await startDiscoveryIfNeeded() }
+        .task { await prepareTransferSelection() }
     }
 
     private var transferPageBackground: some View {
@@ -83,10 +70,10 @@ struct TransferSelectionView: View {
                 .ignoresSafeArea()
 
             Color.black
-                .opacity(discoveryPhase == .matched && isVIP ? 1 : 0)
+                .opacity(isVIP ? 1 : 0)
                 .ignoresSafeArea()
 
-            if discoveryPhase == .matched {
+            if !isVIP {
                 LinearGradient(
                     colors: [
                         Color(red: 0.98, green: 0.96, blue: 0.82).opacity(0.88),
@@ -107,154 +94,7 @@ struct TransferSelectionView: View {
     }
 
     private var pageBackground: Color {
-        discoveryPhase == .matched && isVIP ? .black : .white
-    }
-
-    // MARK: - 30-second Apple Maps search
-
-    private var searchExperience: some View {
-        ZStack(alignment: .top) {
-            TransferLiveSearchMap(second: searchSecond, searchDuration: searchDuration, reduceMotion: reduceMotion, language: settings.language)
-                .ignoresSafeArea()
-
-            searchCeilingGradient
-
-            VStack(spacing: 0) {
-                IumrahGeneratorHeader(
-                    stage: .transfer,
-                    currentPriceText: currentPackagePriceTitle
-                )
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 10)
-
-                Spacer()
-
-                searchBottomSheet
-                    .frame(maxWidth: adaptiveLayout.layoutClass == .compact ? .infinity : 540)
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: adaptiveLayout.isWide ? .trailing : .center
-                    )
-                    .padding(.horizontal, adaptiveLayout.layoutClass == .compact ? 14 : 24)
-                    .padding(.bottom, adaptiveLayout.layoutClass == .compact ? 18 : 24)
-            }
-        }
-    }
-
-    private var searchCeilingGradient: some View {
-        LinearGradient(
-            colors: [
-                pageBackground,
-                pageBackground.opacity(0.96),
-                pageBackground.opacity(0.74),
-                .clear
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(maxWidth: .infinity)
-        .frame(height: 164, alignment: .top)
-        .ignoresSafeArea(edges: .top)
-        .allowsHitTesting(false)
-    }
-
-    private var searchBottomSheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.blue.opacity(0.12))
-                        .frame(width: 46, height: 46)
-                    Image(systemName: "car.2.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.blue)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(localized(
-                        "Ищем свободный трансфер",
-                        "Finding an available transfer",
-                        "Bo‘sh transfer qidirilmoqda",
-                        "Бўш трансфер қидирилмоқда"
-                    ))
-                    .font(.headline)
-
-                    Text(searchStatusTitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .contentTransition(.opacity)
-                }
-
-                Spacer(minLength: 8)
-
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text("\(searchSecond)s")
-                        .font(.caption.monospacedDigit().weight(.bold))
-                        .contentTransition(.numericText())
-                    Text(localized("идёт поиск", "searching", "qidiruv", "қидирув"))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            TransferSearchActivityBar(second: searchSecond)
-
-            HStack(spacing: 8) {
-                searchChip(icon: "location.fill", text: routeTitle)
-                searchChip(icon: "person.2.fill", text: "\(journey.trip.travelerCount)")
-                searchChip(
-                    icon: "car.fill",
-                    text: localized(
-                        "\(nearbyVehicleCount) рядом",
-                        "\(nearbyVehicleCount) nearby",
-                        "\(nearbyVehicleCount) yaqin",
-                        "\(nearbyVehicleCount) яқин"
-                    )
-                )
-            }
-
-            Text(localized(
-                "Проверяем автомобили в Мекке, маршрут поездки, количество гостей и багаж. После проверки iumrah предложит подходящий свободный автомобиль.",
-                "Checking vehicles around Makkah, your trip route, party size and luggage. iumrah will then match a suitable available vehicle.",
-                "Makkadagi avtomobillar, safar yo‘nalishi, mehmonlar va bagaj tekshirilmoqda. So‘ng iumrah mos bo‘sh avtomobilni tanlaydi.",
-                "Маккадаги автомобиллар, сафар йўналиши, меҳмонлар ва багаж текширилмоқда. Сўнг iumrah мос бўш автомобилни танлайди."
-            ))
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(18)
-        .iumrahGlass(in: RoundedRectangle(cornerRadius: 30, style: .continuous), allowsStaticGlass: true)
-    }
-
-    private func searchChip(icon: String, text: String) -> some View {
-        Label(text, systemImage: icon)
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 10)
-            .frame(height: 32)
-            .background(Color.iumrahRaisedBackground.opacity(0.92), in: Capsule())
-    }
-
-    private var nearbyVehicleCount: Int {
-        min(11, 2 + searchSecond / 3)
-    }
-
-    private var searchStatusTitle: String {
-        switch searchSecond {
-        case 0..<5:
-            return localized("Сканируем дороги рядом с Харамом", "Scanning roads around the Haram", "Haram atrofidagi yo‘llar tekshirilmoqda", "Ҳарам атрофидаги йўллар текширилмоқда")
-        case 5..<10:
-            return localized("Проверяем доступность водителей", "Checking driver availability", "Haydovchilar mavjudligi tekshirilmoqda", "Ҳайдовчилар мавжудлиги текширилмоқда")
-        case 10..<15:
-            return localized("Сопоставляем ваши даты", "Matching your travel dates", "Safar sanalari moslashtirilmoqda", "Сафар саналари мослаштирилмоқда")
-        case 15..<20:
-            return localized("Учитываем гостей и багаж", "Matching guests and luggage", "Mehmonlar va bagaj hisoblanmoqda", "Меҳмонлар ва багаж ҳисобланмоқда")
-        case 20..<25:
-            return localized("Проверяем маршрут Мекка — Медина", "Checking the Makkah–Madinah route", "Makka–Madina yo‘nalishi tekshirilmoqda", "Макка–Мадина йўналиши текширилмоқда")
-        default:
-            return localized("Закрепляем лучший доступный вариант", "Securing the best available match", "Eng mos variant biriktirilmoqda", "Энг мос вариант бириктирилмоқда")
-        }
+        isVIP ? .black : .white
     }
 
     // MARK: - Matched Uber-style transfer service
@@ -265,24 +105,21 @@ struct TransferSelectionView: View {
                 .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    IumrahGeneratorHeader(
-                        stage: .transfer,
-                        currentPriceText: currentPackagePriceTitle
-                    )
-
-                    if !familyFlow {
-                        IumrahJourneyFlowSteps(activeStep: 3)
+                VStack(spacing: 0) {
+                    IumrahJourneyHeader(showsNotifications: true) {
+                        IumrahJourneyDisclosureCard(
+                            title: localized("Ваш трансфер", "Your transfer", "Transferingiz", "Трансферингиз"),
+                            total: currentPackagePriceTitle,
+                            subtitle: "\(journey.trip.travelerCount) · " + routeTitle,
+                            priceCaption: journey.hasFinalGeneratorQuote
+                                ? localized("Итого за пакет", "Package total", "Paket jami", "Пакет жами")
+                                : localized("Предварительно за пакет", "Estimated package total", "Taxminiy paket jami", "Тахминий пакет жами")
+                        ) {
+                            IumrahTransferRouteDetails()
+                        }
                     }
-
-                    if familyFlow {
-                        IumrahFoundationCompactSteps(total: 8, current: 6, language: settings.language)
-                        Text(localized("Услуги вашей семьи","Services for your family","Oilangiz uchun xizmatlar","Оилангиз учун хизматлар")).font(.title.bold())
-                        DisclosureGroup(localized("Кто будет рядом?","Who accompanies us?","Kim hamroh bo‘ladi?","Ким ҳамроҳ бўлади?")) {
-                            Text(localized("Ваш гид встретит вас, поможет заселиться и будет рядом на зияратах и во время умры.","Your guide meets you, helps you check in and accompanies you on ziyarat and Umrah.","Gidingiz sizni kutib oladi, joylashishda yordam beradi va ziyorat hamda Umrada hamroh bo‘ladi.","Гидингиз сизни кутиб олади, жойлашишда ёрдам беради ва зиёрат ҳамда Умрада ҳамроҳ бўлади."))
-                        }.iumrahCard()
-                    } else { matchedHeader }
-
+                    .environment(\.colorScheme, inheritedColorScheme)
+                    VStack(spacing: 20) {
                     if adaptiveLayout.isWide {
                         HStack(alignment: .top, spacing: 20) {
                             vehicleStage
@@ -310,8 +147,10 @@ struct TransferSelectionView: View {
                     } else { confirmationButton }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 10)
+                .padding(.top, 20)
                 .padding(.bottom, 46)
+                }
+                .background(IumrahNoVerticalBounce())
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollContentBackground(.hidden)
@@ -589,8 +428,7 @@ struct TransferSelectionView: View {
 
             Button {
                 journey.ensureHaramainTicketDefaults()
-                journey.setHaramainFareClass(.economy)
-                journey.setHaramainTrainSelected(!journey.haramainTrainSelected)
+                        journey.setHaramainTrainSelected(!journey.haramainTrainSelected)
                 journey.haramainTrainSelected ? IumrahHaptics.success() : IumrahHaptics.selection()
             } label: {
                 HStack(spacing: 12) {
@@ -683,17 +521,15 @@ struct TransferSelectionView: View {
     // MARK: - Interaction / pricing
 
     @MainActor
-    private func startDiscoveryIfNeeded() async {
+    private func prepareTransferSelection() async {
         journey.ensureHaramainTicketDefaults()
         if familyFlow {
             let choice = journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle()
             selectedIndex = vehicles.firstIndex(of: choice) ?? 0
             journey.chooseTransferVehicle(choice)
-            discoveryPhase = .matched
             await refreshBasePackagePrice()
             return
         }
-        journey.setHaramainFareClass(.economy)
 
         let selected = journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle()
         selectedIndex = vehicles.firstIndex(of: selected) ?? 1
@@ -703,7 +539,6 @@ struct TransferSelectionView: View {
 
         // Vehicle classes are package options, not GPS-matched nearby drivers.
         // Show them immediately and update the server quote asynchronously.
-        discoveryPhase = .matched
         await refreshBasePackagePrice()
     }
 
@@ -776,7 +611,6 @@ struct TransferSelectionView: View {
             if resolved > 0 { basePackagePriceUsd = resolved }
         }
 
-        if !reduceMotion { try? await Task.sleep(for: .milliseconds(320)) }
         IumrahHaptics.success()
         isConfirming = false
         showFinalPackage = true
@@ -890,10 +724,8 @@ struct TransferSelectionView: View {
     }
 
     private var routeTitle: String {
-        if !includesMadinah { return "JED → Makkah" }
-        return journey.trip.arrivalAirport == .madinah
-            ? "MED → Madinah → Makkah → JED"
-            : "JED → Makkah → Madinah → MED"
+        let cities = !includesMadinah ? "Makkah" : (journey.trip.arrivalAirport == .madinah ? "Madinah → Makkah" : "Makkah → Madinah")
+        return journey.trip.outboundDestinationCode + " → " + cities + " → " + journey.trip.returnOriginCode
     }
 
     private var trainSegmentTitle: String {
@@ -959,189 +791,6 @@ struct TransferSelectionView: View {
     private func localized(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
         transferLocalized(settings.language, russian: ru, english: en, uzbek: uz, uzbekCyrillic: uzCy)
     }
-}
-
-// MARK: - Apple Maps live-search scene
-
-private struct TransferLiveSearchMap: View {
-    let second: Int
-    let searchDuration: Int
-    let reduceMotion: Bool
-    let language: AppSettingsStore.Language
-
-    @State private var position: MapCameraPosition = .camera(
-        MapCamera(
-            centerCoordinate: CLLocationCoordinate2D(latitude: 21.4257, longitude: 39.8264),
-            distance: 7_400,
-            heading: 0,
-            pitch: 38
-        )
-    )
-
-    private static let makkah = CLLocationCoordinate2D(latitude: 21.4225, longitude: 39.8262)
-    private let candidates = TransferSearchCandidate.defaults
-
-    var body: some View {
-        Map(position: $position, interactionModes: [.pan, .zoom]) {
-            MapCircle(center: Self.makkah, radius: searchRadiusMeters)
-                .foregroundStyle(Color.blue.opacity(0.075))
-                .stroke(Color.blue.opacity(0.44), lineWidth: 2)
-
-            Annotation("Makkah", coordinate: Self.makkah, anchor: .center) {
-                TransferSearchCenterPulse(reduceMotion: reduceMotion)
-            }
-
-            ForEach(candidates) { candidate in
-                Annotation(candidate.id, coordinate: candidate.coordinate(at: reduceMotion ? 0 : second), anchor: .center) {
-                    TransferSearchCarPin(emphasis: candidate.emphasis, active: second >= candidate.appearSecond)
-                }
-            }
-        }
-        .mapStyle(
-            .standard(
-                elevation: .realistic,
-                pointsOfInterest: .excludingAll,
-                showsTraffic: true
-            )
-        )
-        .overlay(alignment: .topTrailing) {
-            Label("Makkah", systemImage: "location.fill")
-                .font(.caption.weight(.bold))
-                .padding(.horizontal, 10)
-                .frame(height: 34)
-                .background(.regularMaterial, in: Capsule())
-                .padding(.top, 176)
-                .padding(.trailing, 16)
-        }
-        .onChange(of: second) { _, value in
-            guard !reduceMotion, value > 0, value % 5 == 0 else { return }
-            withAnimation(.easeInOut(duration: 2.1)) {
-                position = .camera(
-                    MapCamera(
-                        centerCoordinate: Self.makkah,
-                        distance: min(12_000, 7_400 + Double(value) * 105),
-                        heading: 0,
-                        pitch: 34
-                    )
-                )
-            }
-        }
-        .accessibilityLabel(IumrahAccessibilityCopy.text(language, ru: "Карта поиска трансфера в Мекке", en: "Live transfer search map in Makkah", uz: "Makkadagi transfer qidiruv xaritasi", cy: "Маккадаги трансфер қидирув харитаси", tr: "Mekke’de canlı transfer arama haritası", id: "Peta pencarian transfer langsung di Makkah"))
-    }
-
-    private var searchRadiusMeters: CLLocationDistance {
-        let denominator = max(1, searchDuration)
-        let progress = min(1, Double(second) / Double(denominator))
-        return 650 + (5_900 * progress)
-    }
-}
-
-private struct TransferSearchCenterPulse: View {
-    let reduceMotion: Bool
-    @State private var animate = false
-
-    var body: some View {
-        ZStack {
-            if !reduceMotion {
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .stroke(Color.blue.opacity(0.46 - Double(index) * 0.09), lineWidth: 2)
-                        .frame(width: 34, height: 34)
-                        .scaleEffect(animate ? CGFloat(3.0 + Double(index) * 0.72) : 0.78)
-                        .opacity(animate ? 0.02 : 0.72)
-                        .animation(
-                            .easeOut(duration: 2.6)
-                                .repeatForever(autoreverses: false)
-                                .delay(Double(index) * 0.55),
-                            value: animate
-                        )
-                }
-            }
-
-            Circle()
-                .fill(Color.blue.opacity(0.14))
-                .frame(width: 48, height: 48)
-            Circle()
-                .fill(.white)
-                .frame(width: 18, height: 18)
-                .overlay(Circle().stroke(Color.blue, lineWidth: 5))
-        }
-        .onAppear { animate = true }
-    }
-}
-
-private struct TransferSearchActivityBar: View {
-    let second: Int
-    @State private var travel = false
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = max(1, proxy.size.width)
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.primary.opacity(0.09))
-                Capsule()
-                    .fill(Color.blue)
-                    .frame(width: max(68, width * 0.34))
-                    .offset(x: travel ? max(0, width * 0.66) : 0)
-            }
-        }
-        .frame(height: 5)
-        .clipShape(Capsule())
-        .onAppear { travel = true }
-        .animation(.easeInOut(duration: 1.35).repeatForever(autoreverses: true), value: travel)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct TransferSearchCarPin: View {
-    let emphasis: Bool
-    let active: Bool
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(active ? Color.black : Color.black.opacity(0.36))
-                .frame(width: emphasis ? 46 : 40, height: emphasis ? 46 : 40)
-                .overlay {
-                    Circle().stroke(Color.white.opacity(active ? 0.92 : 0.45), lineWidth: 2)
-                }
-
-            Image(systemName: "car.fill")
-                .font(.system(size: emphasis ? 18 : 16, weight: .bold))
-                .foregroundStyle(Color.white)
-        }
-        .scaleEffect(active ? 1 : 0.74)
-        .opacity(active ? 1 : 0.42)
-        .animation(.spring(response: 0.5, dampingFraction: 0.82), value: active)
-    }
-}
-
-private struct TransferSearchCandidate: Identifiable {
-    let id: String
-    let latitude: Double
-    let longitude: Double
-    let phase: Double
-    let appearSecond: Int
-    let emphasis: Bool
-
-    func coordinate(at second: Int) -> CLLocationCoordinate2D {
-        let t = Double(second) * 0.22 + phase
-        let lat = latitude + sin(t) * 0.00115 + cos(t * 0.55) * 0.00038
-        let lon = longitude + cos(t * 0.88) * 0.00135 + sin(t * 0.46) * 0.00042
-        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
-    }
-
-    static let defaults: [TransferSearchCandidate] = [
-        .init(id: "A", latitude: 21.4314, longitude: 39.8347, phase: 0.2, appearSecond: 1, emphasis: false),
-        .init(id: "B", latitude: 21.4159, longitude: 39.8382, phase: 1.0, appearSecond: 3, emphasis: true),
-        .init(id: "C", latitude: 21.4378, longitude: 39.8171, phase: 1.8, appearSecond: 5, emphasis: false),
-        .init(id: "D", latitude: 21.4108, longitude: 39.8164, phase: 2.5, appearSecond: 8, emphasis: false),
-        .init(id: "E", latitude: 21.4475, longitude: 39.8292, phase: 3.2, appearSecond: 11, emphasis: true),
-        .init(id: "F", latitude: 21.4234, longitude: 39.8505, phase: 4.1, appearSecond: 14, emphasis: false),
-        .init(id: "G", latitude: 21.4019, longitude: 39.8298, phase: 5.0, appearSecond: 18, emphasis: false),
-        .init(id: "H", latitude: 21.4391, longitude: 39.8460, phase: 5.9, appearSecond: 21, emphasis: true),
-        .init(id: "I", latitude: 21.4201, longitude: 39.8058, phase: 6.6, appearSecond: 24, emphasis: false)
-    ]
 }
 
 // MARK: - Cinematic vehicle stage

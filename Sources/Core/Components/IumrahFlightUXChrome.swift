@@ -104,8 +104,15 @@ struct IumrahJourneySheetStyle: ViewModifier {
 /// Shared compact identity for the flight and hotel selection screens.
 struct IumrahJourneyHeader<Summary: View>: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var chrome: AppChromeStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @ObservedObject private var notifications = ClientNotificationCenter.shared
+    var showsNotifications: Bool = false
     let summary: Summary
-    init(@ViewBuilder summary: () -> Summary) { self.summary = summary() }
+    init(showsNotifications: Bool = false, @ViewBuilder summary: () -> Summary) {
+        self.showsNotifications = showsNotifications
+        self.summary = summary()
+    }
     var body: some View {
         VStack(spacing: 32) {
             HStack {
@@ -113,14 +120,23 @@ struct IumrahJourneyHeader<Summary: View>: View {
                     Image(systemName: "chevron.left").frame(width: 44, height: 44)
                 }
                 .modifier(IumrahNativeChromeButton())
-                .accessibilityLabel(Text("Back"))
+                .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Назад", en: "Back", uz: "Orqaga", cy: "Орқага", tr: "Geri", id: "Kembali"))
                 Spacer(minLength: 0)
                 Image("HeaderWordmarkLight")
                     .resizable().renderingMode(.template).scaledToFit()
                     .frame(width: 208, height: 64)
                     .accessibilityLabel("iumrah")
                 Spacer(minLength: 0)
-                Color.clear.frame(width: 44, height: 44)
+                if showsNotifications {
+                    Button { chrome.openNotifications() } label: {
+                        Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
+                            .frame(width: 44, height: 44)
+                    }
+                    .modifier(IumrahNativeChromeButton())
+                    .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar", cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
+                } else {
+                    Color.clear.frame(width: 44, height: 44)
+                }
             }
             .foregroundStyle(.white)
             summary

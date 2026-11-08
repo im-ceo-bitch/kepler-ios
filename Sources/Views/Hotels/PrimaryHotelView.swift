@@ -53,12 +53,15 @@ struct PrimaryHotelView: View {
     var transferAlreadySelected = false
 
     private var requiresMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
+    private var roomsComplete: Bool {
+        (journey.selectedRoom != nil || journey.selectedRoomCategory != nil) &&
+        (!requiresMadinah || journey.selectedMadinahRoom != nil || journey.selectedMadinahRoomCategory != nil)
+    }
+
     private var canContinue: Bool {
-        // Selection should not be blocked by a stale list-row cache. The existing
-        // pricing pipeline re-reads hotel detail and still requires a fresh 48h
-        // price before any final package quote can be produced.
         journey.selectedHotel != nil &&
-        (!requiresMadinah || journey.selectedMadinahHotel != nil)
+        (!requiresMadinah || journey.selectedMadinahHotel != nil) &&
+        (entryMode != .flightFirst || roomsComplete)
     }
 
     var body: some View {
@@ -72,7 +75,7 @@ struct PrimaryHotelView: View {
                         if familyFlow { IumrahFoundationCompactSteps(total: 8, current: 5, language: settings.language) }
                         cityAndStarNavigation
                         availableHotels
-                        if canContinue { hotelContent }
+                        if journey.selectedHotel != nil { hotelContent }
                     }
                     .frame(width: contentWidth, alignment: .leading)
                     .padding(.horizontal, IumrahDesign.pagePadding)
@@ -152,6 +155,9 @@ struct PrimaryHotelView: View {
                     continueLabel(publishedContinueTitle)
                 }
                 .disabled(!canContinue || isPreparingPublishedPackage)
+                .opacity(canContinue ? 1 : 0)
+                .frame(height: canContinue ? nil : 0)
+                .accessibilityHidden(!canContinue)
             } else {
                 NavigationLink {
                     OutboundFlightView()
@@ -177,6 +183,9 @@ struct PrimaryHotelView: View {
         }
         if requiresMadinah && journey.selectedMadinahHotel == nil {
             return stepText("Осталось выбрать отель в Медине", "Choose your Madinah hotel next", "Madinada mehmonxona tanlang", "Мадинада меҳмонхона танланг", "Medine otelini seçin", "اختر فندقًا في المدينة", "Pilih hotel di Madinah", "Pilih hotel di Madinah")
+        }
+        if entryMode == .flightFirst && !roomsComplete {
+            return stepText("Выберите номер в каждом отеле", "Choose a room in each hotel", "Har bir mehmonxonada xona tanlang", "Ҳар бир меҳмонхонада хона танланг", "Her otelde bir oda seçin", "اختر غرفة في كل فندق", "Pilih kamar di setiap hotel", "Pilih bilik di setiap hotel")
         }
         return ""
     }
@@ -240,12 +249,9 @@ struct PrimaryHotelView: View {
         publishedPackageError = nil
         defer { isPreparingPublishedPackage = false }
 
-        let ready: Bool
-        if journey.packageFlightPath == .aviasalesSelected {
-            ready = await journey.prepareAviasalesSelectedQuote()
-        } else {
-            ready = await journey.preparePublishedDirectQuote()
-        }
+        guard canContinue else { return }
+        await refreshCurrentPackagePrice()
+        let ready = journey.hasFinalGeneratorQuote
         if ready {
             IumrahHaptics.success()
             if transferAlreadySelected, journey.selectedTransferVehicle != nil {
@@ -398,10 +404,10 @@ struct PrimaryHotelView: View {
 
     private var publishedContinueTitle: String {
         switch settings.language {
-        case .russian: return "Продолжить к трансферу"
+        case .russian: return "Выбрать трансфер"
         case .turkish: return TurkishLocalization.phrase("Continue to transfer")
         case .arabic: return ArabicLocalization.phrase("Continue to transfer")
-        case .indonesian, .malay, .english: return "Continue to transfer"
+        case .indonesian, .malay, .english: return "Choose transfer"
         case .uzbek: return "Transferga davom etish"
         case .uzbekCyrillic: return "Трансферга давом этиш"
         }

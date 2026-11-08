@@ -1773,7 +1773,7 @@ private struct StorefrontFlightOptionCard: View {
     }
 }
 
-private enum StorefrontPackageInfoSheet: String, Identifiable {
+enum StorefrontPackageInfoSheet: String, Identifiable {
     case visa
     case guide
     case care
@@ -3944,7 +3944,7 @@ private struct PackageFlightChoiceCard: View {
     }
 }
 
-private struct PackageFlightLegDetailCard: View {
+struct PackageFlightLegDetailCard: View {
     let leg: StorefrontFlightLeg
     let direction: String
     let language: AppSettingsStore.Language
@@ -4106,7 +4106,7 @@ private struct PackageFlightLegDetailCard: View {
     }
 }
 
-private struct PackageHotelDetailCard: View {
+struct PackageHotelDetailCard: View {
     let hotel: StorefrontPackageHotel
     let selectedRoomName: String?
     let chooseRoomText: String
@@ -4198,7 +4198,7 @@ private struct PackageHotelDetailCard: View {
     }
 }
 
-private struct PackagePurchaseTrustCard: View {
+struct PackagePurchaseTrustCard: View {
     let language: AppSettingsStore.Language
     let onOpen: () -> Void
 
@@ -4253,11 +4253,11 @@ private struct PackagePurchaseTrustCard: View {
     }
 }
 
-private struct StorefrontPackageInformationSheet: View {
+struct StorefrontPackageInformationSheet: View {
     @Environment(\.dismiss) private var dismiss
     let kind: StorefrontPackageInfoSheet
     let language: AppSettingsStore.Language
-    let preview: StorefrontFlightPackagePreview
+    var preview: StorefrontFlightPackagePreview? = nil
 
     var body: some View {
         NavigationStack {

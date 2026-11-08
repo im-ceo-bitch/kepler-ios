@@ -122,7 +122,7 @@ struct IumrahHomeAudienceSection: View {
     private var sectionTitle: String {
         switch language {
         case .russian: return "Для кого создан Iumrah"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Who Iumrah is for"
+        case .english: return "Who Iumrah is for"
         case .uzbek: return "Iumrah kimlar uchun"
         case .uzbekCyrillic: return "Iumrah кимлар учун"
         }
@@ -157,7 +157,7 @@ struct IumrahHomeAudienceSection: View {
                     foreground: Color(red: 0.31, green: 0.18, blue: 0.07)
                 ),
             ]
-        case .english, .turkish, .indonesian, .malay, .arabic:
+        case .english:
             return [
                 Item(id: "self", icon: "slider.horizontal.3", title: "Build it your way", body: "Flights, hotels, transfer and services in one personal Umrah package you configure for yourself.", background: Color(red: 0.91, green: 0.95, blue: 1.00), foreground: Color(red: 0.05, green: 0.16, blue: 0.34)),
                 Item(id: "family", icon: "person.3.fill", title: "Family & friends", body: "Organize Umrah together while keeping the journey private, comfortable and paced around your group.", background: Color(red: 0.94, green: 0.98, blue: 0.92), foreground: Color(red: 0.10, green: 0.28, blue: 0.13)),
@@ -181,32 +181,33 @@ struct IumrahHomeAudienceSection: View {
 
 struct IumrahHomeServicesSection: View {
     let language: AppSettingsStore.Language
-    @State private var activeID: String?
+    // Keep the established initializer for compatibility with HomeDashboard.
+    // These actions continue to be used elsewhere on Home; the new carousel
+    // now opens a shared reference screen instead of skipping its description.
     let onTransfer: () -> Void
     let onESIM: () -> Void
     let onFlights: () -> Void
     let onZiyarats: () -> Void
-
-    private struct Item: Identifiable {
-        let id: String
-        let assets: [String]
-        let title: String
-        let body: String
-        let badge: String
-        let icon: String
-        let action: (() -> Void)?
-    }
+    @State private var activeID: IumrahServiceKind?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
-            IumrahHomeSectionHeader(title: sectionTitle, subtitle: sectionSubtitle)
+            IumrahHomeSectionHeader(
+                title: IumrahServicesCopy.sectionTitle(language),
+                subtitle: IumrahServicesCopy.sectionSubtitle(language)
+            )
 
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 13) {
-                    ForEach(items) { item in
-                        IumrahAppleServiceCard(item: item)
-                            .frame(width: 306, height: 455)
-                            .id(item.id)
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(IumrahServiceKind.allCases) { kind in
+                        NavigationLink {
+                            IumrahServicesView(initialService: kind)
+                        } label: {
+                            IumrahServicesCarouselCard(kind: kind, language: language)
+                                .frame(width: 282, height: 322)
+                        }
+                        .buttonStyle(.plain)
+                        .id(kind)
                     }
                 }
                 .scrollTargetLayout()
@@ -216,164 +217,28 @@ struct IumrahHomeServicesSection: View {
             .contentMargins(.horizontal, 0, for: .scrollContent)
             .scrollClipDisabled()
 
-            IumrahHomeCarouselDots(count: items.count, selectedIndex: activeIndex)
-        }
-        .onAppear { if activeID == nil { activeID = items.first?.id } }
-    }
+            IumrahHomeCarouselDots(
+                count: IumrahServiceKind.allCases.count,
+                selectedIndex: IumrahServiceKind.allCases.firstIndex(of: activeID ?? .visa) ?? 0
+            )
 
-    private var activeIndex: Int {
-        guard let activeID, let index = items.firstIndex(where: { $0.id == activeID }) else { return 0 }
-        return index
-    }
-
-    private var sectionTitle: String {
-        switch language {
-        case .russian: return "Что входит в Iumrah Services"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "What’s inside Iumrah Services"
-        case .uzbek: return "Iumrah Services nimalarni o‘z ichiga oladi"
-        case .uzbekCyrillic: return "Iumrah Services нималарни ўз ичига олади"
-        }
-    }
-
-    private var sectionSubtitle: String {
-        switch language {
-        case .russian: return "Основные сервисы уже встроены в пакеты Iumrah и сопровождают поездку от вылета до возвращения."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Core services are built into Iumrah packages and stay with the journey from departure to return."
-        case .uzbek: return "Asosiy servislar Iumrah paketlariga kiritilgan va safarni uchishdan qaytishgacha kuzatadi."
-        case .uzbekCyrillic: return "Асосий сервислар Iumrah пакетларига киритилган ва сафарни учишдан қайтишгача кузатади."
-        }
-    }
-
-    private var items: [Item] {
-        switch language {
-        case .russian:
-            return [
-                Item(id: "transfer", assets: ["TransferMalibu", "TransferCarnival", "TransferYukon"], title: "Iumrah Transfer", body: "Встреча в аэропорту и приватные поездки между ключевыми точками маршрута. Комфортный автомобиль под Ваш формат поездки.", badge: "В пакете", icon: "car.fill", action: onTransfer),
-                Item(id: "ziyarat", assets: ["ZiyaratQuba1", "ZiyaratQuba2", "ZiyaratQuba3", "ZiyaratQuba4", "ZiyaratQuba5"], title: "Iumrah Ziyarat", body: "Места Мекки и Медины в одном маршруте. История, навигация и понятный порядок посещения без лишней суеты.", badge: "Маршруты", icon: "map.fill", action: onZiyarats),
-                Item(id: "esim", assets: ["IumrahESIMHomeCard"], title: "Iumrah eSIM", body: "Интернет в Саудовской Аравии готов к подключению сразу после приземления — без поиска SIM-карты в аэропорту.", badge: "Связь", icon: "antenna.radiowaves.left.and.right", action: onESIM),
-                Item(id: "flights", assets: ["IumrahFlightsHomeCard"], title: "Iumrah Flights", body: "Статус Вашего рейса в реальном времени: изменения времени, задержки и важные обновления поездки в одном месте.", badge: "Live status", icon: "airplane", action: onFlights),
-            ]
-        case .english, .turkish, .indonesian, .malay, .arabic:
-            return [
-                Item(id: "transfer", assets: ["TransferMalibu", "TransferCarnival", "TransferYukon"], title: "Iumrah Transfer", body: "Airport pickup and private rides between key stops, with the right vehicle for your journey.", badge: "Included", icon: "car.fill", action: onTransfer),
-                Item(id: "ziyarat", assets: ["ZiyaratQuba1", "ZiyaratQuba2", "ZiyaratQuba3", "ZiyaratQuba4", "ZiyaratQuba5"], title: "Iumrah Ziyarat", body: "Makkah and Madinah places in one route, with context, navigation and a clear visit sequence.", badge: "Routes", icon: "map.fill", action: onZiyarats),
-                Item(id: "esim", assets: ["IumrahESIMHomeCard"], title: "Iumrah eSIM", body: "Saudi internet ready from arrival, without having to search for a local SIM card at the airport.", badge: "Connectivity", icon: "antenna.radiowaves.left.and.right", action: onESIM),
-                Item(id: "flights", assets: ["IumrahFlightsHomeCard"], title: "Iumrah Flights", body: "Real-time flight status with schedule changes, delays and important journey updates in one place.", badge: "Live status", icon: "airplane", action: onFlights),
-            ]
-        case .uzbek:
-            return [
-                Item(id: "transfer", assets: ["TransferMalibu", "TransferCarnival", "TransferYukon"], title: "Iumrah Transfer", body: "Aeroportdan kutib olish va yo‘nalishning muhim nuqtalari orasida safaringizga mos xususiy transport.", badge: "Paketda", icon: "car.fill", action: onTransfer),
-                Item(id: "ziyarat", assets: ["ZiyaratQuba1", "ZiyaratQuba2", "ZiyaratQuba3", "ZiyaratQuba4", "ZiyaratQuba5"], title: "Iumrah Ziyarat", body: "Makka va Madina ziyorat joylari bitta yo‘nalishda: ma’lumot, navigatsiya va tushunarli tashrif tartibi.", badge: "Yo‘nalishlar", icon: "map.fill", action: onZiyarats),
-                Item(id: "esim", assets: ["IumrahESIMHomeCard"], title: "Iumrah eSIM", body: "Saudiya Arabistonida internet qo‘nganingizdan boshlab tayyor — aeroportda SIM-karta izlash shart emas.", badge: "Internet", icon: "antenna.radiowaves.left.and.right", action: onESIM),
-                Item(id: "flights", assets: ["IumrahFlightsHomeCard"], title: "Iumrah Flights", body: "Parvoz holati real vaqtda: vaqt o‘zgarishi, kechikish va safar uchun muhim yangilanishlar bir joyda.", badge: "Live status", icon: "airplane", action: onFlights),
-            ]
-        case .uzbekCyrillic:
-            return [
-                Item(id: "transfer", assets: ["TransferMalibu", "TransferCarnival", "TransferYukon"], title: "Iumrah Transfer", body: "Аэропортдан кутиб олиш ва йўналишнинг муҳим нуқталари орасида сафарингизга мос хусусий транспорт.", badge: "Пакетда", icon: "car.fill", action: onTransfer),
-                Item(id: "ziyarat", assets: ["ZiyaratQuba1", "ZiyaratQuba2", "ZiyaratQuba3", "ZiyaratQuba4", "ZiyaratQuba5"], title: "Iumrah Ziyarat", body: "Макка ва Мадина зиёрат жойлари битта йўналишда: маълумот, навигация ва тушунарли ташриф тартиби.", badge: "Йўналишлар", icon: "map.fill", action: onZiyarats),
-                Item(id: "esim", assets: ["IumrahESIMHomeCard"], title: "Iumrah eSIM", body: "Саудия Арабистонида интернет қўнганингиздан бошлаб тайёр — аэропортда SIM-карта излаш шарт эмас.", badge: "Интернет", icon: "antenna.radiowaves.left.and.right", action: onESIM),
-                Item(id: "flights", assets: ["IumrahFlightsHomeCard"], title: "Iumrah Flights", body: "Парвоз ҳолати реал вақтда: вақт ўзгариши, кечикиш ва сафар учун муҳим янгиланишлар бир жойда.", badge: "Live status", icon: "airplane", action: onFlights),
-            ]
-        }
-    }
-
-    private struct IumrahAppleServiceCard: View {
-        let item: Item
-        @State private var mediaIndex = 0
-
-        var body: some View {
-            Button {
-                item.action?()
+            NavigationLink {
+                IumrahServicesView(initialService: .visa)
             } label: {
-                VStack(alignment: .leading, spacing: 0) {
-                    media
-                        .frame(height: 246)
-                        .clipped()
-
-                    VStack(alignment: .leading, spacing: 11) {
-                        HStack(spacing: 8) {
-                            Label(item.badge, systemImage: item.icon)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color.black.opacity(0.52))
-                            Spacer(minLength: 0)
-                            if item.action != nil {
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(Color.black.opacity(0.42))
-                            }
-                        }
-
-                        Text(item.title)
-                            .font(.system(size: 25, weight: .bold, design: .rounded))
-                            .tracking(-0.55)
-                            .foregroundStyle(.black)
-                            .lineLimit(2)
-
-                        Text(item.body)
-                            .font(.system(size: 14, design: .rounded))
-                            .foregroundStyle(Color.black.opacity(0.58))
-                            .lineLimit(4)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(18)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .background(Color.white)
+                HStack(spacing: 6) {
+                    Text(IumrahServicesCopy.seeAll(language))
+                    Image(systemName: "arrow.up.right")
                 }
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 31, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 31, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.055), lineWidth: 0.8)
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 31, style: .continuous))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.vertical, 6)
             }
             .buttonStyle(.plain)
         }
-
-        private var media: some View {
-            GeometryReader { proxy in
-                ZStack(alignment: .bottom) {
-                    Image(item.assets[mediaIndex])
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 18)
-                                .onEnded { value in
-                                    guard item.assets.count > 1, abs(value.translation.width) > 38 else { return }
-                                    withAnimation(.snappy(duration: 0.24)) {
-                                        if value.translation.width < 0 {
-                                            mediaIndex = min(item.assets.count - 1, mediaIndex + 1)
-                                        } else {
-                                            mediaIndex = max(0, mediaIndex - 1)
-                                        }
-                                    }
-                                    IumrahHaptics.selection()
-                                }
-                        )
-
-                    if item.assets.count > 1 {
-                        HStack(spacing: 5) {
-                            ForEach(item.assets.indices, id: \.self) { index in
-                                Circle()
-                                    .fill(Color.white.opacity(index == mediaIndex ? 0.96 : 0.48))
-                                    .frame(width: index == mediaIndex ? 7 : 6, height: index == mediaIndex ? 7 : 6)
-                            }
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(.black.opacity(0.26), in: Capsule())
-                        .padding(.bottom, 12)
-                        .allowsHitTesting(false)
-                    }
-                }
-            }
-        }
+        .onAppear { if activeID == nil { activeID = .visa } }
     }
 }
-
 
 struct IumrahTransferServiceView: View {
     @EnvironmentObject private var settings: AppSettingsStore
@@ -693,7 +558,7 @@ struct IumrahTransferServiceView: View {
     private func localized(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch settings.language {
         case .russian: return ru
-        case .english, .turkish, .indonesian, .malay, .arabic: return en
+        case .english: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -919,7 +784,7 @@ struct HomeStorefrontFlightOptionCard: View {
         let route = "\(preview.outbound.origin) → \(preview.outbound.destination) + \(preview.inbound.origin) → \(preview.inbound.destination)"
         switch language {
         case .russian: return "\(route) · \(preview.durationDays) дн. · \(packageScopeText(preview))"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "\(route) · \(preview.durationDays) days · \(packageScopeText(preview))"
+        case .english: return "\(route) · \(preview.durationDays) days · \(packageScopeText(preview))"
         case .uzbek: return "\(route) · \(preview.durationDays) kun · \(packageScopeText(preview))"
         case .uzbekCyrillic: return "\(route) · \(preview.durationDays) кун · \(packageScopeText(preview))"
         }
@@ -939,25 +804,13 @@ struct HomeStorefrontFlightOptionCard: View {
         case (.makkahMadinahStandard, .english): return "Makkah + Madinah"
         case (.makkahMadinahStandard, .uzbek): return "Makka + Madina"
         case (.makkahMadinahStandard, .uzbekCyrillic): return "Макка + Мадина"
-                case (.makkahComfortShort, .turkish): return "Yalnızca Mekke"
-        case (.hotelFirstMakkah, .turkish): return "Yalnızca Mekke"
-        case (.makkahMadinahStandard, .turkish): return "Mekke + Medine"
-        case (.makkahComfortShort, .indonesian): return "Hanya Makkah"
-        case (.hotelFirstMakkah, .indonesian): return "Hanya Makkah"
-        case (.makkahMadinahStandard, .indonesian): return "Makkah + Madinah"
-        case (.makkahComfortShort, .malay): return "Makkah sahaja"
-        case (.hotelFirstMakkah, .malay): return "Makkah sahaja"
-        case (.makkahMadinahStandard, .malay): return "Makkah + Madinah"
-        case (.makkahComfortShort, .arabic): return "مكة فقط"
-        case (.hotelFirstMakkah, .arabic): return "مكة فقط"
-        case (.makkahMadinahStandard, .arabic): return "مكة + المدينة"
         }
     }
 
     private var generatedStampText: String {
         switch language {
         case .russian: return packagePreview == nil ? "Iumrah Flights Scanner" : "Сгенерировано Iumrah Configurator"
-        case .english, .turkish, .indonesian, .malay, .arabic: return packagePreview == nil ? "Iumrah Flights Scanner" : "Generated by Iumrah Configurator"
+        case .english: return packagePreview == nil ? "Iumrah Flights Scanner" : "Generated by Iumrah Configurator"
         case .uzbek: return packagePreview == nil ? "Iumrah Flights Scanner" : "Iumrah Configurator yaratdi"
         case .uzbekCyrillic: return packagePreview == nil ? "Iumrah Flights Scanner" : "Iumrah Configurator яратди"
         }
@@ -966,7 +819,7 @@ struct HomeStorefrontFlightOptionCard: View {
     private var packagePerPersonText: String {
         switch language {
         case .russian: return "пакет · 1 человек"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "package · 1 person"
+        case .english: return "package · 1 person"
         case .uzbek: return "paket · 1 kishi"
         case .uzbekCyrillic: return "пакет · 1 киши"
         }
@@ -975,7 +828,7 @@ struct HomeStorefrontFlightOptionCard: View {
     private var calculatingPackageText: String {
         switch language {
         case .russian: return "Считаем пакет"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Calculating package"
+        case .english: return "Calculating package"
         case .uzbek: return "Paket hisoblanmoqda"
         case .uzbekCyrillic: return "Пакет ҳисобланмоқда"
         }
@@ -984,7 +837,7 @@ struct HomeStorefrontFlightOptionCard: View {
     private var packageUnavailableText: String {
         switch language {
         case .russian: return "нет пары 2–15 дней"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "no 2–15 day pair"
+        case .english: return "no 2–15 day pair"
         case .uzbek: return "2–15 kunlik juftlik yo‘q"
         case .uzbekCyrillic: return "2–15 кунлик жуфтлик йўқ"
         }

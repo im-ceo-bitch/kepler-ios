@@ -14,6 +14,7 @@ struct TransferSelectionView: View {
     @State private var showFinalPackage = false
     @State private var isConfirming = false
     @State private var confirmationError: String?
+    @State private var isHeroVisible = true
 
     private let vehicles = TransferVehicleKind.allCases
 
@@ -66,31 +67,12 @@ struct TransferSelectionView: View {
 
     private var transferPageBackground: some View {
         ZStack(alignment: .top) {
-            Color.white
-                .ignoresSafeArea()
-
-            Color.black
-                .opacity(isVIP ? 1 : 0)
-                .ignoresSafeArea()
-
-            if !isVIP {
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.98, green: 0.96, blue: 0.82).opacity(0.88),
-                        Color(red: 0.99, green: 0.99, blue: 0.96).opacity(0.45),
-                        .clear
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(maxWidth: .infinity)
-                .frame(height: 165, alignment: .top)
-                .opacity(isVIP ? 0 : 1)
+            (isVIP ? Color.black : Color.white).ignoresSafeArea(edges: .bottom)
+            // The top safe area follows the scrolling hero and is not pinned black.
+            (isHeroVisible ? Color.iumrahHeaderBackground : (isVIP ? Color.black : Color.white))
+                .frame(height: 0)
                 .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
-            }
         }
-        .animation(.easeInOut(duration: 0.58), value: isVIP)
     }
 
     private var pageBackground: Color {
@@ -102,7 +84,7 @@ struct TransferSelectionView: View {
     private var matchedExperience: some View {
         ZStack {
             pageBackground
-                .ignoresSafeArea()
+                .ignoresSafeArea(edges: .bottom)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
@@ -118,6 +100,10 @@ struct TransferSelectionView: View {
                             IumrahTransferRouteDetails()
                         }
                     }
+                    .background { GeometryReader { geometry in
+                        Color.clear.preference(key: IumrahScrollingHeroBottomKey.self,
+                            value: geometry.frame(in: .named("transferPackageScroll")).maxY)
+                    } }
                     .environment(\.colorScheme, inheritedColorScheme)
                     VStack(spacing: 20) {
                     if adaptiveLayout.isWide {
@@ -150,9 +136,13 @@ struct TransferSelectionView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 46)
                 }
-                .background(IumrahNoVerticalBounce())
             }
-            .scrollBounceBehavior(.basedOnSize)
+            .refreshable { await prepareTransferSelection() }
+            .coordinateSpace(name: "transferPackageScroll")
+            .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
+                isHeroVisible = bottom > 35
+            }
+            .scrollBounceBehavior(.always)
             .scrollContentBackground(.hidden)
         }
     }

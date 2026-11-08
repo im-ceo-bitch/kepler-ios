@@ -143,7 +143,15 @@ final class NuiteeStaySelectionStore {
 
     func save(_ stay: NuiteeSelectedStay) {
         var all = selections()
-        all[stay.city.lowercased().contains("med") ? "madinah" : "makkah"] = stay
+        let city = stay.city.lowercased()
+        let isMadinah = city.contains("mad") || city.contains("med") || city.contains("المدينة")
+        all[isMadinah ? "madinah" : "makkah"] = stay
+        if let data = try? JSONEncoder().encode(all) { UserDefaults.standard.set(data, forKey: key) }
+    }
+
+    func remove(city: String) {
+        var all = selections()
+        all.removeValue(forKey: city)
         if let data = try? JSONEncoder().encode(all) { UserDefaults.standard.set(data, forKey: key) }
     }
 

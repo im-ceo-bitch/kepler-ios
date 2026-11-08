@@ -50,10 +50,10 @@ struct IumrahJourneyDisclosureCard<Details: View>: View {
                     .transition(.opacity)
             }
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Color.iumrahDesertGold, lineWidth: 1.5))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous).strokeBorder(Color(red: 0.24, green: 0.54, blue: 0.40).opacity(0.75), lineWidth: 1.2))
     }
 }
 
@@ -67,8 +67,12 @@ struct IumrahTransferRouteDetails: View {
     private var madinahFirst: Bool { includesMadinah && journey.trip.arrivalAirport == .madinah }
     private var firstHotel: String { madinahFirst ? madinahHotel : makkahHotel }
     private var lastHotel: String { includesMadinah && !madinahFirst ? madinahHotel : makkahHotel }
-    private var makkahHotel: String { journey.selectedHotel?.name ?? city(false) }
-    private var madinahHotel: String { journey.selectedMadinahHotel?.name ?? city(true) }
+    private var makkahHotel: String {
+        NuiteeStaySelectionStore.shared.selections()["makkah"]?.hotelName ?? city(false)
+    }
+    private var madinahHotel: String {
+        NuiteeStaySelectionStore.shared.selections()["madinah"]?.hotelName ?? city(true)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
@@ -92,7 +96,7 @@ struct IumrahTransferRouteDetails: View {
         Label {
             Text(title).font(.subheadline).fixedSize(horizontal: false, vertical: true)
         } icon: {
-            Image(systemName: icon).foregroundStyle(Color.iumrahDesertGold).frame(width: 24)
+            Image(systemName: icon).foregroundStyle(Color(red: 0.24, green: 0.54, blue: 0.40)).frame(width: 24)
         }
     }
     private func city(_ madinah: Bool) -> String {

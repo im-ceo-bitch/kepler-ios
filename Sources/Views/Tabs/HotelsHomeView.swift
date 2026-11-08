@@ -196,50 +196,10 @@ struct HotelsHomeView: View {
     // MARK: - Hotels
 
     private var hotelsBoard: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            NuiteeHotelsCatalogView(refreshSignal: hotelCatalogRefreshSignal)
-
-            ShowcaseHero(
-                asset: "IumrahHotelsShowcaseHero",
-                title: "iumrah Hotels",
-                description: L10n.text("hotel_storefront_hero_body", settings.language),
-                note: nil
-            )
-
-            IumrahFriendsCalculatorCard()
-                .environmentObject(settings)
-                .environmentObject(storefront)
-
-            hotelCitySection(
-                title: L10n.text("hotels_makkah", settings.language),
-                hotels: storefront.makkahHotels
-            )
-            hotelCitySection(
-                title: L10n.text("hotels_madinah", settings.language),
-                hotels: storefront.madinahHotels
-            )
-
-            if storefront.isLoading && storefront.allHotels.isEmpty {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(L10n.text("hotel_storefront_loading", settings.language))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 92)
-            }
-
-            if let error = storefront.errorMessage, storefront.allHotels.isEmpty {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .iumrahCard()
-            }
-
-            HotelCareShowcaseCard(language: settings.language) {
-                carePresented = true
-            }
-        }
+        // Nuitee is the only public hotel inventory. Legacy iumrah Business/D1
+        // hotel lists remain internal for old booking links, never as a second
+        // contradictory catalogue next to supplier rates.
+        NuiteeHotelsCatalogView(refreshSignal: hotelCatalogRefreshSignal)
     }
 
     private func hotelCitySection(title: String, hotels: [HotelSummary]) -> some View {
@@ -293,40 +253,6 @@ struct HotelsHomeView: View {
                     .environmentObject(chrome)
             }
 
-            if !guidedFlightBooking && !readyFlightOptions.isEmpty {
-                VStack(alignment: .leading, spacing: 14) {
-                    SectionHeader(
-                        readyPackagesTitle,
-                        eyebrow: readyPackagesEyebrow,
-                        subtitle: readyPackagesSubtitle
-                    )
-
-                    LazyVStack(spacing: 12) {
-                        ForEach(readyFlightOptions) { option in
-                            if let preview = storefront.packagePreview(for: option) {
-                                StorefrontFlightOptionCard(
-                                    option: option,
-                                    packagePreview: preview,
-                                    isCalculating: false,
-                                    language: settings.language,
-                                    onOpen: {
-                                        IumrahHaptics.selection()
-                                        selectedFlightPackage = preview
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            } else if !guidedFlightBooking && storefront.isLoading {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(readyPackagesLoadingText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 96)
-            }
         }
     }
 

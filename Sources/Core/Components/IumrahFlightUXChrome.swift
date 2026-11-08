@@ -84,9 +84,9 @@ struct IumrahGlassPillSelector<Value: Hashable>: View {
 struct IumrahNativeChromeButton: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.buttonStyle(.glass).buttonBorderShape(.circle)
+            content.buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.regular)
         } else {
-            content.buttonStyle(.bordered).buttonBorderShape(.circle)
+            content.buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.regular)
         }
     }
 }
@@ -114,42 +114,51 @@ struct IumrahJourneyHeader<Summary: View>: View {
         self.summary = summary()
     }
     var body: some View {
-        VStack(spacing: 32) {
-            HStack {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
                 Button(action: { dismiss() }) {
-                    Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 23, height: 23)
                 }
                 .modifier(IumrahNativeChromeButton())
                 .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Назад", en: "Back", uz: "Orqaga", cy: "Орқага", tr: "Geri", id: "Kembali"))
                 Spacer(minLength: 0)
                 Image("HeaderWordmarkLight")
                     .resizable().renderingMode(.template).scaledToFit()
-                    .frame(width: 208, height: 64)
+                    .frame(width: 187, height: 57) // 10% smaller, same aspect ratio.
                     .accessibilityLabel("iumrah")
                 Spacer(minLength: 0)
                 if showsNotifications {
                     Button { chrome.openNotifications() } label: {
                         Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                            .frame(width: 44, height: 44)
+                            .font(.system(size: 17, weight: .medium))
+                            .frame(width: 23, height: 23)
                     }
                     .modifier(IumrahNativeChromeButton())
                     .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar", cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
                 } else {
-                    Color.clear.frame(width: 44, height: 44)
+                    Color.clear.frame(width: 46, height: 46)
                 }
             }
             .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 84)
+            .frame(maxWidth: .infinity)
+            .background {
+                IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
+                    .ignoresSafeArea(edges: .top)
+                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+            }
+            // The card is centered on the hero/content boundary and scrolls
+            // with the hero.  It is never a fixed navigation-bar overlay.
             summary
                 .foregroundStyle(Color.iumrahInk)
+                .padding(.horizontal, 18)
+                .offset(y: -46)
+                .padding(.bottom, -46)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 14)
-        .padding(.bottom, 24)
-        .background {
-            IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
-                .ignoresSafeArea(edges: .top)
-        }
-        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
     }
 }
 

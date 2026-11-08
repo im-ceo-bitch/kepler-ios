@@ -19,6 +19,7 @@ struct FinalPackageView: View {
     @State private var showTransferDetails = false
     @State private var showTransferSelection = false
     @State private var hotelForDetails: HotelSummary?
+    @State private var isHeroVisible = true
 
     private var needsMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
     private var roomsComplete: Bool {
@@ -68,6 +69,10 @@ struct FinalPackageView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         IumrahJourneyHeader(showsNotifications: true) { packageSummary }
+                            .background { GeometryReader { geometry in
+                                Color.clear.preference(key: IumrahScrollingHeroBottomKey.self,
+                                    value: geometry.frame(in: .named("finalPackageScroll")).maxY)
+                            } }
                         VStack(alignment: .leading, spacing: 18) {
                             if !journey.hasFinalGeneratorQuote { pricingStatus }
                             Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")).font(.title2.bold())
@@ -93,9 +98,16 @@ struct FinalPackageView: View {
                         .padding(IumrahDesign.pagePadding)
                         .padding(.bottom, 20)
                     }
-                    .background(IumrahNoVerticalBounce())
                 }
-                .background(Color.iumrahPageBackground)
+                .refreshable { await recalculatePrice() }
+                .coordinateSpace(name: "finalPackageScroll")
+                .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
+                    isHeroVisible = bottom > 35
+                }
+                .background {
+                    (isHeroVisible ? Color.iumrahHeaderBackground : Color.iumrahPageBackground)
+                        .ignoresSafeArea(edges: .top)
+                }
             }
         }
         .toolbar(.hidden, for: .navigationBar)

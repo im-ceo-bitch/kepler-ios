@@ -6,6 +6,6 @@ import SwiftUI
 /// and Makkah/Madinah scope in the existing JourneyStore.
 struct FlightFirstPackageFlowView: View {
     var body: some View {
-        PrimaryHotelView(entryMode: .flightFirst)
+        IumrahNuiteeJourneyHotelsView()
     }
 }

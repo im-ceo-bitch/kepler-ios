@@ -19,6 +19,7 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var showTransferPicker = false
     @State private var isFlightHeaderVisible = true
     @State private var isShowingSourceHelp = false
+    @State private var searchExpanded = false
 
     private enum LegStep: Hashable { case outbound, inbound }
     fileprivate enum Source: Hashable { case published, dataAPI }
@@ -148,8 +149,8 @@ struct IumrahGuidedFlightSelectionView: View {
                     .padding(.top, 18)
                     .padding(.bottom, 50)
                 }
-                .background(IumrahNoVerticalBounce())
             }
+            .refreshable { await loadFlights(force: true) }
             .coordinateSpace(name: "flightFirstScroll")
             .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
                 isFlightHeaderVisible = bottom > 35
@@ -160,7 +161,10 @@ struct IumrahGuidedFlightSelectionView: View {
                 }
             }
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .background {
+            (isFlightHeaderVisible ? Color.iumrahHeaderBackground : Color.iumrahPageBackground)
+                .ignoresSafeArea(edges: .top)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             stageContinueButton
         }
@@ -176,7 +180,7 @@ struct IumrahGuidedFlightSelectionView: View {
             )
         }
         .navigationDestination(isPresented: $showTransferPicker) {
-            PrimaryHotelView(entryMode: .flightFirst)
+            IumrahNuiteeJourneyHotelsView()
         }
         .task { await loadFlights() }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
@@ -229,32 +233,50 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private var searchSummary: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack {
-                Text("\(outboundCode) → \(destinationCode)   ·   \(returnCode) → \(outboundCode)")
-                    .font(.subheadline.weight(.bold))
-                Spacer()
-                Text("±\(flexDays)")
-                    .font(.caption.weight(.bold))
-                    .padding(.horizontal, 10)
-                    .frame(height: 30)
-                    .background(Color.iumrahRaisedBackground, in: Capsule())
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.23)) { searchExpanded.toggle() }
+            } label: {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Text("\(outboundCode) → \(destinationCode)  ·  \(returnCode) → \(outboundCode)")
+                            .font(.system(size: 16, weight: .bold))
+                            .lineLimit(1).minimumScaleFactor(0.75)
+                        Spacer(minLength: 4)
+                        Image(systemName: searchExpanded ? "chevron.up" : "slider.horizontal.3")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    HStack(spacing: 7) {
+                        Label("\(journey.trip.travelerCount) " + tr("чел.", "travelers", "kishi", "киши"), systemImage: "person.2")
+                        Text("·")
+                        Text(cabinTitle)
+                        Spacer(minLength: 4)
+                        Text("\(dayText(journey.trip.departureDate)) – \(dayText(journey.trip.returnDate))")
+                            .monospacedDigit()
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.72)
+                }
+                .contentShape(Rectangle())
             }
-            HStack {
-                Text("\(journey.trip.adults) + \(journey.trip.children) + \(journey.trip.infants)")
-                    .font(.caption)
-                Text("·")
-                Text(cabinTitle)
-                    .font(.caption)
-                Spacer()
-                Text("\(dayText(journey.trip.departureDate)) – \(dayText(journey.trip.returnDate))")
-                    .font(.caption.monospacedDigit())
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("Изменить параметры поиска", "Edit search", "Qidiruvni tahrirlash", "Қидирувни таҳрирлаш"))
+            if searchExpanded {
+                Divider().padding(.vertical, 13)
+                IumrahFlightSearchInlineEditor(onSearch: {
+                    outbound = nil
+                    inbound = nil
+                    step = .outbound
+                    searchExpanded = false
+                    Task { await loadFlights(force: true) }
+                })
             }
-            .foregroundStyle(.secondary)
         }
-        .padding(15)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.iumrahDesertGold, lineWidth: 1.5))
+        .padding(17)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 30, style: .continuous)
+            .strokeBorder(Color(red: 0.24, green: 0.54, blue: 0.40).opacity(0.8), lineWidth: 1.2))
     }
 
     private var cabinTitle: String {
@@ -358,12 +380,12 @@ struct IumrahGuidedFlightSelectionView: View {
             selectedDetail = choice
             IumrahHaptics.soft()
         } label: {
-            VStack(alignment: .leading, spacing: 17) {
-                HStack(spacing: 14) {
-                    AirlineLogoView(airlineCode: choice.airlineCode, size: 52)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    AirlineLogoView(airlineCode: choice.airlineCode, size: 44)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(choice.airlineName)
-                            .font(IumrahType.bold(19, relativeTo: .title3))
+                            .font(IumrahType.bold(17, relativeTo: .headline))
                             .lineLimit(1)
                         Text([choice.airlineCode, choice.flightNumber].filter { !$0.isEmpty }.joined(separator: " "))
                             .font(.subheadline.monospaced())
@@ -378,7 +400,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(timeText(choice.departureAt))
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(.system(size: 28, weight: .semibold))
                             .monospacedDigit()
                         Text(choice.origin)
                             .font(.subheadline.weight(.semibold))
@@ -388,8 +410,9 @@ struct IumrahGuidedFlightSelectionView: View {
                     flightRouteGraphic(stops: choice.stops)
                     Spacer(minLength: 4)
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text(dayTextFromISO(choice.departureAt))
-                            .font(.title3.weight(.bold))
+                        Text(choice.arrivalAt.map(timeText) ?? "—")
+                            .font(.system(size: 28, weight: .semibold))
+                            .monospacedDigit()
                         Text(choice.destination)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.secondary)
@@ -413,7 +436,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 .font(.subheadline.weight(.semibold))
 
                 HStack(spacing: 10) {
-                    Text(choice.source == .published ? "iumrah" : "Data API")
+                    Text(dayTextFromISO(choice.departureAt) + " · " + (choice.source == .published ? "iumrah" : "Data API"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     if offset > 0 {
@@ -432,11 +455,11 @@ struct IumrahGuidedFlightSelectionView: View {
                 }
             }
             .foregroundStyle(Color.iumrahInk)
-            .padding(20)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+            .padding(17)
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 30, style: .continuous)
-                    .strokeBorder(selected ? Color.iumrahInk.opacity(0.64) : Color.primary.opacity(0.05), lineWidth: selected ? 1.2 : 0.8)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .strokeBorder(selected ? Color(red: 0.24, green: 0.54, blue: 0.40) : Color.primary.opacity(0.065), lineWidth: selected ? 1.4 : 0.8)
             }
         }
         .buttonStyle(.plain)
@@ -599,9 +622,14 @@ struct IumrahGuidedFlightSelectionView: View {
         return String(part[1].prefix(5))
     }
 
-    private func loadFlights() async {
+    private func loadFlights(force: Bool = false) async {
         guard !isLoading else { return }
         isLoading = true
+        if force {
+            published = []
+            dataOutbound = []
+            dataReturn = []
+        }
         loadError = nil
         defer { isLoading = false }
         let trip = journey.trip

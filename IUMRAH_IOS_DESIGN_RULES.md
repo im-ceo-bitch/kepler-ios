@@ -1624,3 +1624,8 @@ It is one product.
 **One interaction language.**  
 **One Liquid Glass implementation.**  
 **One level of quality.**
+
+
+---
+## Binding update · 2026-11-08
+`DESIGN_RULES.md` is the current implementation contract for native Glass chrome, solid 56pt capsule CTA, overlapping emerald journey card, scroll-safe black header, Nuitee-only public hotel inventory and truthful local component pricing. Follow it over older screenshots or ad-hoc styles.

@@ -374,7 +374,7 @@ struct IumrahPrimaryButtonStyle: ButtonStyle {
             .foregroundStyle(Color.iumrahPrimaryButtonText)
             .background(
                 Color.iumrahPrimaryButtonBackground.opacity(configuration.isPressed ? 0.84 : 1),
-                in: RoundedRectangle(cornerRadius: IumrahDesign.compactRadius, style: .continuous)
+                in: Capsule()
             )
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
@@ -384,19 +384,12 @@ struct IumrahPrimaryButtonStyle: ButtonStyle {
 struct IumrahSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 16, weight: .semibold, design: .rounded))
+            .font(.system(size: 16, weight: .semibold))
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity)
             .frame(height: IumrahDesign.controlHeight)
             .foregroundStyle(.primary)
-            .iumrahGlass(
-                in: RoundedRectangle(cornerRadius: IumrahDesign.compactRadius, style: .continuous),
-                interactive: true,
-                chrome: true
-            )
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-            .opacity(configuration.isPressed ? 0.90 : 1)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+            .background(Color.iumrahRaisedBackground.opacity(configuration.isPressed ? 0.72 : 1), in: Capsule())
     }
 }
 

@@ -56,6 +56,11 @@ private final class NuiteeCatalogModel: ObservableObject {
 
 struct NuiteeHotelsCatalogView: View {
     let refreshSignal: Int
+    var guidedCity: String? = nil
+    var guidedCheckin: Date? = nil
+    var guidedNights: Int? = nil
+    var guidedAdults: Int? = nil
+    var onStaySelected: ((NuiteeSelectedStay) -> Void)? = nil
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
     @StateObject private var model = NuiteeCatalogModel()
@@ -133,6 +138,7 @@ struct NuiteeHotelsCatalogView: View {
                     }
                     .padding(13)
                     .background(Color.black.opacity(0.045), in: RoundedRectangle(cornerRadius: 15))
+                    if guidedCity == nil {
                     HStack(spacing: 12) {
                         Label(NuiteeCopy.text("Даты проживания", "Yashash sanalari", "Stay dates", settings.language), systemImage: "calendar")
                             .font(.subheadline.weight(.semibold))
@@ -175,13 +181,18 @@ struct NuiteeHotelsCatalogView: View {
                     } label: {
                         Label(NuiteeCopy.text("Найти отели", "Mehmonxonalarni topish", "Find hotels", settings.language), systemImage: "magnifyingglass")
                             .font(.system(size: 16, weight: .bold))
-                            .frame(maxWidth: .infinity).frame(height: 54)
+                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent).tint(.black)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .buttonStyle(IumrahPrimaryButtonStyle())
+                    .clipShape(Capsule())
+                    } else {
+                        Label(NuiteeCopy.text("Даты и гости установлены из вашей поездки", "Sanalar va mehmonlar sayohatdan olindi", "Stay dates and guests match your trip", settings.language), systemImage: "calendar.badge.checkmark")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
 
+            if guidedCity == nil {
             Picker("City", selection: $city) {
                 ForEach(NuiteeCity.allCases, id: \.self) { item in
                     Text(item.title(settings.language)).tag(item)
@@ -189,7 +200,7 @@ struct NuiteeHotelsCatalogView: View {
             }
             .pickerStyle(.segmented)
             .onChange(of: city) { _, _ in stars = 0; visibleCount = 20; hotelQuery = "" }
-
+            }
 
             Picker(NuiteeCopy.text("Звёзды", "Yulduzlar", "Stars", settings.language), selection: $stars) {
                 ForEach([0, 1, 2, 3, 4, 5], id: \.self) { star in
@@ -235,7 +246,7 @@ struct NuiteeHotelsCatalogView: View {
                     Button(NuiteeCopy.text("Повторить", "Qayta", "Retry", settings.language)) {
                         Task { await reload() }
                     }
-                    .buttonStyle(.borderedProminent).tint(.black)
+                    .buttonStyle(IumrahPrimaryButtonStyle())
                 }
                 .frame(maxWidth: .infinity).padding(25)
             } else if candidateHotels.isEmpty && !model.busy {
@@ -282,18 +293,43 @@ struct NuiteeHotelsCatalogView: View {
                 }
             }
         }
-        .task(id: reloadIdentity) { await reload() }
-        .onAppear { consumeHomeSearch(chrome.requestedHotelTabSearch) }
+        .task(id: reloadIdentity) {
+            // The guided flow must not fetch the default 10-days-from-now stay
+            // while onAppear is still applying the selected itinerary.
+            guard guidedCity == nil || (guidedCity == city.rawValue &&
+                  guidedCheckin.map { Calendar.current.isDate($0, inSameDayAs: checkin) } == true &&
+                  guidedNights == nights && guidedAdults == adults) else { return }
+            await reload()
+        }
+        .onAppear {
+            if guidedCity != nil { applyGuidedSearch() }
+            else { consumeHomeSearch(chrome.requestedHotelTabSearch) }
+        }
         .onChange(of: chrome.requestedHotelTabSearch) { _, request in
-            consumeHomeSearch(request)
+            if guidedCity == nil { consumeHomeSearch(request) }
         }
         .onChange(of: refreshSignal) { _, _ in Task { await reload() } }
         .sheet(isPresented: $calendarPresented) {
             NuiteeStayCalendarSheet(checkin: $draftCheckin, nights: $draftNights)
         }
         .navigationDestination(item: $opened) { hotel in
-            NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox)
+            NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox,
+                onStaySelected: onStaySelected, lockStayParameters: guidedCity != nil)
         }
+    }
+
+    private func applyGuidedSearch() {
+        guard let guidedCity, let guidedCheckin, let guidedNights, let guidedAdults else { return }
+        city = guidedCity == "madinah" ? .madinah : .makkah
+        checkin = guidedCheckin
+        nights = max(1, guidedNights)
+        adults = max(1, guidedAdults)
+        draftCheckin = checkin
+        draftNights = nights
+        draftAdults = adults
+        hotelQuery = ""
+        searchExpanded = false
+        stars = 0
     }
 
     /// Apply Home's request in-place; this view remains the single supplier-backed
@@ -447,6 +483,8 @@ struct NuiteeHotelDetailView: View {
     @State var nights: Int
     @State var adults: Int
     let sandbox: Bool
+    var onStaySelected: ((NuiteeSelectedStay) -> Void)? = nil
+    var lockStayParameters: Bool = false
 
     @State private var detail: NuiteeHotelDetail?
     @State private var rates: [NuiteeRoomRate] = []
@@ -624,6 +662,7 @@ struct NuiteeHotelDetailView: View {
     private var staySelector: some View {
         VStack(alignment: .leading, spacing: 13) {
             sectionTitle(NuiteeCopy.text("Даты проживания", "Yashash sanalari", "Stay dates", settings.language))
+            if !lockStayParameters {
             HStack(spacing: 10) {
                 DatePicker(NuiteeCopy.text("Заезд", "Kirish", "Check-in", settings.language), selection: $checkin, in: Date()..., displayedComponents: .date)
                     .datePickerStyle(.compact)
@@ -633,6 +672,10 @@ struct NuiteeHotelDetailView: View {
             }
             Stepper("\(adults) " + NuiteeCopy.text("взрослых", "kattalar", "adults", settings.language), value: $adults, in: 1...6)
                 .font(.subheadline)
+            } else {
+                Label("\(nights) " + NuiteeCopy.text("ночей", "tun", "nights", settings.language) + " · \(adults) " + NuiteeCopy.text("взрослых", "katta", "adults", settings.language), systemImage: "person.2")
+                    .font(.subheadline)
+            }
             Text("\(checkin.formatted(date: .abbreviated, time: .omitted)) — \(checkout.formatted(date: .abbreviated, time: .omitted))")
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -641,13 +684,16 @@ struct NuiteeHotelDetailView: View {
     }
 
     private func saveRate(_ rate: NuiteeRoomRate) {
-        NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
+        guard rate.currency.uppercased() == "USD", rate.price > 0 else { return }
+        let selection = NuiteeSelectedStay(
             provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
             checkin: dateISO(checkin), checkout: dateISO(checkout), adults: adults,
             offerId: rate.offerId, roomId: rate.roomId, roomName: rate.roomName,
             totalUSD: rate.price, mealPlan: rate.mealPlan, cancellationTag: rate.cancellationTag,
             selectedAt: Date()
-        ))
+        )
+        NuiteeStaySelectionStore.shared.save(selection)
+        onStaySelected?(selection)
         chosenOffer = rate
         showSaveConfirmation = true
     }
@@ -689,9 +735,9 @@ struct NuiteeHotelDetailView: View {
             Button { saveRate(rate) } label: {
                 Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
                     .font(.subheadline.weight(.bold))
-                    .frame(maxWidth: .infinity).frame(height: 48)
+                    .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent).tint(.black)
+            .buttonStyle(IumrahPrimaryButtonStyle())
             .disabled(rate.offerId.isEmpty)
         }
         .padding(16)
@@ -959,9 +1005,9 @@ private struct NuiteeRoomDetailsPage: View {
             .safeAreaInset(edge: .bottom) {
                 Button(action: onAdd) {
                     Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
-                        .frame(maxWidth: .infinity).frame(height: 48)
+                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent).tint(.black)
+                .buttonStyle(IumrahPrimaryButtonStyle())
                 .disabled(rate.offerId.isEmpty)
                 .padding(.horizontal, 20).padding(.vertical, 8)
                 .background(.regularMaterial)
@@ -1019,9 +1065,9 @@ private struct NuiteeStayCalendarSheet: View {
                     Text(NuiteeCopy.text("Выбрать даты", "Sanalarni tanlash", "Select dates", settings.language)
                          + " · \(max(1, calendar.dateComponents([.day], from: proposedStart, to: proposedEnd).day ?? 1)) "
                          + NuiteeCopy.text("ночей", "tun", "nights", settings.language))
-                        .font(.headline).frame(maxWidth: .infinity).frame(height: 48)
+                        .font(.headline).frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent).tint(.black)
+                .buttonStyle(IumrahPrimaryButtonStyle())
                 .padding(.horizontal, 18).padding(.vertical, 8)
                 .background(.regularMaterial)
             }

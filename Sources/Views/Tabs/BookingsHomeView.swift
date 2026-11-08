@@ -50,6 +50,7 @@ struct BookingsHomeView: View {
                 emptyBookingHome
             }
         }
+        .modifier(IumrahPrimaryTabScrollChrome())
         .refreshable {
             await bookings.refreshAll()
             await loadActiveCheckout()
@@ -115,11 +116,9 @@ struct BookingsHomeView: View {
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 0) {
-                IumrahRootPageTitle(
-                    title: L10n.text("tab_booking", settings.language),
-                    showsMakkahTime: false,
-                    usesBrandLogo: true
-                )
+                IumrahPrimaryTabHeader()
+                    .padding(.horizontal, -IumrahDesign.pagePadding)
+                    .padding(.top, -10)
                 .padding(.bottom, 16)
 
                 JourneyTravelInfoView()
@@ -188,7 +187,7 @@ struct BookingsHomeView: View {
             .padding(.top, 10)
             .padding(.bottom, 44)
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .animation(.snappy(duration: 0.34), value: session.effectiveStatus)
     }
 
@@ -1636,10 +1635,9 @@ struct BookingsHomeView: View {
     private var emptyBookingHome: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                IumrahRootPageTitle(
-                    title: L10n.text("tab_booking", settings.language),
-                    showsMakkahTime: true
-                )
+                IumrahPrimaryTabHeader()
+                    .padding(.horizontal, -IumrahDesign.pagePadding)
+                    .padding(.top, -10)
 
                 bookingEmptyStatusCard
 
@@ -1659,7 +1657,7 @@ struct BookingsHomeView: View {
             .padding(.top, 10)
             .padding(.bottom, 42)
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
     }
 
     private var bookingEmptyStatusCard: some View {

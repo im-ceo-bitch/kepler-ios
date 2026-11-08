@@ -155,6 +155,7 @@ struct IumrahAccountView: View {
             }
         }
         .background(Color.iumrahPageBackground)
+        .modifier(IumrahPrimaryTabScrollChrome())
         .refreshable {
             await refreshAccountContent()
         }
@@ -227,54 +228,9 @@ struct IumrahAccountView: View {
     }
 
     private var accountHeader: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Account")
-                    .font(.system(size: 38, weight: .bold, design: .rounded))
-                    .tracking(-1)
-                Text(account.isAuthenticated ? tr("Your iumrah profile and trips", "Ваш профиль и поездки iumrah", "iumrah profilingiz va safarlaringiz", "iumrah профилингиз ва сафарларингиз") : tr("Sign in or create your permanent iumrah account", "Войдите или создайте постоянный аккаунт iumrah", "Doimiy iumrah akkauntingizga kiring yoki uni yarating", "Доимий iumrah аккаунтингизга киринг ёки уни яратинг"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 10)
-
-            HStack(spacing: 10) {
-                Button {
-                    chrome.openNotifications()
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: clientNotifications.unreadCount > 0 ? "bell.badge.fill" : "bell")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: 50, height: 50)
-                            .iumrahGlass(in: Circle(), interactive: true, chrome: true)
-
-                        if clientNotifications.unreadCount > 0 {
-                            Text(clientNotifications.unreadCount > 9 ? "9+" : "\(clientNotifications.unreadCount)")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, clientNotifications.unreadCount > 9 ? 5 : 0)
-                                .frame(minWidth: 16, minHeight: 16)
-                                .background(Color.red, in: Capsule())
-                                .overlay { Capsule().stroke(Color.white.opacity(0.95), lineWidth: 1) }
-                                .offset(x: -3, y: 4)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    chrome.openSidebar()
-                } label: {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 50, height: 50)
-                        .iumrahGlass(in: Circle(), interactive: true, chrome: true)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        IumrahPrimaryTabHeader()
+            .padding(.horizontal, -IumrahDesign.pagePadding)
+            .padding(.top, -12)
     }
 
     private func identityCard(_ profile: IumrahAccountProfile) -> some View {

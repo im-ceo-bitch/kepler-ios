@@ -29,15 +29,16 @@ struct NuiteeHotelService {
         return response.hotel
     }
 
-    func rates(hotelID: String, checkin: Date, checkout: Date, adults: Int) async throws -> NuiteeRatesEnvelope {
+    func rates(hotelID: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = []) async throws -> NuiteeRatesEnvelope {
         struct Request: Encodable {
             let hotelId: String
             let checkin: String
             let checkout: String
             let adults: Int
+            let children: [Int]
         }
         return try await api.post("/api/package/nuitee/rates", body: Request(
-            hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults
+            hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges
         ), timeoutInterval: 35)
     }
 

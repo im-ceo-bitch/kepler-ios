@@ -1,8 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Non-global scroll configuration. Disables overscroll/stretch only in the
-/// Home and Flight First pages that opt into this marker.
+/// Opt-in vertical bounce, required for the journey pull-to-refresh gesture.
 struct IumrahNoVerticalBounce: UIViewRepresentable {
     final class Marker: UIView {
         override func didMoveToWindow() {
@@ -17,8 +16,8 @@ struct IumrahNoVerticalBounce: UIViewRepresentable {
             var ancestor = superview
             while let view = ancestor {
                 if let scroll = view as? UIScrollView {
-                    scroll.bounces = false
-                    scroll.alwaysBounceVertical = false
+                    scroll.bounces = true
+                    scroll.alwaysBounceVertical = true
                     return
                 }
                 ancestor = view.superview
@@ -101,18 +100,23 @@ struct IumrahJourneySheetStyle: ViewModifier {
     }
 }
 
-/// Shared compact identity for the flight and hotel selection screens.
+/// The header is exactly the same height for Flights, Nuitee, Transfer and
+/// Review, even when the search/route details are expanded.
+/// Only the WHITE card grows: it never stretches the black world-map surface.
 struct IumrahJourneyHeader<Summary: View>: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var chrome: AppChromeStore
     @EnvironmentObject private var settings: AppSettingsStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
+    @Environment(\.journeyRefreshing) private var refreshing
     var showsNotifications: Bool = false
     let summary: Summary
+
     init(showsNotifications: Bool = false, @ViewBuilder summary: () -> Summary) {
         self.showsNotifications = showsNotifications
         self.summary = summary()
     }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
@@ -125,8 +129,11 @@ struct IumrahJourneyHeader<Summary: View>: View {
                 .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Назад", en: "Back", uz: "Orqaga", cy: "Орқага", tr: "Geri", id: "Kembali"))
                 Spacer(minLength: 0)
                 Image("HeaderWordmarkLight")
-                    .resizable().renderingMode(.template).scaledToFit()
-                    .frame(width: 187, height: 57) // 10% smaller, same aspect ratio.
+                    .resizable()
+                    .renderingMode(.template)
+                    .scaledToFit()
+                    .frame(width: IumrahSignatureHeaderGeometry.logoWidth,
+                           height: IumrahSignatureHeaderGeometry.logoHeight)
                     .accessibilityLabel("iumrah")
                 Spacer(minLength: 0)
                 if showsNotifications {
@@ -138,26 +145,46 @@ struct IumrahJourneyHeader<Summary: View>: View {
                     .modifier(IumrahNativeChromeButton())
                     .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar", cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
                 } else {
-                    Color.clear.frame(width: 46, height: 46)
+                    Color.clear.frame(width: 46, height: 46).accessibilityHidden(true)
                 }
             }
             .foregroundStyle(.white)
+            .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
             .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 84)
+            .padding(.top, IumrahSignatureHeaderGeometry.topInset)
+            .padding(.bottom, IumrahSignatureHeaderGeometry.lowerInset)
             .frame(maxWidth: .infinity)
             .background {
                 IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
-                    .ignoresSafeArea(edges: .top)
-                    .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
+                    .clipShape(UnevenRoundedRectangle(
+                        bottomLeadingRadius: IumrahSignatureHeaderGeometry.bottomRadius,
+                        bottomTrailingRadius: IumrahSignatureHeaderGeometry.bottomRadius))
             }
-            // The card is centered on the hero/content boundary and scrolls
-            // with the hero.  It is never a fixed navigation-bar overlay.
+
+            // The fixed overlap is relative to the *collapsed* summary. When
+            // expanded, only the card below the boundary grows downward.
             summary
                 .foregroundStyle(Color.iumrahInk)
                 .padding(.horizontal, 18)
-                .offset(y: -46)
-                .padding(.bottom, -46)
+                .offset(y: -IumrahSignatureHeaderGeometry.summaryOverlap)
+                .padding(.bottom, -IumrahSignatureHeaderGeometry.summaryOverlap)
+
+            if refreshing {
+                ProgressView()
+                    .tint(Color.iumrahInk)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 32)
+                    .accessibilityLabel("Обновление")
+            }
+        }
+        .background(Color.iumrahPageBackground)
+        // Needed by IumrahJourneyRefresh to detect the pull gesture while the
+        // header remains in the scrolling content, not in a fixed overlay.
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: JourneyHeaderFrameKey.self,
+                    value: proxy.frame(in: .global))
+            }
         }
     }
 }
@@ -174,5 +201,52 @@ enum IumrahHotelPhotoIdentity {
             if url.queryItems?.isEmpty == true { url.queryItems = nil }
             return seen.insert(url.string ?? value).inserted
         }
+    }
+}
+
+private struct JourneyHeaderFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .null
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+}
+private struct JourneyRefreshingKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var journeyRefreshing: Bool {
+        get { self[JourneyRefreshingKey.self] }
+        set { self[JourneyRefreshingKey.self] = newValue }
+    }
+}
+
+/// Tracks the scrolling header. Refresh progress belongs below the summary,
+/// not in the logo/status-bar area. No timer or simulated network delay.
+struct IumrahJourneyRefresh: ViewModifier {
+    let action: () async -> Void
+    @State private var restingY: CGFloat?
+    @State private var refreshing = false
+    @State private var armed = true
+    @State private var headerVisible = true
+    func body(content: Content) -> some View {
+        content
+            .scrollBounceBehavior(.always)
+            .environment(\.journeyRefreshing, refreshing)
+            .background(Color.iumrahPageBackground)
+            .background(alignment: .top) {
+                (headerVisible ? Color.iumrahHeaderBackground : Color.iumrahPageBackground)
+                    .frame(height: 120).offset(y: -120)
+            }
+            .onPreferenceChange(JourneyHeaderFrameKey.self) { frame in
+                guard !frame.isNull else { return }
+                headerVisible = frame.maxY > 60
+                if restingY == nil { restingY = frame.minY }
+                let pull = frame.minY - (restingY ?? frame.minY)
+                if pull < 8 { armed = true }
+                if pull > 72 && armed && !refreshing {
+                    armed = false
+                    refreshing = true
+                    Task { @MainActor in
+                        await action()
+                        refreshing = false
+                    }
+                }
+            }
     }
 }

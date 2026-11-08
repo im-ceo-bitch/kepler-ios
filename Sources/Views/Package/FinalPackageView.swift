@@ -5,6 +5,15 @@ import SwiftUI
 struct FinalPackageView: View {
     var familyFlow = false
     @EnvironmentObject private var journey: JourneyStore
+    var body: some View {
+        if journey.usesLocalJourney { LocalJourneyReviewView() }
+        else { LegacyFinalPackageView(familyFlow: familyFlow) }
+    }
+}
+
+struct LegacyFinalPackageView: View {
+    var familyFlow = false
+    @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
     @EnvironmentObject private var chrome: AppChromeStore
@@ -19,7 +28,6 @@ struct FinalPackageView: View {
     @State private var showTransferDetails = false
     @State private var showTransferSelection = false
     @State private var hotelForDetails: HotelSummary?
-    @State private var isHeroVisible = true
 
     private var needsMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
     private var roomsComplete: Bool {
@@ -69,10 +77,6 @@ struct FinalPackageView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         IumrahJourneyHeader(showsNotifications: true) { packageSummary }
-                            .background { GeometryReader { geometry in
-                                Color.clear.preference(key: IumrahScrollingHeroBottomKey.self,
-                                    value: geometry.frame(in: .named("finalPackageScroll")).maxY)
-                            } }
                         VStack(alignment: .leading, spacing: 18) {
                             if !journey.hasFinalGeneratorQuote { pricingStatus }
                             Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")).font(.title2.bold())
@@ -98,19 +102,14 @@ struct FinalPackageView: View {
                         .padding(IumrahDesign.pagePadding)
                         .padding(.bottom, 20)
                     }
+                    .background(IumrahNoVerticalBounce())
                 }
-                .refreshable { await recalculatePrice() }
-                .coordinateSpace(name: "finalPackageScroll")
-                .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
-                    isHeroVisible = bottom > 35
-                }
-                .background {
-                    (isHeroVisible ? Color.iumrahHeaderBackground : Color.iumrahPageBackground)
-                        .ignoresSafeArea(edges: .top)
-                }
+                .modifier(IumrahJourneyRefresh { await recalculatePrice() })
+                .background(Color.iumrahPageBackground)
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if createdSession == nil { bookingBar }
         }
@@ -260,7 +259,7 @@ struct FinalPackageView: View {
     }
     private func serviceRow(_ title: String, icon: String, detail: String?) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon).frame(width: 24).foregroundStyle(Color.iumrahDesertGold)
+            Image(systemName: icon).frame(width: 24).foregroundStyle(Color.iumrahJourneyGreen)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.subheadline.weight(.semibold))
                 if let detail { Text(detail).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }

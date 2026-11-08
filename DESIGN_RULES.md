@@ -33,3 +33,12 @@
 ## QA gate
 
 Review iPhone 11, iPhone 13 mini, iOS 26 native controls, iOS 17 fallback, long names, Dynamic Type, VoiceOver, dark mode, both Saudi arrival airports, Makkah-only vs two cities, expired rates, no flight fare, USD currency, child/infant and multi-room limitations, pull-to-refresh when overscrolling. No acceptance without a native Xcode build and visual QA on simulator/device.
+
+## Shared black header — 2026-11-08 update
+
+- `IumrahSignatureHeaderGeometry` is the only accepted source for hero top inset (14 pt), wordmark region (57.6 pt), bottom inset (80 pt), corner radius (30 pt), and journey summary overlap (46 pt). Home bottom inset was increased from 60 by 20 pt.
+- The Home wordmark is centered; in **Hotels, Bookings, Care, and Account** the smaller wordmark is left-aligned, with notification and menu controls on the right. All five have the same black world-map frame height, all scroll away with the page.
+- The Flight, Hotel, Transfer and Review screens use `IumrahJourneyHeader`, which shares exactly those metrics; search disclosure expansion must never resize the black region.
+- Hide the native bottom TabView bar ONLY while a journey destination is pushed (`.toolbar(.hidden, for: .tabBar)`). Restore it automatically on pop to one of the main five tabs. Do not replace it with a fake bar.
+- `Nuitee` alone is the customer-facing Hotels tab source. The old D1 catalogue remains internal for preexisting deep links and stored bookings.
+- Per-adult Data API flight prices are not valid child or infant fares; suppress the aggregate estimate until the fare mix is known. On refresh, revalidate exact selected Nuitee room offers; an unavailable rate invalidates that room and total. `Care` request = availability inquiry, NOT paid/confirmed booking.

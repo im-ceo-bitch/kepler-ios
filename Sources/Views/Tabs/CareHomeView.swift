@@ -22,7 +22,9 @@ struct CareHomeView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                IumrahRootPageTitle(title: "iumrah Care")
+                IumrahPrimaryTabHeader()
+                    .padding(.horizontal, -IumrahDesign.pagePadding)
+                    .padding(.top, -10)
                     .padding(.bottom, 14)
 
                 intro
@@ -58,7 +60,8 @@ struct CareHomeView: View {
             .padding(.bottom, 112)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
+        .modifier(IumrahPrimaryTabScrollChrome())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .refreshable {

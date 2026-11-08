@@ -136,6 +136,9 @@ struct HomeDashboardView: View {
                     onZiyarats: { showZiyarats = true }
                 )
 
+                readyPackagesSection
+                // Historical Business/D1 hotel showcases are no longer
+                // customer-visible. Live Hotels now displays Nuitee only.
                 homeIntegrationsSection
 
                 VStack(alignment: .leading, spacing: 15) {
@@ -157,9 +160,7 @@ struct HomeDashboardView: View {
             // A top gap exposes the page background between the status bar and hero.
             .padding(.bottom, 46)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .refreshable {
-                await storefront.refresh()
+            .background(IumrahNoVerticalBounce())
             }
             // Only the page content is gray. Do not extend this surface into the
             // TOP safe area or it paints a pale strip behind the iPhone status bar.
@@ -1766,7 +1767,7 @@ struct HomeDashboardView: View {
                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                     .padding(.horizontal, 16)
                     .frame(height: 52)
-                    .background(Color.iumrahPrimaryButtonBackground, in: Capsule())
+                    .background(Color.iumrahPrimaryButtonBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .foregroundStyle(Color.iumrahPrimaryButtonText)
                 }
                 .padding(20)
@@ -2021,7 +2022,7 @@ struct HomeDashboardView: View {
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(.white.opacity(0.92))
                             .frame(width: 38, height: 38)
-                            .background(Color.white.opacity(0.14), in: Circle())
+                            .iumrahGlass(in: Circle(), tint: .white.opacity(0.09))
                     }
 
                     Spacer(minLength: 24)
@@ -2513,14 +2514,12 @@ private struct IumrahHomeJourneySearchHero: View {
                     if navigationChromeStyle == .drawer {
                         Button { chrome.openSidebar() } label: {
                             Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 17, weight: .medium))
-                                .frame(width: 23, height: 23)
-
+                                .font(.system(size: 18, weight: .medium))
                         }
                         .modifier(IumrahNativeChromeButton())
                         .accessibilityLabel(tr("Меню", "Menu", "Menyu", "Меню"))
                     } else {
-                        Color.clear.frame(width: 46, height: 46)
+                        Color.clear.frame(width: 48, height: 48)
                             .accessibilityHidden(true)
                     }
 
@@ -2530,15 +2529,13 @@ private struct IumrahHomeJourneySearchHero: View {
                         .renderingMode(.template)
                         .scaledToFit()
                         .foregroundStyle(.white)
-                        .frame(width: 187, height: 57)
+                        .frame(width: 187.2, height: 57.6)
                         .accessibilityLabel("iumrah")
                     Spacer(minLength: 0)
 
                     Button { chrome.openNotifications() } label: {
                         Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                            .font(.system(size: 17, weight: .medium))
-                            .frame(width: 23, height: 23)
-
+                            .font(.system(size: 18, weight: .medium))
                     }
                     .modifier(IumrahNativeChromeButton())
                     .accessibilityLabel(tr("Уведомления", "Notifications", "Bildirishnomalar", "Билдиришномалар"))
@@ -2548,8 +2545,8 @@ private struct IumrahHomeJourneySearchHero: View {
         }
         .foregroundStyle(.white)
         .padding(.horizontal, IumrahDesign.pagePadding)
-        .padding(.top, 14)
-        .padding(.bottom, 51)
+        .padding(.top, IumrahSignatureHeaderGeometry.topInset)
+        .padding(.bottom, IumrahSignatureHeaderGeometry.lowerInset)
         .background {
             IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
@@ -2572,7 +2569,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 .id(headlineIndex)
                 .transition(.opacity)
                 .lineLimit(2)
-                .frame(minHeight: 30, alignment: .leading)
+                .frame(minHeight: 26, alignment: .leading)
                 .font(IumrahType.bold(18, relativeTo: .headline))
                 .foregroundStyle(Color.iumrahInk)
 
@@ -2586,7 +2583,7 @@ private struct IumrahHomeJourneySearchHero: View {
             }
 
             Divider()
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 7) {
                 IumrahGlassPillSelector(options: [
                     .init(.makkahOnly, tr("Только Мекка", "Makkah only", "Faqat Makka", "Фақат Макка")),
                     .init(.makkahAndMadinah, tr("Мекка + Медина", "Makkah + Madinah", "Makka + Madina", "Макка + Мадина"))
@@ -2659,7 +2656,8 @@ private struct IumrahHomeJourneySearchHero: View {
                 .padding(.horizontal, 18)
                 .frame(maxWidth: .infinity)
                 .frame(height: IumrahDesign.controlHeight)
-                .background(Color.iumrahSignatureBlack, in: Capsule())
+                .background(Color.iumrahSignatureBlack,
+                            in: Capsule())
             }
             .buttonStyle(.plain)
             .disabled(!isValidSearch)
@@ -2672,11 +2670,11 @@ private struct IumrahHomeJourneySearchHero: View {
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
         }
-        .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .padding(18)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 25.5, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .strokeBorder(Color(red: 0.24, green: 0.54, blue: 0.40), lineWidth: 1.4)
+            RoundedRectangle(cornerRadius: 25.5, style: .continuous)
+                .strokeBorder(Color.iumrahJourneyGreen, lineWidth: 2)
         }
     }
 
@@ -2721,10 +2719,8 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var passengerSummary: String {
-        tr("\(journey.trip.adults) взр. · \(journey.trip.children) дет. · \(journey.trip.infants) млад.",
-           "\(journey.trip.adults) adults · \(journey.trip.children) children · \(journey.trip.infants) infants",
-           "\(journey.trip.adults) katta · \(journey.trip.children) bola · \(journey.trip.infants) chaqaloq",
-           "\(journey.trip.adults) катта · \(journey.trip.children) бола · \(journey.trip.infants) чақалоқ")
+        tr("\(journey.trip.travelerCount) чел.", "\(journey.trip.travelerCount) travelers",
+           "\(journey.trip.travelerCount) kishi", "\(journey.trip.travelerCount) киши")
     }
 
     private func findFlights() {
@@ -2840,7 +2836,7 @@ private struct IumrahHomeJourneyPassengersSheet: View {
                 } label: {
                     Text(tr("Готово", "Done", "Tayyor", "Тайёр"))
                         .frame(maxWidth: .infinity)
-                        .frame(minHeight: 58)
+                        .frame(height: IumrahDesign.controlHeight)
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
                 .padding(.horizontal, 20)

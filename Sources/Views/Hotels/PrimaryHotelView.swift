@@ -88,6 +88,7 @@ struct PrimaryHotelView: View {
         .background(Color.iumrahPageBackground)
         .safeAreaInset(edge: .bottom, spacing: 0) { pinnedContinueButton }
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .task {
             if journey.hotels.isEmpty { await journey.loadMakkahHotels() }
             if requiresMadinah, journey.madinahHotels.isEmpty { await journey.loadMadinahHotels() }
@@ -285,7 +286,7 @@ struct PrimaryHotelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(15)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.iumrahDesertGold, lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.iumrahJourneyGreen, lineWidth: 1.5))
     }
 
     private var flightFirstTierSelector: some View {

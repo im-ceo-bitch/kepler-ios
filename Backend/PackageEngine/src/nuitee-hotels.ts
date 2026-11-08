@@ -258,14 +258,16 @@ async function rates(request: Request, env: Env) {
   if (!stayDates(checkin, checkout)) return error('INVALID_DATES');
   const adults = Number(body.adults);
   if (!Number.isInteger(adults) || adults < 1 || adults > 8) return error('INVALID_OCCUPANCY');
+  const children = body.children ?? [];
+  if (!Array.isArray(children) || children.length > 8 || children.some((age: unknown) => !Number.isInteger(age) || Number(age) < 0 || Number(age) > 17)) return error('INVALID_CHILD_AGES');
   const id = text(body.hotelId);
   if (!await isListedHotel(env, id)) return error('HOTEL_NOT_IN_CATALOG', 404);
-  const key = `rates:v1:${id}:${checkin}:${checkout}:${adults}:UZ:USD`;
+  const key = `rates:v2:${id}:${checkin}:${checkout}:${adults}:${children.join(",")}:UZ:USD`;
   const cached = await read(env, key);
   // Detail prices are limited to 10 min. NEVER use a stale rate as a bookable offer.
   if (cached?.fresh) return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: cached.data, cached: true });
   const response = await provider(env, '/hotels/rates', undefined, {
-    hotelIds: [id], checkin, checkout, occupancies: [{ adults }],
+    hotelIds: [id], checkin, checkout, occupancies: [{ adults, children }],
     currency: 'USD', guestNationality: 'UZ', roomMapping: true,
     maxRatesPerHotel: 50, timeout: 10,
   });

@@ -1,10 +1,8 @@
 import Foundation
 
-/// Customer-visible add-on presentation only.
-///
-/// The package generator, supplier costs, markup, payment fee, rounding and profit
-/// rules live exclusively in Cloudflare PackageEngine. Keep this file free of any
-/// authoritative package arithmetic so the iOS binary cannot reveal the generator.
+/// Shared service-price presentation for existing package screens.
+/// The new Nuitee journey computes its estimate on-device in
+/// LocalJourneySelection.swift. Legacy signed quotes retain their server path.
 enum PackagePricingPresentation {
     /// These two values are intentionally public because they are shown to the
     /// pilgrim as selectable meal-service add-ons in the UI.

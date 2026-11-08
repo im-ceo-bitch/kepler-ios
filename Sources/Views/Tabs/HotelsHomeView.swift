@@ -23,8 +23,9 @@ struct HotelsHomeView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 22) {
-                IumrahRootPageTitle(title: guidedFlightBooking && board == .flights
-                    ? guidedFlowTitle : pageTitle)
+                IumrahPrimaryTabHeader()
+                    .padding(.horizontal, -IumrahDesign.pagePadding)
+                    .padding(.top, -10)
 
                 if guidedFlightBooking && board == .flights {
                     HStack(spacing: 12) {
@@ -77,6 +78,7 @@ struct HotelsHomeView: View {
             .padding(.bottom, board == .hotels ? 112 : 42)
         }
         .background(Color.iumrahPageBackground)
+        .modifier(IumrahPrimaryTabScrollChrome())
         // With the navigation bar hidden, iOS can render scrolled section titles
         // behind the system status bar. Clip the scroll content to the safe-area
         // viewport, keeping all hotel card geometry and original side insets.
@@ -195,10 +197,9 @@ struct HotelsHomeView: View {
 
     // MARK: - Hotels
 
+    // Public Hotels tab: Nuitee only. Keep legacy helpers for old deep links,
+    // not as a competing Business/D1 hotel catalogue in the live UI.
     private var hotelsBoard: some View {
-        // Nuitee is the only public hotel inventory. Legacy iumrah Business/D1
-        // hotel lists remain internal for old booking links, never as a second
-        // contradictory catalogue next to supplier rates.
         NuiteeHotelsCatalogView(refreshSignal: hotelCatalogRefreshSignal)
     }
 
@@ -253,6 +254,40 @@ struct HotelsHomeView: View {
                     .environmentObject(chrome)
             }
 
+            if !guidedFlightBooking && !readyFlightOptions.isEmpty {
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionHeader(
+                        readyPackagesTitle,
+                        eyebrow: readyPackagesEyebrow,
+                        subtitle: readyPackagesSubtitle
+                    )
+
+                    LazyVStack(spacing: 12) {
+                        ForEach(readyFlightOptions) { option in
+                            if let preview = storefront.packagePreview(for: option) {
+                                StorefrontFlightOptionCard(
+                                    option: option,
+                                    packagePreview: preview,
+                                    isCalculating: false,
+                                    language: settings.language,
+                                    onOpen: {
+                                        IumrahHaptics.selection()
+                                        selectedFlightPackage = preview
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            } else if !guidedFlightBooking && storefront.isLoading {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(readyPackagesLoadingText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 96)
+            }
         }
     }
 

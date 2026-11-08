@@ -27,6 +27,9 @@ struct GeneratorGroupSavingsQuoteSet: Hashable {
 @MainActor
 final class JourneyStore: ObservableObject {
     @Published var trip = TripDraft()
+    @Published var usesLocalJourney = false
+    @Published var localJourneyFlights: [LocalJourneyFlight] = []
+    @Published var localJourneyRooms: [String: LocalJourneyRoom] = [:]
     /// User-facing ±0…4-day discovery window. Does not change the booked dates.
     @Published var flightSearchFlexDays: Int = 0
 
@@ -251,6 +254,9 @@ final class JourneyStore: ObservableObject {
     }
 
     func resetAfterTripChange(keepingPublishedFlightSelection: Bool = false) {
+        usesLocalJourney = false
+        localJourneyFlights = []
+        localJourneyRooms = [:]
         if !keepingPublishedFlightSelection { clearPublishedFlightSelection() }
 
         // A newly configured journey starts from the package default meal plan.
@@ -1102,6 +1108,7 @@ final class JourneyStore: ObservableObject {
     }
 
     func buildQuote(forceHotelRefresh: Bool = false) async {
+        if usesLocalJourney { rebuildLocalJourneyQuote(); return }
         let revision = packageQuoteRevision
         let tripForQuote = trip
         guard let hotel = selectedHotel,

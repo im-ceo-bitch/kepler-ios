@@ -14,7 +14,6 @@ struct TransferSelectionView: View {
     @State private var showFinalPackage = false
     @State private var isConfirming = false
     @State private var confirmationError: String?
-    @State private var isHeroVisible = true
 
     private let vehicles = TransferVehicleKind.allCases
 
@@ -50,6 +49,7 @@ struct TransferSelectionView: View {
         }
         .animation(.easeInOut(duration: 0.58), value: isVIP)
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .background(transferPageBackground)
         .navigationDestination(isPresented: $showFinalPackage) {
             FinalPackageView(familyFlow: familyFlow)
@@ -67,12 +67,16 @@ struct TransferSelectionView: View {
 
     private var transferPageBackground: some View {
         ZStack(alignment: .top) {
-            (isVIP ? Color.black : Color.white).ignoresSafeArea(edges: .bottom)
-            // The top safe area follows the scrolling hero and is not pinned black.
-            (isHeroVisible ? Color.iumrahHeaderBackground : (isVIP ? Color.black : Color.white))
-                .frame(height: 0)
-                .ignoresSafeArea(edges: .top)
+            Color.white
+                .ignoresSafeArea()
+
+            Color.black
+                .opacity(isVIP ? 1 : 0)
+                .ignoresSafeArea()
+
+
         }
+        .animation(.easeInOut(duration: 0.58), value: isVIP)
     }
 
     private var pageBackground: Color {
@@ -84,7 +88,7 @@ struct TransferSelectionView: View {
     private var matchedExperience: some View {
         ZStack {
             pageBackground
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
@@ -100,10 +104,6 @@ struct TransferSelectionView: View {
                             IumrahTransferRouteDetails()
                         }
                     }
-                    .background { GeometryReader { geometry in
-                        Color.clear.preference(key: IumrahScrollingHeroBottomKey.self,
-                            value: geometry.frame(in: .named("transferPackageScroll")).maxY)
-                    } }
                     .environment(\.colorScheme, inheritedColorScheme)
                     VStack(spacing: 20) {
                     if adaptiveLayout.isWide {
@@ -136,13 +136,13 @@ struct TransferSelectionView: View {
                 .padding(.top, 20)
                 .padding(.bottom, 46)
                 }
+                .background(IumrahNoVerticalBounce())
             }
-            .refreshable { await prepareTransferSelection() }
-            .coordinateSpace(name: "transferPackageScroll")
-            .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
-                isHeroVisible = bottom > 35
-            }
-            .scrollBounceBehavior(.always)
+            .modifier(IumrahJourneyRefresh {
+                await journey.refreshLocalJourneyRoomRates()
+                await refreshBasePackagePrice()
+            })
+            .scrollBounceBehavior(.basedOnSize)
             .scrollContentBackground(.hidden)
         }
     }
@@ -535,7 +535,7 @@ struct TransferSelectionView: View {
     @MainActor
     private func refreshBasePackagePrice() async {
         await journey.buildQuote(forceHotelRefresh: false)
-        guard let quote = journey.quote else { return }
+        guard let quote = journey.quote else { basePackagePriceUsd = nil; return }
         let activeVehicleAddOn = (journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle())
             .publicUpgradeUsd(for: journey.trip.scope)
         let activeTrainAddOn = journey.haramainTrainSelected ? journey.haramainTrainAddOnUsd : 0
@@ -582,7 +582,7 @@ struct TransferSelectionView: View {
 
         await journey.buildQuote(forceHotelRefresh: false)
 
-        guard journey.hasFinalGeneratorQuote else {
+        guard journey.hasFinalGeneratorQuote || (journey.usesLocalJourney && journey.localRoomsComplete) else {
             journey.transferSelectionConfirmed = false
             confirmationError = journey.errorMessage ?? localized(
                 "Не удалось подтвердить итоговую конфигурацию поездки. Попробуйте ещё раз.",

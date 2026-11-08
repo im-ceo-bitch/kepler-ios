@@ -30,6 +30,7 @@ type CareRequestPayload = {
   guidePreference?: unknown;
   budgetUSD?: unknown;
   notes?: unknown;
+  configuration?: unknown;
 };
 
 function json(value: unknown, status = 200) {
@@ -187,6 +188,9 @@ export async function createCarePackageRequest(request: Request, env: Env): Prom
     guidePreference: clean(body.guidePreference, 24) || "voice",
     budgetUSD: body.budgetUSD == null ? null : integer(body.budgetUSD, 0, 0, 100_000),
     notes: clean(body.notes, 2000),
+    // Client estimate is an operator request attachment, never a signed quote.
+    configuration: body.configuration && typeof body.configuration === "object" &&
+      JSON.stringify(body.configuration).length <= 64000 ? body.configuration : null,
   };
 
   if (!["makkahOnly", "makkahAndMadinah"].includes(normalized.scope)) {

@@ -61,6 +61,7 @@ struct IumrahCarePackageRequest: Encodable {
     let guidePreference: IumrahCareGuidePreference
     let budgetUSD: Int?
     let notes: String
+    var configuration: LocalJourneyRequestSnapshot? = nil
 }
 
 struct IumrahCarePackageRequestResponse: Decodable, Hashable {

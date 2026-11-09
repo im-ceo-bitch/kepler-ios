@@ -1,0 +1,149 @@
+name: Clean successfully unpacked ZIP archives
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only report verified archives; do not delete'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cleanup-applied-zips-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout selected branch with history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Verify ZIP contents against committed files
+        shell: python
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          import hashlib
+          import os
+          from pathlib import Path, PurePosixPath
+          import stat
+          import subprocess
+          import zipfile
+          
+          def git(*args, **kwargs):
+              return subprocess.check_output(['git', '--literal-pathspecs', *args], **kwargs)
+          
+          root = Path.cwd()
+          dry_run = os.environ.get('DRY_RUN', 'false').lower() == 'true'
+          algorithm = git('rev-parse', '--show-object-format').decode().strip()
+          if algorithm not in ('sha1', 'sha256'):
+              raise RuntimeError('Unsupported Git object format')
+          
+          def blob_id(data):
+              h = hashlib.new(algorithm)
+              h.update(b'blob ' + str(len(data)).encode() + b'\0' + data)
+              return h.hexdigest()
+          
+          def expected_files(archive):
+              result = {}
+              with zipfile.ZipFile(archive) as z:
+                  members = z.infolist()
+                  if len(members) > 5000 or sum(m.file_size for m in members) > 512 * 1024 * 1024:
+                      raise ValueError('Archive exceeds verification limits')
+                  for m in members:
+                      name = m.filename
+                      if '\\' in name or '\x00' in name:
+                          raise ValueError('Non-canonical ZIP path')
+                      p = PurePosixPath(name)
+                      if p.is_absolute() or '..' in p.parts or not p.parts or p.parts[0] == '.git':
+                          raise ValueError('Unsafe ZIP path')
+                      if m.is_dir():
+                          continue
+                      if stat.S_ISLNK(m.external_attr >> 16):
+                          raise ValueError('ZIP symlink is not supported')
+                      name = str(p)
+                      if name in result or name == archive.name:
+                          raise ValueError('Duplicate/self-referential ZIP entry')
+                      if m.file_size > 64 * 1024 * 1024:
+                          raise ValueError('Entry exceeds verification limit')
+                      result[name] = blob_id(z.read(m))
+              if not result:
+                  raise ValueError('Empty archive')
+              return result
+          
+          def matches(commit, expected):
+              tree = {}
+              for record in git('ls-tree', '-rz', '--full-tree', commit).split(b'\0'):
+                  if not record:
+                      continue
+                  meta, raw_path = record.split(b'\t', 1)
+                  mode, kind, oid = meta.split()
+                  name = os.fsdecode(raw_path)
+                  if name in expected and kind == b'blob' and mode in (b'100644', b'100755'):
+                      tree[name] = oid.decode()
+              return all(tree.get(name) == digest for name, digest in expected.items())
+          
+          tracked = [os.fsdecode(p) for p in git('ls-files', '-z').split(b'\0') if p]
+          archives = sorted(p for p in tracked if '/' not in p and p.startswith('iumrah') and p.endswith('.zip'))
+          removed, skipped = [], []
+          head = git('rev-parse', 'HEAD').decode().strip()
+          for name in archives:
+              archive = root / name
+              try:
+                  if archive.is_symlink() or not archive.is_file():
+                      raise ValueError('Not a regular file')
+                  expected = expected_files(archive)
+                  # Compare all entries against ONE committed tree. Mixing unrelated
+                  # historical versions would falsely classify an unapplied ZIP as applied.
+                  # No ZIP is ever extracted or executed by this workflow.
+                  commits = [head]
+                  commits += git('log', '--format=%H', '--max-count=1000', 'HEAD', '--', *expected).decode().splitlines()
+                  evidence = next((commit for commit in dict.fromkeys(commits) if matches(commit, expected)), None)
+                  if evidence is None:
+                      skipped.append((name, 'No complete match in HEAD or the last 1000 relevant commits'))
+                      continue
+                  print(f'VERIFIED {name!r}: all {len(expected)} files match commit {evidence}')
+                  if not dry_run:
+                      git('rm', '--', name)
+                  removed.append((name, evidence))
+              except (ValueError, OSError, zipfile.BadZipFile, RuntimeError, subprocess.CalledProcessError) as exc:
+                  skipped.append((name, str(exc)))
+          
+          for name, reason in skipped:
+              print(f'KEPT {name!r}: {reason}')
+          print(f'{"Would remove" if dry_run else "Removed"}: {len(removed)}; kept: {len(skipped)}')
+          if os.environ.get('GITHUB_STEP_SUMMARY'):
+              import html
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+                  out.write('## ZIP cleanup\n\n')
+                  out.write(f'{"Dry run" if dry_run else "Deletion staged"}: {len(removed)} verified ZIP(s); {len(skipped)} kept.\n\n')
+                  for name, commit in removed:
+                      out.write(f'- {html.escape(name)} — matched `{commit[:12]}`\n')
+                  for name, reason in skipped:
+                      out.write(f'- Kept {html.escape(name)} — {html.escape(reason)}\n')
+
+      - name: Commit verified ZIP removals
+        if: ${{ !inputs.dry_run }}
+        env:
+          TARGET_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if git diff --cached --quiet; then
+            echo "No verified ZIP archives to remove."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Remove verified unpacked ZIP archives [skip ci]"
+          # Never force-push/rebase cleanup over a simultaneous update.
+          # If the branch moved or is protected, push fails; rerun after resolving.
+          git push origin "HEAD:${TARGET_BRANCH}"

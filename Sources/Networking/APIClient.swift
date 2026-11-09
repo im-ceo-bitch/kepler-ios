@@ -30,15 +30,18 @@ private struct APIErrorEnvelope: Decodable {
 
 actor APIClient {
     static let shared = APIClient()
+    // Price searches have no short application deadline. URLSession/platform
+    // failures still surface as errors, never as "no availability".
+    static let hotelPrices = APIClient(longRunning: true)
 
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
 
-    init() {
+    init(longRunning: Bool = false) {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = 25
-        configuration.timeoutIntervalForResource = 60
+        configuration.timeoutIntervalForRequest = longRunning ? 604800 : 25
+        configuration.timeoutIntervalForResource = longRunning ? 604800 : 60
         configuration.waitsForConnectivity = true
         session = URLSession(configuration: configuration)
         decoder = JSONDecoder()

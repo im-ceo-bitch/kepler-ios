@@ -84,6 +84,8 @@ struct HotelsHomeView: View {
                 .padding(.top, -40)
                 .padding(.bottom, 20)
 
+                IumrahPageHelpCard(mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights")
+                    .padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 16)
                 if mode == .hotels {
                     Picker("City", selection: $hotelCity) {
                         Text(copy("Мекка", "Makkah", "Makka", "Макка")).tag("makkah")

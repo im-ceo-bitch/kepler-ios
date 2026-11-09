@@ -60,14 +60,7 @@ final class NuiteeCatalogModel: ObservableObject {
             catalogStale = catalog.hotelCatalogStale
             let response = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults)
             guard generation == version, !Task.isCancelled else { return }
-            hotels = response.hotels.map { hotel in
-                var value = hotel
-                if response.sandbox || response.pricesStale {
-                    value.minimumRate = nil
-                    value.rateStatus = "provider_error"
-                }
-                return value
-            }
+            hotels = response.hotels
             sandbox = response.sandbox
             catalogStale = response.hotelCatalogStale || response.pricesStale
             rateError = response.rateError
@@ -420,18 +413,24 @@ struct NuiteeHotelListingCard: View {
                     Label(L10n.city(hotel.city, settings.language), systemImage: "mappin.and.ellipse")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength: 0)
-                    if let rate = hotel.minimumRate, rate.price > 0, !sandbox {
+                    if let rate = hotel.minimumRate, rate.price > 0 {
+                        if sandbox {
+                            Text(NuiteeCopy.text("Тестовый тариф", "Sinov tarifi", "Test rate", settings.language)).font(.caption2)
+                        } else if hotel.rateStatus == "cached" {
+                            Text(NuiteeCopy.text("Сохранённая цена", "Saqlangan narx", "Cached price", settings.language)).font(.caption2)
+                        }
                         Text(NuiteeHotelService.usd(rate.price))
                             .font(.system(size: 23, weight: .bold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.7)
                         Text("\(nights) " + NuiteeCopy.text("ночь · 1 номер · ", "tun · 1 xona · ", "nights · 1 room · ", settings.language) + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
                     } else {
-                        Text(hotel.rateStatus == "no_availability"
-                             ? NuiteeCopy.text("Уточнить цену", "Narxni aniqlash", "Request price", settings.language)
-                             : hotel.rateStatus == "not_requested"
-                             ? NuiteeCopy.text("Проверяем цену…", "Narx tekshirilmoqda…", "Checking price…", settings.language)
-                             : NuiteeCopy.text("Уточнить цену", "Narxni aniqlash", "Request price", settings.language)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        if hotel.rateStatus == "not_requested" || hotel.rateStatus == "loading" {
+                            ProgressView().controlSize(.small)
+                            Text(NuiteeCopy.text("Загружаем цену…", "Narx yuklanmoqda…", "Loading price…", settings.language)).font(.caption)
+                        } else {
+                            Text(NuiteeCopy.text("Посмотреть номера", "Xonalarni ko‘rish", "View rooms", settings.language)).font(.caption)
+                        }
                     }
                     HStack { Spacer(); Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary) }
 
@@ -500,7 +499,9 @@ struct NuiteeHotelDetailView: View {
     @State private var rates: [NuiteeRoomRate] = []
     @State private var detailError: String?
     @State private var ratesError: String?
-    @State private var ratesLoading = false
+    @State private var ratesLoading = true
+    @State private var ratesCompleted = false
+    @State private var ratesSandbox = false
     @State private var ratesRequestID = UUID()
     @State private var isGalleryPresented = false
     @State private var showSaveConfirmation = false
@@ -548,19 +549,23 @@ struct NuiteeHotelDetailView: View {
                     }
                 }
                 staySelector.disabled(onSelectRate != nil)
+                IumrahPageHelpCard(ratesLoading || !ratesCompleted ? "hotel.loading" : ratesError != nil ? "hotel.rates_error" : rates.isEmpty ? (onSelectRate == nil ? "hotel.no_rates" : "hotel.package_no_rates") : chosenOffer != nil ? "hotel.saved" : "hotel.details")
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language))
                 if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
                 else if ratesError != nil {
-                    Label(NuiteeCopy.text("Стоимость уточнит поддержка", "Narxni qo‘llab-quvvatlash xizmati aniqlaydi", "Contact support for a price", settings.language), systemImage: "phone.bubble")
+                    Label(NuiteeCopy.text("Не удалось загрузить цены", "Narxlarni yuklab bo‘lmadi", "Could not load prices", settings.language), systemImage: "phone.bubble")
                         .font(.footnote).foregroundStyle(.secondary)
-                    Button("Повторить") { Task { await refreshRates() } }.tint(.primary)
+                    Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await refreshRates() } }.tint(.primary)
                 } else if rates.isEmpty {
                     Text(NuiteeCopy.text("На выбранные даты нет доступных тарифов.", "Bu sanalarda xona mavjud emas.", "No rooms available for these dates.", settings.language))
                         .font(.subheadline).foregroundStyle(.secondary)
                 } else {
+                    if ratesSandbox {
+                        Text(NuiteeCopy.text("Тестовые тарифы", "Sinov tariflari", "Test rates", settings.language)).font(.caption)
+                    }
                     ForEach(rates) { rate in rateCard(rate) }
                 }
-                if !ratesLoading && rates.isEmpty {
+                if ratesCompleted && !ratesLoading && rates.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(NuiteeCopy.text("Наличие и стоимость подтвердит поддержка. До подтверждения отель не включён в сумму пакета.",
                             "Mavjudlik va narxni qo‘llab-quvvatlash xizmati tasdiqlaydi. Ungacha mehmonxona paket narxiga kiritilmaydi.",
@@ -651,8 +656,8 @@ struct NuiteeHotelDetailView: View {
                 onAdd: { saveRate(rate); expandedRoomRate = nil }
             )
         }
-        .alert("Выбор номера сохранён", isPresented: $showSaveConfirmation) {
-            Button("Понятно", role: .cancel) { }
+        .alert(NuiteeCopy.text("Выбор номера сохранён", "Xona tanlovi saqlandi", "Room selection saved", settings.language), isPresented: $showSaveConfirmation) {
+            Button(NuiteeCopy.text("Понятно", "Tushunarli", "OK", settings.language), role: .cancel) { }
         } message: {
             Text(NuiteeCopy.text("Отель добавлен в план поездки.", "Mehmonxona safar rejasiga qo‘shildi.", "Hotel added to your trip plan.", settings.language))
         }
@@ -865,17 +870,20 @@ struct NuiteeHotelDetailView: View {
         let requestedCheckout = checkout
         let requestedAdults = adults
         ratesLoading = true
+        ratesCompleted = false
+        pendingSaved = false
         ratesError = nil
         rates = []
         do {
             let result = try await service.rates(hotelID: hotel.id, checkin: requestedCheckin, checkout: requestedCheckout, adults: requestedAdults, childrenAges: childrenAges, language: settings.language.hotelContentCode)
             guard ratesRequestID == requestID, !Task.isCancelled else { return }
-            rates = result.sandbox ? [] : result.rates
+            rates = result.rates
+            ratesSandbox = result.sandbox
         } catch {
             guard ratesRequestID == requestID, !Task.isCancelled else { return }
             ratesError = error.localizedDescription
         }
-        if ratesRequestID == requestID { ratesLoading = false }
+        if ratesRequestID == requestID { ratesLoading = false; ratesCompleted = true }
     }
 }
 
@@ -994,6 +1002,7 @@ private struct NuiteeRoomDetailsPage: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                    IumrahPageHelpCard("hotel.rate_details")
                     NuiteeRoomPhotoCarousel(images: room?.images ?? [], height: 260)
                     Text(rate.roomName).font(.title2.bold())
                     Text(hotelName).font(.subheadline).foregroundStyle(.secondary)

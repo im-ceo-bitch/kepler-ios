@@ -14,13 +14,13 @@ struct NuiteeHotelService {
     }
 
     func hotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false) async throws -> NuiteeHotelListEnvelope {
-        try await api.get("/api/package/nuitee/hotels", query: [
+        try await APIClient.hotelPrices.get("/api/package/nuitee/hotels", query: [
             URLQueryItem(name: "city", value: city),
             URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
             URLQueryItem(name: "checkout", value: Self.dateText(checkout)),
             URLQueryItem(name: "adults", value: String(adults)),
             URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")
-        ], timeoutInterval: 35)
+        ], timeoutInterval: 604800)
     }
 
     func detail(hotelID: String, language: String = "en") async throws -> NuiteeHotelDetail {
@@ -39,9 +39,9 @@ struct NuiteeHotelService {
             let children: [Int]
             let language: String
         }
-        return try await api.post("/api/package/nuitee/rates", body: Request(
+        return try await APIClient.hotelPrices.post("/api/package/nuitee/rates", body: Request(
             hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges, language: language
-        ), timeoutInterval: 35)
+        ), timeoutInterval: 604800)
     }
 
     static func usd(_ value: Double) -> String {

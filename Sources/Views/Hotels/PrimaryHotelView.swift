@@ -73,6 +73,7 @@ struct PrimaryHotelView: View {
                     IumrahJourneyHeader { flightFirstContextCard }
                     LazyVStack(alignment: .leading, spacing: 16) {
                         if familyFlow { IumrahFoundationCompactSteps(total: 8, current: 5, language: settings.language) }
+                        IumrahPageHelpCard("legacy.hotel")
                         cityAndStarNavigation
                         availableHotels
                         if journey.selectedHotel != nil { hotelContent }

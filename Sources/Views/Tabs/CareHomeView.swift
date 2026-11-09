@@ -46,6 +46,7 @@ struct CareHomeView: View {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
+                IumrahPageHelpCard(activeSession == nil ? "support.no_booking" : "support.active").padding(.bottom, 18)
 
                 if adaptiveLayout.isWide {
                     HStack(alignment: .top, spacing: 22) {

@@ -78,6 +78,7 @@ struct LegacyFinalPackageView: View {
                     VStack(spacing: 0) {
                         IumrahJourneyHeader(showsNotifications: true) { packageSummary }
                         VStack(alignment: .leading, spacing: 18) {
+                            IumrahPageHelpCard(journey.hasFinalGeneratorQuote ? "legacy.final" : "legacy.recalculate")
                             if !journey.hasFinalGeneratorQuote { pricingStatus }
                             Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")).font(.title2.bold())
                             if let outbound = journey.selectedOutbound {

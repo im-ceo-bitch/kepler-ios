@@ -110,6 +110,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
     @ObservedObject private var notifications = ClientNotificationCenter.shared
     @Environment(\.journeyRefreshing) private var refreshing
     @Environment(\.journeyHeaderPull) private var pull
+    @Environment(\.iumrahPullHandler) private var pullHandler
     @Environment(\.journeyTopInset) private var topInset
     var showsNotifications: Bool = false
     let summary: Summary
@@ -160,6 +161,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
                 IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
             }
             .offset(y: -pull)
+            .transaction { $0.animation = nil }
 
             if refreshing || pull > 18 {
                 ProgressView().frame(maxWidth: .infinity)
@@ -177,14 +179,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
 
         }
         .background(Color.iumrahPageBackground)
-        // Needed by IumrahJourneyRefresh to detect the pull gesture while the
-        // header remains in the scrolling content, not in a fixed overlay.
-        .background {
-            GeometryReader { proxy in
-                Color.clear.preference(key: JourneyHeaderFrameKey.self,
-                    value: proxy.frame(in: .global))
-            }
-        }
+        .background(IumrahPullObserver(onChange: pullHandler))
     }
 }
 
@@ -231,8 +226,6 @@ struct IumrahJourneyRefresh: ViewModifier {
     let action: () async -> Void
     @State private var pull: CGFloat = 0
     @State private var refreshing = false
-    @State private var armed = true
-    @State private var maximumPull: CGFloat = 0
     func body(content: Content) -> some View {
         GeometryReader { viewport in
             content
@@ -243,27 +236,16 @@ struct IumrahJourneyRefresh: ViewModifier {
                 .environment(\.iumrahSearchPullActive, refreshing || pull > 18)
                 .ignoresSafeArea(.container, edges: .top)
                 .background(Color.iumrahPageBackground.ignoresSafeArea())
-                .onPreferenceChange(JourneyHeaderFrameKey.self) { frame in
-                    guard !frame.isNull else { return }
-                    let top = viewport.frame(in: .global).minY - viewport.safeAreaInsets.top
-                    pull = max(0, frame.minY - top)
-                    if pull < 4 && !refreshing { armed = true }
-                }
-                .simultaneousGesture(DragGesture(minimumDistance: 12)
-                    .onChanged { value in
-                        if value.translation.height > 0 { maximumPull = max(maximumPull, pull) }
-                    }
-                    .onEnded { value in
-                        let reached = max(maximumPull, pull) >= 76
-                        maximumPull = 0
-                        guard reached, value.translation.height > 55, armed, !refreshing else { return }
-                        armed = false
+                .environment(\.iumrahPullHandler, { distance, released in
+                    if released {
+                        guard distance >= 76, !refreshing else { return }
                         refreshing = true
                         Task { @MainActor in
                             await action()
                             refreshing = false
                         }
-                    })
+                    } else { pull = distance }
+                })
         }
     }
 }

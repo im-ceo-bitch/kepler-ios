@@ -66,7 +66,7 @@ async function provider(env: Env, path: string, params?: URLSearchParams, data?:
       method: data ? 'POST' : 'GET', headers: {
         'X-API-Key': key, 'accept': 'application/json', ...(data ? { 'content-type': 'application/json' } : {}),
       }, body: data ? JSON.stringify(data) : undefined,
-      signal: AbortSignal.timeout(22000),
+      signal: path.startsWith('/hotels/') ? undefined : AbortSignal.timeout(22000),
     });
   } catch (e) {
     const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
@@ -171,7 +171,7 @@ async function minimums(env: Env, city: 'makkah' | 'madinah', hotels: Json[], ch
     if (!ids.length) return { values: [], stale: false, updatedAt: Date.now() };
     // Nuitee min-rates is a batch request. We never perform one request per card.
     const result = await provider(env, '/hotels/min-rates', undefined, {
-      hotelIds: ids, checkin, checkout, currency: 'USD', guestNationality: 'UZ', occupancies: [{ adults }], timeout: 10,
+      hotelIds: ids, checkin, checkout, currency: 'USD', guestNationality: 'UZ', occupancies: [{ adults }],
     });
     const values = Array.isArray(result.data) ? result.data.map((r: Json) => ({
       hotelId: text(r.hotelId), price: priceOf(r.price), currency: 'USD', offerId: text(r.offerId),
@@ -348,7 +348,7 @@ async function rates(request: Request, env: Env) {
   const response = await provider(env, '/hotels/rates', undefined, {
     hotelIds: [id], checkin, checkout, occupancies: [{ adults, children }],
     currency: 'USD', guestNationality: 'UZ', roomMapping: true,
-    maxRatesPerHotel: 50, timeout: 10,
+    maxRatesPerHotel: 50,
   });
   const offers = normalizedRates(response, id);
   await save(env, key, offers, 10 * 60);

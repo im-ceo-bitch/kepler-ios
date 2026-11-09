@@ -108,6 +108,7 @@ struct TransferSelectionView: View {
                     }
                     .environment(\.colorScheme, inheritedColorScheme)
                     VStack(spacing: 20) {
+                    IumrahPageHelpCard("transfer.default", extraKey: includesMadinah ? "transfer.train" : nil)
                     if adaptiveLayout.isWide {
                         HStack(alignment: .top, spacing: 20) {
                             vehicleStage
@@ -469,6 +470,7 @@ struct TransferSelectionView: View {
     private var familyReview: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                IumrahPageHelpCard("transfer.review")
                 IumrahFoundationCompactSteps(total: 8, current: 7, language: settings.language)
                 Text(localized("Ваша поездка","Your trip","Safaringiz","Сафарингиз")).font(.largeTitle.bold())
                 Label(journey.trip.originCode + " → " + journey.trip.outboundDestinationCode + " · " + journey.trip.returnOriginCode + " → " + journey.trip.originCode, systemImage: "airplane")

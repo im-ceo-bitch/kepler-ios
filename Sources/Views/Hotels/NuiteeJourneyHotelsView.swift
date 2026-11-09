@@ -49,6 +49,7 @@ struct NuiteeJourneyHotelsView: View {
                     }
                 }
                 LazyVStack(alignment: .leading, spacing: 14) {
+                    IumrahPageHelpCard(!ready ? "hotels.child_ages" : journey.localRoomsComplete ? "hotels.complete" : journey.trip.rooms > 1 ? "hotels.multiple_rooms" : city == "madinah" ? "hotels.madinah" : "hotels.makkah")
                     if journey.trip.scope == .makkahAndMadinah {
                         Picker("Город", selection: $city) {
                             Text("Мекка").tag("makkah")

@@ -27,6 +27,7 @@ struct TripBuilderView: View {
             ScrollView {
                 VStack(spacing: 22) {
                     IumrahGeneratorHeader(stage: .trip)
+                    IumrahPageHelpCard("legacy.trip")
 
                     if adaptiveLayout.isWide {
                         HStack(alignment: .top, spacing: 20) {

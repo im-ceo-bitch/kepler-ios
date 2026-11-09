@@ -46,7 +46,9 @@ struct BookingsHomeView: View {
         IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, header: {
             bookingHeader(hasActiveBooking: activeSession != nil)
         }, content: {
-            Group {
+            VStack(spacing: 12) {
+                IumrahPageHelpCard(activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : "bookings.schedule")
+                    .padding(.horizontal, IumrahDesign.pagePadding).padding(.top, 12)
                 if let activeSession {
                     activeBookingHub(activeSession)
                 } else {

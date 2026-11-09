@@ -114,6 +114,7 @@ struct HomeDashboardView: View {
                     IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
+                    IumrahPageHelpCard("home.default")
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
                         notifications: Array(clientNotifications.homeNotifications.prefix(5)),
@@ -2749,6 +2750,7 @@ private struct IumrahHomeJourneyPassengersSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 15) {
+                    IumrahPageHelpCard("home.passengers")
                     passengerRow(
                     title: tr("Взрослые", "Adults", "Kattalar", "Катталар"),
                     subtitle: tr("12 лет и старше", "Ages 12+", "12 yosh va yuqori", "12 ёшдан катта"),

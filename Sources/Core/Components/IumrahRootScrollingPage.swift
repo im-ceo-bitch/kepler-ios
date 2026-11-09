@@ -9,13 +9,6 @@ import SwiftUI
 /// This wrapper intentionally does not use .refreshable: UIKit's refresh
 /// control sits above the first scroll item (the masthead), which is the
 /// wrong location for the product's under-header refresh indicator.
-private struct IumrahRootScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 private struct IumrahSearchPullKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
     var iumrahSearchPullActive: Bool {
@@ -25,6 +18,7 @@ extension EnvironmentValues {
 }
 
 struct IumrahRootScrollingPage<Header: View, Page: View>: View {
+    @EnvironmentObject private var settings: AppSettingsStore
     private let masthead: Header
     private let page: Page
     private let onRefresh: () async -> Void
@@ -32,8 +26,6 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     private let extendsUnderStatusBar: Bool
     @State private var scrollTop: CGFloat = 0
     @State private var refreshing = false
-    @State private var refreshArmed = true
-    @State private var maxDragPull: CGFloat = 0
 
     init(
         onRefresh: @escaping () async -> Void,
@@ -57,16 +49,20 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
         GeometryReader { viewport in
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                GeometryReader { geometry in
-                    Color.clear.preference(
-                        key: IumrahRootScrollOffsetKey.self,
-                        value: geometry.frame(in: .named("iumrah.root.nonstickyScroll")).minY
-                            + (extendsUnderStatusBar ? viewport.safeAreaInsets.top : 0)
-                    )
+                IumrahPullObserver { distance, released in
+                    if released {
+                        guard distance >= 76, !refreshing else { return }
+                        refreshing = true
+                        Task { @MainActor in
+                            await onRefresh()
+                            refreshing = false
+                        }
+                    } else {
+                        scrollTop = distance
+                    }
                 }
                 .frame(height: 0)
                 .accessibilityHidden(true)
-                .allowsHitTesting(false)
 
                 masthead
                     .padding(.top, extendsUnderStatusBar ? viewport.safeAreaInsets.top : 0)
@@ -79,6 +75,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                     // The header is a normal scroll child: it disappears on
                     // upward swipes. Only positive top overscroll is cancelled.
                     .offset(y: -overscroll)
+                    .transaction { $0.animation = nil }
                     // The following search card must paint ABOVE the lower
                     // edge of the hero; a positive zIndex on the masthead
                     // hid the card title on Home and Hotels.
@@ -94,7 +91,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                         .frame(height: refreshing
                                ? 64 + searchCardOverlap
                                : min(64 + searchCardOverlap, max(0, overscroll - 8)))
-                        .accessibilityLabel("Обновление")
+                        .accessibilityLabel(NuiteeCopy.text("Обновление", "Yangilash", "Refreshing", settings.language))
                 }
 
                 page
@@ -105,31 +102,16 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
         .ignoresSafeArea(.container, edges: extendsUnderStatusBar ? .top : [])
         .background(Color.iumrahPageBackground.ignoresSafeArea())
         .scrollBounceBehavior(.always)
-        .onPreferenceChange(IumrahRootScrollOffsetKey.self) { y in
-            scrollTop = y
-            if y < 4 { refreshArmed = true }
-        }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 12)
-                .onChanged { value in
-                    if value.translation.height > 0 {
-                        maxDragPull = max(maxDragPull, overscroll)
-                    }
-                }
-                .onEnded { value in
-                    let reachedThreshold = max(maxDragPull, overscroll) >= 76
-                    maxDragPull = 0
-                    guard value.translation.height > 55,
-                          reachedThreshold, refreshArmed, !refreshing else { return }
-                    refreshArmed = false
-                    refreshing = true
-                    Task { @MainActor in
-                        await onRefresh()
-                        refreshing = false
-                    }
-                }
-        )
+
         }
         .coordinateSpace(name: "iumrah.root.nonstickyScroll")
+    }
+}
+
+struct IumrahCollapseSearchOnPull: ViewModifier {
+    @Environment(\.iumrahSearchPullActive) private var pulling
+    let collapse: () -> Void
+    func body(content: Content) -> some View {
+        content.onChange(of: pulling) { _, active in if active { collapse() } }
     }
 }

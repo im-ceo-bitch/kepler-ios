@@ -143,6 +143,7 @@ struct IumrahGuidedFlightSelectionView: View {
                             }
                         }
                     VStack(alignment: .leading, spacing: 16) {
+                        IumrahPageHelpCard(isLoading ? "flights.loading" : loadError != nil && availableCandidates.isEmpty ? "flights.error" : availableCandidates.isEmpty ? (step == .inbound ? "flights.inbound_empty" : "flights.empty") : step == .outbound ? "flights.outbound" : "flights.inbound")
                         stepSelector
                         resultsSection
                             .id("flight-results")
@@ -274,6 +275,7 @@ struct IumrahGuidedFlightSelectionView: View {
         }
         .padding(16)
         .modifier(IumrahAnimatedSearchBorder())
+        .modifier(IumrahCollapseSearchOnPull { editingSearch = false })
     }
 
     private var cabinTitle: String {
@@ -784,6 +786,7 @@ private struct IumrahGuidedFlightDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 19) {
+                IumrahPageHelpCard("flights.details")
                 VStack(alignment: .leading, spacing: 10) {
                     Text(tr("Авиабилет", "Flight details", "Aviachipta", "Авиачипта"))
                         .font(IumrahType.bold(30, relativeTo: .largeTitle))

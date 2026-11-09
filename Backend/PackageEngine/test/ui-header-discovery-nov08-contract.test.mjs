@@ -63,7 +63,8 @@ test('all five mastheads scroll offscreen upward and never stretch on refresh pu
   assert.match(scrolling, /max\(0, scrollTop\)/);
   assert.match(scrolling, /if refreshing \|\| overscroll > 18/);
   assert.match(scrolling, /ProgressView\(\)/);
-  assert.match(scrolling, /reachedThreshold, refreshArmed, !refreshing/);
+  assert.match(scrolling, /distance >= 76, !refreshing/);
+  assert.match(scrolling, /IumrahPullObserver/);
   assert.match(scrolling, /await onRefresh\(\)/);
   assert.doesNotMatch(scrolling, /\.refreshable\s*\{/);
   assert.match(home, /IumrahRootScrollingPage\(onRefresh:/);

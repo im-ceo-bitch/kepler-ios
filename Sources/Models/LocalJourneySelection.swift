@@ -133,7 +133,7 @@ extension JourneyStore {
                 let response = try await service.rates(
                     hotelID: room.hotel.id, checkin: room.checkin, checkout: room.checkout,
                     adults: room.adults, childrenAges: room.childrenAges)
-                guard !response.sandbox, let current = response.rates.first(where: {
+                guard let current = response.rates.first(where: {
                     $0.offerId == room.rate.offerId && $0.roomId == room.rate.roomId
                 }), current.currency.uppercased() == "USD", current.price.isFinite,
                     current.price > 0 else {

@@ -47,6 +47,7 @@ struct IumrahCareRequestView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
                 introCard
+                IumrahPageHelpCard("care.request")
                 timingCard
                 travelersCard
                 routeCard

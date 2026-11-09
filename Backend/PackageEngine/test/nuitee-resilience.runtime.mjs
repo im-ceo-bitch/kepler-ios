@@ -54,3 +54,22 @@ test('cold static catalog persists at most 150 real properties and photo URLs',a
   try{const first=await get(env,'&catalogOnly=1'),second=await get(env,'&catalogOnly=1');assert.equal(first.hotels.length,150);assert.equal(second.hotels.length,150);assert.equal(calls,1);assert.ok(first.hotels.every(h=>h.coverImageURL.startsWith('https://')));}
   finally{globalThis.fetch=old;}
 });
+
+test('delayed price result remains pending and retains supplier prices without app deadlines', async () => {
+  const env=environment(), old=globalThis.fetch;let release;let complete=false;
+  globalThis.fetch=async(_url,init)=>{
+    assert.equal(init.signal,undefined,'do not abort hotel price requests at 22 seconds');
+    assert.equal(JSON.parse(init.body).timeout,undefined,'do not impose the former 10-second supplier deadline');
+    await new Promise(resolve=>{release=resolve;});
+    return Response.json({data:[{hotelId:'lp123',price:375.5,offerId:'priced'}]});
+  };
+  try {
+    const request=get(env).then(value=>{complete=true;return value;});
+    for(let i=0;i<20&&!release;i++) await new Promise(resolve=>setTimeout(resolve,0));
+    assert.ok(release);assert.equal(complete,false);
+    release();const result=await request;
+    assert.equal(result.hotels[0].minimumRate.price,375.5);
+    assert.equal(result.hotels[0].rateStatus,'available');
+    assert.equal(result.sandbox,true,'preserve test provenance rather than erasing price');
+  } finally {globalThis.fetch=old;}
+});

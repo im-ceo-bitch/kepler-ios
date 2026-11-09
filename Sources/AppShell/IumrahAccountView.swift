@@ -110,6 +110,7 @@ struct IumrahAccountView: View {
                 accountHeader
             }, content: {
                 VStack(spacing: 20) {
+                    IumrahPageHelpCard(account.account == nil ? "account.guest" : "account.signed_in")
 
                     if let profile = account.account {
                         IumrahAccountIdentityHeroCard(

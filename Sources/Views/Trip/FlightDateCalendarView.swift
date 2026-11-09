@@ -56,6 +56,7 @@ struct FlightDateCalendarView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
+                        IumrahPageHelpCard(stage == .departure ? "calendar.departure" : "calendar.return")
                         stageSwitcher
                         if publishedOnly { flexibilityPicker }
                         if isLoading {

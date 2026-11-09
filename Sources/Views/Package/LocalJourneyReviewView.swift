@@ -28,6 +28,7 @@ struct LocalJourneyReviewView: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 16) {
+                    IumrahPageHelpCard(journey.localPriceLines == nil ? "review.unpriced_flight" : "review.local")
                     Text("Авиабилеты").font(.title2.bold())
                     ForEach(Array(journey.localJourneyFlights.enumerated()), id: \.element.id) { index, flight in
                         PackageFlightLegDetailCard(leg: StorefrontFlightLeg(airline: flight.airline,
@@ -124,6 +125,8 @@ private struct LocalJourneyRequestView: View {
     @State private var error: String?
     var body: some View {
         Form {
+            IumrahPageHelpCard(response != nil ? "request.sent" : sending ? "request.sending" : error != nil ? "request.error" : "request.contact")
+                .listRowBackground(Color.clear)
             if let response {
                 Section("Заявка отправлена") {
                     Text(response.requestID)

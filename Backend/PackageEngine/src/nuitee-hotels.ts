@@ -1,5 +1,6 @@
 /** Nuitee Hotels V1 — server-only supplier adapter. No supplier keys leave this worker. */
 import type { Env } from './env';
+import { hotelLanguage, translateHotelText, uzbekCyrillic } from './hotel-localization';
 
 type Json = Record<string, any>;
 type Entry = { payload: string; expires_at: number; updated_at: number };
@@ -269,27 +270,71 @@ async function isListedHotel(env: Env, id: string): Promise<boolean> {
 
 async function detail(url: URL, env: Env) {
   const id = text(url.searchParams.get('hotelId'));
+  const language = hotelLanguage(url.searchParams.get('language'));
   if (!/^lp[a-zA-Z0-9]{1,50}$/.test(id)) return error('INVALID_HOTEL_ID');
-  // Prevent unrestricted scraping of supplier IDs outside our curated city list.
   if (!await isListedHotel(env, id)) return error('HOTEL_NOT_IN_CATALOG', 404);
-  const cached = await read(env, `detail:v1:${id}`);
-  if (cached?.fresh) return output({ ok: true, sandbox: isSandbox(env), hotel: cached.data });
+  const cacheKey = language === 'en' ? `detail:v1:${id}` : `detail:v3:${id}:${language}`;
+  const cached = await read(env, cacheKey);
+  if (cached?.fresh) return output({ok:true,sandbox:isSandbox(env),hotel:cached.data});
   try {
-    const raw = (await provider(env, '/data/hotel', new URLSearchParams({ hotelId: id }))).data;
-    if (!raw || !raw.id) throw new Error('HOTEL_NOT_FOUND');
-    const h = normalizedDetail(raw, hotelItem(raw) || { id, name: text(raw.name), city: text(raw.city) });
-    await save(env, `detail:v1:${id}`, h, 7 * DAY);
-    return output({ ok: true, sandbox: isSandbox(env), hotel: h });
+    let h: Json;
+    if (language !== 'en' && env.HOTEL_TRANSLATION_API_KEY) {
+      // Reuse the English static snapshot so translating never changes factual fields.
+      const englishURL = new URL(url); englishURL.searchParams.set('language','en');
+      const response = await detail(englishURL, env);
+      const english = await response.json() as Json;
+      if (!english.hotel) throw new Error('NUITEE_HOTEL_NOT_FOUND');
+      h = await translateHotelText(env, english.hotel, language);
+    } else {
+      const supplierLanguage = language === 'uz-cyrl' ? 'uz' : language;
+      const raw = (await provider(env, '/data/hotel', new URLSearchParams({hotelId:id,language:supplierLanguage}))).data;
+      if (!raw?.id) throw new Error('NUITEE_HOTEL_NOT_FOUND');
+      h = normalizedDetail(raw, hotelItem(raw) || {id,name:text(raw.name),city:text(raw.city)});
+      if (language === 'uz-cyrl') {
+        // Native provider Uzbek is Latin. Transform text only, not identifiers/URLs.
+        h.description = uzbekCyrillic(h.description);
+        h.importantInformation = uzbekCyrillic(h.importantInformation);
+        h.amenities = h.amenities.map(uzbekCyrillic);
+        h.policies = h.policies.map((p:Json)=>({...p,title:uzbekCyrillic(p.title),description:uzbekCyrillic(p.description)}));
+        h.rooms = h.rooms.map((r:Json)=>({...r,name:uzbekCyrillic(r.name),description:uzbekCyrillic(r.description),amenities:r.amenities.map(uzbekCyrillic)}));
+      }
+    }
+    await save(env,cacheKey,h,7 * DAY);
+    return output({ok:true,sandbox:isSandbox(env),hotel:h});
   } catch (e) {
-    if (cached) return output({ ok: true, sandbox: isSandbox(env), stale: true, hotel: cached.data });
+    if (cached) return output({ok:true,sandbox:isSandbox(env),stale:true,hotel:cached.data});
+    // Translation failure must not hide the hotel or corrupt the English cache.
+    if (language !== 'en' && env.HOTEL_TRANSLATION_API_KEY) {
+      return detail(url, {...env, HOTEL_TRANSLATION_API_KEY: undefined});
+    }
+    if (language !== 'en') {
+      const englishURL = new URL(url); englishURL.searchParams.set('language','en');
+      return detail(englishURL,env);
+    }
     throw e;
   }
+}
+async function localizedRates(env: Env, offers: Json[], language: string, key: string): Promise<Json[]> {
+  if (language === 'en' || !env.HOTEL_TRANSLATION_API_KEY) return offers;
+  const cached = await read(env, `${key}:text:${language}`);
+  // Translation cache holds strings only; never restore stale prices/offer IDs.
+  const signature = JSON.stringify(offers.map(r=>[r.roomName,r.mealPlan,r.cancellationDescription]));
+  if (cached?.fresh && cached.data.signature === signature) {
+    return offers.map((rate,i)=>({...rate,...cached.data.text[i]}));
+  }
+  try {
+    const localized = (await translateHotelText(env,{rates:offers},language)).rates;
+    const text = localized.map((rate:Json)=>({roomName:rate.roomName,mealPlan:rate.mealPlan,cancellationDescription:rate.cancellationDescription}));
+    await save(env,`${key}:text:${language}`,{signature,text},7 * DAY);
+    return offers.map((rate,i)=>({...rate,...text[i]}));
+  } catch { return offers; }
 }
 async function rates(request: Request, env: Env) {
   const body = await request.json().catch(() => null) as Json | null;
   if (!body || !/^lp[a-zA-Z0-9]{1,50}$/.test(text(body.hotelId))) return error('INVALID_HOTEL_ID');
   const checkin = dateParam(text(body.checkin)), checkout = dateParam(text(body.checkout));
   if (!stayDates(checkin, checkout)) return error('INVALID_DATES');
+  const language = hotelLanguage(body.language);
   const adults = Number(body.adults);
   if (!Number.isInteger(adults) || adults < 1 || adults > 8) return error('INVALID_OCCUPANCY');
   const children = body.children ?? [];
@@ -299,7 +344,7 @@ async function rates(request: Request, env: Env) {
   const key = `rates:v2:${id}:${checkin}:${checkout}:${adults}:${children.join(",")}:UZ:USD`;
   const cached = await read(env, key);
   // Detail prices are limited to 10 min. NEVER use a stale rate as a bookable offer.
-  if (cached?.fresh) return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: cached.data, cached: true });
+  if (cached?.fresh) return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: await localizedRates(env,cached.data,language,key), cached: true });
   const response = await provider(env, '/hotels/rates', undefined, {
     hotelIds: [id], checkin, checkout, occupancies: [{ adults, children }],
     currency: 'USD', guestNationality: 'UZ', roomMapping: true,
@@ -307,7 +352,7 @@ async function rates(request: Request, env: Env) {
   });
   const offers = normalizedRates(response, id);
   await save(env, key, offers, 10 * 60);
-  return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: offers, cached: false });
+  return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: await localizedRates(env,offers,language,key), cached: false });
 }
 const activeRequests = new WeakMap<object, Map<string, Promise<Response>>>();
 async function coalesced(env: Env, key: string, work: () => Promise<Response>): Promise<Response> {

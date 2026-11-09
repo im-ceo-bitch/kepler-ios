@@ -2,6 +2,7 @@ import type { D1Like, D1PreparedStatementLike } from "./d1";
 
 export type Env = {
   NUITEE_API_KEY?: string;
+  HOTEL_TRANSLATION_API_KEY?: string;
   IGNAV_API_KEY?: string;
   TRAVELPAYOUTS_API_TOKEN?: string;
   IGNAV_MONTHLY_REQUEST_BUDGET?: string;

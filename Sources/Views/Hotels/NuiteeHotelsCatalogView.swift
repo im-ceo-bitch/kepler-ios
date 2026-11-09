@@ -2,18 +2,31 @@ import SwiftUI
 import MapKit
 import CoreLocation
 
-private enum NuiteeCopy {
+enum NuiteeCopy {
     static func text(_ ru: String, _ uz: String, _ en: String, _ lang: AppSettingsStore.Language) -> String {
         switch lang {
         case .russian: return ru
         case .uzbek: return uz
-        case .uzbekCyrillic: return ru
+        case .uzbekCyrillic: return cyrillic(uz)
         default: return en
         }
     }
+    private static func cyrillic(_ text: String) -> String {
+        let normalized = text.replacingOccurrences(of: "[‘’ʻʼ`]", with: "'", options: .regularExpression)
+        let table = ["a":"а","b":"б","d":"д","e":"е","f":"ф","g":"г","h":"ҳ","i":"и","j":"ж","k":"к","l":"л","m":"м","n":"н","o":"о","p":"п","q":"қ","r":"р","s":"с","t":"т","u":"у","v":"в","x":"х","y":"й","z":"з","sh":"ш","ch":"ч","yo":"ё","yu":"ю","ya":"я","o'":"ў","g'":"ғ","'":"ъ"]
+        guard let regex = try? NSRegularExpression(pattern: "o'|g'|sh|ch|yo|yu|ya|[a-z']", options: .caseInsensitive) else { return text }
+        let result = NSMutableString(string: normalized)
+        for match in regex.matches(in: normalized, range: NSRange(normalized.startIndex..., in: normalized)).reversed() {
+            let token = (normalized as NSString).substring(with: match.range)
+            let translated = table[token.lowercased()] ?? token
+            result.replaceCharacters(in: match.range, with: token.first?.isUppercase == true ? translated.uppercased() : translated)
+        }
+        return result as String
+    }
+
 }
 
-private enum NuiteeCity: String, CaseIterable {
+enum NuiteeCity: String, CaseIterable {
     case makkah, madinah
     func title(_ lang: AppSettingsStore.Language) -> String {
         self == .makkah ? NuiteeCopy.text("Мекка", "Makka", "Makkah", lang)
@@ -22,7 +35,7 @@ private enum NuiteeCity: String, CaseIterable {
 }
 
 @MainActor
-private final class NuiteeCatalogModel: ObservableObject {
+final class NuiteeCatalogModel: ObservableObject {
     @Published var hotels: [NuiteeHotel] = []
     @Published var sandbox = true
     @Published var catalogStale = false
@@ -47,7 +60,14 @@ private final class NuiteeCatalogModel: ObservableObject {
             catalogStale = catalog.hotelCatalogStale
             let response = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults)
             guard generation == version, !Task.isCancelled else { return }
-            hotels = response.hotels
+            hotels = response.hotels.map { hotel in
+                var value = hotel
+                if response.sandbox || response.pricesStale {
+                    value.minimumRate = nil
+                    value.rateStatus = "provider_error"
+                }
+                return value
+            }
             sandbox = response.sandbox
             catalogStale = response.hotelCatalogStale || response.pricesStale
             rateError = response.rateError
@@ -74,7 +94,7 @@ struct NuiteeHotelsCatalogView: View {
     var showsSearchControls = true
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
-    @StateObject private var model = NuiteeCatalogModel()
+    @StateObject private var model: NuiteeCatalogModel
     @State private var appliedHomeSearchID: UUID?
     @State private var homeSearchRevision = 0
     @State private var city: NuiteeCity = .makkah
@@ -94,7 +114,8 @@ struct NuiteeHotelsCatalogView: View {
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
 
     init(refreshSignal: Int, initialHotelQuery: String = "", searchOverride: IumrahHotelTabSearch? = nil,
-         showsSearchControls: Bool = true) {
+         showsSearchControls: Bool = true, model: NuiteeCatalogModel? = nil) {
+        _model = StateObject(wrappedValue: model ?? NuiteeCatalogModel())
         self.refreshSignal = refreshSignal
         self.initialHotelQuery = initialHotelQuery
         self.searchOverride = searchOverride
@@ -182,7 +203,7 @@ struct NuiteeHotelsCatalogView: View {
                                 Text("\(draftNights) " + NuiteeCopy.text("ночь", "tun", "night(s)", settings.language))
                                     .font(.caption2)
                             }
-                            .foregroundStyle(.black)
+                            .foregroundStyle(Color.primary)
                         }.buttonStyle(.plain)
                     }
                     Divider()
@@ -213,7 +234,7 @@ struct NuiteeHotelsCatalogView: View {
                             .font(.system(size: 16, weight: .bold))
                             .frame(maxWidth: .infinity).frame(height: 54)
                     }
-                    .buttonStyle(.borderedProminent).tint(.black)
+                    .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
                     .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
             }
@@ -238,31 +259,6 @@ struct NuiteeHotelsCatalogView: View {
             .frame(minHeight: 44)
             .onChange(of: stars) { _, _ in visibleCount = 20 }
 
-            HStack {
-                Spacer()
-                Button {
-                    Task { await reload() }
-                } label: {
-                    Label(NuiteeCopy.text("Обновить", "Yangilash", "Refresh", settings.language), systemImage: "arrow.clockwise")
-                        .font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.plain)
-                .disabled(model.busy)
-            }
-
-            if model.sandbox {
-                Label(NuiteeCopy.text("Предварительные цены · бронирование пока недоступно", "Taxminiy narxlar · bronlash hali mavjud emas", "Indicative prices · booking unavailable", settings.language), systemImage: "info.circle")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            if model.catalogStale {
-                Label(NuiteeCopy.text("Данные обновляются, показан кеш", "Keshlangan maʼlumotlar", "Showing cached data", settings.language), systemImage: "clock.arrow.circlepath")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            if model.rateError != nil {
-                Text(NuiteeCopy.text("Цены временно недоступны. Каталог можно просматривать.", "Narxlar vaqtincha mavjud emas.", "Prices temporarily unavailable; catalogue is still accessible.", settings.language))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-
             if model.busy && model.hotels.isEmpty {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 48)
             } else if let error = model.errorMessage {
@@ -273,7 +269,7 @@ struct NuiteeHotelsCatalogView: View {
                     Button(NuiteeCopy.text("Повторить", "Qayta", "Retry", settings.language)) {
                         Task { await reload() }
                     }
-                    .buttonStyle(.borderedProminent).tint(.black)
+                    .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
                 }
                 .frame(maxWidth: .infinity).padding(25)
             } else if candidateHotels.isEmpty && !model.busy {
@@ -421,10 +417,10 @@ struct NuiteeHotelListingCard: View {
                         }
                         if let rating = hotel.rating { Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary) }
                     }
-                    Label(hotel.city, systemImage: "mappin.and.ellipse")
+                    Label(L10n.city(hotel.city, settings.language), systemImage: "mappin.and.ellipse")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength: 0)
-                    if let rate = hotel.minimumRate, rate.price > 0 {
+                    if let rate = hotel.minimumRate, rate.price > 0, !sandbox {
                         Text(NuiteeHotelService.usd(rate.price))
                             .font(.system(size: 23, weight: .bold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.7)
@@ -432,17 +428,13 @@ struct NuiteeHotelListingCard: View {
                             .font(.caption2).foregroundStyle(.secondary)
                     } else {
                         Text(hotel.rateStatus == "no_availability"
-                             ? NuiteeCopy.text("Нет тарифа на эти даты", "Bu sanalarda tarif yo‘q", "No rate for these dates", settings.language)
+                             ? NuiteeCopy.text("Уточнить цену", "Narxni aniqlash", "Request price", settings.language)
                              : hotel.rateStatus == "not_requested"
                              ? NuiteeCopy.text("Проверяем цену…", "Narx tekshirilmoqda…", "Checking price…", settings.language)
-                             : NuiteeCopy.text("Цена временно недоступна", "Narx vaqtincha mavjud emas", "Rate temporarily unavailable", settings.language)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                             : NuiteeCopy.text("Уточнить цену", "Narxni aniqlash", "Request price", settings.language)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     }
-                    HStack {
-                        Text(hotel.rateStatus == "cached" ? NuiteeCopy.text("Цена из кэша · уточняется", "Keshlangan narx", "Cached price · recheck", settings.language) : sandbox ? NuiteeCopy.text("Предварительная цена", "Taxminiy narx", "Indicative price", settings.language) : NuiteeCopy.text("Стоимость проживания", "Turar joy narxi", "Stay price", settings.language))
-                            .font(.caption2).foregroundStyle(.secondary)
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
-                    }
+                    HStack { Spacer(); Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary) }
+
                 }
                 .padding(.horizontal, 12).padding(.vertical, 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -450,9 +442,9 @@ struct NuiteeHotelListingCard: View {
             .frame(width: proxy.size.width, height: 232)
         }
         .frame(height: 232)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .onTapGesture(perform: onOpen)
     }
 }
@@ -500,6 +492,9 @@ struct NuiteeHotelDetailView: View {
     let sandbox: Bool
     var childrenAges: [Int] = []
     var onSelectRate: ((NuiteeRoomRate) -> Void)? = nil
+    var onSelectPending: ((LocalJourneyPendingHotel) -> Void)? = nil
+    @State private var showSupport = false
+    @State private var pendingSaved = false
 
     @State private var detail: NuiteeHotelDetail?
     @State private var rates: [NuiteeRoomRate] = []
@@ -514,7 +509,7 @@ struct NuiteeHotelDetailView: View {
     private let service = NuiteeHotelService()
 
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
-    private var reloadID: String { "\(hotel.id):\(checkin.timeIntervalSince1970):\(nights):\(adults)" }
+    private var reloadID: String { "\(hotel.id):\(checkin.timeIntervalSince1970):\(nights):\(adults):\(settings.language.rawValue)" }
     private var photos: [String] {
         let list = detail?.images ?? []
         return list.isEmpty ? [hotel.coverImageURL].compactMap { $0 } : list
@@ -555,8 +550,8 @@ struct NuiteeHotelDetailView: View {
                 staySelector.disabled(onSelectRate != nil)
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language))
                 if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
-                else if let ratesError {
-                    Label(ratesError, systemImage: "exclamationmark.circle")
+                else if ratesError != nil {
+                    Label(NuiteeCopy.text("Стоимость уточнит поддержка", "Narxni qo‘llab-quvvatlash xizmati aniqlaydi", "Contact support for a price", settings.language), systemImage: "phone.bubble")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button("Повторить") { Task { await refreshRates() } }.tint(.primary)
                 } else if rates.isEmpty {
@@ -564,6 +559,23 @@ struct NuiteeHotelDetailView: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                 } else {
                     ForEach(rates) { rate in rateCard(rate) }
+                }
+                if !ratesLoading && rates.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(NuiteeCopy.text("Наличие и стоимость подтвердит поддержка. До подтверждения отель не включён в сумму пакета.",
+                            "Mavjudlik va narxni qo‘llab-quvvatlash xizmati tasdiqlaydi. Ungacha mehmonxona paket narxiga kiritilmaydi.",
+                            "Support will confirm availability and price. Until then, this hotel is excluded from the package total.", settings.language))
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Button { savePendingHotel() } label: {
+                            Text(pendingSaved ? NuiteeCopy.text("Добавлен · на уточнении", "Qo‘shildi · aniqlanmoqda", "Added · awaiting confirmation", settings.language)
+                                : NuiteeCopy.text("Добавить с уточнением цены", "Narxni aniqlash bilan qo‘shish", "Add pending price confirmation", settings.language))
+                        }.buttonStyle(IumrahPrimaryButtonStyle())
+                        Button { showSupport = true } label: {
+                            Label(NuiteeCopy.text("Уточнить цену · связаться", "Narxni aniqlash · bog‘lanish", "Request price · contact support", settings.language), systemImage: "phone.bubble")
+                        }.buttonStyle(.bordered).buttonBorderShape(.capsule)
+                    }
+                    .padding(18)
+                    .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
                 }
                 cancellationAndPrivacy
                 if let detail {
@@ -612,8 +624,21 @@ struct NuiteeHotelDetailView: View {
                 Image(systemName: "square.and.arrow.up")
             }
         } }
-        .task { await refreshDetail() }
-        .task(id: reloadID) { await refreshRates() }
+        .task(id: settings.language.rawValue) { await refreshDetail() }
+        .task(id: reloadID) { pendingSaved = false; await refreshRates() }
+        .sheet(isPresented: $showSupport) {
+            NavigationStack {
+                CareHomeView()
+                    .safeAreaInset(edge: .bottom) {
+                        VStack(spacing: 8) {
+                            Text(hotel.name).font(.headline)
+                            ShareLink(item: "\(hotel.name) · \(dateISO(checkin)) — \(dateISO(checkout)) · \(adults). " + NuiteeCopy.text("Прошу уточнить наличие и цену.", "Mavjudlik va narxni aniqlab bering.", "Please confirm availability and price.", settings.language)) {
+                                Label(NuiteeCopy.text("Поделиться запросом", "So‘rovni ulashish", "Share request", settings.language), systemImage: "square.and.arrow.up")
+                            }
+                        }.padding().frame(maxWidth: .infinity).background(Color.iumrahCardBackground)
+                    }
+            }
+        }
         .fullScreenCover(isPresented: $isGalleryPresented) {
             NuiteeHotelGallery(images: photos, hotelName: hotel.name)
         }
@@ -629,7 +654,7 @@ struct NuiteeHotelDetailView: View {
         .alert("Выбор номера сохранён", isPresented: $showSaveConfirmation) {
             Button("Понятно", role: .cancel) { }
         } message: {
-            Text("Отель и тариф сохранены для дальнейшего расчёта. Это ещё не подтверждённая бронь и не итоговая стоимость умра-пакета. Генератор пересчитает стоимость отдельно после интеграции серверного расчёта Nuitee.")
+            Text(NuiteeCopy.text("Отель добавлен в план поездки.", "Mehmonxona safar rejasiga qo‘shildi.", "Hotel added to your trip plan.", settings.language))
         }
     }
 
@@ -693,6 +718,16 @@ struct NuiteeHotelDetailView: View {
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
     }
 
+    private func savePendingHotel() {
+        let name = hotel.city.lowercased()
+        let city = name.contains("mad") || name.contains("med") || name.contains("المدينة") ? "madinah" : "makkah"
+        let selection = LocalJourneyPendingHotel(id: "\(city):0", city: city, hotel: hotel,
+            checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, requestedAt: Date())
+        if let onSelectPending { onSelectPending(selection); dismiss(); return }
+        NuiteeStaySelectionStore.shared.savePending(selection)
+        pendingSaved = true
+    }
+
     private func saveRate(_ rate: NuiteeRoomRate) {
         if let onSelectRate { onSelectRate(rate); dismiss(); return }
         NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
@@ -745,7 +780,7 @@ struct NuiteeHotelDetailView: View {
                     .font(.subheadline.weight(.bold))
                     .frame(maxWidth: .infinity).frame(height: 48)
             }
-            .buttonStyle(.borderedProminent).tint(.black)
+            .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
             .disabled(rate.offerId.isEmpty)
         }
         .padding(16)
@@ -802,15 +837,7 @@ struct NuiteeHotelDetailView: View {
                 "Bekor qilish shartlari tarifga bog‘liq. To‘lovdan oldin shartlarni tekshiring.",
                 "Cancellation and refund rules differ by room and rate. Recheck them before payment.", settings.language
             )).font(.footnote).foregroundStyle(.secondary)
-            Text(NuiteeCopy.text(
-                "Для запроса цены сервер передаёт Nuitee даты проживания, количество гостей и гражданство по умолчанию (UZ). API-ключ хранится только на сервере. Данные паспортов здесь не запрашиваются.",
-                "Narx so‘rovlarida sanalar, mehmonlar soni va UZ fuqaroligi yuboriladi. Pasport maʼlumotlari olinmaydi.",
-                "Rate lookup sends stay dates, guest count and default nationality (UZ) to Nuitee. Passport details are not collected here.", settings.language
-            )).font(.footnote).foregroundStyle(.secondary)
-            if sandbox {
-                Label(NuiteeCopy.text("Цены предварительные. Подтверждение и оплата пока недоступны.", "Narxlar taxminiy. Tasdiqlash va to‘lov hali mavjud emas.", "Prices are indicative. Confirmation and payment are unavailable.", settings.language), systemImage: "info.circle")
-                    .font(.caption.weight(.medium))
-            }
+
         }
         .padding(16)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
@@ -828,7 +855,7 @@ struct NuiteeHotelDetailView: View {
         return f.string(from: date)
     }
     private func refreshDetail() async {
-        do { detail = try await service.detail(hotelID: hotel.id) }
+        do { detail = try await service.detail(hotelID: hotel.id, language: settings.language.hotelContentCode) }
         catch { detailError = error.localizedDescription }
     }
     private func refreshRates() async {
@@ -841,9 +868,9 @@ struct NuiteeHotelDetailView: View {
         ratesError = nil
         rates = []
         do {
-            let result = try await service.rates(hotelID: hotel.id, checkin: requestedCheckin, checkout: requestedCheckout, adults: requestedAdults, childrenAges: childrenAges)
+            let result = try await service.rates(hotelID: hotel.id, checkin: requestedCheckin, checkout: requestedCheckout, adults: requestedAdults, childrenAges: childrenAges, language: settings.language.hotelContentCode)
             guard ratesRequestID == requestID, !Task.isCancelled else { return }
-            rates = result.rates
+            rates = result.sandbox ? [] : result.rates
         } catch {
             guard ratesRequestID == requestID, !Task.isCancelled else { return }
             ratesError = error.localizedDescription
@@ -884,15 +911,48 @@ private struct NuiteeHotelGallery: View {
     }
 }
 
-// Listing photos come from the persisted static catalog. Opening a gallery may
-// fetch detail; scrolling through cards must not fan out supplier API requests.
+private actor NuiteePreviewGate {
+    static let shared = NuiteePreviewGate()
+    private var running = false
+    private var cache: [String: [String]] = [:]
+    private var failedUntil: [String: Date] = [:]
+    func images(hotelID: String) async -> [String] {
+        if let cached = cache[hotelID] { return cached }
+        if let until = failedUntil[hotelID], until > Date() { return [] }
+        while running {
+            do { try await Task.sleep(for: .milliseconds(150)) } catch { return [] }
+        }
+        guard !Task.isCancelled else { return [] }
+        if let cached = cache[hotelID] { return cached }
+        running = true
+        defer { running = false }
+        do {
+            let detail = try await NuiteeHotelService().detail(hotelID: hotelID)
+            let images = IumrahHotelPhotoIdentity.unique(detail.images)
+            cache[hotelID] = images
+            return images
+        } catch {
+            failedUntil[hotelID] = Date().addingTimeInterval(120)
+            return []
+        }
+    }
+}
 private struct NuiteeCatalogPreviewCollage: View {
     let hotel: NuiteeHotel
+    @State private var enriched: [String] = []
     private var images: [String] {
-        let values = IumrahHotelPhotoIdentity.unique(hotel.previewImages ?? [])
-        return values.isEmpty ? [hotel.coverImageURL].compactMap { $0 } : values
+        let source = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 })
+        return enriched.isEmpty ? source : enriched
     }
-    var body: some View { NuiteeHotelCollage(images: images) }
+    var body: some View {
+        NuiteeHotelCollage(images: Array(images.prefix(3)))
+            .task(id: hotel.id) {
+                guard images.count < 3 else { return }
+                let loaded = await NuiteePreviewGate.shared.images(hotelID: hotel.id)
+                guard !Task.isCancelled else { return }
+                if !loaded.isEmpty { enriched = loaded }
+            }
+    }
 }
 
 private struct NuiteeRoomPhotoCarousel: View {
@@ -975,7 +1035,7 @@ private struct NuiteeRoomDetailsPage: View {
                     Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
                         .frame(maxWidth: .infinity).frame(height: 48)
                 }
-                .buttonStyle(.borderedProminent).tint(.black)
+                .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
                 .disabled(rate.offerId.isEmpty)
                 .padding(.horizontal, 20).padding(.vertical, 8)
                 .background(.regularMaterial)
@@ -1035,7 +1095,7 @@ private struct NuiteeStayCalendarSheet: View {
                          + NuiteeCopy.text("ночей", "tun", "nights", settings.language))
                         .font(.headline).frame(maxWidth: .infinity).frame(height: 48)
                 }
-                .buttonStyle(.borderedProminent).tint(.black)
+                .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
                 .padding(.horizontal, 18).padding(.vertical, 8)
                 .background(.regularMaterial)
             }

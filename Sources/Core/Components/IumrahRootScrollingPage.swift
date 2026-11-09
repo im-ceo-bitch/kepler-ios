@@ -16,6 +16,14 @@ private struct IumrahRootScrollOffsetKey: PreferenceKey {
     }
 }
 
+private struct IumrahSearchPullKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+    var iumrahSearchPullActive: Bool {
+        get { self[IumrahSearchPullKey.self] }
+        set { self[IumrahSearchPullKey.self] = newValue }
+    }
+}
+
 struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     private let masthead: Header
     private let page: Page
@@ -30,7 +38,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     init(
         onRefresh: @escaping () async -> Void,
         searchCardOverlap: CGFloat = 0,
-        extendsUnderStatusBar: Bool = false,
+        extendsUnderStatusBar: Bool = true,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Page
     ) {
@@ -53,6 +61,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                     Color.clear.preference(
                         key: IumrahRootScrollOffsetKey.self,
                         value: geometry.frame(in: .named("iumrah.root.nonstickyScroll")).minY
+                            + (extendsUnderStatusBar ? viewport.safeAreaInsets.top : 0)
                     )
                 }
                 .frame(height: 0)
@@ -61,7 +70,12 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
 
                 masthead
                     .padding(.top, extendsUnderStatusBar ? viewport.safeAreaInsets.top : 0)
-                    .background(Color.iumrahHeaderBackground)
+                    .background(alignment: .top) {
+                        // Paint only the moving top inset, leaving Home's curved
+                        // lower edge transparent rather than filling its corners.
+                        Color.iumrahHeaderBackground
+                            .frame(height: extendsUnderStatusBar ? viewport.safeAreaInsets.top : 0)
+                    }
                     // The header is a normal scroll child: it disappears on
                     // upward swipes. Only positive top overscroll is cancelled.
                     .offset(y: -overscroll)
@@ -84,12 +98,12 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                 }
 
                 page
+                    .environment(\.iumrahSearchPullActive, refreshing || overscroll > 18)
             }
             .frame(maxWidth: .infinity, alignment: .top)
         }
         .ignoresSafeArea(.container, edges: extendsUnderStatusBar ? .top : [])
         .background(Color.iumrahPageBackground.ignoresSafeArea())
-        .coordinateSpace(name: "iumrah.root.nonstickyScroll")
         .scrollBounceBehavior(.always)
         .onPreferenceChange(IumrahRootScrollOffsetKey.self) { y in
             scrollTop = y
@@ -116,5 +130,6 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                 }
         )
         }
+        .coordinateSpace(name: "iumrah.root.nonstickyScroll")
     }
 }

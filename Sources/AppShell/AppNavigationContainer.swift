@@ -33,7 +33,7 @@ struct AppNavigationContainer<Content: View>: View {
 
     var body: some View {
         ZStack {
-            (tab == .hotels ? Color.iumrahPageBackground : Color.iumrahSignatureBlack)
+            Color.iumrahPageBackground
                 .ignoresSafeArea(edges: .top)
 
             // CRITICAL: Always retain ONE NavigationStack identity. Previously

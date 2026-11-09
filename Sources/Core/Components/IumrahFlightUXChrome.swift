@@ -109,6 +109,8 @@ struct IumrahJourneyHeader<Summary: View>: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
     @Environment(\.journeyRefreshing) private var refreshing
+    @Environment(\.journeyHeaderPull) private var pull
+    @Environment(\.journeyTopInset) private var topInset
     var showsNotifications: Bool = false
     let summary: Summary
 
@@ -151,14 +153,17 @@ struct IumrahJourneyHeader<Summary: View>: View {
             .foregroundStyle(.white)
             .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
             .padding(.horizontal, 20)
-            .padding(.top, IumrahSignatureHeaderGeometry.topInset)
+            .padding(.top, IumrahSignatureHeaderGeometry.topInset + topInset)
             .padding(.bottom, IumrahSignatureHeaderGeometry.lowerInset)
             .frame(maxWidth: .infinity)
             .background {
                 IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
-                    .clipShape(UnevenRoundedRectangle(
-                        bottomLeadingRadius: IumrahSignatureHeaderGeometry.bottomRadius,
-                        bottomTrailingRadius: IumrahSignatureHeaderGeometry.bottomRadius))
+            }
+            .offset(y: -pull)
+
+            if refreshing || pull > 18 {
+                ProgressView().frame(maxWidth: .infinity)
+                    .frame(height: 32 + IumrahSignatureHeaderGeometry.summaryOverlap)
             }
 
             // The fixed overlap is relative to the *collapsed* summary. When
@@ -169,13 +174,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
                 .offset(y: -IumrahSignatureHeaderGeometry.summaryOverlap)
                 .padding(.bottom, -IumrahSignatureHeaderGeometry.summaryOverlap)
 
-            if refreshing {
-                ProgressView()
-                    .tint(Color.iumrahInk)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 32)
-                    .accessibilityLabel("Обновление")
-            }
+
         }
         .background(Color.iumrahPageBackground)
         // Needed by IumrahJourneyRefresh to detect the pull gesture while the
@@ -208,8 +207,18 @@ private struct JourneyHeaderFrameKey: PreferenceKey {
     static var defaultValue: CGRect = .null
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
 }
+private struct JourneyHeaderPullKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
+private struct JourneyTopInsetKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
 private struct JourneyRefreshingKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
+    var journeyHeaderPull: CGFloat {
+        get { self[JourneyHeaderPullKey.self] }
+        set { self[JourneyHeaderPullKey.self] = newValue }
+    }
+    var journeyTopInset: CGFloat {
+        get { self[JourneyTopInsetKey.self] }
+        set { self[JourneyTopInsetKey.self] = newValue }
+    }
     var journeyRefreshing: Bool {
         get { self[JourneyRefreshingKey.self] }
         set { self[JourneyRefreshingKey.self] = newValue }
@@ -220,33 +229,41 @@ extension EnvironmentValues {
 /// not in the logo/status-bar area. No timer or simulated network delay.
 struct IumrahJourneyRefresh: ViewModifier {
     let action: () async -> Void
-    @State private var restingY: CGFloat?
+    @State private var pull: CGFloat = 0
     @State private var refreshing = false
     @State private var armed = true
-    @State private var headerVisible = true
+    @State private var maximumPull: CGFloat = 0
     func body(content: Content) -> some View {
-        content
-            .scrollBounceBehavior(.always)
-            .environment(\.journeyRefreshing, refreshing)
-            .background(Color.iumrahPageBackground)
-            .background(alignment: .top) {
-                (headerVisible ? Color.iumrahHeaderBackground : Color.iumrahPageBackground)
-                    .frame(height: 120).offset(y: -120)
-            }
-            .onPreferenceChange(JourneyHeaderFrameKey.self) { frame in
-                guard !frame.isNull else { return }
-                headerVisible = frame.maxY > 60
-                if restingY == nil { restingY = frame.minY }
-                let pull = frame.minY - (restingY ?? frame.minY)
-                if pull < 8 { armed = true }
-                if pull > 72 && armed && !refreshing {
-                    armed = false
-                    refreshing = true
-                    Task { @MainActor in
-                        await action()
-                        refreshing = false
-                    }
+        GeometryReader { viewport in
+            content
+                .scrollBounceBehavior(.always)
+                .environment(\.journeyRefreshing, refreshing)
+                .environment(\.journeyHeaderPull, pull)
+                .environment(\.journeyTopInset, viewport.safeAreaInsets.top)
+                .environment(\.iumrahSearchPullActive, refreshing || pull > 18)
+                .ignoresSafeArea(.container, edges: .top)
+                .background(Color.iumrahPageBackground.ignoresSafeArea())
+                .onPreferenceChange(JourneyHeaderFrameKey.self) { frame in
+                    guard !frame.isNull else { return }
+                    let top = viewport.frame(in: .global).minY - viewport.safeAreaInsets.top
+                    pull = max(0, frame.minY - top)
+                    if pull < 4 && !refreshing { armed = true }
                 }
-            }
+                .simultaneousGesture(DragGesture(minimumDistance: 12)
+                    .onChanged { value in
+                        if value.translation.height > 0 { maximumPull = max(maximumPull, pull) }
+                    }
+                    .onEnded { value in
+                        let reached = max(maximumPull, pull) >= 76
+                        maximumPull = 0
+                        guard reached, value.translation.height > 55, armed, !refreshing else { return }
+                        armed = false
+                        refreshing = true
+                        Task { @MainActor in
+                            await action()
+                            refreshing = false
+                        }
+                    })
+        }
     }
 }

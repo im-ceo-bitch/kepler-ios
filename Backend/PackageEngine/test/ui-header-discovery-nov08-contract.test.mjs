@@ -17,7 +17,7 @@ const services = read('Sources/Views/Home/IumrahServicesView.swift');
 test('five root tabs use shared height and do not paint white status-bar safe area', () => {
   assert.match(header, /contentHeight: CGFloat = logoHeight \+ topInset \+ lowerInset/);
   assert.match(header, /frame\(height: IumrahSignatureHeaderGeometry\.contentHeight, alignment: \.top\)/);
-  assert.match(header, /ignoresSafeArea\(\.container, edges: \.top\)/);
+  assert.match(read('Sources/Core/Components/IumrahRootScrollingPage.swift'), /extendsUnderStatusBar: Bool = true/);
   assert.match(rootNav, /background\(Color\.iumrahPageBackground\.ignoresSafeArea\(edges: \.bottom\)\)/);
   assert.match(account, /IumrahPrimaryTabHeader\(/);
   assert.match(booking, /bookingHeader\(hasActiveBooking: activeSession != nil\)/);
@@ -36,10 +36,10 @@ test('hotel discovery has separate real searches and never invents a multi-room 
   assert.match(hotels, /case \.hotels: hotelFields/);
   assert.match(hotels, /case \.flights: flightFields/);
   assert.match(hotels, /case \.weekends: weekendFields/);
-  assert.match(hotels, /IumrahAnimatedSearchCard/);
-  assert.match(hotels, /TimelineView\(\.animation/);
+  assert.match(hotels, /IumrahGraphiteSearchSurface/);
+  assert.match(read('Sources/Core/Components/IumrahSignatureChrome.swift'), /TimelineView\(\.animation/);
   assert.match(hotels, /NuiteeHotelsCatalogView\(/);
-  assert.match(hotels, /NuiteeHotelService\(\)\.hotels/);
+  assert.match(hotels, /hotelCatalog\.reload/);
   assert.match(hotels, /manualQuoteRequired = hotelRooms != 1 \|\| hotelChildren > 0 \|\| hotelAdults > 6/);
   assert.match(hotels, /IumrahGuidedFlightSelectionView\(\)/);
   assert.doesNotMatch(hotels, /private var hotelsBoard|StorefrontFlightOptionCard|HotelStorefrontCard/);

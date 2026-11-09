@@ -8,6 +8,7 @@ struct IumrahJourneyDisclosureCard<Details: View>: View {
     let priceCaption: String
     let details: Details
     @State private var expanded = false
+    @Environment(\.iumrahSearchPullActive) private var pulling
 
     init(title: String, total: String, subtitle: String, priceCaption: String,
          @ViewBuilder details: () -> Details) {
@@ -52,8 +53,8 @@ struct IumrahJourneyDisclosureCard<Details: View>: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
-        .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(Color.iumrahJourneyGreen, lineWidth: 1.5))
+        .modifier(IumrahAnimatedSearchBorder())
+        .onChange(of: pulling) { _, active in if active { expanded = false } }
     }
 }
 
@@ -67,8 +68,8 @@ struct IumrahTransferRouteDetails: View {
     private var madinahFirst: Bool { includesMadinah && journey.trip.arrivalAirport == .madinah }
     private var firstHotel: String { madinahFirst ? madinahHotel : makkahHotel }
     private var lastHotel: String { includesMadinah && !madinahFirst ? madinahHotel : makkahHotel }
-    private var makkahHotel: String { journey.localJourneyRooms["makkah:0"]?.hotel.name ?? journey.selectedHotel?.name ?? city(false) }
-    private var madinahHotel: String { journey.localJourneyRooms["madinah:0"]?.hotel.name ?? journey.selectedMadinahHotel?.name ?? city(true) }
+    private var makkahHotel: String { journey.localJourneyRooms["makkah:0"]?.hotel.name ?? journey.localPendingHotels["makkah:0"]?.hotel.name ?? journey.selectedHotel?.name ?? city(false) }
+    private var madinahHotel: String { journey.localJourneyRooms["madinah:0"]?.hotel.name ?? journey.localPendingHotels["madinah:0"]?.hotel.name ?? journey.selectedMadinahHotel?.name ?? city(true) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {

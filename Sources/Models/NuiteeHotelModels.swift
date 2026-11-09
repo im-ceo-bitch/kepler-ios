@@ -14,7 +14,7 @@ struct NuiteeHotel: Codable, Identifiable, Hashable {
     let previewImages: [String]?
     let latitude: Double?
     let longitude: Double?
-    let minimumRate: NuiteeHotelMinimumRate?
+    var minimumRate: NuiteeHotelMinimumRate?
     var rateStatus: String? = nil
 
     var roundedStars: Int { max(0, min(5, Int(stars?.rounded() ?? 0))) }
@@ -142,11 +142,30 @@ final class NuiteeStaySelectionStore {
     static let shared = NuiteeStaySelectionStore()
     private let key = "iumrah.nuitee.hotelSelections.v1"
 
+    private let pendingKey = "iumrah.nuitee.pendingHotels.v1"
+    func savePending(_ hotel: LocalJourneyPendingHotel) {
+        var pending = pendingSelections()
+        pending[hotel.city] = hotel
+        if let data = try? JSONEncoder().encode(pending) { UserDefaults.standard.set(data, forKey: pendingKey) }
+        remove(city: hotel.city)
+    }
+    func pendingSelections() -> [String: LocalJourneyPendingHotel] {
+        guard let data = UserDefaults.standard.data(forKey: pendingKey),
+              let pending = try? JSONDecoder().decode([String: LocalJourneyPendingHotel].self, from: data) else { return [:] }
+        return pending
+    }
+    func removePending(city: String) {
+        var pending = pendingSelections()
+        pending.removeValue(forKey: city)
+        if let data = try? JSONEncoder().encode(pending) { UserDefaults.standard.set(data, forKey: pendingKey) }
+    }
+
     func save(_ stay: NuiteeSelectedStay) {
         var all = selections()
         let city = stay.city.lowercased()
         let isMadinah = city.contains("mad") || city.contains("med") || city.contains("المدينة")
         all[isMadinah ? "madinah" : "makkah"] = stay
+        removePending(city: isMadinah ? "madinah" : "makkah")
         if let data = try? JSONEncoder().encode(all) { UserDefaults.standard.set(data, forKey: key) }
     }
 

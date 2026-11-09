@@ -4,9 +4,10 @@ struct UmrahHomeView: View {
     @EnvironmentObject private var settings: AppSettingsStore
 
     var body: some View {
-        ScrollView {
+        IumrahRootScrollingPage(onRefresh: {}, header: {
+            IumrahPrimaryTabHeader(title: L10n.text("tab_umrah", settings.language))
+        }, content: {
             VStack(spacing: 22) {
-                IumrahRootPageTitle(title: L10n.text("tab_umrah", settings.language))
 
                 VStack(alignment: .leading, spacing: 18) {
                     IumrahIconBadge(systemName: "book.closed.fill", role: .umrah, size: 64, symbolSize: 28, cornerRadius: 22)
@@ -26,8 +27,7 @@ struct UmrahHomeView: View {
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 0)
             .padding(.bottom, 120)
-        }
-        .iumrahSignatureScrollChrome(title: L10n.text("tab_umrah", settings.language))
+        })
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
     }

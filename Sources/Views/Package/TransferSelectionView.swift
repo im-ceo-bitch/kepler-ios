@@ -97,7 +97,9 @@ struct TransferSelectionView: View {
                             title: localized("Ваш трансфер", "Your transfer", "Transferingiz", "Трансферингиз"),
                             total: currentPackagePriceTitle,
                             subtitle: "\(journey.trip.travelerCount) · " + routeTitle,
-                            priceCaption: journey.hasFinalGeneratorQuote
+                            priceCaption: !journey.localPendingHotels.isEmpty
+                                ? localized("Без отелей на уточнении", "Excludes pending hotels", "Aniqlanayotgan mehmonxonalarsiz", "Аниқланаётган меҳмонхоналарсиз")
+                                : journey.hasFinalGeneratorQuote
                                 ? localized("Итого за пакет", "Package total", "Paket jami", "Пакет жами")
                                 : localized("Предварительно за пакет", "Estimated package total", "Taxminiy paket jami", "Тахминий пакет жами")
                         ) {

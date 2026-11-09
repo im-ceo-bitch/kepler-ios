@@ -113,11 +113,7 @@ struct IumrahHomeHotelSearchView: View {
                 .accessibilityIdentifier("iumrah.home.hotels.find")
                 .padding(12)
             }
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: IumrahFoundation.Radius.card, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: IumrahFoundation.Radius.card, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.09), lineWidth: 0.8)
-            }
+            .modifier(IumrahAnimatedSearchBorder())
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

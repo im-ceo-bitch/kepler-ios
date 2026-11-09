@@ -26,6 +26,9 @@ struct HotelsHomeView: View {
     @State private var hotelSearchRevision = 0
     @State private var showHotelResults = true
     @State private var searchExpanded = false
+    @State private var flightDirection = 0
+    @StateObject private var hotelCatalog = NuiteeCatalogModel()
+    @StateObject private var flightCatalog = IumrahFlightBrowseModel()
     @State private var appliedHotelName = ""
     @State private var manualQuoteRequired = false
     @State private var manualHotels: [NuiteeHotel] = []
@@ -52,35 +55,14 @@ struct HotelsHomeView: View {
     }
 
     private var fixedHeader: some View {
-        IumrahPrimaryTabHeader(
-                    title: modes[0],
-                    footer: AnyView(IumrahHeaderTripleTabs(
-                        labels: modes,
-                        selection: mode.rawValue,
-                        onSelect: { selected in
-                            withAnimation(.easeInOut(duration: 0.22)) {
-                                mode = Discovery(rawValue: selected) ?? .hotels
-                            }
-                        }
-                    ))
-                )
+        IumrahPrimaryTabHeader(title: modes[mode.rawValue])
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, extendsUnderStatusBar: true, header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, header: {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
-                if mode == .hotels {
-                    Picker("City", selection: $hotelCity) {
-                        Text(copy("Мекка", "Makkah", "Makka", "Макка")).tag("makkah")
-                        Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag("madinah")
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, IumrahDesign.pagePadding)
-                    .padding(.top, 16)
-                    .padding(.bottom, 12)
-                }
                 IumrahGraphiteSearchSurface(
                     isExpanded: $searchExpanded,
                     summary: mode == .hotels
@@ -99,8 +81,28 @@ struct HotelsHomeView: View {
                     }
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, mode == .hotels ? 0 : 16)
+                .padding(.top, -40)
                 .padding(.bottom, 20)
+
+                if mode == .hotels {
+                    Picker("City", selection: $hotelCity) {
+                        Text(copy("Мекка", "Makkah", "Makka", "Макка")).tag("makkah")
+                        Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag("madinah")
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, IumrahDesign.pagePadding)
+                    .padding(.top, 0)
+                    .padding(.bottom, 16)
+                }
+                if mode != .hotels {
+                    Picker("Direction", selection: $flightDirection) {
+                        Text(copy("Туда", "Outbound", "Borish", "Бориш")).tag(0)
+                        Text(copy("Обратно", "Return", "Qaytish", "Қайтиш")).tag(1)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, IumrahDesign.pagePadding)
+                    .padding(.bottom, 16)
+                }
 
                 if mode == .hotels && showHotelResults {
                     if manualQuoteRequired {
@@ -108,13 +110,11 @@ struct HotelsHomeView: View {
                         manualHotelList
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(copy("Доступные отели", "Available stays", "Mavjud mehmonxonalar", "Мавжуд меҳмонхоналар"))
-                                .font(.system(size: 24, weight: .bold))
                             NuiteeHotelsCatalogView(
                                 refreshSignal: hotelSearchRevision,
                                 initialHotelQuery: appliedHotelName,
                                 searchOverride: hotelRequest,
-                                showsSearchControls: false
+                                showsSearchControls: false, model: hotelCatalog
                             )
                         }
                         .padding(.horizontal, IumrahDesign.pagePadding)
@@ -128,30 +128,36 @@ struct HotelsHomeView: View {
                                      "Shahar, sana va mehmonlarni tanlang. Natijalar Nuitee’dan keladi.",
                                      "Шаҳар, сана ва меҳмонларни танланг. Натижалар Nuitee’дан келади.")
                     )
-                } else if mode == .flights {
-                    discoveryPrompt(
-                        icon: "airplane.departure",
-                        title: copy("Выберите удобный перелёт", "Choose your flight", "Qulay reysni tanlang", "Қулай рейсни танланг"),
-                        detail: copy("Подберём доступные рейсы по введённым датам и пассажирам — без выдуманных тарифов.",
-                                     "See available flights for your dates and passengers, with no invented fares.",
-                                     "Kiritilgan sanalar bo‘yicha mavjud reyslarni ko‘ring.",
-                                     "Киритилган саналар бўйича мавжуд рейсларни кўринг.")
-                    )
                 } else {
-                    discoveryPrompt(
-                        icon: "calendar.badge.clock",
-                        title: copy("Умра на выходные", "Weekend Umrah", "Dam olish kunlari Umra", "Дам олиш кунлари Умра"),
-                        detail: copy("Укажите дату начала и продолжительность короткой поездки. Покажем доступные рейсы.",
-                                     "Choose a weekend and trip length to search available flights.",
-                                     "Boshlanish sanasi va kunlar sonini tanlang.",
-                                     "Бошланиш санаси ва кунлар сонини танланг.")
-                    )
+                    IumrahFlightBrowseCatalog(direction: flightDirection, refreshSignal: hotelSearchRevision, model: flightCatalog) { flight in
+                        let formatter = DateFormatter()
+                        formatter.locale = Locale(identifier: "en_US_POSIX")
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        if let day = formatter.date(from: String(flight.departureAt.prefix(10))) {
+                            if flightDirection == 0 {
+                                flightDeparture = day
+                                flightDestination = flight.destination == "MED" ? .madinah : .jeddah
+                                if flightReturn <= day { flightReturn = Calendar.current.date(byAdding: .day, value: 7, to: day) ?? day }
+                            } else {
+                                flightReturn = day
+                                flightDestination = flight.origin == "MED" ? .madinah : .jeddah
+                                if flightDeparture >= day { flightDeparture = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day }
+                            }
+                        }
+                        if mode == .weekends { weekendDate = flightDeparture }
+                        search()
+                    }
+                    .padding(.horizontal, IumrahDesign.pagePadding)
                 }
+
             }
             .padding(.bottom, 115)
         })
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
 
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            discoverySwitcher.padding(.horizontal, 18).padding(.vertical, 8)
+        }
         .navigationDestination(isPresented: $flightResultsPresented) {
             IumrahGuidedFlightSelectionView()
                 .toolbar(.hidden, for: .tabBar)
@@ -184,6 +190,23 @@ struct HotelsHomeView: View {
                 flightReturn = Calendar.current.date(byAdding: .day, value: 7, to: date) ?? date
             }
         }
+    }
+
+    @ViewBuilder private var discoverySwitcher: some View {
+        if #available(iOS 26.0, *) {
+            discoveryPicker.padding(8).glassEffect(.regular, in: .capsule)
+        } else {
+            discoveryPicker.padding(8)
+        }
+    }
+    private var discoveryPicker: some View {
+        Picker("", selection: $mode) {
+            Text(modes[0]).tag(Discovery.hotels)
+            Text(modes[1]).tag(Discovery.flights)
+            Text(modes[2]).tag(Discovery.weekends)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     private var hotelFields: some View {
@@ -416,9 +439,16 @@ struct HotelsHomeView: View {
     }
 
     private func refreshSearch() async {
+        searchExpanded = false
+        if mode != .hotels { await flightCatalog.load(trip: journey.trip, language: settings.language); return }
         if mode == .hotels && showHotelResults {
             if manualQuoteRequired { await loadManualHotelCatalog() }
-            else { hotelSearchRevision += 1 }
+            else if let request = hotelRequest {
+                await hotelCatalog.reload(city: request.city == "madinah" ? .madinah : .makkah,
+                    checkin: request.checkin,
+                    checkout: Calendar.current.date(byAdding: .day, value: request.nights, to: request.checkin) ?? request.checkin,
+                    adults: request.adults)
+            }
         }
     }
 

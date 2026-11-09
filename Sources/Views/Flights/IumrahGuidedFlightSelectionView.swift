@@ -273,8 +273,7 @@ struct IumrahGuidedFlightSelectionView: View {
             }
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
-        .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(Color.iumrahJourneyGreen, lineWidth: 1.5))
+        .modifier(IumrahAnimatedSearchBorder())
     }
 
     private var cabinTitle: String {
@@ -620,6 +619,7 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func loadFlights() async {
+        editingSearch = false
         let requestID = UUID()
         loadingRequestID = requestID
         dataOutbound = []; dataReturn = []
@@ -717,6 +717,7 @@ struct IumrahGuidedFlightSelectionView: View {
         journey.prepareFlightFirstHotelStage()
         journey.usesLocalJourney = true
         journey.localJourneyRooms = [:]
+        journey.localPendingHotels = [:]
         journey.localJourneyFlights = [outbound, inbound].map { flight in
             LocalJourneyFlight(id: flight.id, origin: flight.origin, destination: flight.destination,
                 airline: flight.airlineName, flightNumber: flight.flightNumber, airlineCode: flight.airlineCode,

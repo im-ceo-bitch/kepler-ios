@@ -6,7 +6,7 @@ enum IumrahSignatureHeaderGeometry {
     static let logoWidth: CGFloat = 187.2
     static let logoHeight: CGFloat = 57.6
     static let topInset: CGFloat = 14
-    static let lowerInset: CGFloat = 80
+    static let lowerInset: CGFloat = 100
     static let bottomRadius: CGFloat = 30
     static let summaryOverlap: CGFloat = 46
     static let contentHeight: CGFloat = logoHeight + topInset + lowerInset
@@ -29,6 +29,7 @@ struct IumrahPrimaryHeaderBrandRow: View {
                     Button { chrome.openSidebar() } label: {
                         Image(systemName: "line.3.horizontal")
                             .font(.system(size: 17, weight: .medium))
+                            .frame(width: 24, height: 24)
                     }
                     .modifier(IumrahNativeChromeButton())
                     .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
@@ -37,7 +38,7 @@ struct IumrahPrimaryHeaderBrandRow: View {
                     Color.clear.accessibilityHidden(true)
                 }
             }
-            .frame(width: 44, height: 48)
+            .frame(width: 48, height: 48)
 
             Spacer(minLength: 0)
             Image("HeaderWordmarkLight")
@@ -54,12 +55,13 @@ struct IumrahPrimaryHeaderBrandRow: View {
             Button { chrome.openNotifications() } label: {
                 Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
                     .font(.system(size: 17, weight: .medium))
+                            .frame(width: 24, height: 24)
             }
             .modifier(IumrahNativeChromeButton())
             .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
                 ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar",
                 cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
-            .frame(width: 44, height: 48)
+            .frame(width: 48, height: 48)
         }
         .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
         .foregroundStyle(.white)
@@ -175,13 +177,9 @@ struct IumrahPrimaryTabHeader: View {
     }
 }
 
-/// Paint the status-bar safe area behind the world-map masthead at rest.
-/// This modifier does NOT pin the masthead or intercept scroll gestures.
+/// The scrolling header owns its top inset. Never leave a black status-bar plate.
 struct IumrahPrimaryTabScrollChrome: ViewModifier {
     func body(content: Content) -> some View {
-        content.background {
-            Color.iumrahSignatureBlack
-                .ignoresSafeArea(.container, edges: .top)
-        }
+        content.background(Color.iumrahPageBackground.ignoresSafeArea())
     }
 }

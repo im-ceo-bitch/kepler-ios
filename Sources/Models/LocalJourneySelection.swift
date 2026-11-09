@@ -26,6 +26,18 @@ struct LocalJourneyRoom: Codable, Identifiable {
     let childrenAges: [Int]
 }
 
+/// A request, never a priced room. No amount or offer ID exists until confirmed.
+struct LocalJourneyPendingHotel: Codable, Identifiable {
+    let id: String
+    let city: String
+    let hotel: NuiteeHotel
+    let checkin: Date
+    let checkout: Date
+    let adults: Int
+    let childrenAges: [Int]
+    let requestedAt: Date
+}
+
 struct LocalJourneyPriceLine: Identifiable {
     let id: String
     let title: String
@@ -36,7 +48,7 @@ extension JourneyStore {
     var localRoomsComplete: Bool {
         let cities = trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"]
         return cities.allSatisfy { city in
-            (0..<trip.rooms).allSatisfy { localJourneyRooms["\(city):\($0)"] != nil }
+            (0..<trip.rooms).allSatisfy { localJourneyRooms["\(city):\($0)"] != nil || localPendingHotels["\(city):\($0)"] != nil }
         }
     }
 
@@ -99,6 +111,7 @@ struct LocalJourneyRequestSnapshot: Codable {
     let trip: TripDraft
     let flights: [LocalJourneyFlight]
     let rooms: [LocalJourneyRoom]
+    var pendingHotels: [LocalJourneyPendingHotel]? = nil
     let transfer: String
     let trainTickets: Int
     let trainClass: String
@@ -120,7 +133,7 @@ extension JourneyStore {
                 let response = try await service.rates(
                     hotelID: room.hotel.id, checkin: room.checkin, checkout: room.checkout,
                     adults: room.adults, childrenAges: room.childrenAges)
-                guard let current = response.rates.first(where: {
+                guard !response.sandbox, let current = response.rates.first(where: {
                     $0.offerId == room.rate.offerId && $0.roomId == room.rate.roomId
                 }), current.currency.uppercased() == "USD", current.price.isFinite,
                     current.price > 0 else {

@@ -107,7 +107,7 @@ struct HomeDashboardView: View {
                 await bookings.refreshAll()
                 await clientNotifications.refresh(accountToken: account.bearerToken)
                 await storefront.refresh()
-            }, searchCardOverlap: 28, header: {
+            }, searchCardOverlap: 40, header: {
                 IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header)
             }, content: {
                 LazyVStack(spacing: 30) {
@@ -168,7 +168,7 @@ struct HomeDashboardView: View {
                 }
             }
         }
-        .background(Color.iumrahHeaderBackground.ignoresSafeArea(edges: .top))
+        .background(Color.iumrahPageBackground.ignoresSafeArea())
     }
 
 
@@ -2412,6 +2412,7 @@ private struct IumrahHomeJourneySearchHero: View {
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var chrome: AppChromeStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
+    @State private var searchExpanded = false
     @State private var showingCalendar = false
     @State private var showingPassengers = false
 
@@ -2437,7 +2438,7 @@ private struct IumrahHomeJourneySearchHero: View {
             } else {
                 searchCard
                     .padding(.horizontal, IumrahDesign.pagePadding)
-                    .padding(.top, -28)
+                    .padding(.top, -40)
                     .padding(.bottom, 2)
                     .task(id: scenePhase == .active && !reduceMotion) {
                         guard scenePhase == .active && !reduceMotion else { return }
@@ -2522,6 +2523,14 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var searchCard: some View {
+        IumrahGraphiteSearchSurface(isExpanded: $searchExpanded,
+            summary: headlineOptions[headlineIndex],
+            subtitle: "\(journey.trip.originCode) · \(journey.trip.departureDate.formatted(date: .abbreviated, time: .omitted))") {
+            searchFields
+        }
+    }
+
+    private var searchFields: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(headlineOptions[headlineIndex])
                 .id(headlineIndex)
@@ -2603,7 +2612,7 @@ private struct IumrahHomeJourneySearchHero: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: findFlights) {
+            Button(action: { searchExpanded = false; findFlights() }) {
                 HStack(spacing: 10) {
                     Text(tr("Найти авиабилеты", "Find flights", "Reyslarni topish", "Рейсларни топиш"))
                     Spacer()
@@ -2629,11 +2638,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 .multilineTextAlignment(.center)
         }
         .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 25.5, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 25.5, style: .continuous)
-                .strokeBorder(Color.iumrahJourneyGreen, lineWidth: 2)
-        }
+
     }
 
     private func cabinTitle(_ cabin: FlightCabinClass) -> String {

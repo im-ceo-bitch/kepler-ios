@@ -23,27 +23,39 @@ struct NuiteeHotelService {
         ], timeoutInterval: 35)
     }
 
-    func detail(hotelID: String) async throws -> NuiteeHotelDetail {
+    func detail(hotelID: String, language: String = "en") async throws -> NuiteeHotelDetail {
         let response: NuiteeHotelDetailEnvelope = try await api.get(
-            "/api/package/nuitee/hotel", query: [URLQueryItem(name: "hotelId", value: hotelID)], timeoutInterval: 25
+            "/api/package/nuitee/hotel", query: [URLQueryItem(name: "hotelId", value: hotelID), URLQueryItem(name: "language", value: language)], timeoutInterval: 35
         )
         return response.hotel
     }
 
-    func rates(hotelID: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = []) async throws -> NuiteeRatesEnvelope {
+    func rates(hotelID: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], language: String = "en") async throws -> NuiteeRatesEnvelope {
         struct Request: Encodable {
             let hotelId: String
             let checkin: String
             let checkout: String
             let adults: Int
             let children: [Int]
+            let language: String
         }
         return try await api.post("/api/package/nuitee/rates", body: Request(
-            hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges
+            hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges, language: language
         ), timeoutInterval: 35)
     }
 
     static func usd(_ value: Double) -> String {
         value.formatted(.currency(code: "USD").precision(.fractionLength(0...2)))
+    }
+}
+
+extension AppSettingsStore.Language {
+    var hotelContentCode: String {
+        switch self {
+        case .russian: return "ru"
+        case .uzbek: return "uz"
+        case .uzbekCyrillic: return "uz-Cyrl"
+        default: return String(rawValue.prefix(2)).lowercased()
+        }
     }
 }

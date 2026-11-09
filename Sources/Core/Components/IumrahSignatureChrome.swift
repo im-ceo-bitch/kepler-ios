@@ -272,6 +272,8 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
     let summary: String
     let subtitle: String
     let content: Content
+    @Environment(\.iumrahSearchPullActive) private var pulling
+    @Environment(\.journeyRefreshing) private var refreshing
     @EnvironmentObject private var settings: AppSettingsStore
 
     init(isExpanded: Binding<Bool>, summary: String, subtitle: String,
@@ -304,7 +306,7 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(Color.black)
+                .foregroundStyle(Color.primary)
                 .padding(15)
                 .contentShape(Rectangle())
             }
@@ -320,14 +322,12 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.11), lineWidth: 0.8)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(minHeight: 80)
+        .modifier(IumrahAnimatedSearchBorder())
         .animation(.easeInOut(duration: 0.20), value: isExpanded)
-        .environment(\.colorScheme, .light)
+        .onChange(of: pulling || refreshing) { _, active in
+            if active { isExpanded = false }
+        }
     }
 
     private func localized(_ ru: String, _ uz: String, _ en: String) -> String {
@@ -337,5 +337,27 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
         case .uzbekCyrillic: return ru
         default: return en
         }
+    }
+}
+
+/// One opaque search surface and the original moving monochrome border.
+struct IumrahAnimatedSearchBorder: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    var radius: CGFloat = 34
+    func body(content: Content) -> some View {
+        content
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay {
+                TimelineView(.animation(minimumInterval: 1.0 / 24.0,
+                                         paused: reduceMotion || scenePhase != .active)) { timeline in
+                    let rotation = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * 72
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(AngularGradient(colors: [.black, .black, .white, .gray, .black, .white, .black],
+                            center: .center, startAngle: .degrees(rotation), endAngle: .degrees(rotation + 360)), lineWidth: 3)
+                        .allowsHitTesting(false)
+                }
+            }
     }
 }

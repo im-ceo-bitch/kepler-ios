@@ -38,7 +38,9 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
         self.page = content()
     }
 
-    private var overscroll: CGFloat { max(0, min(180, scrollTop)) }
+    // Never cap the compensation: an unusually deep iOS rubber-band pull
+    // must not expose a giant blank area ABOVE the black masthead.
+    private var overscroll: CGFloat { max(0, scrollTop) }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -57,7 +59,9 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                     // The header is a normal scroll child: it disappears on
                     // upward swipes. Only positive top overscroll is cancelled.
                     .offset(y: -overscroll)
-                    .zIndex(1)
+                    // The following search card must paint ABOVE the lower
+                    // edge of the hero; a positive zIndex on the masthead
+                    // hid the card title on Home and Hotels.
 
                 if refreshing || overscroll > 18 {
                     ProgressView()

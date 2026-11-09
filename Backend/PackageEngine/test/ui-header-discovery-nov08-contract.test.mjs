@@ -60,7 +60,7 @@ test('all five mastheads scroll offscreen upward and never stretch on refresh pu
   const scrolling = read('Sources/Core/Components/IumrahRootScrollingPage.swift');
   assert.match(scrolling, /ScrollView\(showsIndicators: false\)/);
   assert.match(scrolling, /masthead[\s\S]*?\.offset\(y: -overscroll\)/);
-  assert.match(scrolling, /max\(0, min\(180, scrollTop\)\)/);
+  assert.match(scrolling, /max\(0, scrollTop\)/);
   assert.match(scrolling, /if refreshing \|\| overscroll > 18/);
   assert.match(scrolling, /ProgressView\(\)/);
   assert.match(scrolling, /reachedThreshold, refreshArmed, !refreshing/);
@@ -84,4 +84,18 @@ test('the installed Services carousel and full screen survive the fix with every
   assert.match(services, /enum IumrahServiceKind/);
   assert.match(services, /case \.english, \.turkish, \.indonesian, \.malay, \.arabic/);
   assert.match(serviceCards, /case \.english, \.turkish, \.indonesian, \.malay, \.arabic/);
+});
+
+// November 9: direct visual QA fixes requested after the Booking comparison.
+test('all primary tabs center the same brand row, with flat lower edge outside Home', () => {
+  assert.match(header, /struct IumrahPrimaryHeaderBrandRow: View/);
+  assert.match(header, /IumrahPrimaryTabHeader:[\s\S]*?IumrahPrimaryHeaderBrandRow\(\)/);
+  assert.match(home, /private var blackTop:[\s\S]*?IumrahPrimaryHeaderBrandRow\(\)/);
+  assert.match(header, /IumrahType\.bold\(28, relativeTo: \.largeTitle\)/);
+  assert.doesNotMatch(header, /clipShape\(UnevenRoundedRectangle/);
+  assert.match(home, /clipShape\(UnevenRoundedRectangle/);
+  assert.match(header, /chrome\.openSidebar\(\)/);
+  assert.match(header, /chrome\.openNotifications\(\)/);
+  const scrolling = read('Sources/Core/Components/IumrahRootScrollingPage.swift');
+  assert.doesNotMatch(scrolling, /\.zIndex\(1\)/);
 });

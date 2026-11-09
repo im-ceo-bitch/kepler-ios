@@ -1,264 +1,216 @@
 {
-  "kind": "full-cumulative-overlay",
+  "type": "full-cumulative-overlay",
   "date": "2026-11-09",
   "base": "kepler-ios-main 4.zip",
-  "last_known_github_commit_from_log": "04ad64eb33e9968dc3a9135a520a08dbc1abb16f",
-  "excluded_old_patch_readmes": true,
+  "count": 52,
   "files": {
     "Backend/PackageEngine/scripts/runtime-tests.sh": {
-      "sha256": "126ecb14c2485a1fa9abe60ae8bca2f5b62cc490511fa737d18b853ba633d9f8",
       "bytes": 570,
-      "change": "changed"
+      "sha256": "126ecb14c2485a1fa9abe60ae8bca2f5b62cc490511fa737d18b853ba633d9f8"
     },
     "Backend/PackageEngine/src/care-requests.ts": {
-      "sha256": "0d8fa8d828554334e447efb769480e52221fa01dfc29e3f88bce7846980a1bbb",
       "bytes": 12948,
-      "change": "changed"
+      "sha256": "0d8fa8d828554334e447efb769480e52221fa01dfc29e3f88bce7846980a1bbb"
     },
     "Backend/PackageEngine/src/nuitee-hotels.ts": {
-      "sha256": "5a9e75d4f0ac599201305720deb13a96613d50a6afc0b6e35b35bf621459d88f",
       "bytes": 17808,
-      "change": "changed"
+      "sha256": "5a9e75d4f0ac599201305720deb13a96613d50a6afc0b6e35b35bf621459d88f"
     },
     "Backend/PackageEngine/test/aviasales-data-contract.test.mjs": {
-      "sha256": "072a337388cf90b710515a1910b4adaf8cb64eef736964db3c5e84a2ab874a03",
       "bytes": 3617,
-      "change": "changed"
+      "sha256": "072a337388cf90b710515a1910b4adaf8cb64eef736964db3c5e84a2ab874a03"
     },
     "Backend/PackageEngine/test/client-hotel-flight-package-contract.test.mjs": {
-      "sha256": "0823a4841023b7ee28cbcc71f6c9776ea69694ebfd873566bc7d526ed744f870",
       "bytes": 5280,
-      "change": "changed"
+      "sha256": "0823a4841023b7ee28cbcc71f6c9776ea69694ebfd873566bc7d526ed744f870"
     },
     "Backend/PackageEngine/test/client-hotels-push-transfer-v14-contract.test.mjs": {
-      "sha256": "28f9e6d23307e59e6d7673d131ceba9c67bf541ce8660fd9862ba05a555ab131",
       "bytes": 2426,
-      "change": "changed"
+      "sha256": "28f9e6d23307e59e6d7673d131ceba9c67bf541ce8660fd9862ba05a555ab131"
     },
     "Backend/PackageEngine/test/guest-booking-confirmation-contract.test.mjs": {
-      "sha256": "e20b53f7ed28ab53f97299e0aa999c5f50ac0c9f1aa5d90d665965e10fcaeb9f",
       "bytes": 3377,
-      "change": "changed"
+      "sha256": "e20b53f7ed28ab53f97299e0aa999c5f50ac0c9f1aa5d90d665965e10fcaeb9f"
     },
     "Backend/PackageEngine/test/nuitee-hotels-v1-contract.test.mjs": {
-      "sha256": "b30720d79c9a63fd3d611643e22cddc95396c6c1e81198131013170d93fa670b",
       "bytes": 2231,
-      "change": "changed"
+      "sha256": "b30720d79c9a63fd3d611643e22cddc95396c6c1e81198131013170d93fa670b"
     },
     "Backend/PackageEngine/test/nuitee-occupancy.runtime.mjs": {
-      "sha256": "ab4db4eff20300bac05c01bccc519f080eaf320b5c33c3fdd02835c3bd40327b",
       "bytes": 2242,
-      "change": "added"
+      "sha256": "ab4db4eff20300bac05c01bccc519f080eaf320b5c33c3fdd02835c3bd40327b"
     },
     "Backend/PackageEngine/test/storefront-package-booking-contract.test.mjs": {
-      "sha256": "d484a424030b895e4ff05d0067e8b8306839418c77f3383a141e125b9003be56",
       "bytes": 5301,
-      "change": "changed"
+      "sha256": "d484a424030b895e4ff05d0067e8b8306839418c77f3383a141e125b9003be56"
     },
     "Backend/PackageEngine/test/ui-header-discovery-nov08-contract.test.mjs": {
-      "sha256": "2c4736ac3d14ab7e9fb8ecdbbbf542bae6d2524d86900a683277e10d37b59d6a",
-      "bytes": 5260,
-      "change": "added"
+      "bytes": 6114,
+      "sha256": "b684029a5bac0f33404db8e7fd461eb79ce10bca57e1824afa8a2adbe8e8a50f"
     },
     "DESIGN_RULES.md": {
-      "sha256": "554c77c676c5cc00e457a736c41e0ee906f23bfb668b2e28fc808f3c6f7bc5f3",
-      "bytes": 11391,
-      "change": "added"
+      "bytes": 12867,
+      "sha256": "cc6f3aed3f86c83a203d439de5cd879733089e2c4d9d8056cbab23203a4496ed"
     },
     "Design Rules.md": {
-      "sha256": "f90dccc5d2f22963b511f19971a8f1da8959d97b3eb790ea34fcbd58430b550e",
       "bytes": 287,
-      "change": "added"
+      "sha256": "f90dccc5d2f22963b511f19971a8f1da8959d97b3eb790ea34fcbd58430b550e"
     },
     "IUMRAH_IOS_DESIGN_RULES.md": {
-      "sha256": "b2b8f6b16df9fcb01ace5cfb25febb8290d365bb0b351a084ac37b78820b61b9",
       "bytes": 35750,
-      "change": "changed"
+      "sha256": "b2b8f6b16df9fcb01ace5cfb25febb8290d365bb0b351a084ac37b78820b61b9"
     },
     "IUMRAH_SERVICES_20261108_APPLIED.txt": {
-      "sha256": "dfa959888f595c2c5614623146cddcd28b3b3911b9c397b407f33c8a723b90e8",
       "bytes": 62,
-      "change": "added"
+      "sha256": "dfa959888f595c2c5614623146cddcd28b3b3911b9c397b407f33c8a723b90e8"
     },
     "IUMRAH_SERVICES_20261108_README.md": {
-      "sha256": "adee2decfb98dd72fa1ed501920c240ece986e0ee815ff361cee740c203e2d90",
       "bytes": 2946,
-      "change": "added"
+      "sha256": "adee2decfb98dd72fa1ed501920c240ece986e0ee815ff361cee740c203e2d90"
+    },
+    "README_HEADER_CENTERED_20261109_RU.md": {
+      "bytes": 4618,
+      "sha256": "7c0002a28e8d1a74c7215aac2e80b483c22208fb80d30966a0fae7ebb94558b7"
     },
     "Resources/Assets.xcassets/IumrahServicesFlightHero.imageset/Contents.json": {
-      "sha256": "27cbd6d8fa9a3b97552ca279856d60686b8bff3dfc7acffb85261ff81b9f77c4",
       "bytes": 167,
-      "change": "added"
+      "sha256": "27cbd6d8fa9a3b97552ca279856d60686b8bff3dfc7acffb85261ff81b9f77c4"
     },
     "Resources/Assets.xcassets/IumrahServicesFlightHero.imageset/IumrahServicesFlightHero.jpg": {
-      "sha256": "e3a4d39f9d227fe76f54ac64f48bb4bd964a164d9b76755779b42c71513913e6",
       "bytes": 178466,
-      "change": "added"
+      "sha256": "e3a4d39f9d227fe76f54ac64f48bb4bd964a164d9b76755779b42c71513913e6"
     },
     "Resources/Assets.xcassets/IumrahVisaServicesHero.imageset/Contents.json": {
-      "sha256": "c5bdf46502541c3bff13fd80f68116508a4f3c3f9633f965a07d2b3296ff2a6c",
       "bytes": 165,
-      "change": "added"
+      "sha256": "c5bdf46502541c3bff13fd80f68116508a4f3c3f9633f965a07d2b3296ff2a6c"
     },
     "Resources/Assets.xcassets/IumrahVisaServicesHero.imageset/IumrahVisaServicesHero.jpg": {
-      "sha256": "441c28baf2290f394fc7cfb6bcac54fb9e7dc03728936b690be74be03c161e45",
       "bytes": 83354,
-      "change": "added"
+      "sha256": "441c28baf2290f394fc7cfb6bcac54fb9e7dc03728936b690be74be03c161e45"
     },
     "Sources/AppShell/AppNavigationContainer.swift": {
-      "sha256": "d17f328dd142752d1a96b6e65dba364fb05b8601f6a8e0827538d0570a0127b5",
       "bytes": 2538,
-      "change": "changed"
+      "sha256": "d17f328dd142752d1a96b6e65dba364fb05b8601f6a8e0827538d0570a0127b5"
     },
     "Sources/AppShell/IumrahAccountView.swift": {
-      "sha256": "adbdcf3b3757d47872359dd9e457a81dd3591456e797d5b3aa8e041e3beb5214",
       "bytes": 131666,
-      "change": "changed"
+      "sha256": "adbdcf3b3757d47872359dd9e457a81dd3591456e797d5b3aa8e041e3beb5214"
     },
     "Sources/Core/Components/IumrahFlightSearchEditor.swift": {
-      "sha256": "c2599a9192bffde27596fc45d36df63639ad84da61b9d058bde70448a169facb",
       "bytes": 2068,
-      "change": "added"
+      "sha256": "c2599a9192bffde27596fc45d36df63639ad84da61b9d058bde70448a169facb"
     },
     "Sources/Core/Components/IumrahFlightUXChrome.swift": {
-      "sha256": "25c6aa8e2fc92ebcb92a93953b97491b79ef355209e5fe973e92fa46a20f18f2",
       "bytes": 10432,
-      "change": "changed"
+      "sha256": "25c6aa8e2fc92ebcb92a93953b97491b79ef355209e5fe973e92fa46a20f18f2"
     },
     "Sources/Core/Components/IumrahJourneySummary.swift": {
-      "sha256": "bb934d29f0944f577b11e9071404e10acddb94d639fb6c3d6040b12ca294a3f7",
       "bytes": 5282,
-      "change": "changed"
+      "sha256": "bb934d29f0944f577b11e9071404e10acddb94d639fb6c3d6040b12ca294a3f7"
     },
     "Sources/Core/Components/IumrahRootScrollingPage.swift": {
-      "sha256": "38eb2a996358301afe319ee3a7a0ec7b24c55f012e6e29cd3078e4c65e5a7692",
-      "bytes": 4305,
-      "change": "added"
+      "bytes": 4619,
+      "sha256": "86fda1cb90c4266ca4ef070bb6846af86d35cc9d7e1aebb3f5fbaabb6ada953d"
     },
     "Sources/Core/Components/IumrahSignatureHeaders.swift": {
-      "sha256": "70ead2861d134bc5fa70d9c700d9278427a6ad383dd1e10d3d1a4a670a49716d",
-      "bytes": 7280,
-      "change": "added"
+      "bytes": 7916,
+      "sha256": "2295059875895f48f2578a9797aef79f516ddc2bb38ff9d59f91f15fc487a162"
     },
     "Sources/Core/DesignSystem.swift": {
-      "sha256": "493dcf9f7161e32e3c12b45f03c4367d3af8b224a25612ac93b3fd2309070830",
       "bytes": 24473,
-      "change": "changed"
+      "sha256": "493dcf9f7161e32e3c12b45f03c4367d3af8b224a25612ac93b3fd2309070830"
     },
     "Sources/Core/IumrahFoundation.swift": {
-      "sha256": "8e7a6d3d3475a27773aaa8d98ee9470ab204115b3763f01651e7d8b240118347",
       "bytes": 10723,
-      "change": "changed"
+      "sha256": "8e7a6d3d3475a27773aaa8d98ee9470ab204115b3763f01651e7d8b240118347"
     },
     "Sources/Models/IumrahCareRequestModels.swift": {
-      "sha256": "d92c87ba797bae6a427e234143083ce5bff4c04fdb26f4deed568f8a68a77e86",
       "bytes": 1938,
-      "change": "changed"
+      "sha256": "d92c87ba797bae6a427e234143083ce5bff4c04fdb26f4deed568f8a68a77e86"
     },
     "Sources/Models/LocalJourneySelection.swift": {
-      "sha256": "3ad5642b16c04248a919e9b7ddbee83d0174b1ad75496bf0d9e5424a59085de3",
       "bytes": 7162,
-      "change": "added"
+      "sha256": "3ad5642b16c04248a919e9b7ddbee83d0174b1ad75496bf0d9e5424a59085de3"
     },
     "Sources/Services/LocalPackagePricingEngine.swift": {
-      "sha256": "e952fde275879751ccab50dec227cfa38520e032b35b3ef8ef567f7b2e5155f4",
       "bytes": 1787,
-      "change": "changed"
+      "sha256": "e952fde275879751ccab50dec227cfa38520e032b35b3ef8ef567f7b2e5155f4"
     },
     "Sources/Services/NuiteeHotelService.swift": {
-      "sha256": "82ca350fa5011fea3f71faa38991f0bd8c44f18b9fed24ef49ab8a1476726e16",
       "bytes": 2006,
-      "change": "changed"
+      "sha256": "82ca350fa5011fea3f71faa38991f0bd8c44f18b9fed24ef49ab8a1476726e16"
     },
     "Sources/State/JourneyStore.swift": {
-      "sha256": "e1c8f90e2ad0010b86584d9e20db30392f7bac139510103ca4f1be22f6247416",
       "bytes": 66512,
-      "change": "changed"
+      "sha256": "e1c8f90e2ad0010b86584d9e20db30392f7bac139510103ca4f1be22f6247416"
     },
     "Sources/Views/Flights/IumrahGuidedFlightSelectionView.swift": {
-      "sha256": "ca11a8b54d4dcbbc28a7a68fefd0f846fccf1c43ccb23421f3b08080484ec496",
       "bytes": 48337,
-      "change": "changed"
+      "sha256": "ca11a8b54d4dcbbc28a7a68fefd0f846fccf1c43ccb23421f3b08080484ec496"
     },
     "Sources/Views/Home/HomeAppleStoreSections.swift": {
-      "sha256": "6b6f824d343bc91702c78d4003a6b57ba7efd8555532cf2bb5d4f0f9bb53d79a",
       "bytes": 41785,
-      "change": "changed"
+      "sha256": "6b6f824d343bc91702c78d4003a6b57ba7efd8555532cf2bb5d4f0f9bb53d79a"
     },
     "Sources/Views/Home/HomeDashboardView.swift": {
-      "sha256": "2f7083a453f38aad2f23160d068bbc114b9b4cc0f7472cf50f64d4086b274a4d",
-      "bytes": 140819,
-      "change": "changed"
+      "bytes": 139377,
+      "sha256": "8cd72e2714cb84892276bc2361e2ea6cdd77749a05d0e66089f5108024b09933"
     },
     "Sources/Views/Home/IumrahCareRequestView.swift": {
-      "sha256": "4a591add8e5ab2d193733aaf5bd10701550dc6a18bfed551756f9a9f92d883d8",
       "bytes": 35766,
-      "change": "changed"
+      "sha256": "4a591add8e5ab2d193733aaf5bd10701550dc6a18bfed551756f9a9f92d883d8"
     },
     "Sources/Views/Home/IumrahServicesView.swift": {
-      "sha256": "f0eb3b1da793455a77d385ceaeeab2a56aad0d3ee798428687cf9423d5bd25c1",
       "bytes": 33065,
-      "change": "added"
+      "sha256": "f0eb3b1da793455a77d385ceaeeab2a56aad0d3ee798428687cf9423d5bd25c1"
     },
     "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": {
-      "sha256": "3bb82df1ebec43fbde55b6bc4008c8c7d0128a8193ce6bc5e705273675d30c8f",
       "bytes": 59071,
-      "change": "changed"
+      "sha256": "3bb82df1ebec43fbde55b6bc4008c8c7d0128a8193ce6bc5e705273675d30c8f"
     },
     "Sources/Views/Hotels/NuiteeJourneyHotelsView.swift": {
-      "sha256": "2faf736b3156a6a6d8dbb0dd9908dca0d8e77e164b3f72783f76e1dd268bfd20",
       "bytes": 8480,
-      "change": "added"
+      "sha256": "2faf736b3156a6a6d8dbb0dd9908dca0d8e77e164b3f72783f76e1dd268bfd20"
     },
     "Sources/Views/Hotels/PrimaryHotelView.swift": {
-      "sha256": "159bd8e208739365160afaa97551cb80402decc5dc6eb304426332881248d4f2",
       "bytes": 50729,
-      "change": "changed"
+      "sha256": "159bd8e208739365160afaa97551cb80402decc5dc6eb304426332881248d4f2"
     },
     "Sources/Views/Package/FinalPackageView.swift": {
-      "sha256": "483e58d6ede031238b17d11ba88e5e536636fe9ddaa2a60889c77b10050f410b",
       "bytes": 24022,
-      "change": "changed"
+      "sha256": "483e58d6ede031238b17d11ba88e5e536636fe9ddaa2a60889c77b10050f410b"
     },
     "Sources/Views/Package/FlightFirstPackageFlowView.swift": {
-      "sha256": "cf10543567f79da55672c8b0e74ad2452f6d9675399b85eef841e3b0054381b5",
       "bytes": 272,
-      "change": "changed"
+      "sha256": "cf10543567f79da55672c8b0e74ad2452f6d9675399b85eef841e3b0054381b5"
     },
     "Sources/Views/Package/IumrahNuiteeJourneyFlow.swift": {
-      "sha256": "aa28b67fb70f2eb58cbfffd87ae8365e70b96973de128cba41cffaa75df4826f",
       "bytes": 789,
-      "change": "added"
+      "sha256": "aa28b67fb70f2eb58cbfffd87ae8365e70b96973de128cba41cffaa75df4826f"
     },
     "Sources/Views/Package/LocalJourneyReviewView.swift": {
-      "sha256": "bd1b7d97f4d5bdda7ca18c459cb69b653094ecf12a4dd7e2153c7958efc337cf",
       "bytes": 11352,
-      "change": "added"
+      "sha256": "bd1b7d97f4d5bdda7ca18c459cb69b653094ecf12a4dd7e2153c7958efc337cf"
     },
     "Sources/Views/Package/TransferSelectionView.swift": {
-      "sha256": "587c91141920584a8f864699736e9d85a0614f981776476bda682903fbdf2d64",
       "bytes": 39462,
-      "change": "changed"
+      "sha256": "587c91141920584a8f864699736e9d85a0614f981776476bda682903fbdf2d64"
     },
     "Sources/Views/Tabs/BookingsHomeView.swift": {
-      "sha256": "6c52dbe851fb39e0c3a687a2660d426dcd9e57a852f05c8cb5680a03242b3467",
       "bytes": 115692,
-      "change": "changed"
+      "sha256": "6c52dbe851fb39e0c3a687a2660d426dcd9e57a852f05c8cb5680a03242b3467"
     },
     "Sources/Views/Tabs/CareHomeView.swift": {
-      "sha256": "262ff417ab15fd66fd6e1eb529b7c5383d2a6be54d30454d7d90e3d21ee80390",
       "bytes": 25043,
-      "change": "changed"
+      "sha256": "262ff417ab15fd66fd6e1eb529b7c5383d2a6be54d30454d7d90e3d21ee80390"
     },
     "Sources/Views/Tabs/HotelStorefrontCompatibility.swift": {
-      "sha256": "c8a37a07bbcfab0c965a4fbd3e7231d42986bcd4b8820745886176fccdbe6e32",
       "bytes": 214379,
-      "change": "added"
+      "sha256": "c8a37a07bbcfab0c965a4fbd3e7231d42986bcd4b8820745886176fccdbe6e32"
     },
     "Sources/Views/Tabs/HotelsHomeView.swift": {
-      "sha256": "7e0c60a396cbe79db1bdb8fc56c9430f3b390e4cdaa419fd3500598bb927430c",
       "bytes": 27842,
-      "change": "changed"
+      "sha256": "7e0c60a396cbe79db1bdb8fc56c9430f3b390e4cdaa419fd3500598bb927430c"
     }
   }
 }

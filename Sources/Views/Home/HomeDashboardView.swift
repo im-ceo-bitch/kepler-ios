@@ -2508,48 +2508,17 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var blackTop: some View {
-        VStack(spacing: 0) {
-                HStack(spacing: 12) {
-                    if navigationChromeStyle == .drawer {
-                        Button { chrome.openSidebar() } label: {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 18, weight: .medium))
-                        }
-                        .modifier(IumrahNativeChromeButton())
-                        .accessibilityLabel(tr("Меню", "Menu", "Menyu", "Меню"))
-                    } else {
-                        Color.clear.frame(width: 48, height: 48)
-                            .accessibilityHidden(true)
-                    }
-
-                    Spacer(minLength: 0)
-                    Image("HeaderWordmarkLight")
-                        .resizable()
-                        .renderingMode(.template)
-                        .scaledToFit()
-                        .foregroundStyle(.white)
-                        .frame(width: 187.2, height: 57.6)
-                        .accessibilityLabel("iumrah")
-                    Spacer(minLength: 0)
-
-                    Button { chrome.openNotifications() } label: {
-                        Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                            .font(.system(size: 18, weight: .medium))
-                    }
-                    .modifier(IumrahNativeChromeButton())
-                    .accessibilityLabel(tr("Уведомления", "Notifications", "Bildirishnomalar", "Билдиришномалар"))
-                }
-                .font(.system(size: 18, weight: .medium))
-
-        }
-        .foregroundStyle(.white)
-        .padding(.horizontal, IumrahDesign.pagePadding)
-        .padding(.top, IumrahSignatureHeaderGeometry.topInset)
-        .padding(.bottom, IumrahSignatureHeaderGeometry.lowerInset)
-        .background {
-            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
-        }
+        IumrahPrimaryHeaderBrandRow()
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.top, IumrahSignatureHeaderGeometry.topInset)
+            .padding(.bottom, IumrahSignatureHeaderGeometry.lowerInset)
+            .frame(maxWidth: .infinity)
+            .background {
+                IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
+                    .clipShape(UnevenRoundedRectangle(
+                        bottomLeadingRadius: IumrahSignatureHeaderGeometry.bottomRadius,
+                        bottomTrailingRadius: IumrahSignatureHeaderGeometry.bottomRadius))
+            }
     }
 
     private var searchCard: some View {
@@ -2559,7 +2528,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 .transition(.opacity)
                 .lineLimit(2)
                 .frame(minHeight: 26, alignment: .leading)
-                .font(IumrahType.bold(18, relativeTo: .headline))
+                .font(IumrahType.bold(22, relativeTo: .title2))
                 .foregroundStyle(Color.iumrahInk)
 
             Divider()

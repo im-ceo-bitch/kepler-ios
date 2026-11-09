@@ -36,8 +36,8 @@ Review iPhone 11, iPhone 13 mini, iOS 26 native controls, iOS 17 fallback, long 
 
 ## Shared black header — 2026-11-08 update
 
-- `IumrahSignatureHeaderGeometry` is the only accepted source for hero top inset (14 pt), wordmark region (57.6 pt), bottom inset (80 pt), corner radius (30 pt), and journey summary overlap (46 pt). Home bottom inset was increased from 60 by 20 pt.
-- The Home wordmark is centered; in **Hotels, Bookings, Care, and Account** the smaller wordmark is left-aligned, with notification and menu controls on the right. All five have the same black world-map frame height and scroll upward with their content.
+- `IumrahSignatureHeaderGeometry` defines the shared hero top inset (14 pt), wordmark region (57.6 pt), bottom inset (80 pt), **Home-only** lower corner radius (30 pt), and journey summary overlap (46 pt). Home bottom inset was increased from 60 by 20 pt.
+- The wordmark is **geometrically centered on all five primary tabs**, with identical dimensions (187.2 × 57.6 pt). Use `IumrahPrimaryHeaderBrandRow` consistently: native menu button on the left, notification button on the right. All five scroll upward with their content. Four non-Home tabs have a **straight lower header edge**; only Home retains its 30 pt lower rounding.
 - The Flight, Hotel, Transfer and Review screens use `IumrahJourneyHeader`, which shares exactly those metrics; search disclosure expansion must never resize the black region.
 - Hide the native bottom TabView bar ONLY while a journey destination is pushed (`.toolbar(.hidden, for: .tabBar)`). Restore it automatically on pop to one of the main five tabs. Do not replace it with a fake bar.
 - `Nuitee` alone is the customer-facing Hotels tab source. The old D1 catalogue remains internal for preexisting deep links and stored bookings.
@@ -46,7 +46,7 @@ Review iPhone 11, iPhone 13 mini, iOS 26 native controls, iOS 17 fallback, long 
 ## Five primary tabs and three searches — 2026-11-08 night revision
 
 - All five root headers start at the **physical top edge** of the device: the **status bar must be white on the black header**, never white-on-white. Root NavigationStack backgrounds must not extend the page-gray fill over the top safe area. The five root headers belong inside the same page scroll as the content, and MUST scroll away on upward swipes.
-- The black hero's content height is **151.6 pt**, excluding the actual device status-bar safe area. The four non-Home tabs use the **same 187.2 × 57.6 pt wordmark** as Home. Home is center aligned; Hotels, Booking, Care and Account left align their wordmark while preserving notification and menu controls at right (matches approved device screenshots).
+- The black hero's content height is **151.6 pt**, excluding the actual device status-bar safe area. The four non-Home tabs use the **same 187.2 × 57.6 pt wordmark** as Home. All five center the wordmark using a symmetrical menu-left / notifications-right row. Do not move both buttons to the right where they collide with the centered logo.
 - Header navigation symbols are **native circular `.glass` / `.buttonBorderShape(.circle)` controls** on iOS 26. Do not force oversized custom circle backgrounds or use blurred images to approximate them. No duplicate custom back controls in journey stages.
 - Account: title and concise subtitle inside black hero. Bookings: title and **Booking / Status / Schedule** capsule selection inside hero **only with an active booking**. Care: title, then **Call / Telegram / Chat** capsule actions inside hero; chat requires an existing booking ID, not an invented conversation.
 - Hotels public root is rebuilt from zero. Exactly three modes: **Hotels / Flights / Weekends**, each with its own input form but a consistent visual envelope. Hotels uses city, optional hotel name, stay dates, nights, room count, adults, children and children's ages; Flights uses origin, destination, outbound/return dates, adults/children/infants and cabin; Weekends uses origin, travel start, 2–4 nights and passenger mix. Search must open the existing supplier-backed results, not placeholder lists.
@@ -69,3 +69,11 @@ Review iPhone 11, iPhone 13 mini, iOS 26 native controls, iOS 17 fallback, long 
 - Never put `.refreshable` on a ScrollView that contains the black masthead: native UIRefreshControl would render ABOVE the masthead. Use `IumrahRootScrollingPage` for under-header refresh.
 - Do not nest a second vertical ScrollView inside `IumrahRootScrollingPage`; nested scrolling would leave the masthead pinned.
 - Home search-card overlap 28 pt; Hotels search-card overlap 40 pt. Keep native Liquid Glass controls and iumrah Services intact.
+
+## Centered shared branding and flat root headers — 2026-11-09 (latest)
+
+- **All five primary tabs**, including Hotels, Booking, Support and Account, must use exactly the same wordmark size and geometrical center alignment as Home (`IumrahPrimaryHeaderBrandRow`). Menu is left, notifications right. These are official system Liquid Glass controls on supported iOS versions; never simulate them.
+- Root titles in Hotels, Booking, Support and Account use `IumrahType.bold(28, relativeTo: .largeTitle)`; the Home search headline is 22 pt Lato Bold. Make headings legible without truncating the action capsules or stretching the masthead.
+- Only **Home** rounds the two lower corners of its black world-map header (`bottomRadius = 30`). The other four primary tabs have a **completely square bottom edge**. This does not alter the journey-stage header geometry.
+- Search cards on Home and Hotels are allowed to visually overlap the black hero. Never give the scroll masthead a foreground `zIndex` that covers the title or inputs in the top of these cards. Never cap the top-overscroll offset compensation: even a strong downward pull must not reveal empty space above the masthead.
+- Existing scroll requirement remains: header scrolls away on UP swipe; it does not stretch on top-edge pull; refreshing appears immediately below. Do not pin it while scrolling.

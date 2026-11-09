@@ -12,6 +12,60 @@ enum IumrahSignatureHeaderGeometry {
     static let contentHeight: CGFloat = logoHeight + topInset + lowerInset
 }
 
+/// One brand row shared by all five iPhone root tabs.
+/// Identical 44-pt native chrome slots keep the wordmark geometrically
+/// centered, including on smaller phones and when the drawer is unavailable.
+/// This is also the layout used on Home: menu / wordmark / notifications.
+struct IumrahPrimaryHeaderBrandRow: View {
+    @EnvironmentObject private var chrome: AppChromeStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
+    @ObservedObject private var notifications = ClientNotificationCenter.shared
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Group {
+                if navigationChromeStyle == .drawer {
+                    Button { chrome.openSidebar() } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 17, weight: .medium))
+                    }
+                    .modifier(IumrahNativeChromeButton())
+                    .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
+                        ru: "Меню", en: "Menu", uz: "Menyu", cy: "Меню", tr: "Menu", id: "Menu"))
+                } else {
+                    Color.clear.accessibilityHidden(true)
+                }
+            }
+            .frame(width: 44, height: 48)
+
+            Spacer(minLength: 0)
+            Image("HeaderWordmarkLight")
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
+                .foregroundStyle(.white)
+                .frame(width: IumrahSignatureHeaderGeometry.logoWidth,
+                       height: IumrahSignatureHeaderGeometry.logoHeight)
+                .accessibilityLabel("iumrah")
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 0)
+
+            Button { chrome.openNotifications() } label: {
+                Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
+                    .font(.system(size: 17, weight: .medium))
+            }
+            .modifier(IumrahNativeChromeButton())
+            .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
+                ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar",
+                cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
+            .frame(width: 44, height: 48)
+        }
+        .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
+        .foregroundStyle(.white)
+    }
+}
+
 /// The segmented navigation inside a black hero is intentionally a solid
 /// capsule, NOT a mocked Liquid Glass navigation control.
 struct IumrahHeaderTripleTabs: View {
@@ -78,65 +132,34 @@ struct IumrahHeaderCapsuleActions: View {
 /// normal scroll item: swiping UP moves it offscreen. During top overscroll,
 /// IumrahRootScrollingPage compensates its position so it does not stretch.
 struct IumrahPrimaryTabHeader: View {
-    @EnvironmentObject private var chrome: AppChromeStore
-    @EnvironmentObject private var settings: AppSettingsStore
-    @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
-    @ObservedObject private var notifications = ClientNotificationCenter.shared
-
     var title: String? = nil
     var subtitle: String? = nil
     var footer: AnyView? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
-                Image("HeaderWordmarkLight")
-                    .resizable()
-                    .renderingMode(.template)
-                    .scaledToFit()
-                    .foregroundStyle(.white)
-                    .frame(width: IumrahSignatureHeaderGeometry.logoWidth,
-                           height: IumrahSignatureHeaderGeometry.logoHeight, alignment: .leading)
-                    .accessibilityLabel("iumrah")
-                Spacer(minLength: 0)
-                Button { chrome.openNotifications() } label: {
-                    Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                        .font(.system(size: 17, weight: .medium))
-                }
-                .modifier(IumrahNativeChromeButton())
-                .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
-                    ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar",
-                    cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
-                if navigationChromeStyle == .drawer {
-                    Button { chrome.openSidebar() } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 17, weight: .medium))
-                    }
-                    .modifier(IumrahNativeChromeButton())
-                    .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
-                        ru: "Меню", en: "Menu", uz: "Menyu", cy: "Меню", tr: "Menu", id: "Menu"))
-                }
-            }
-            .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
+            IumrahPrimaryHeaderBrandRow()
 
             if let title {
                 Text(title)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(IumrahType.bold(28, relativeTo: .largeTitle))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .minimumScaleFactor(0.78)
                     .foregroundStyle(.white)
-                    .padding(.top, footer == nil ? 9 : 3)
+                    .padding(.top, footer == nil ? 7 : 2)
+                    .accessibilityAddTraits(.isHeader)
             }
             if let subtitle {
                 Text(subtitle)
-                    .font(.system(size: 12.5, weight: .regular))
+                    .font(IumrahType.regular(14, relativeTo: .subheadline))
                     .lineLimit(1)
-                    .foregroundStyle(.white.opacity(0.72))
+                    .minimumScaleFactor(0.8)
+                    .foregroundStyle(.white.opacity(0.76))
                     .padding(.top, 3)
             }
             if let footer {
                 footer
-                    .padding(.top, title == nil ? 8 : 7)
+                    .padding(.top, title == nil ? 7 : 4)
             }
             Spacer(minLength: 0)
         }
@@ -145,12 +168,9 @@ struct IumrahPrimaryTabHeader: View {
         .padding(.top, IumrahSignatureHeaderGeometry.topInset)
         .frame(maxWidth: .infinity)
         .frame(height: IumrahSignatureHeaderGeometry.contentHeight, alignment: .top)
-        .background {
-            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
-                .clipShape(UnevenRoundedRectangle(
-                    bottomLeadingRadius: IumrahSignatureHeaderGeometry.bottomRadius,
-                    bottomTrailingRadius: IumrahSignatureHeaderGeometry.bottomRadius))
-        }
+        // Hotels, Bookings, Support and Account have a STRAIGHT bottom edge.
+        // Only Home retains the brand's curved lower corners.
+        .background(IumrahWorldDotsHeaderBackground(mapOpacity: 0.33))
         .accessibilityElement(children: .contain)
     }
 }

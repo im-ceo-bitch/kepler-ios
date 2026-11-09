@@ -46,8 +46,9 @@ assert.match(packageSearch, /providerID\.startsWith\("aviasales:"\)/);
 assert.match(packageSearch, /pickAviasalesReturnRow/);
 assert.match(journeyStore, /prepareAviasalesSelectedQuote/);
 assert.match(journeyStore, /prepareFlightFirstHotelStage/);
-assert.match(hotelsHome, /startFlightFirstTrip/);
-assert.match(hotelsHome, /Билет туда‑обратно выбран/);
+assert.match(hotelsHome, /IumrahGuidedFlightSelectionView\(\)/);
+assert.match(hotelsHome, /journey\.trip\.flightTripType = \.roundTrip/);
+assert.match(hotelsHome, /case \.flights: flightFields/);
 assert.match(primaryHotel, /PrimaryHotelEntryMode/);
 assert.match(primaryHotel, /flightFirstTierSelector/);
 

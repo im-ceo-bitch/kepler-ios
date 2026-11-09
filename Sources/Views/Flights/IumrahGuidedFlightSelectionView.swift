@@ -165,7 +165,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 }
             }
         }
-        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .safeAreaInset(edge: .bottom, spacing: 0) {
             stageContinueButton
         }

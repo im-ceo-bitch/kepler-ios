@@ -19,10 +19,13 @@ test('Nuitee supplier authorization stays exclusively on server', () => {
   assert.doesNotMatch(view, /NUITEE_API_KEY|X-API-Key|api\.liteapi\.travel/);
 });
 
-test('Hotels board switches provider without touching Flights and Sunday Club', () => {
-  assert.match(home, /private var hotelsBoard:[\s\S]{0,150}NuiteeHotelsCatalogView\([^)]*\)/);
-  assert.match(home, /case \.flights: flightsBoard/);
-  assert.match(home, /case \.sundayClub: sundayClubBoard/);
+test('Fresh Hotels tab has independent Hotel, Flight, Weekend searches and Nuitee supplier', () => {
+  assert.match(home, /case \.hotels: hotelFields/);
+  assert.match(home, /case \.flights: flightFields/);
+  assert.match(home, /case \.weekends: weekendFields/);
+  assert.match(home, /NuiteeHotelsCatalogView\(/);
+  assert.match(home, /IumrahAnimatedSearchCard/);
+  assert.match(home, /manualQuoteRequired/);
   assert.match(view, /case makkah, madinah/);
   assert.match(view, /\[0, 1, 2, 3, 4, 5\]/);
 });

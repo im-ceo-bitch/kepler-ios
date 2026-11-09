@@ -7,6 +7,7 @@ struct CareHomeView: View {
     @EnvironmentObject private var bookings: BookingStore
     @EnvironmentObject private var settings: AppSettingsStore
 
+    @State private var showHeaderChat = false
     @State private var careProfile: IumrahPublicProfile?
     @State private var isLoadingCareProfile = false
     @AppStorage("iumrah.care.cachedPhoneSA") private var cachedPhoneSA = ""
@@ -19,16 +20,32 @@ struct CareHomeView: View {
         }
     }
 
-    var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                IumrahPrimaryTabHeader()
-                    .padding(.horizontal, -IumrahDesign.pagePadding)
-                    .padding(.top, -10)
-                    .padding(.bottom, 14)
+    private var fixedHeader: some View {
+        IumrahPrimaryTabHeader(
+                    title: tr("Support", "Поддержка", "Yordam", "Ёрдам"),
+                    footer: AnyView(IumrahHeaderCapsuleActions(
+                        labels: [tr("Call", "Позвонить", "Qo‘ng‘iroq", "Қўнғироқ"),
+                                 "Telegram", tr("Chat", "Чат", "Chat", "Чат")],
+                        symbols: ["phone.fill", "paperplane.fill", "message.fill"],
+                        enabled: [!preferredPhone.isEmpty, telegramURL != nil, activeSession != nil],
+                        onSelect: { index in
+                            switch index {
+                            case 0: openPhone()
+                            case 1: openTelegram()
+                            case 2: if activeSession != nil { showHeaderChat = true }
+                            default: break
+                            }
+                        }
+                    ))
+                )
 
-                intro
-                    .padding(.bottom, 24)
+    }
+
+    var body: some View {
+        IumrahRootScrollingPage(onRefresh: { await refreshCare() }, header: {
+            fixedHeader
+        }, content: {
+            VStack(alignment: .leading, spacing: 0) {
 
                 if adaptiveLayout.isWide {
                     HStack(alignment: .top, spacing: 22) {
@@ -59,14 +76,18 @@ struct CareHomeView: View {
             .padding(.top, 10)
             .padding(.bottom, 112)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
+        })
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
+        .navigationDestination(isPresented: $showHeaderChat) {
+            if let activeSession {
+                BookingChatView(bookingID: activeSession.id)
+            } else {
+                ContentUnavailableView("Чат будет доступен после бронирования", systemImage: "message")
+            }
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .refreshable {
-            await refreshCare()
-        }
         .task {
             await refreshCare()
         }
@@ -124,8 +145,6 @@ struct CareHomeView: View {
                     .font(.system(size: 14.5, weight: .medium))
                     .foregroundStyle(.secondary)
                 }
-
-                careActions
 
                 if let activeSession {
                     activeBookingContext(activeSession)

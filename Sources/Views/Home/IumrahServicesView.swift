@@ -50,7 +50,7 @@ enum IumrahServicesCopy {
     static func text(_ ru: String, _ en: String, _ uz: String, _ cy: String, language: AppSettingsStore.Language) -> String {
         switch language {
         case .russian: return ru
-        case .english: return en
+        case .english, .turkish, .indonesian, .malay, .arabic: return en
         case .uzbek: return uz
         case .uzbekCyrillic: return cy
         }
@@ -160,7 +160,7 @@ enum IumrahServicesCopy {
         let values: (String, String, String, String)
         switch language {
         case .russian: values = ru
-        case .english: values = en
+        case .english, .turkish, .indonesian, .malay, .arabic: values = en
         case .uzbek: values = uz
         case .uzbekCyrillic: values = cy
         }

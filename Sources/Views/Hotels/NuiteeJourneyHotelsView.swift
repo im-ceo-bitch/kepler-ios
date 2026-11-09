@@ -84,7 +84,7 @@ struct NuiteeJourneyHotelsView: View {
                 }.padding(.horizontal, 18).padding(.bottom, 24)
             }
         }
-        .background(Color.iumrahPageBackground)
+        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .modifier(IumrahJourneyRefresh {

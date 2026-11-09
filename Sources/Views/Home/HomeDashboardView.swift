@@ -26,7 +26,6 @@ struct HomeDashboardView: View {
     @State private var showAboutProject = false
     @State private var showGuidedFlightSelection = false
     @State private var focusJourneySearchRevision = 0
-    @State private var isHomeHeaderVisible = true
 
     private struct ReadyPackageItem: Identifiable {
         let option: StorefrontFlightOption
@@ -104,15 +103,15 @@ struct HomeDashboardView: View {
 
     private var marketingHome: some View {
         ScrollViewReader { scrollProxy in
-            ScrollView(showsIndicators: false) {
+            IumrahRootScrollingPage(onRefresh: {
+                await bookings.refreshAll()
+                await clientNotifications.refresh(accountToken: account.bearerToken)
+                await storefront.refresh()
+            }, searchCardOverlap: 28, header: {
+                IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header)
+            }, content: {
                 LazyVStack(spacing: 30) {
-                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true })
-                        .background {
-                            GeometryReader { geo in
-                                Color.clear.preference(key: IumrahScrollingHeroBottomKey.self,
-                                    value: geo.frame(in: .named("homeMarketingScroll")).maxY)
-                            }
-                        }
+                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
                 if !clientNotifications.homeNotifications.isEmpty {
@@ -161,30 +160,15 @@ struct HomeDashboardView: View {
             .padding(.bottom, 46)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .background(IumrahNoVerticalBounce())
-            }
-            // Only the page content is gray. Do not extend this surface into the
-            // TOP safe area or it paints a pale strip behind the iPhone status bar.
-            .background {
-                Color.iumrahPageBackground
-                    .ignoresSafeArea(edges: .bottom)
-            }
-            .coordinateSpace(name: "homeMarketingScroll")
-            .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
-                isHomeHeaderVisible = bottom > 35
-            }
+            })
+            .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
             .onChange(of: focusJourneySearchRevision) { _, _ in
                 withAnimation(.easeInOut(duration: 0.28)) {
                     scrollProxy.scrollTo("journey-search", anchor: .top)
                 }
             }
         }
-        // The header's background must be owned by the page, outside the
-        // ScrollView. Its black surface extends into the TOP safe area while
-        // the actual controls remain inside the safe area, below the status bar.
-        .background {
-            (isHomeHeaderVisible ? Color.iumrahHeaderBackground : Color.iumrahPageBackground)
-                .ignoresSafeArea(edges: .top)
-        }
+        .background(Color.iumrahHeaderBackground.ignoresSafeArea(edges: .top))
     }
 
 
@@ -2420,7 +2404,9 @@ private extension View {
 /// This search is only a handoff to the live flights catalogue in Hotels.
 /// Nothing is priced, booked or marked available by this view.
 private struct IumrahHomeJourneySearchHero: View {
+    enum Presentation { case header, search }
     let onSearch: () -> Void
+    var presentation: Presentation = .search
     @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var journey: JourneyStore
@@ -2446,11 +2432,24 @@ private struct IumrahHomeJourneySearchHero: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            blackTop
-            searchCard
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, -28)
-                .padding(.bottom, 2)
+            if presentation == .header {
+                blackTop
+            } else {
+                searchCard
+                    .padding(.horizontal, IumrahDesign.pagePadding)
+                    .padding(.top, -28)
+                    .padding(.bottom, 2)
+                    .task(id: scenePhase == .active && !reduceMotion) {
+                        guard scenePhase == .active && !reduceMotion else { return }
+                        while !Task.isCancelled {
+                            try? await Task.sleep(for: .seconds(5))
+                            guard !Task.isCancelled else { break }
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                headlineIndex = (headlineIndex + 1) % headlineOptions.count
+                            }
+                        }
+                    }
+            }
         }
         .sheet(isPresented: $showingCalendar) {
             FlightDateCalendarView(
@@ -2550,16 +2549,6 @@ private struct IumrahHomeJourneySearchHero: View {
         .background {
             IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 30, bottomTrailingRadius: 30))
-        }
-        .task(id: scenePhase == .active && !reduceMotion) {
-            guard scenePhase == .active && !reduceMotion else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
-                guard !Task.isCancelled else { break }
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    headlineIndex = (headlineIndex + 1) % headlineOptions.count
-                }
-            }
         }
     }
 

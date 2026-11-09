@@ -68,11 +68,11 @@ struct TransferSelectionView: View {
     private var transferPageBackground: some View {
         ZStack(alignment: .top) {
             Color.white
-                .ignoresSafeArea()
+                .ignoresSafeArea(edges: .bottom)
 
             Color.black
                 .opacity(isVIP ? 1 : 0)
-                .ignoresSafeArea()
+                .ignoresSafeArea(edges: .bottom)
 
 
         }
@@ -88,7 +88,7 @@ struct TransferSelectionView: View {
     private var matchedExperience: some View {
         ZStack {
             pageBackground
-                .ignoresSafeArea()
+                .ignoresSafeArea(edges: .bottom)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {

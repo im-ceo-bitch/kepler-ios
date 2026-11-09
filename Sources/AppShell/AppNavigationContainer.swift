@@ -52,7 +52,7 @@ struct AppNavigationContainer<Content: View>: View {
                 // that combination caused duplicated navigation on iOS 26.
                 // Detail destinations can still hide the tab bar individually.
                 .toolbar(.hidden, for: .navigationBar)
-                .background(Color.iumrahPageBackground)
+                .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
                 .navigationDestination(isPresented: isESIMDestinationActive) {
                     ESIMView()
                         .environmentObject(settings)

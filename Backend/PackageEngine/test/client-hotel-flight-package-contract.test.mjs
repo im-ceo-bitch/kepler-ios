@@ -7,6 +7,7 @@ const journey = fs.readFileSync(new URL("Sources/State/JourneyStore.swift", root
 const store = fs.readFileSync(new URL("Sources/State/HotelStorefrontStore.swift", root), "utf8");
 const models = fs.readFileSync(new URL("Sources/Models/HotelStorefrontModels.swift", root), "utf8");
 const home = fs.readFileSync(new URL("Sources/Views/Tabs/HotelsHomeView.swift", root), "utf8");
+const compat = fs.readFileSync(new URL("Sources/Views/Tabs/HotelStorefrontCompatibility.swift", root), "utf8");
 const primary = fs.readFileSync(new URL("Sources/Views/Hotels/PrimaryHotelView.swift", root), "utf8");
 const imageCache = fs.readFileSync(new URL("Sources/Services/HotelImageCache.swift", root), "utf8");
 const hotelCard = fs.readFileSync(new URL("Sources/Views/Components/HotelCard.swift", root), "utf8");
@@ -44,35 +45,17 @@ test("Flights Scanner composes short Comfort and 4-15 day Standard packages from
   assert.match(store, /TripStayPlanner\.breakdown/);
 });
 
-test("Flights storefront uses the dedicated Aviasales discovery experience and keeps ready Flight First packages below it", () => {
-  assert.match(home, /IumrahFlightDiscoveryView\(\)/);
-  assert.match(home, /readyPackagesTitle/);
-  assert.match(home, /StorefrontFlightOptionCard/);
-  assert.match(home, /let preview = storefront\.packagePreview\(for: option\)/);
-  assert.match(home, /selectedFlightPackage = preview/);
-
+test("Flights discovery uses the new search form and routes to real supplier-backed results", () => {
+  assert.match(home, /case \.flights: flightFields/);
+  assert.match(home, /IumrahGuidedFlightSelectionView\(\)/);
+  assert.match(home, /journey\.trip\.flightFilters = filters/);
+  assert.match(home, /flightResultsPresented = true/);
+  assert.match(home, /NuiteeHotelsCatalogView\(/);
+  assert.match(home, /manualQuoteRequired/);
+  assert.doesNotMatch(home, /private var flightsBoard/);
+  assert.match(compat, /struct StorefrontFlightOptionCard/);
   assert.match(flightDiscovery, /FlightDiscoveryPriceGraphSheet/);
-  assert.match(flightDiscovery, /calendarPresented/);
-  assert.match(flightDiscovery, /passengersPresented/);
-  assert.match(flightDiscovery, /FlightDiscoverySearchMode/);
-  assert.match(flightDiscovery, /iumrahRecommended/);
   assert.match(flightDiscovery, /CuratedFlightRecommendationService/);
-  assert.match(flightDiscovery, /searchProgress/);
-  assert.doesNotMatch(flightDiscovery, /FlightDiscoveryDirectFlightsSheet/);
-  assert.match(flightDiscovery, /directOnly/);
-  assert.match(flightDiscovery, /recently found Aviasales fares/);
-  assert.match(flightDiscovery, /journey\.trip\.flightTripType = \.roundTrip/);
-
-  const card = home.slice(home.indexOf("private struct StorefrontFlightOptionCard"), home.indexOf("private struct StorefrontUmrahPackageDetailView"));
-  assert.match(card, /HotelCachedImage\(rawURL: imageURL\)/);
-  assert.match(card, /AirlineLogoView/);
-  assert.match(card, /packagePreview\.pricePerPerson/);
-  assert.doesNotMatch(card, /option\.perTravelerFare/);
-
-  const flightsBoard = home.slice(home.indexOf("private var flightsBoard"), home.indexOf("MARK: - Sunday Club"));
-  assert.match(flightsBoard, /IumrahFlightDiscoveryView\(\)/);
-  assert.match(flightsBoard, /readyPackagesTitle/);
-  assert.doesNotMatch(flightsBoard, /StorefrontBaselineFlightCard/);
 });
 
 test("panoramic hotel photos are constrained by the card viewport and the meal UI remains intact", () => {
@@ -88,7 +71,7 @@ test("panoramic hotel photos are constrained by the card viewport and the meal U
   assert.match(primary, /frame\(maxWidth: \.infinity, alignment: \.leading\)/);
   assert.match(hotelCard, /HotelCachedImage\(rawURL: hotel\.coverImageURL\)/);
   assert.match(finalPackage, /PackageHotelDetailCard\(/);
-  assert.match(home, /HotelCachedImage\(rawURL: imageURL\)/);
+  assert.match(compat, /HotelCachedImage\(rawURL: imageURL\)/);
   assert.match(bookingDetail, /HotelCachedImage\(/);
   assert.match(finalPackage, /mealCount\(\.makkah\)/);
   assert.match(finalPackage, /mealCount\(\.madinah\)/);

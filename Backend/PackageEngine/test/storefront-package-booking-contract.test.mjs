@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const root = new URL("../../../", import.meta.url);
-const home = fs.readFileSync(new URL("Sources/Views/Tabs/HotelsHomeView.swift", root), "utf8");
+const home = fs.readFileSync(new URL("Sources/Views/Tabs/HotelStorefrontCompatibility.swift", root), "utf8");
 const store = fs.readFileSync(new URL("Sources/State/HotelStorefrontStore.swift", root), "utf8");
 const models = fs.readFileSync(new URL("Sources/Models/HotelStorefrontModels.swift", root), "utf8");
 const transfer = fs.readFileSync(new URL("Sources/Views/Package/TransferSelectionView.swift", root), "utf8");

@@ -106,9 +106,10 @@ struct IumrahAccountView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView(showsIndicators: false) {
+            IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, header: {
+                accountHeader
+            }, content: {
                 VStack(spacing: 20) {
-                    accountHeader
 
                     if let profile = account.account {
                         IumrahAccountIdentityHeroCard(
@@ -147,18 +148,15 @@ struct IumrahAccountView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 46)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
+            })
             .onChange(of: loginScrollNonce) { _, _ in
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.90)) {
                     proxy.scrollTo("account-login", anchor: .top)
                 }
             }
         }
-        .background(Color.iumrahPageBackground)
+        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
-        .refreshable {
-            await refreshAccountContent()
-        }
         .task {
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
@@ -228,9 +226,10 @@ struct IumrahAccountView: View {
     }
 
     private var accountHeader: some View {
-        IumrahPrimaryTabHeader()
-            .padding(.horizontal, -IumrahDesign.pagePadding)
-            .padding(.top, -12)
+        IumrahPrimaryTabHeader(
+            title: tr("Account", "Аккаунт", "Akkaunt", "Аккаунт"),
+            subtitle: tr("Your profile, iumrah ID and journeys", "Ваш профиль, iumrah ID и поездки", "Profilingiz, iumrah ID va safarlar", "Профилингиз, iumrah ID ва сафарлар")
+        )
     }
 
     private func identityCard(_ profile: IumrahAccountProfile) -> some View {

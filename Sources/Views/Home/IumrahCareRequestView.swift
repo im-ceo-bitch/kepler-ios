@@ -65,6 +65,7 @@ struct IumrahCareRequestView: View {
         .background(Color.iumrahPageBackground)
         .navigationTitle(pageTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .onAppear {
             prefillContact()
             Task { await loadCarePhone() }

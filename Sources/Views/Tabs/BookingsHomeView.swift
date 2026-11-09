@@ -43,18 +43,18 @@ struct BookingsHomeView: View {
     }
 
     var body: some View {
-        Group {
-            if let activeSession {
-                activeBookingHub(activeSession)
-            } else {
-                emptyBookingHome
+        IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, header: {
+            bookingHeader(hasActiveBooking: activeSession != nil)
+        }, content: {
+            Group {
+                if let activeSession {
+                    activeBookingHub(activeSession)
+                } else {
+                    emptyBookingHome
+                }
             }
-        }
+        })
         .modifier(IumrahPrimaryTabScrollChrome())
-        .refreshable {
-            await bookings.refreshAll()
-            await loadActiveCheckout()
-        }
         .task {
             await bookings.refreshAll()
             await loadActiveCheckout()
@@ -111,21 +111,18 @@ struct BookingsHomeView: View {
         }
     }
 
+    private func refreshBookings() async {
+        await bookings.refreshAll()
+        await loadActiveCheckout()
+    }
+
     // MARK: - Active booking
 
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
-        ScrollView(showsIndicators: false) {
+        VStack(spacing: 0) {
             LazyVStack(spacing: 0) {
-                IumrahPrimaryTabHeader()
-                    .padding(.horizontal, -IumrahDesign.pagePadding)
-                    .padding(.top, -10)
-                .padding(.bottom, 16)
-
                 JourneyTravelInfoView()
                     .padding(.bottom, 18)
-
-                bookingPanelPicker
-                    .padding(.bottom, 12)
 
                 bookingIdentity(session)
                     .padding(.bottom, 18)
@@ -259,14 +256,23 @@ struct BookingsHomeView: View {
         .background(Color.iumrahRaisedBackground, in: Capsule())
     }
 
-    private var bookingPanelPicker: some View {
-        Picker(localized("Раздел бронирования", "Booking section", "Bron bo‘limi", "Брон бўлими"), selection: $bookingPanel) {
-            Text(localized("Бронирование", "Booking", "Bron", "Брон")).tag(BookingPanel.booking)
-            Text(localized("Статус", "Status", "Holat", "Ҳолат")).tag(BookingPanel.status)
-            Text(localized("Расписание", "Schedule", "Jadval", "Жадвал")).tag(BookingPanel.schedule)
-        }
-        .pickerStyle(.segmented)
-        .onChange(of: bookingPanel) { _, _ in IumrahHaptics.selection() }
+    private func bookingHeader(hasActiveBooking: Bool) -> some View {
+        IumrahPrimaryTabHeader(
+            title: localized("Бронирование", "Bookings", "Bronlar", "Бронлар"),
+            footer: hasActiveBooking ? AnyView(
+                IumrahHeaderTripleTabs(
+                    labels: [
+                        localized("Бронирование", "Booking", "Bron", "Брон"),
+                        localized("Статус", "Status", "Holat", "Ҳолат"),
+                        localized("Расписание", "Schedule", "Jadval", "Жадвал")
+                    ],
+                    selection: bookingPanel == .booking ? 0 : (bookingPanel == .status ? 1 : 2),
+                    onSelect: { index in
+                        bookingPanel = index == 0 ? .booking : (index == 1 ? .status : .schedule)
+                    }
+                )
+            ) : nil
+        )
     }
 
     @ViewBuilder
@@ -1633,12 +1639,8 @@ struct BookingsHomeView: View {
     }
 
     private var emptyBookingHome: some View {
-        ScrollView(showsIndicators: false) {
+        VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 18) {
-                IumrahPrimaryTabHeader()
-                    .padding(.horizontal, -IumrahDesign.pagePadding)
-                    .padding(.top, -10)
-
                 bookingEmptyStatusCard
 
                 NavigationLink {

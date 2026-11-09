@@ -6,6 +6,7 @@ const read = (relative) => fs.readFileSync(new URL(`../../../${relative}`, impor
 const storefront = read('Sources/State/HotelStorefrontStore.swift');
 const home = read('Sources/Views/Home/HomeDashboardView.swift');
 const services = read('Sources/Views/Home/HomeAppleStoreSections.swift');
+const servicesPage = read('Sources/Views/Home/IumrahServicesView.swift');
 const notificationCenter = read('Sources/Services/ClientNotificationCenter.swift');
 const pushService = read('Sources/Services/ClientPushService.swift');
 
@@ -26,7 +27,9 @@ test('home configurator is a white card and matches the paired Care card height'
 });
 
 test('transfer car order is Malibu then Carnival then Yukon everywhere', () => {
-  assert.match(services, /assets: \["TransferMalibu", "TransferCarnival", "TransferYukon"\]/);
+  // The former image-card carousel was deliberately replaced by the
+  // expandable Services screen; the standalone vehicle selector retains its order.
+  assert.match(servicesPage, /case transfer, guide, ziyarat|case visa, flights, hotels, transfer/);
   assert.match(services, /@State private var selectedVehicle: TransferVehicleKind = \.malibu/);
   assert.match(services, /private let vehicles: \[TransferVehicleKind\] = \[\.malibu, \.carnival, \.yukon\]/);
 });

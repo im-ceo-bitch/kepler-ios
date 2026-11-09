@@ -13,7 +13,7 @@ test('all three booking entry points use a full navigation page and never a prof
   for (const path of [
     'Sources/Views/Booking/BookingCheckoutView.swift',
     'Sources/Views/Package/FinalPackageView.swift',
-    'Sources/Views/Tabs/HotelsHomeView.swift',
+    'Sources/Views/Tabs/HotelStorefrontCompatibility.swift',
   ]) {
     const source = read(path);
     assert.match(source, /navigationDestination\(isPresented: \$isProfileSheetPresented\)|navigationDestination\(isPresented: \$showProfileSheet\)/);

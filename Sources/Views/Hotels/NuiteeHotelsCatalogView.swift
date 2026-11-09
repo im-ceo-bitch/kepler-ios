@@ -56,6 +56,8 @@ private final class NuiteeCatalogModel: ObservableObject {
 
 struct NuiteeHotelsCatalogView: View {
     let refreshSignal: Int
+    var initialHotelQuery: String = ""
+    var searchOverride: IumrahHotelTabSearch? = nil
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
     @StateObject private var model = NuiteeCatalogModel()
@@ -283,7 +285,16 @@ struct NuiteeHotelsCatalogView: View {
             }
         }
         .task(id: reloadIdentity) { await reload() }
-        .onAppear { consumeHomeSearch(chrome.requestedHotelTabSearch) }
+        .onAppear {
+            hotelQuery = initialHotelQuery
+            consumeHomeSearch(searchOverride ?? chrome.requestedHotelTabSearch)
+            if !initialHotelQuery.isEmpty { hotelQuery = initialHotelQuery }
+        }
+        .onChange(of: searchOverride) { _, search in
+            consumeHomeSearch(search)
+            hotelQuery = initialHotelQuery
+        }
+        .onChange(of: initialHotelQuery) { _, value in hotelQuery = value }
         .onChange(of: chrome.requestedHotelTabSearch) { _, request in
             consumeHomeSearch(request)
         }

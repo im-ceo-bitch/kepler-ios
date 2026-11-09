@@ -17,11 +17,11 @@
 
 ## Journey composition
 
-- The black world-map header and its native chrome scroll **with** content. Do not pin a black navigation rectangle to the top. At rest the status-bar-safe-area background is black; after hero scrolls away it transitions to page color.
+- On the **five primary tabs**, the black world-map masthead **scrolls away with the page when the user swipes up**; it is never pinned. When the user is already at the top and pulls down to refresh, only the content below the masthead reveals the indicator; the masthead itself does not stretch or descend. At rest, the status-bar safe area is black. Pushed journey-stage headers follow their own existing scroll behavior.
 - The white search/route disclosure card sits approximately **half above and half below** the black-to-white/gray page boundary. It has a continuous **30 pt** radius and a subtle muted emerald outline (not sand/gold).
 - Tap the search summary to **expand inline**. Show human-readable travelers, cabin and travel dates, not `2 + 0 + 0`. Edit flight search atomically, invalidating previous offers and quotes.
 - Nuitee is the only publicly exposed hotel catalogue. D1/Business hotel catalogue is compatibility-only for already persisted links and legacy server quotes. New Flight First routes use supplier hotel IDs, offer IDs, exact dated rates, and one customer-visible subtotal computed from the actual chosen components.
-- `ScrollView.refreshable` provides the native pull-to-refresh progress indicator. Never disable `UIScrollView.bounces` on these screens. On refresh recheck supplier hotel rates; if a selected offer disappears, invalidate the amount.
+- Use `IumrahRootScrollingPage` on the five root tabs: its native `ProgressView` indicator appears **below** the masthead and its refresh action fires only after a deliberate top-of-page pull. Do **not** attach `.refreshable` to the whole root `ScrollView` (UIKit would show the indicator above the masthead). Never disable `UIScrollView.bounces` on these screens. On journey refresh recheck supplier hotel rates; if a selected offer disappears, invalidate the amount.
 
 ## Money and trust
 
@@ -37,8 +37,35 @@ Review iPhone 11, iPhone 13 mini, iOS 26 native controls, iOS 17 fallback, long 
 ## Shared black header — 2026-11-08 update
 
 - `IumrahSignatureHeaderGeometry` is the only accepted source for hero top inset (14 pt), wordmark region (57.6 pt), bottom inset (80 pt), corner radius (30 pt), and journey summary overlap (46 pt). Home bottom inset was increased from 60 by 20 pt.
-- The Home wordmark is centered; in **Hotels, Bookings, Care, and Account** the smaller wordmark is left-aligned, with notification and menu controls on the right. All five have the same black world-map frame height, all scroll away with the page.
+- The Home wordmark is centered; in **Hotels, Bookings, Care, and Account** the smaller wordmark is left-aligned, with notification and menu controls on the right. All five have the same black world-map frame height and scroll upward with their content.
 - The Flight, Hotel, Transfer and Review screens use `IumrahJourneyHeader`, which shares exactly those metrics; search disclosure expansion must never resize the black region.
 - Hide the native bottom TabView bar ONLY while a journey destination is pushed (`.toolbar(.hidden, for: .tabBar)`). Restore it automatically on pop to one of the main five tabs. Do not replace it with a fake bar.
 - `Nuitee` alone is the customer-facing Hotels tab source. The old D1 catalogue remains internal for preexisting deep links and stored bookings.
 - Per-adult Data API flight prices are not valid child or infant fares; suppress the aggregate estimate until the fare mix is known. On refresh, revalidate exact selected Nuitee room offers; an unavailable rate invalidates that room and total. `Care` request = availability inquiry, NOT paid/confirmed booking.
+
+## Five primary tabs and three searches — 2026-11-08 night revision
+
+- All five root headers start at the **physical top edge** of the device: the **status bar must be white on the black header**, never white-on-white. Root NavigationStack backgrounds must not extend the page-gray fill over the top safe area. The five root headers belong inside the same page scroll as the content, and MUST scroll away on upward swipes.
+- The black hero's content height is **151.6 pt**, excluding the actual device status-bar safe area. The four non-Home tabs use the **same 187.2 × 57.6 pt wordmark** as Home. Home is center aligned; Hotels, Booking, Care and Account left align their wordmark while preserving notification and menu controls at right (matches approved device screenshots).
+- Header navigation symbols are **native circular `.glass` / `.buttonBorderShape(.circle)` controls** on iOS 26. Do not force oversized custom circle backgrounds or use blurred images to approximate them. No duplicate custom back controls in journey stages.
+- Account: title and concise subtitle inside black hero. Bookings: title and **Booking / Status / Schedule** capsule selection inside hero **only with an active booking**. Care: title, then **Call / Telegram / Chat** capsule actions inside hero; chat requires an existing booking ID, not an invented conversation.
+- Hotels public root is rebuilt from zero. Exactly three modes: **Hotels / Flights / Weekends**, each with its own input form but a consistent visual envelope. Hotels uses city, optional hotel name, stay dates, nights, room count, adults, children and children's ages; Flights uses origin, destination, outbound/return dates, adults/children/infants and cabin; Weekends uses origin, travel start, 2–4 nights and passenger mix. Search must open the existing supplier-backed results, not placeholder lists.
+- **Hotels-tab search-card border** overrides the earlier emerald rule **for this card only**: corner radius **40 pt**, monochrome animated angular-gradient outline **3.5 pt**, with `TimelineView` paused in background and when Reduce Motion is enabled. This animation is **ordinary brand decoration, never Liquid Glass**. The solid black CTA remains a 56-pt capsule.
+- Nuitee catalog is the only public hotel source. An occupancy request involving >1 room, children, or >6 adults may show a **rate-free hotel discovery list** but **must not pretend a single adult-rate room is a confirmed group quote**; provide direct Care inquiry instead. Never expose vendor credentials in the app.
+- Bottom native TabView remains visible on primary tabs, disappears in pushed configurator/search or Care request views, and reappears on pop.
+
+## Root refresh and Services integration — 2026-11-09
+
+- **Each main tab has one `IumrahRootScrollingPage`**, containing the masthead and page content in a single `ScrollView`. Do not pin the masthead in a surrounding `VStack`. This wrapper uses overscroll compensation and the system `ProgressView` below the masthead, rather than `.refreshable`, which would position `UIRefreshControl` above the masthead.
+- The Home tab also supports the shared pull-to-refresh; it reloads bookings, customer notifications and public storefront data. The four other tabs refresh their existing data flows. The spinner appears immediately **below** the non-stretching masthead during top-edge overscroll.
+- Preserve the approved **28 pt Home** and **40 pt Hotels** search-card overlaps while allowing the entire hero to scroll away. These overlaps must not cover the pull-to-refresh spinner beneath the masthead.
+- Home's dynamic headline animation remains active in the scrolling search surface; it must not be tied to the header-only component after splitting the views.
+- The 2026-11-08 Services ZIP is preserved. `IumrahHomeServicesSection` opens `IumrahServicesView` for the selected service and the assets `IumrahVisaServicesHero` and `IumrahServicesFlightHero` remain required. For `AppSettingsStore.Language` cover Russian, English, Uzbek Latin, Uzbek Cyrillic, Turkish, Indonesian, Malay and Arabic in every exhaustive language switch; unsupported translations may fall back to English.
+
+
+## Root-tab vertical scrolling (2026-11-09)
+- All five tabs share one scrolling coordinate space that **includes the black masthead**. Swiping UP must scroll the header entirely away, with no sticky/pinned overlay.
+- Pulling DOWN while already at the top must NOT stretch the masthead. Only the content beneath it reveals the system ProgressView indicator.
+- Never put `.refreshable` on a ScrollView that contains the black masthead: native UIRefreshControl would render ABOVE the masthead. Use `IumrahRootScrollingPage` for under-header refresh.
+- Do not nest a second vertical ScrollView inside `IumrahRootScrollingPage`; nested scrolling would leave the masthead pinned.
+- Home search-card overlap 28 pt; Hotels search-card overlap 40 pt. Keep native Liquid Glass controls and iumrah Services intact.

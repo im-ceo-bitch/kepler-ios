@@ -339,6 +339,7 @@ export default {
 
   async scheduled(controller: { cron?: string }, env: Env): Promise<void> {
     if (controller.cron === "0 3 * * *") await refreshNuiteeHotelCatalog(env);
+    if (controller.cron === "23 * * * *") await refreshNuiteeHotelCatalog(env, false);
     if (!env.HOTELS_DB) return;
     if (controller.cron === "17 0 * * *") await cleanupExpiredFlightCache(env.HOTELS_DB);
     if (controller.cron === "*/5 * * * *") await flushBookingStatusEmails(env);

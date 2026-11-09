@@ -15,6 +15,7 @@ struct NuiteeHotel: Codable, Identifiable, Hashable {
     let latitude: Double?
     let longitude: Double?
     let minimumRate: NuiteeHotelMinimumRate?
+    var rateStatus: String? = nil
 
     var roundedStars: Int { max(0, min(5, Int(stars?.rounded() ?? 0))) }
     var imageURL: String? { coverImageURL }

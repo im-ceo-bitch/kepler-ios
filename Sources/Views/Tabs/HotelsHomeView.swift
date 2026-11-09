@@ -20,9 +20,13 @@ struct HotelsHomeView: View {
     @State private var hotelAdults = 2
     @State private var hotelChildren = 0
     @State private var childAges: [Int] = []
-    @State private var hotelRequest: IumrahHotelTabSearch?
+    @State private var hotelRequest: IumrahHotelTabSearch? = IumrahHotelTabSearch(
+        city: "makkah", checkin: Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date(),
+        nights: 7, adults: 2)
     @State private var hotelSearchRevision = 0
-    @State private var showHotelResults = false
+    @State private var showHotelResults = true
+    @State private var searchExpanded = false
+    @State private var appliedHotelName = ""
     @State private var manualQuoteRequired = false
     @State private var manualHotels: [NuiteeHotel] = []
     @State private var manualHotelsBusy = false
@@ -63,12 +67,29 @@ struct HotelsHomeView: View {
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, extendsUnderStatusBar: true, header: {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
-                IumrahAnimatedSearchCard {
-                    VStack(alignment: .leading, spacing: 18) {
+                if mode == .hotels {
+                    Picker("City", selection: $hotelCity) {
+                        Text(copy("Мекка", "Makkah", "Makka", "Макка")).tag("makkah")
+                        Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag("madinah")
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, IumrahDesign.pagePadding)
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
+                }
+                IumrahGraphiteSearchSurface(
+                    isExpanded: $searchExpanded,
+                    summary: mode == .hotels
+                        ? copy("Поиск отелей", "Hotel search", "Mehmonxona qidirish", "Меҳмонхона қидириш") : modes[mode.rawValue],
+                    subtitle: mode == .hotels
+                        ? "\((hotelRequest?.checkin ?? hotelCheckin).formatted(date: .abbreviated, time: .omitted)) · \(hotelRequest?.nights ?? hotelNights) " + copy("ночей", "nights", "tun", "тун")
+                        : copy("Даты и пассажиры", "Dates and passengers", "Sanalar va yo‘lovchilar", "Саналар ва йўловчилар")
+                ) {
+                    VStack(alignment: .leading, spacing: 16) {
                         switch mode {
                         case .hotels: hotelFields
                         case .flights: flightFields
@@ -76,11 +97,10 @@ struct HotelsHomeView: View {
                         }
                         searchAction
                     }
-                    .padding(21)
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, -40)
-                .padding(.bottom, 24)
+                .padding(.top, mode == .hotels ? 0 : 16)
+                .padding(.bottom, 20)
 
                 if mode == .hotels && showHotelResults {
                     if manualQuoteRequired {
@@ -92,10 +112,12 @@ struct HotelsHomeView: View {
                                 .font(.system(size: 24, weight: .bold))
                             NuiteeHotelsCatalogView(
                                 refreshSignal: hotelSearchRevision,
-                                initialHotelQuery: hotelName,
-                                searchOverride: hotelRequest
+                                initialHotelQuery: appliedHotelName,
+                                searchOverride: hotelRequest,
+                                showsSearchControls: false
                             )
                         }
+                        .padding(.horizontal, IumrahDesign.pagePadding)
                     }
                 } else if mode == .hotels {
                     discoveryPrompt(
@@ -129,7 +151,7 @@ struct HotelsHomeView: View {
             .padding(.bottom, 115)
         })
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
-        .modifier(IumrahPrimaryTabScrollChrome())
+
         .navigationDestination(isPresented: $flightResultsPresented) {
             IumrahGuidedFlightSelectionView()
                 .toolbar(.hidden, for: .tabBar)
@@ -145,6 +167,14 @@ struct HotelsHomeView: View {
         .onChange(of: chrome.requestedHotelsBoard) { _, _ in applyRequestedBoard() }
         .onChange(of: chrome.requestedHotelTabSearch) { _, value in applyRequestedHotelSearch(value) }
         .onChange(of: chrome.requestedPackageID) { _, value in openRequestedPackage(value) }
+        .onChange(of: hotelCity) { _, city in
+            guard hotelRequest?.city != city else { return }
+            let applied = hotelRequest
+            hotelRequest = IumrahHotelTabSearch(city: city,
+                checkin: applied?.checkin ?? hotelCheckin,
+                nights: applied?.nights ?? hotelNights, adults: applied?.adults ?? hotelAdults)
+            if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
+        }
         .onChange(of: hotelChildren) { _, count in
             if count > childAges.count { childAges += Array(repeating: 6, count: count - childAges.count) }
             if count < childAges.count { childAges = Array(childAges.prefix(count)) }
@@ -159,14 +189,6 @@ struct HotelsHomeView: View {
     private var hotelFields: some View {
         VStack(alignment: .leading, spacing: 17) {
             fieldTitle(copy("Найти отель", "Find a hotel", "Mehmonxona qidirish", "Меҳмонхона қидириш"))
-            VStack(alignment: .leading, spacing: 6) {
-                fieldLabel(copy("Город", "City", "Shahar", "Шаҳар"))
-                Picker("City", selection: $hotelCity) {
-                    Text(copy("Мекка", "Makkah", "Makka", "Макка")).tag("makkah")
-                    Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag("madinah")
-                }
-                .pickerStyle(.segmented)
-            }
             VStack(alignment: .leading, spacing: 6) {
                 fieldLabel(copy("Название отеля (необязательно)", "Hotel name (optional)", "Mehmonxona nomi", "Меҳмонхона номи"))
                 TextField(copy("Например, Hilton", "For example, Hilton", "Masalan, Hilton", "Масалан, Hilton"), text: $hotelName)
@@ -303,7 +325,7 @@ struct HotelsHomeView: View {
             .buttonBorderShape(.capsule)
         }
         .padding(22)
-        .background(.white, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .padding(.horizontal, IumrahDesign.pagePadding)
     }
 
@@ -330,7 +352,7 @@ struct HotelsHomeView: View {
                             Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
                         }
                         .padding(11)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 23))
+                        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 23))
                     }
                     .buttonStyle(.plain)
                 }
@@ -348,7 +370,7 @@ struct HotelsHomeView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(22)
-        .background(.white, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .padding(.horizontal, IumrahDesign.pagePadding)
     }
 
@@ -361,11 +383,12 @@ struct HotelsHomeView: View {
 
     private func search() {
         IumrahHaptics.selection()
+        withAnimation(.easeInOut(duration: 0.22)) { searchExpanded = false }
+        appliedHotelName = hotelName
         if mode == .hotels {
             manualQuoteRequired = hotelRooms != 1 || hotelChildren > 0 || hotelAdults > 6
             hotelRequest = IumrahHotelTabSearch(city: hotelCity, checkin: hotelCheckin,
                 nights: hotelNights, adults: hotelAdults)
-            hotelSearchRevision += 1
             showHotelResults = true
             if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
             return
@@ -412,7 +435,7 @@ struct HotelsHomeView: View {
             let checkOut = Calendar.current.date(byAdding: .day, value: hotelNights, to: hotelCheckin) ?? hotelCheckin
             let response = try await NuiteeHotelService().hotels(
                 city: hotelCity, checkin: hotelCheckin, checkout: checkOut,
-                adults: min(6, hotelAdults)
+                adults: min(6, hotelAdults), catalogOnly: true
             )
             guard manualHotelsRequestID == requestID, !Task.isCancelled else { return }
             manualHotels = response.hotels
@@ -465,41 +488,6 @@ struct HotelsHomeView: View {
         case .uzbekCyrillic: return cyrl
         default: return en
         }
-    }
-}
-
-/// Animated monochrome 3.5-point border. This is a proprietary search-card
-/// accent, never presented as or used in place of Apple's Liquid Glass APIs.
-private struct IumrahAnimatedSearchCard<Content: View>: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.scenePhase) private var scenePhase
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) { self.content = content() }
-
-    var body: some View {
-        content
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 40, style: .continuous))
-            .overlay {
-                TimelineView(.animation(minimumInterval: 1.0 / 24.0,
-                                         paused: reduceMotion || scenePhase != .active)) { timeline in
-                    let rotation = reduceMotion ? 0.0 :
-                        timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * 72
-                    RoundedRectangle(cornerRadius: 40, style: .continuous)
-                        .strokeBorder(
-                            AngularGradient(
-                                colors: [.black, .black, .white, .gray, .black, .white, .black],
-                                center: .center,
-                                startAngle: .degrees(rotation),
-                                endAngle: .degrees(rotation + 360)
-                            ), lineWidth: 3.5
-                        )
-                        .allowsHitTesting(false)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 40, style: .continuous))
-            .shadow(color: .black.opacity(0.08), radius: 20, y: 9)
     }
 }
 

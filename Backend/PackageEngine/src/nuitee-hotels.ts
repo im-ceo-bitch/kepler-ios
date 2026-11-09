@@ -54,15 +54,42 @@ async function provider(env: Env, path: string, params?: URLSearchParams, data?:
   const key = apiKey(env);
   if (!key) throw new Error('NUITEE_NOT_CONFIGURED');
   const url = `${BASE}${path}${params ? `?${params}` : ''}`;
-  const response = await fetch(url, {
-    method: data ? 'POST' : 'GET', headers: {
-      'X-API-Key': key, 'accept': 'application/json', ...(data ? { 'content-type': 'application/json' } : {}),
-    }, body: data ? JSON.stringify(data) : undefined,
-    signal: AbortSignal.timeout(22000),
-  });
-  if (!response.ok) throw new Error(response.status === 429 ? 'NUITEE_RATE_LIMIT' : `NUITEE_HTTP_${response.status}`);
-  const json: Json = await response.json();
-  if (json?.error) throw new Error(`NUITEE_PROVIDER_ERROR`);
+  // Shared across isolates via D1: respect provider backoff rather than retrying
+  // once per visible card/user. Static cache reads still work during cooldown.
+  const cooldown = await read(env, 'provider:cooldown:v1');
+  if (cooldown?.fresh) throw new Error('NUITEE_RATE_LIMIT');
+  const started = Date.now();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: data ? 'POST' : 'GET', headers: {
+        'X-API-Key': key, 'accept': 'application/json', ...(data ? { 'content-type': 'application/json' } : {}),
+      }, body: data ? JSON.stringify(data) : undefined,
+      signal: AbortSignal.timeout(22000),
+    });
+  } catch (e) {
+    const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
+    console.warn(JSON.stringify({event: 'nuitee_request', path, code: timeout ? 'timeout' : 'network', durationMs: Date.now() - started}));
+    throw new Error(timeout ? 'NUITEE_TIMEOUT' : 'NUITEE_NETWORK');
+  }
+  const json: Json = await response.json().catch(() => ({}));
+  const supplierCode = String(json?.error?.code ?? '');
+  // Log only diagnostic metadata, never keys, request bodies or guest details.
+  console.info(JSON.stringify({event: 'nuitee_request', path, status: response.status,
+    supplierCode: supplierCode || null, durationMs: Date.now() - started,
+    returned: Array.isArray(json.data) ? json.data.length : null}));
+  if (response.status === 429 || supplierCode === '4290') {
+    const retry = response.headers.get('retry-after');
+    const seconds = retry && /^\d+$/.test(retry) ? Number(retry)
+      : retry ? Math.ceil((Date.parse(retry) - Date.now()) / 1000) : 60;
+    await save(env, 'provider:cooldown:v1', true, Math.max(1, Math.min(3600, Number.isFinite(seconds) ? seconds : 60)));
+    throw new Error('NUITEE_RATE_LIMIT');
+  }
+  if (supplierCode === '2001' && path.startsWith('/hotels/')) return {data: []};
+  if (supplierCode === '4011') throw new Error('NUITEE_SUPPLIER_TIMEOUT');
+  if (!response.ok) throw new Error(`NUITEE_HTTP_${response.status}${supplierCode ? `_CODE_${supplierCode.replace(/[^0-9]/g, '')}` : ''}`);
+  if (json?.error) throw new Error(`NUITEE_PROVIDER_${supplierCode.replace(/[^0-9]/g, '') || 'ERROR'}`);
+  if (!('data' in json)) throw new Error('NUITEE_INVALID_RESPONSE');
   return json;
 }
 async function ensure(env: Env): Promise<void> {
@@ -135,7 +162,7 @@ async function catalog(env: Env, city: 'makkah' | 'madinah') {
   }
 }
 async function minimums(env: Env, city: 'makkah' | 'madinah', hotels: Json[], checkin: string, checkout: string, adults: number) {
-  const key = `minimum:v1:${city}:${checkin}:${checkout}:${adults}:UZ:USD`;
+  const key = `minimum:v2:${city}:${checkin}:${checkout}:${adults}:UZ:USD`;
   const cached = await read(env, key);
   if (cached?.fresh) return { values: cached.data as Json[], stale: false, updatedAt: cached.updatedAt };
   try {
@@ -148,10 +175,10 @@ async function minimums(env: Env, city: 'makkah' | 'madinah', hotels: Json[], ch
     const values = Array.isArray(result.data) ? result.data.map((r: Json) => ({
       hotelId: text(r.hotelId), price: priceOf(r.price), currency: 'USD', offerId: text(r.offerId),
     })).filter((r: Json) => r.hotelId && r.price !== null) : [];
-    await save(env, key, values, 48 * 3600);
+    await save(env, key, values, values.length ? 15 * 60 : 2 * 60);
     return { values, stale: false, updatedAt: Date.now() };
   } catch (e) {
-    if (cached) return { values: cached.data as Json[], stale: true, updatedAt: cached.updatedAt };
+    if (cached && Date.now() - cached.updatedAt < 6 * 3600 * 1000) return { values: cached.data as Json[], stale: true, updatedAt: cached.updatedAt, rateError: e instanceof Error ? e.message : 'RATES_UNAVAILABLE' };
     throw e;
   }
 }
@@ -216,13 +243,20 @@ async function listing(url: URL, env: Env) {
   const c = await catalog(env, city);
   let rates: Awaited<ReturnType<typeof minimums>> | undefined;
   let rateError: string | null = null;
-  try { rates = await minimums(env, city, c.items, inDate, outDate, adults); }
+  try {
+    if (url.searchParams.get('catalogOnly') !== '1') {
+      rates = await minimums(env, city, c.items, inDate, outDate, adults);
+      rateError = rates.rateError ?? null;
+    }
+  }
   catch (e) { rateError = e instanceof Error ? e.message : 'RATES_UNAVAILABLE'; }
   const indexed = new Map<string, Json>((rates?.values ?? []).map((x: Json): [string, Json] => [x.hotelId, x]));
   return output({ ok: true, provider: 'nuitee', sandbox: isSandbox(env),
     city, checkin: inDate, checkout: outDate, adults, priceType: 'room_total', currency: 'USD',
     hotelCatalogStale: c.stale, pricesStale: Boolean(rates?.stale), pricesUpdatedAt: rates?.updatedAt ?? null, rateError,
-    hotels: c.items.map(h => ({ ...h, minimumRate: indexed.get(h.id) ?? null })),
+    hotels: c.items.map(h => ({ ...h, minimumRate: indexed.get(h.id) ?? null,
+      rateStatus: indexed.has(h.id) ? (rates?.stale ? 'cached' : 'available')
+        : rateError ? 'provider_error' : url.searchParams.get('catalogOnly') === '1' ? 'not_requested' : 'no_availability' })),
   });
 }
 async function isListedHotel(env: Env, id: string): Promise<boolean> {
@@ -275,12 +309,24 @@ async function rates(request: Request, env: Env) {
   await save(env, key, offers, 10 * 60);
   return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: offers, cached: false });
 }
+const activeRequests = new WeakMap<object, Map<string, Promise<Response>>>();
+async function coalesced(env: Env, key: string, work: () => Promise<Response>): Promise<Response> {
+  let active = activeRequests.get(env.HOTELS_DB!);
+  if (!active) { active = new Map(); activeRequests.set(env.HOTELS_DB!, active); }
+  let running = active.get(key);
+  if (!running) {
+    running = work();
+    active.set(key, running);
+  }
+  try { return (await running).clone(); }
+  finally { if (active.get(key) === running) active.delete(key); }
+}
 export async function handleNuiteeHotelRequest(request: Request, env: Env, url: URL): Promise<Response> {
   if (!env.HOTELS_DB) return error('HOTELS_DB_NOT_CONFIGURED', 503);
   try {
     await ensure(env);
-    if (url.pathname === '/api/package/nuitee/hotels' && request.method === 'GET') return await listing(url, env);
-    if (url.pathname === '/api/package/nuitee/hotel' && request.method === 'GET') return await detail(url, env);
+    if (url.pathname === '/api/package/nuitee/hotels' && request.method === 'GET') return await coalesced(env, url.pathname + url.search, () => listing(url, env));
+    if (url.pathname === '/api/package/nuitee/hotel' && request.method === 'GET') return await coalesced(env, url.pathname + url.search, () => detail(url, env));
     if (url.pathname === '/api/package/nuitee/rates' && request.method === 'POST') return await rates(request, env);
     return error('NOT_FOUND', 404);
   } catch (e) {
@@ -290,17 +336,43 @@ export async function handleNuiteeHotelRequest(request: Request, env: Env, url: 
 }
 
 /** Scheduled two-city refresh; never clears a last-known-good cache on provider errors. */
-export async function refreshNuiteeHotelCatalog(env: Env): Promise<void> {
+export async function refreshNuiteeHotelCatalog(env: Env, refreshPrices = true): Promise<void> {
   if (!env.HOTELS_DB || !apiKey(env)) return;
   await ensure(env);
   const { checkin, checkout } = defaultDates();
   for (const city of ['makkah', 'madinah'] as const) {
     try {
-      const lastRefresh = await read(env, `scheduled:v1:${city}`);
+      const lastRefresh = await read(env, `scheduled:v2:${city}:${refreshPrices}`);
       if (lastRefresh?.fresh) continue;
       const result = await catalog(env, city);
-      await minimums(env, city, result.items, checkin, checkout, 2);
-      await save(env, `scheduled:v1:${city}`, true, 48 * 3600);
+      // Warm a bounded number of missing photo/details snapshots per cron run.
+      // Persist URLs/gallery metadata in D1; image bytes use the iOS disk cache.
+      let warmed = 0;
+      for (const hotel of result.items) {
+        const snapshot = await read(env, `detail:v1:${hotel.id}`);
+        if (snapshot?.fresh) {
+          hotel.previewImages = safeImages(snapshot.data.images).slice(0, 3);
+          hotel.coverImageURL = hotel.previewImages[0] || hotel.coverImageURL;
+          continue;
+        }
+        if (warmed >= 4) continue;
+        warmed += 1;
+        try {
+          const raw = (await provider(env, '/data/hotel', new URLSearchParams({hotelId: hotel.id}))).data;
+          if (!raw?.id) continue;
+          const enriched = normalizedDetail(raw, hotel);
+          await save(env, `detail:v1:${hotel.id}`, enriched, 7 * DAY);
+          hotel.previewImages = enriched.images.slice(0, 3);
+          hotel.coverImageURL = enriched.images[0] || hotel.coverImageURL;
+        } catch { break; }
+      }
+      // Keep the original static expiry: photo enrichment must not prevent refresh.
+      if (!result.stale) {
+        await env.HOTELS_DB.prepare('UPDATE nuitee_hotel_cache SET payload = ?1 WHERE key = ?2')
+          .bind(JSON.stringify(result.items), `catalog:v1:${city}`).run();
+      }
+      if (refreshPrices) await minimums(env, city, result.items, checkin, checkout, 2);
+      await save(env, `scheduled:v2:${city}:${refreshPrices}`, true, 15 * 60);
     } catch {
       // The next scheduled run or an on-demand request will retry.
       // Existing hotel and price snapshots remain intact.

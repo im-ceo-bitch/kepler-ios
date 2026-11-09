@@ -1,0 +1,14 @@
+{
+  "Backend/PackageEngine/scripts/runtime-tests.sh": "deb5978d954d76e4fcfd54a79b2f036dc030a33d02479bcf0ff7b32522eac84f",
+  "Backend/PackageEngine/src/index.ts": "1a496c4749c805fd2f261337789220fa1288d6f2259d78c1598ddb378c481c5f",
+  "Backend/PackageEngine/src/nuitee-hotels.ts": "f393bf13735eece14cc6c420be1860c708076ed60b66c45b9974aae7670c319b",
+  "Backend/PackageEngine/test/nuitee-hotels-v1-contract.test.mjs": "47936a358f09fad9666d8a35d7c21d2c9755b28fe92e6d0148c0fa9b0f253b1d",
+  "Backend/PackageEngine/wrangler.template.jsonc": "666849ea770512d8e28bdf4904bbb328d9ba1e980a340a194364c0bcdda3d8e5",
+  "Sources/AppShell/AppNavigationContainer.swift": "36a727467ed8ba794f8a4d8493526e1e5d501cd047aa44985dc4e82d4c0a2038",
+  "Sources/Core/Components/IumrahRootScrollingPage.swift": "5731f188fe87f5e9182f0b6b53ae2215297faaa206eea94b328064199e07d824",
+  "Sources/Models/NuiteeHotelModels.swift": "716cf74a941e880e3a465adf9c60d73e9b4c21cb3c9703f8db269c290d4d48e1",
+  "Sources/Services/NuiteeHotelService.swift": "eb3ba6ef148c5b01ec85a95a0da57741cfa41bb869fc1fee7a4b3f92ebc120cb",
+  "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift": "2ab387a998b9e9f219a1d2414c8e2b45f9fda7f6f60fb55580e7e95c372d4de6",
+  "Sources/Views/Tabs/HotelsHomeView.swift": "f302ccd8c7a14121477305d8af731f37c673626d47211b55cfe24b68c5cffad5",
+  "Backend/PackageEngine/test/nuitee-resilience.runtime.mjs": "ad715623166efdbc94970927184fc666f39918ac1dcef1ce564ad0894e12ca1b"
+}

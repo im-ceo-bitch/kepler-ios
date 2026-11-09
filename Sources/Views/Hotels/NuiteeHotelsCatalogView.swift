@@ -38,7 +38,13 @@ private final class NuiteeCatalogModel: ObservableObject {
         busy = true
         hotels = [] // Never show old city/date prices while loading a new request.
         errorMessage = nil
+        rateError = nil
         do {
+            let catalog = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: true)
+            guard generation == version, !Task.isCancelled else { return }
+            hotels = catalog.hotels
+            sandbox = catalog.sandbox
+            catalogStale = catalog.hotelCatalogStale
             let response = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults)
             guard generation == version, !Task.isCancelled else { return }
             hotels = response.hotels
@@ -47,8 +53,15 @@ private final class NuiteeCatalogModel: ObservableObject {
             rateError = response.rateError
         } catch {
             guard generation == version, !Task.isCancelled else { return }
-            hotels = [] // Never mix prices from a different city/date with current search.
-            errorMessage = error.localizedDescription
+            if hotels.isEmpty { errorMessage = error.localizedDescription }
+            else {
+                rateError = error.localizedDescription
+                hotels = hotels.map { hotel in
+                    var updated = hotel
+                    updated.rateStatus = "provider_error"
+                    return updated
+                }
+            }
         }
         if generation == version { busy = false }
     }
@@ -58,6 +71,7 @@ struct NuiteeHotelsCatalogView: View {
     let refreshSignal: Int
     var initialHotelQuery: String = ""
     var searchOverride: IumrahHotelTabSearch? = nil
+    var showsSearchControls = true
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
     @StateObject private var model = NuiteeCatalogModel()
@@ -79,9 +93,28 @@ struct NuiteeHotelsCatalogView: View {
     @State private var opened: NuiteeHotel?
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
 
+    init(refreshSignal: Int, initialHotelQuery: String = "", searchOverride: IumrahHotelTabSearch? = nil,
+         showsSearchControls: Bool = true) {
+        self.refreshSignal = refreshSignal
+        self.initialHotelQuery = initialHotelQuery
+        self.searchOverride = searchOverride
+        self.showsSearchControls = showsSearchControls
+        _hotelQuery = State(initialValue: initialHotelQuery)
+        if let request = searchOverride {
+            _city = State(initialValue: request.city == "madinah" ? .madinah : .makkah)
+            _checkin = State(initialValue: request.checkin)
+            _nights = State(initialValue: min(28, max(1, request.nights)))
+            _adults = State(initialValue: min(6, max(1, request.adults)))
+            _draftCheckin = State(initialValue: request.checkin)
+            _draftNights = State(initialValue: min(28, max(1, request.nights)))
+            _draftAdults = State(initialValue: min(6, max(1, request.adults)))
+            _appliedHomeSearchID = State(initialValue: request.id)
+        }
+    }
+
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
     private var reloadIdentity: String {
-        [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults), String(homeSearchRevision)].joined(separator: ":")
+        [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults), String(homeSearchRevision), String(refreshSignal)].joined(separator: ":")
     }
     private var candidateHotels: [NuiteeHotel] {
         model.hotels.filter { stars == 0 || $0.roundedStars == stars }
@@ -111,6 +144,7 @@ struct NuiteeHotelsCatalogView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if showsSearchControls {
             IumrahGraphiteSearchSurface(
                 isExpanded: $searchExpanded,
                 summary: normalizedQuery.isEmpty ? city.title(settings.language) : normalizedQuery,
@@ -192,6 +226,8 @@ struct NuiteeHotelsCatalogView: View {
             .pickerStyle(.segmented)
             .onChange(of: city) { _, _ in stars = 0; visibleCount = 20; hotelQuery = "" }
 
+
+            }
 
             Picker(NuiteeCopy.text("Звёзды", "Yulduzlar", "Stars", settings.language), selection: $stars) {
                 ForEach([0, 1, 2, 3, 4, 5], id: \.self) { star in
@@ -298,7 +334,7 @@ struct NuiteeHotelsCatalogView: View {
         .onChange(of: chrome.requestedHotelTabSearch) { _, request in
             consumeHomeSearch(request)
         }
-        .onChange(of: refreshSignal) { _, _ in Task { await reload() } }
+
         .sheet(isPresented: $calendarPresented) {
             NuiteeStayCalendarSheet(checkin: $draftCheckin, nights: $draftNights)
         }
@@ -395,10 +431,14 @@ struct NuiteeHotelListingCard: View {
                         Text("\(nights) " + NuiteeCopy.text("ночь · 1 номер · ", "tun · 1 xona · ", "nights · 1 room · ", settings.language) + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
                     } else {
-                        Text(NuiteeCopy.text("Цена недоступна", "Narx mavjud emas", "Rate unavailable", settings.language)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                        Text(hotel.rateStatus == "no_availability"
+                             ? NuiteeCopy.text("Нет тарифа на эти даты", "Bu sanalarda tarif yo‘q", "No rate for these dates", settings.language)
+                             : hotel.rateStatus == "not_requested"
+                             ? NuiteeCopy.text("Проверяем цену…", "Narx tekshirilmoqda…", "Checking price…", settings.language)
+                             : NuiteeCopy.text("Цена временно недоступна", "Narx vaqtincha mavjud emas", "Rate temporarily unavailable", settings.language)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text(sandbox ? NuiteeCopy.text("Предварительная цена", "Taxminiy narx", "Indicative price", settings.language) : NuiteeCopy.text("Стоимость проживания", "Turar joy narxi", "Stay price", settings.language))
+                        Text(hotel.rateStatus == "cached" ? NuiteeCopy.text("Цена из кэша · уточняется", "Keshlangan narx", "Cached price · recheck", settings.language) : sandbox ? NuiteeCopy.text("Предварительная цена", "Taxminiy narx", "Indicative price", settings.language) : NuiteeCopy.text("Стоимость проживания", "Turar joy narxi", "Stay price", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary)
@@ -844,55 +884,15 @@ private struct NuiteeHotelGallery: View {
     }
 }
 
-// Lazy image enrichment: request full static detail only for cards that become
-// visible and have fewer than 3 real supplier photos. The server caches detail.
-private actor NuiteePreviewGate {
-    static let shared = NuiteePreviewGate()
-    private var running = 0
-    func acquire() async -> Bool {
-        while running >= 3 {
-            if Task.isCancelled { return false }
-            try? await Task.sleep(for: .milliseconds(120))
-        }
-        guard !Task.isCancelled else { return false }
-        running += 1
-        return true
-    }
-    func release() { running = max(0, running - 1) }
-}
-
-@MainActor
-private final class NuiteePreviewCache {
-    static let shared = NuiteePreviewCache()
-    private var photos: [String: [String]] = [:]
-    func get(_ id: String) -> [String]? { photos[id] }
-    func put(_ id: String, images: [String]) { photos[id] = images }
-}
-
+// Listing photos come from the persisted static catalog. Opening a gallery may
+// fetch detail; scrolling through cards must not fan out supplier API requests.
 private struct NuiteeCatalogPreviewCollage: View {
     let hotel: NuiteeHotel
-    @State private var enriched: [String] = []
-    private var initial: [String] {
+    private var images: [String] {
         let values = IumrahHotelPhotoIdentity.unique(hotel.previewImages ?? [])
         return values.isEmpty ? [hotel.coverImageURL].compactMap { $0 } : values
     }
-    var body: some View {
-        NuiteeHotelCollage(images: enriched.isEmpty ? initial : enriched)
-            .task(id: hotel.id) {
-                guard initial.count < 3 else { return }
-                if let stored = NuiteePreviewCache.shared.get(hotel.id) {
-                    enriched = stored
-                    return
-                }
-                guard await NuiteePreviewGate.shared.acquire() else { return }
-                defer { Task { await NuiteePreviewGate.shared.release() } }
-                guard !Task.isCancelled else { return }
-                guard let detail = try? await NuiteeHotelService().detail(hotelID: hotel.id) else { return }
-                let photos = IumrahHotelPhotoIdentity.unique(initial + detail.images)
-                NuiteePreviewCache.shared.put(hotel.id, images: photos)
-                enriched = photos
-            }
-    }
+    var body: some View { NuiteeHotelCollage(images: images) }
 }
 
 private struct NuiteeRoomPhotoCarousel: View {

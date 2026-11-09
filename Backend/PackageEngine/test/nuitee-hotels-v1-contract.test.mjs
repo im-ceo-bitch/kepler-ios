@@ -24,7 +24,7 @@ test('Fresh Hotels tab has independent Hotel, Flight, Weekend searches and Nuite
   assert.match(home, /case \.flights: flightFields/);
   assert.match(home, /case \.weekends: weekendFields/);
   assert.match(home, /NuiteeHotelsCatalogView\(/);
-  assert.match(home, /IumrahAnimatedSearchCard/);
+  assert.match(home, /IumrahGraphiteSearchSurface/);
   assert.match(home, /manualQuoteRequired/);
   assert.match(view, /case makkah, madinah/);
   assert.match(view, /\[0, 1, 2, 3, 4, 5\]/);
@@ -34,8 +34,8 @@ test('Default one night 10 days in advance and supplier price is ROOM-ONLY', () 
   assert.match(view, /value: 10, to: Date\(\)/);
   assert.match(view, /private var nights = 1/);
   assert.match(backend, /priceType: 'room_total'/);
-  assert.match(backend, /minimum:v1:/);
-  assert.match(backend, /48 \* 3600/);
+  assert.match(backend, /minimum:v2:/);
+  assert.match(backend, /15 \* 60/);
   assert.match(backend, /10 \* 60/);
 });
 

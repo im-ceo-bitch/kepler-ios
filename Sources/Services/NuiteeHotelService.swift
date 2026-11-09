@@ -13,12 +13,13 @@ struct NuiteeHotelService {
         return f.string(from: date)
     }
 
-    func hotels(city: String, checkin: Date, checkout: Date, adults: Int) async throws -> NuiteeHotelListEnvelope {
+    func hotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false) async throws -> NuiteeHotelListEnvelope {
         try await api.get("/api/package/nuitee/hotels", query: [
             URLQueryItem(name: "city", value: city),
             URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
             URLQueryItem(name: "checkout", value: Self.dateText(checkout)),
-            URLQueryItem(name: "adults", value: String(adults))
+            URLQueryItem(name: "adults", value: String(adults)),
+            URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")
         ], timeoutInterval: 35)
     }
 

@@ -21,6 +21,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     private let page: Page
     private let onRefresh: () async -> Void
     private let searchCardOverlap: CGFloat
+    private let extendsUnderStatusBar: Bool
     @State private var scrollTop: CGFloat = 0
     @State private var refreshing = false
     @State private var refreshArmed = true
@@ -29,9 +30,11 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     init(
         onRefresh: @escaping () async -> Void,
         searchCardOverlap: CGFloat = 0,
+        extendsUnderStatusBar: Bool = false,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Page
     ) {
+        self.extendsUnderStatusBar = extendsUnderStatusBar
         self.onRefresh = onRefresh
         self.searchCardOverlap = searchCardOverlap
         self.masthead = header()
@@ -43,6 +46,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     private var overscroll: CGFloat { max(0, scrollTop) }
 
     var body: some View {
+        GeometryReader { viewport in
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 GeometryReader { geometry in
@@ -56,6 +60,8 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                 .allowsHitTesting(false)
 
                 masthead
+                    .padding(.top, extendsUnderStatusBar ? viewport.safeAreaInsets.top : 0)
+                    .background(Color.iumrahHeaderBackground)
                     // The header is a normal scroll child: it disappears on
                     // upward swipes. Only positive top overscroll is cancelled.
                     .offset(y: -overscroll)
@@ -81,6 +87,8 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .ignoresSafeArea(.container, edges: extendsUnderStatusBar ? .top : [])
+        .background(Color.iumrahPageBackground.ignoresSafeArea())
         .coordinateSpace(name: "iumrah.root.nonstickyScroll")
         .scrollBounceBehavior(.always)
         .onPreferenceChange(IumrahRootScrollOffsetKey.self) { y in
@@ -107,5 +115,6 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                     }
                 }
         )
+        }
     }
 }

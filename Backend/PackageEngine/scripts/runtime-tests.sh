@@ -10,4 +10,4 @@ for file in .runtime-dist/*.js; do
   base="${file%.js}"
   ln -sf "$(basename "$file")" "$base"
 done
-node --test test/nuitee-occupancy.runtime.mjs test/runtime-production.runtime.mjs test/guest-booking-sms.runtime.mjs test/guest-booking-email.runtime.mjs
+node --test test/nuitee-occupancy.runtime.mjs test/nuitee-resilience.runtime.mjs test/runtime-production.runtime.mjs test/guest-booking-sms.runtime.mjs test/guest-booking-email.runtime.mjs

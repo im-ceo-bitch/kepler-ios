@@ -1,0 +1,22 @@
+{
+  "kind": "incremental-patch-on-v5",
+  "requires": "iumrah-beta-update-20261110-ui-flights-v5.zip already applied",
+  "source_v5_sha256": "0bf93bd4e94e767caeb20b7af8b6ed29bb10b1e6de0f66b23b408a68b172ff9a",
+  "overridden_files": {
+    "Sources/Views/Flights/IumrahFlightBrowseCatalog.swift": {
+      "expected_sha256_before": "aae7f22d14595b57f656ce5305d3451700d81541cc0092351aa702634ed881a4",
+      "sha256_after": "b8b0e32384c5b30214aa5a9fe5bbc127fbd17a40f289350b8ec2c0f700bbc177"
+    },
+    "Sources/Views/Flights/IumrahGuidedFlightSelectionView.swift": {
+      "expected_sha256_before": "5c275c5d0e070a29a8c55cece3430c2e5dc646f5ce96ccf9d82ca885eca67fc7",
+      "sha256_after": "c9a0b95bddf5c513b0bd4ab46fed9211ed7de0cf83405cf2bcc8b523760aa911"
+    }
+  },
+  "untouched_v5_files": 77,
+  "changes": [
+    "Shared OTA card and detail for catalog and configurator",
+    "Preserve V5 filters, price calendar, exact date search, sorting, verified segment arrivals",
+    "Preserve V5 selection / booking and existing analytics",
+    "Preserve display-only estimated arrivals and flight help"
+  ]
+}

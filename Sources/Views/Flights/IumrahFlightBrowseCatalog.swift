@@ -43,17 +43,93 @@ struct IumrahFlightBrowseCatalog: View {
                     .foregroundStyle(.secondary).padding(.vertical, 24)
             }
             ForEach(Array(filtered.prefix(visibleCount))) { flight in
-                IumrahFlightResultCard(airline: flight.airline, airlineCode: flight.airlineCode,
-                    flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination,
-                    departureAt: flight.departureAt, arrivalAt: flight.arrivalAt,
-                    duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice,
-                    isAviasales: flight.id.hasPrefix("feed:")) { onChoose(flight) }
+                let presentation = presentation(for: flight)
+                VStack(spacing: 7) {
+                    NavigationLink {
+                        IumrahOTAFlightDetailPage(
+                            flight: presentation,
+                            language: settings.language,
+                            actionTitle: chooseTitle,
+                            onChoose: { onChoose(flight) },
+                            dismissAfterChoose: false
+                        )
+                    } label: {
+                        IumrahOTAFlightCard(flight: presentation, language: settings.language)
+                    }
+                    .buttonStyle(.plain)
+
+                    HStack {
+                        Text(presentation.source == .cachedSearch ? indicativePriceNote : publishedNote)
+                            .font(IumrahType.regular(11, relativeTo: .caption2))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer(minLength: 6)
+                        Button {
+                            onChoose(flight)
+                            IumrahHaptics.selection()
+                        } label: {
+                            Text(chooseTitle)
+                                .font(IumrahType.bold(12, relativeTo: .caption))
+                                .padding(.horizontal, 14)
+                                .frame(height: 36)
+                                .background(Color.iumrahRoyalViolet.opacity(0.09), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Color.iumrahRoyalViolet)
+                    }
+                    .padding(.horizontal, 7)
+                }
                 .onAppear { if flight.id == filtered.prefix(visibleCount).last?.id { visibleCount += 30 } }
             }
         }
         .task(id: identity) { await model.load(trip: journey.trip, language: settings.language) }
         .onChange(of: direction) { _, _ in visibleCount = 30; filters = IumrahFlightFilterState() }
     }
+    private var chooseTitle: String {
+        switch settings.language {
+        case .russian: return "Подобрать"
+        case .uzbek: return "Tanlash"
+        case .uzbekCyrillic: return "Танлаш"
+        default: return "Choose"
+        }
+    }
+    private var indicativePriceNote: String {
+        switch settings.language {
+        case .russian: return "Кэш · цена требует проверки"
+        case .uzbek: return "Kesh · narxni tekshiring"
+        case .uzbekCyrillic: return "Кеш · нархни текширинг"
+        default: return "Cached · reconfirm fare"
+        }
+    }
+    private var publishedNote: String {
+        switch settings.language {
+        case .russian: return "Опубликованный рейс"
+        case .uzbek: return "E’lon qilingan reys"
+        case .uzbekCyrillic: return "Эълон қилинган рейс"
+        default: return "Published flight"
+        }
+    }
+
+    private func presentation(for flight: LocalJourneyFlight) -> IumrahOTAFlightSnapshot {
+        let published = flight.id.hasPrefix("published:")
+        let verifiedDirectLeg: [IumrahOTAFlightLeg]
+        if published, flight.stops == 0, let arrival = flight.arrivalAt, !arrival.isEmpty {
+            verifiedDirectLeg = [IumrahOTAFlightLeg(origin: flight.origin, destination: flight.destination,
+                departureAt: flight.departureAt, arrivalAt: arrival,
+                airlineCode: flight.airlineCode, flightNumber: flight.flightNumber)]
+        } else {
+            verifiedDirectLeg = []
+        }
+        return IumrahOTAFlightSnapshot(id: flight.id, airline: flight.airline,
+            airlineCode: flight.airlineCode, flightNumber: flight.flightNumber,
+            origin: flight.origin, destination: flight.destination,
+            departureAt: flight.departureAt, arrivalAt: flight.arrivalAt,
+            durationMinutes: flight.durationMinutes, stops: flight.stops,
+            priceUSD: flight.displayedPrice,
+            source: published ? .published : .cachedSearch,
+            cabin: nil, segments: verifiedDirectLeg)
+    }
+
     private var outboundTitle: String {
         switch settings.language { case .russian: return "Туда"; case .uzbek: return "Borish"; case .uzbekCyrillic: return "Бориш"; default: return "Outbound" }
     }

@@ -310,8 +310,6 @@ struct LegacyFinalPackageView: View {
                 } label: {
                     HStack {
                         Text(tr("Забронировать поездку", "Book this trip", "Safarni bron qilish", "Сафарни брон қилиш"))
-                        Spacer()
-                        Image(systemName: "arrow.right")
                     }.frame(minHeight: 52)
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())

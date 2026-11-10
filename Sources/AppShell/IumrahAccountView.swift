@@ -51,7 +51,6 @@ struct IumrahAccountView: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @ObservedObject private var push = PushNotificationManager.shared
 
-    @AppStorage(IumrahIntelligence.enabledKey) private var analyticsEnabled = true
     @State private var guestAccountMode: IumrahGuestAccountMode = .signIn
     @State private var guestAuthMethod: IumrahGuestAuthMethod = .sms
     @State private var loginID = ""
@@ -159,9 +158,6 @@ struct IumrahAccountView: View {
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
-        .onChange(of: analyticsEnabled) { _, enabled in
-            Task { await IumrahIntelligence.shared.setEnabled(enabled) }
-        }
         .task {
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
@@ -974,9 +970,9 @@ struct IumrahAccountView: View {
                     } label: {
                         HStack(spacing: 10) {
                             if isSavingProfile { ProgressView().tint(.white) }
-                            Image(systemName: "checkmark.circle.fill")
+                            
                             Text(tr("Save account details", "Сохранить данные аккаунта", "Akkaunt ma’lumotlarini saqlash", "Аккаунт маълумотларини сақлаш"))
-                            Spacer(minLength: 8)
+                            
                         }
                     }
                     .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1235,10 +1231,6 @@ struct IumrahAccountView: View {
                 )
             }
             .buttonStyle(.plain)
-
-            Divider().padding(.leading, 54)
-
-            analyticsPrivacyControl
         }
         .iumrahCard()
     }
@@ -1383,10 +1375,10 @@ struct IumrahAccountView: View {
             } label: {
                 HStack(spacing: 10) {
                     if isLoggingIn { ProgressView().tint(.white) }
-                    Image(systemName: "person.crop.circle.fill")
+                    
                     Text(tr("Sign in to iumrah", "Войти в iumrah", "iumrah ga kirish", "iumrah га кириш"))
-                    Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1409,10 +1401,10 @@ struct IumrahAccountView: View {
             } label: {
                 HStack(spacing: 10) {
                     if isLoggingIn { ProgressView().tint(.white) }
-                    Image(systemName: "person.crop.circle.fill")
+                    
                     Text(tr("Sign in to iumrah", "Войти в iumrah", "iumrah ga kirish", "iumrah га кириш"))
-                    Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1458,12 +1450,12 @@ struct IumrahAccountView: View {
             } label: {
                 HStack(spacing: 10) {
                     if isLoggingIn { ProgressView().tint(.white) }
-                    Image(systemName: loginSMSChallengeID.isEmpty ? "message.badge.fill" : "person.crop.circle.fill")
+                    
                     Text(loginSMSChallengeID.isEmpty
                          ? tr("Send SMS code", "Отправить SMS-код", "SMS kodni yuborish", "SMS кодни юбориш")
                          : tr("Confirm and sign in", "Подтвердить и войти", "Tasdiqlab kirish", "Тасдиқлаб кириш"))
-                    Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1511,8 +1503,8 @@ struct IumrahAccountView: View {
                     Text(registrationEmailChallengeID.isEmpty
                          ? tr("Send verification code", "Отправить код", "Tasdiqlash kodini yuborish", "Тасдиқлаш кодини юбориш")
                          : tr("Create iumrah account", "Создать аккаунт iumrah", "iumrah akkauntini yaratish", "iumrah аккаунтини яратиш"))
-                    Spacer()
-                    Image(systemName: registrationEmailChallengeID.isEmpty ? "envelope.badge.fill" : "arrow.right")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1605,12 +1597,12 @@ struct IumrahAccountView: View {
             } label: {
                 HStack(spacing: 10) {
                     if isRegistering { ProgressView().tint(.white) }
-                    Image(systemName: registrationSMSChallengeID.isEmpty ? "message.badge.fill" : "person.badge.plus")
+                    
                     Text(registrationSMSChallengeID.isEmpty
                          ? tr("Send SMS code", "Отправить SMS-код", "SMS kodni yuborish", "SMS кодни юбориш")
                          : tr("Create iumrah account", "Создать аккаунт iumrah", "iumrah akkauntini yaratish", "iumrah аккаунтини яратиш"))
-                    Spacer(minLength: 10)
-                    Image(systemName: "arrow.right")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1634,8 +1626,6 @@ struct IumrahAccountView: View {
             } label: {
                 HStack {
                     Text(tr("Open booking activation", "Открыть активацию брони", "Bron faollashtirishini ochish", "Брон фаоллаштиришини очиш"))
-                    Spacer()
-                    Image(systemName: "arrow.right")
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1797,25 +1787,6 @@ struct IumrahAccountView: View {
         .buttonStyle(.plain)
     }
 
-    private var analyticsPrivacyControl: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Toggle(isOn: $analyticsEnabled) {
-                Label(tr("Usage analytics", "Аналитика использования", "Foydalanish tahlili", "Фойдаланиш таҳлили"), systemImage: "chart.bar.xaxis")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .tint(Color.iumrahRoyalViolet)
-            Text(tr(
-                "Helps improve screens and bookings. No names, passports, messages or payment details.",
-                "Помогает улучшать экраны и бронирование. Без имён, паспортов, переписки и платёжных данных.",
-                "Ekranlar va bandlovni yaxshilaydi. Ism, pasport, xabar va to‘lov ma’lumotlarisiz.",
-                "Экранлар ва бронни яхшилайди. Исм, паспорт, хабар ва тўлов маълумотларисиз."
-            ))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 8)
-    }
-
     private var guestSettingsSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             sectionHeader(
@@ -1867,10 +1838,6 @@ struct IumrahAccountView: View {
                 )
             }
             .buttonStyle(.plain)
-
-            Divider().padding(.leading, 54)
-
-            analyticsPrivacyControl
         }
         .iumrahCard()
     }

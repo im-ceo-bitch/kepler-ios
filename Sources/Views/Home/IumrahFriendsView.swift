@@ -60,7 +60,7 @@ struct IumrahGiftCardsView: View {
         .tint(.white)
         .preferredColorScheme(.dark)
         .task(id: account.bearerToken) { await loadDashboard() }
-        .refreshable { await loadDashboard() }
+        
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active, account.isAuthenticated else { return }
             Task { await loadDashboard() }

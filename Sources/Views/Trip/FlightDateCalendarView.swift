@@ -57,6 +57,7 @@ struct FlightDateCalendarView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         IumrahPageHelpCard(stage == .departure ? "calendar.departure" : "calendar.return")
+                        directDatesLegend
                         stageSwitcher
                         if publishedOnly { flexibilityPicker }
                         if isLoading {
@@ -92,6 +93,7 @@ struct FlightDateCalendarView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle(copy(.title))
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) { IumrahPageHelpButton() }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(closeLabel) { dismiss() }
                 }
@@ -107,6 +109,7 @@ struct FlightDateCalendarView: View {
             stage = .departure
         }
         .modifier(IumrahJourneySheetStyle())
+        .modifier(IumrahHelpOverlayHost(enabled: true))
     }
 
     private var header: some View {
@@ -205,7 +208,7 @@ struct FlightDateCalendarView: View {
         let day = calendar.startOfDay(for: date)
         let disabledByPast = day < calendar.startOfDay(for: Date())
         let available = isAvailableDay(day)
-        let selectable = !disabledByPast && available
+        let selectable = !disabledByPast
         let isDeparture = departure.map { calendar.isDate($0, inSameDayAs: day) } ?? false
         let isReturn = returnDate.map { calendar.isDate($0, inSameDayAs: day) } ?? false
         let inRange = isInsideSelectedRange(day)
@@ -226,8 +229,8 @@ struct FlightDateCalendarView: View {
                     } else if inRange {
                         Rectangle().fill(Color.iumrahSignatureBlack.opacity(0.12))
                             .frame(height: 37)
-                    } else if selectable {
-                        Circle().fill(Color.iumrahRaisedBackground)
+                    } else if available && selectable {
+                        Circle().fill(Color.green.opacity(0.22))
                             .padding(4)
                     }
                 }
@@ -296,13 +299,9 @@ struct FlightDateCalendarView: View {
             return
         }
 
-        guard !publishedOnly else {
-            IumrahHaptics.error()
-            return
-        }
-
-        IumrahHaptics.soft()
-        showFlexibleWarning = true
+        IumrahHaptics.selection()
+        onApply(FlightDateCalendarResult(departure: departure, returnDate: returnDate, publishedSelection: nil))
+        dismiss()
     }
 
     private var flexibleWarningOverlay: some View {
@@ -453,20 +452,29 @@ struct FlightDateCalendarView: View {
     }
 
     private func isAvailableDay(_ day: Date) -> Bool {
-        if publishedOnly {
-            switch stage {
-            case .departure:
-                return recommendedOutboundDateKeys.contains(dayKey(day))
-            case .return:
-                guard let departure else { return false }
-                return recommendedReturnDateKeys(for: departure).contains(dayKey(day))
-            }
+        switch stage {
+        case .departure: return recommendedOutboundDateKeys.contains(dayKey(day))
+        case .return:
+            guard let departure else { return false }
+            return recommendedReturnDateKeys(for: departure).contains(dayKey(day))
         }
+    }
 
-        if stage == .return, let departure {
-            return day > departure
+    private var directDatesLegend: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle().fill(Color.green).frame(width: 10, height: 10).padding(.top, 4)
+            Text(directDatesLegendText).font(.subheadline)
         }
-        return true
+        .frame(maxWidth: .infinity, alignment: .leading).padding(14)
+        .background(Color.green.opacity(0.10), in: RoundedRectangle(cornerRadius: 18))
+    }
+    private var directDatesLegendText: String {
+        switch settings.language {
+        case .russian: return "Зелёные даты — прямые рейсы. Вы можете выбрать любую будущую дату."
+        case .uzbek: return "Yashil sanalarda to‘g‘ridan-to‘g‘ri reyslar bor. Istalgan kelgusi sanani tanlashingiz mumkin."
+        case .uzbekCyrillic: return "Яшил саналарда тўғридан-тўғри рейслар бор. Исталган келгуси санани танлашингиз мумкин."
+        default: return "Green dates have non-stop flights. You can choose any future date."
+        }
     }
 
     private func select(_ date: Date) {

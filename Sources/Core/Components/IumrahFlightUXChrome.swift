@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Opt-in vertical bounce, required for the journey pull-to-refresh gesture.
+/// Stops rubber-band overscroll without offset compensation or refresh gestures.
 struct IumrahNoVerticalBounce: UIViewRepresentable {
     final class Marker: UIView {
         override func didMoveToWindow() {
@@ -16,8 +16,8 @@ struct IumrahNoVerticalBounce: UIViewRepresentable {
             var ancestor = superview
             while let view = ancestor {
                 if let scroll = view as? UIScrollView {
-                    scroll.bounces = true
-                    scroll.alwaysBounceVertical = true
+                    scroll.bounces = false
+                    scroll.alwaysBounceVertical = false
                     return
                 }
                 ancestor = view.superview
@@ -139,17 +139,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
                            height: IumrahSignatureHeaderGeometry.logoHeight)
                     .accessibilityLabel("iumrah")
                 Spacer(minLength: 0)
-                if showsNotifications {
-                    Button { chrome.openNotifications() } label: {
-                        Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                            .font(.system(size: 17, weight: .medium))
-                            .frame(width: 23, height: 23)
-                    }
-                    .modifier(IumrahNativeChromeButton())
-                    .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar", cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
-                } else {
-                    Color.clear.frame(width: 46, height: 46).accessibilityHidden(true)
-                }
+                IumrahPageHelpButton()
             }
             .foregroundStyle(.white)
             .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
@@ -160,13 +150,8 @@ struct IumrahJourneyHeader<Summary: View>: View {
             .background {
                 IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
             }
-            .offset(y: -pull)
+            .offset(y: 0)
             .transaction { $0.animation = nil }
-
-            if refreshing || pull > 18 {
-                ProgressView().frame(maxWidth: .infinity)
-                    .frame(height: 32 + IumrahSignatureHeaderGeometry.summaryOverlap)
-            }
 
             // The fixed overlap is relative to the *collapsed* summary. When
             // expanded, only the card below the boundary grows downward.
@@ -179,7 +164,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
 
         }
         .background(Color.iumrahPageBackground)
-        .background(IumrahPullObserver(onChange: pullHandler))
+        .background(IumrahNoVerticalBounce())
     }
 }
 
@@ -222,30 +207,19 @@ extension EnvironmentValues {
 
 /// Tracks the scrolling header. Refresh progress belongs below the summary,
 /// not in the logo/status-bar area. No timer or simulated network delay.
+// Compatibility name: layout only. Pull-to-refresh intentionally removed.
 struct IumrahJourneyRefresh: ViewModifier {
     let action: () async -> Void
-    @State private var pull: CGFloat = 0
-    @State private var refreshing = false
     func body(content: Content) -> some View {
         GeometryReader { viewport in
             content
-                .scrollBounceBehavior(.always)
-                .environment(\.journeyRefreshing, refreshing)
-                .environment(\.journeyHeaderPull, pull)
                 .environment(\.journeyTopInset, viewport.safeAreaInsets.top)
-                .environment(\.iumrahSearchPullActive, refreshing || pull > 18)
+                .environment(\.journeyRefreshing, false)
+                .environment(\.journeyHeaderPull, 0)
+                .environment(\.iumrahSearchPullActive, false)
                 .ignoresSafeArea(.container, edges: .top)
                 .background(Color.iumrahPageBackground.ignoresSafeArea())
-                .environment(\.iumrahPullHandler, { distance, released in
-                    if released {
-                        guard distance >= 76, !refreshing else { return }
-                        refreshing = true
-                        Task { @MainActor in
-                            await action()
-                            refreshing = false
-                        }
-                    } else { pull = distance }
-                })
         }
+        .modifier(IumrahHelpOverlayHost(enabled: true))
     }
 }

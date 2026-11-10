@@ -369,6 +369,7 @@ struct IumrahGeneratorHeader: View {
 
                     nativeBackButton
                         .padding(.leading, 2)
+                    HStack { Spacer(); IumrahPageHelpButton() }.padding(.trailing, 2)
                 }
                 .frame(height: 76)
 
@@ -463,6 +464,7 @@ private struct IumrahInternalNavigationModifier: ViewModifier {
     func body(content: Content) -> some View {
         if showsGeneratorAmbient, progressStage != nil {
             content
+                .modifier(IumrahHelpOverlayHost(enabled: true))
                 // The generator header is part of each destination's own scroll
                 // content. This branch only removes the stock navigation bar and
                 // preserves Apple's interactive edge-swipe back gesture.

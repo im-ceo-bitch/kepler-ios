@@ -242,9 +242,6 @@ struct IumrahFoundationHomeHero: View {
                     HStack(spacing: 12) {
                         Text(actionTitle)
                             .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 15, weight: .semibold))
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())

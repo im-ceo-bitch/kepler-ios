@@ -68,27 +68,10 @@ struct NuiteeJourneyHotelsView: View {
                         ForEach(1...5, id: \.self) { Text("\($0) ★").tag($0) }
                     }.pickerStyle(.segmented)
                     if !ready { Text("Раскройте карточку сверху и укажите возраст детей для точного тарифа.").font(.footnote) }
-                    if journey.localJourneyRooms[key] == nil, journey.localPendingHotels[key] == nil,
-                       let saved = NuiteeStaySelectionStore.shared.pendingSelections()[city] {
-                        Button {
-                            guard ready else { return }
-                            journey.localPendingHotels[key] = LocalJourneyPendingHotel(id: key, city: city,
-                                hotel: saved.hotel, checkin: window.checkIn, checkout: window.checkOut,
-                                adults: roomAdults, childrenAges: roomChildren, requestedAt: Date())
-                            journey.rebuildLocalJourneyQuote()
-                        } label: {
-                            Label(saved.hotel.name + " · " + NuiteeCopy.text("добавить на уточнение", "aniqlash uchun qo‘shish", "add pending confirmation", settings.language), systemImage: "plus.circle")
-                        }.disabled(!ready)
-                    }
                     if let selection = journey.localJourneyRooms[key] {
                         Label(selection.hotel.name + " · " + selection.rate.roomName, systemImage: "checkmark.circle.fill")
                             .font(.subheadline).foregroundStyle(Color.iumrahJourneyGreen)
                         Text(NuiteeHotelService.usd(selection.rate.price) + " · за номер, весь срок").font(.caption)
-                    }
-                    if let pending = journey.localPendingHotels[key] {
-                        Label(pending.hotel.name + " · " + NuiteeCopy.text("Уточнить цену", "Narxni aniqlash", "Request price", settings.language), systemImage: "clock")
-                            .font(.subheadline)
-                        Text(NuiteeCopy.text("Не включён в сумму пакета до подтверждения поддержкой", "Tasdiqlanguncha paket narxiga kiritilmagan", "Excluded from total until support confirms", settings.language)).font(.caption).foregroundStyle(.secondary)
                     }
                     if loading { ProgressView().frame(maxWidth: .infinity) }
                     if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
@@ -117,23 +100,14 @@ struct NuiteeJourneyHotelsView: View {
             }
         }
         .onChange(of: journey.trip.rooms) { _, _ in invalidateRooms() }
-        .onChange(of: ages) { _, _ in journey.localJourneyRooms = [:]; journey.localPendingHotels = [:]; journey.quote = nil }
+        .onChange(of: ages) { _, _ in journey.localJourneyRooms = [:]; journey.quote = nil }
         .onChange(of: stars) { _, _ in visibleCount = 20 }
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: window.checkIn, nights: window.nights,
                 adults: roomAdults, sandbox: sandbox, childrenAges: roomChildren, onSelectRate: { rate in
                     guard rate.currency == "USD", rate.price.isFinite, rate.price > 0 else { return }
-                    journey.localPendingHotels.removeValue(forKey: key)
-                    NuiteeStaySelectionStore.shared.removePending(city: city)
                     journey.localJourneyRooms[key] = LocalJourneyRoom(id: key, city: city, hotel: hotel, rate: rate,
                         checkin: window.checkIn, checkout: window.checkOut, adults: roomAdults, childrenAges: roomChildren)
-                    journey.transferSelectionConfirmed = false
-                    journey.rebuildLocalJourneyQuote()
-                }, onSelectPending: { pending in
-                    journey.localJourneyRooms.removeValue(forKey: key)
-                    journey.localPendingHotels[key] = LocalJourneyPendingHotel(id: key, city: city,
-                        hotel: pending.hotel, checkin: window.checkIn, checkout: window.checkOut,
-                        adults: roomAdults, childrenAges: roomChildren, requestedAt: Date())
                     journey.transferSelectionConfirmed = false
                     journey.rebuildLocalJourneyQuote()
                 })
@@ -150,7 +124,6 @@ struct NuiteeJourneyHotelsView: View {
     private func invalidateRooms() {
         roomIndex = 0
         journey.localJourneyRooms = [:]
-        journey.localPendingHotels = [:]
         journey.quote = nil
         journey.transferSelectionConfirmed = false
     }

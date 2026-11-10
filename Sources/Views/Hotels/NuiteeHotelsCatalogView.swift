@@ -55,12 +55,23 @@ final class NuiteeCatalogModel: ObservableObject {
         do {
             let catalog = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: true)
             guard generation == version, !Task.isCancelled else { return }
-            hotels = catalog.hotels
+            hotels = catalog.hotels.map { hotel in
+                var row = hotel
+                row.rateStatus = row.minimumRate != nil ? "available" : "loading"
+                return row
+            }
             sandbox = catalog.sandbox
             catalogStale = catalog.hotelCatalogStale
             let response = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults)
             guard generation == version, !Task.isCancelled else { return }
-            hotels = response.hotels
+            // Older deployed adapters do not return rateStatus. Derive it from
+            // the completed response, never from elapsed time or sandbox mode.
+            hotels = response.hotels.map { hotel in
+                var row = hotel
+                row.rateStatus = row.minimumRate != nil ? (response.pricesStale ? "cached" : "available")
+                    : response.rateError != nil ? "provider_error" : "no_availability"
+                return row
+            }
             sandbox = response.sandbox
             catalogStale = response.hotelCatalogStale || response.pricesStale
             rateError = response.rateError
@@ -287,10 +298,7 @@ struct NuiteeHotelsCatalogView: View {
                         NuiteeHotelListingCard(
                             hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
                             favorite: favorites.contains(hotel.id),
-                            onOpen: {
-                                Task { await IumrahIntelligence.shared.record("tap", screen: "hotels", element: "hotel_card") }
-                                opened = hotel
-                            }, onFavorite: { toggleFavorite(hotel.id) }
+                            onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
                         )
                     }
                     if matchingHotels.count > visibleCount {
@@ -305,10 +313,7 @@ struct NuiteeHotelsCatalogView: View {
                             NuiteeHotelListingCard(
                                 hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
                                 favorite: favorites.contains(hotel.id),
-                                onOpen: {
-                                    Task { await IumrahIntelligence.shared.record("tap", screen: "hotels", element: "hotel_card") }
-                                    opened = hotel
-                                }, onFavorite: { toggleFavorite(hotel.id) }
+                                onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
                             )
                         }
                     }
@@ -360,14 +365,7 @@ struct NuiteeHotelsCatalogView: View {
 
     private func reload() async {
         visibleCount = 20
-        await IumrahIntelligence.shared.record("search_started", screen: "hotels", element: "catalog")
         await model.reload(city: city, checkin: checkin, checkout: checkout, adults: adults)
-        guard !Task.isCancelled else { return }
-        if model.errorMessage == nil {
-            await IumrahIntelligence.shared.record("search_results", screen: "hotels", element: model.hotels.isEmpty ? "empty" : "available")
-        } else {
-            await IumrahIntelligence.shared.record("error", screen: "hotels", element: "catalog_load")
-        }
     }
     private func toggleFavorite(_ id: String) {
         if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
@@ -442,7 +440,9 @@ struct NuiteeHotelListingCard: View {
                             ProgressView().controlSize(.small)
                             Text(NuiteeCopy.text("Загружаем цену…", "Narx yuklanmoqda…", "Loading price…", settings.language)).font(.caption)
                         } else {
-                            Text(NuiteeCopy.text("Посмотреть номера", "Xonalarni ko‘rish", "View rooms", settings.language)).font(.caption)
+                            Text(hotel.rateStatus == "provider_error"
+                                 ? NuiteeCopy.text("Не удалось загрузить цену", "Narxni yuklab bo‘lmadi", "Could not load price", settings.language)
+                                 : NuiteeCopy.text("Нет тарифа на эти даты", "Bu sanalar uchun tarif yo‘q", "No rate for these dates", settings.language)).font(.caption)
                         }
                     }
                     HStack { Spacer(); Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary) }
@@ -504,9 +504,6 @@ struct NuiteeHotelDetailView: View {
     let sandbox: Bool
     var childrenAges: [Int] = []
     var onSelectRate: ((NuiteeRoomRate) -> Void)? = nil
-    var onSelectPending: ((LocalJourneyPendingHotel) -> Void)? = nil
-    @State private var showSupport = false
-    @State private var pendingSaved = false
 
     @State private var detail: NuiteeHotelDetail?
     @State private var rates: [NuiteeRoomRate] = []
@@ -566,7 +563,7 @@ struct NuiteeHotelDetailView: View {
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language))
                 if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
                 else if ratesError != nil {
-                    Label(NuiteeCopy.text("Не удалось загрузить цены", "Narxlarni yuklab bo‘lmadi", "Could not load prices", settings.language), systemImage: "phone.bubble")
+                    Label(NuiteeCopy.text("Не удалось загрузить цены", "Narxlarni yuklab bo‘lmadi", "Could not load prices", settings.language), systemImage: "exclamationmark.circle")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await refreshRates() } }.tint(.primary)
                 } else if rates.isEmpty {
@@ -577,23 +574,6 @@ struct NuiteeHotelDetailView: View {
                         Text(NuiteeCopy.text("Тестовые тарифы", "Sinov tariflari", "Test rates", settings.language)).font(.caption)
                     }
                     ForEach(rates) { rate in rateCard(rate) }
-                }
-                if ratesCompleted && !ratesLoading && rates.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(NuiteeCopy.text("Наличие и стоимость подтвердит поддержка. До подтверждения отель не включён в сумму пакета.",
-                            "Mavjudlik va narxni qo‘llab-quvvatlash xizmati tasdiqlaydi. Ungacha mehmonxona paket narxiga kiritilmaydi.",
-                            "Support will confirm availability and price. Until then, this hotel is excluded from the package total.", settings.language))
-                            .font(.footnote).foregroundStyle(.secondary)
-                        Button { savePendingHotel() } label: {
-                            Text(pendingSaved ? NuiteeCopy.text("Добавлен · на уточнении", "Qo‘shildi · aniqlanmoqda", "Added · awaiting confirmation", settings.language)
-                                : NuiteeCopy.text("Добавить с уточнением цены", "Narxni aniqlash bilan qo‘shish", "Add pending price confirmation", settings.language))
-                        }.buttonStyle(IumrahPrimaryButtonStyle())
-                        Button { showSupport = true } label: {
-                            Label(NuiteeCopy.text("Уточнить цену · связаться", "Narxni aniqlash · bog‘lanish", "Request price · contact support", settings.language), systemImage: "phone.bubble")
-                        }.buttonStyle(.bordered).buttonBorderShape(.capsule)
-                    }
-                    .padding(18)
-                    .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
                 }
                 cancellationAndPrivacy
                 if let detail {
@@ -631,6 +611,8 @@ struct NuiteeHotelDetailView: View {
             .padding(.bottom, 70)
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { IumrahPageHelpButton() } }
+        .modifier(IumrahHelpOverlayHost(enabled: true))
         .navigationTitle(hotel.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.iumrahSignatureBlack, for: .navigationBar)
@@ -643,26 +625,7 @@ struct NuiteeHotelDetailView: View {
             }
         } }
         .task(id: settings.language.rawValue) { await refreshDetail() }
-        .task(id: reloadID) { pendingSaved = false; await refreshRates() }
-        .onAppear { Task { await IumrahIntelligence.shared.detailAppeared("hotel_details") } }
-        .onDisappear { Task { await IumrahIntelligence.shared.detailDisappeared("hotel_details") } }
-        .onChange(of: rates.isEmpty) { _, empty in
-            guard !empty else { return }
-            Task { await IumrahIntelligence.shared.record("price_viewed", screen: "hotel_details", element: "room_rates") }
-        }
-        .sheet(isPresented: $showSupport) {
-            NavigationStack {
-                CareHomeView()
-                    .safeAreaInset(edge: .bottom) {
-                        VStack(spacing: 8) {
-                            Text(hotel.name).font(.headline)
-                            ShareLink(item: "\(hotel.name) · \(dateISO(checkin)) — \(dateISO(checkout)) · \(adults). " + NuiteeCopy.text("Прошу уточнить наличие и цену.", "Mavjudlik va narxni aniqlab bering.", "Please confirm availability and price.", settings.language)) {
-                                Label(NuiteeCopy.text("Поделиться запросом", "So‘rovni ulashish", "Share request", settings.language), systemImage: "square.and.arrow.up")
-                            }
-                        }.padding().frame(maxWidth: .infinity).background(Color.iumrahCardBackground)
-                    }
-            }
-        }
+        .task(id: reloadID) { await refreshRates() }
         .fullScreenCover(isPresented: $isGalleryPresented) {
             NuiteeHotelGallery(images: photos, hotelName: hotel.name)
         }
@@ -742,19 +705,7 @@ struct NuiteeHotelDetailView: View {
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
     }
 
-    private func savePendingHotel() {
-        Task { await IumrahIntelligence.shared.record("hotel_selected", screen: "hotel_details", element: "pending_price") }
-        let name = hotel.city.lowercased()
-        let city = name.contains("mad") || name.contains("med") || name.contains("المدينة") ? "madinah" : "makkah"
-        let selection = LocalJourneyPendingHotel(id: "\(city):0", city: city, hotel: hotel,
-            checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, requestedAt: Date())
-        if let onSelectPending { onSelectPending(selection); dismiss(); return }
-        NuiteeStaySelectionStore.shared.savePending(selection)
-        pendingSaved = true
-    }
-
     private func saveRate(_ rate: NuiteeRoomRate) {
-        Task { await IumrahIntelligence.shared.record("hotel_selected", screen: "hotel_details", element: "confirmed_rate") }
         if let onSelectRate { onSelectRate(rate); dismiss(); return }
         NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
             provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
@@ -892,7 +843,6 @@ struct NuiteeHotelDetailView: View {
         let requestedAdults = adults
         ratesLoading = true
         ratesCompleted = false
-        pendingSaved = false
         ratesError = nil
         rates = []
         do {

@@ -197,9 +197,9 @@ struct IumrahEmergencyContactView: View {
             IumrahHaptics.success()
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "checkmark.circle.fill")
+                
                 Text(tr("Save emergency contact", "Сохранить экстренный контакт", "Favqulodda kontaktni saqlash", "Фавқулодда контактни сақлаш"))
-                Spacer()
+                
             }
         }
         .buttonStyle(IumrahPrimaryButtonStyle())

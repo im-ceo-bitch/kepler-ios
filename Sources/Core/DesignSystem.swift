@@ -367,6 +367,8 @@ extension View {
 struct IumrahPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .labelStyle(.titleOnly)
+            .multilineTextAlignment(.center)
             .font(.system(size: 16, weight: .semibold, design: .rounded))
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity)

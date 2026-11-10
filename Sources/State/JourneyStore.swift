@@ -30,7 +30,6 @@ final class JourneyStore: ObservableObject {
     @Published var usesLocalJourney = false
     @Published var localJourneyFlights: [LocalJourneyFlight] = []
     @Published var localJourneyRooms: [String: LocalJourneyRoom] = [:]
-    @Published var localPendingHotels: [String: LocalJourneyPendingHotel] = [:]
     /// User-facing ±0…4-day discovery window. Does not change the booked dates.
     @Published var flightSearchFlexDays: Int = 0
 
@@ -258,7 +257,6 @@ final class JourneyStore: ObservableObject {
         usesLocalJourney = false
         localJourneyFlights = []
         localJourneyRooms = [:]
-        localPendingHotels = [:]
         if !keepingPublishedFlightSelection { clearPublishedFlightSelection() }
 
         // A newly configured journey starts from the package default meal plan.

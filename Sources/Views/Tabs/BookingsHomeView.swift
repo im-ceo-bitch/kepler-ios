@@ -1797,9 +1797,7 @@ struct BookingsHomeView: View {
 
                     HStack(spacing: 10) {
                         Text(cta)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.headline)
                     .foregroundStyle(dark ? .black : .white)
                     .padding(.horizontal, 18)

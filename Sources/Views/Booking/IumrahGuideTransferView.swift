@@ -345,9 +345,9 @@ struct IumrahGuideTransferView: View {
                 } label: {
                     HStack(spacing: 10) {
                         if isSendingFacePhoto { ProgressView().tint(.white) }
-                        Image(systemName: "paperplane.fill")
+                        
                         Text(tr("Send to meeting team", "Отправить команде встречи", "Kutib olish jamoasiga yuborish", "Кутиб олиш жамоасига юбориш"))
-                        Spacer()
+                        
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())

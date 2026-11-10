@@ -7,6 +7,7 @@ struct IumrahGuidedFlightSelectionView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
 
+    @State private var filters = IumrahFlightFilterState()
     @State private var editingSearch = false
     @State private var step: LegStep = .outbound
     @State private var published: [CuratedFlightRecommendation] = []
@@ -79,7 +80,7 @@ struct IumrahGuidedFlightSelectionView: View {
             case .published(let item, let isReturn):
                 return isReturn ? (item.inbound?.arrivalAt ?? item.outbound.arrivalAt) : item.outbound.arrivalAt
             case .dataAPI(let offer):
-                return FlightDiscoveryItineraryValidator.verified(offer.outboundSegments,
+                return offer.arrivalAt ?? FlightDiscoveryItineraryValidator.verified(offer.outboundSegments,
                     origin: offer.origin, destination: offer.destination, transfers: offer.transfers)?.last?.arrivalAt
             }
         }
@@ -145,6 +146,7 @@ struct IumrahGuidedFlightSelectionView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         IumrahPageHelpCard(isLoading ? "flights.loading" : loadError != nil && availableCandidates.isEmpty ? "flights.error" : availableCandidates.isEmpty ? (step == .inbound ? "flights.inbound_empty" : "flights.empty") : step == .outbound ? "flights.outbound" : "flights.inbound")
                         stepSelector
+                        searchControls
                         resultsSection
                             .id("flight-results")
                     }
@@ -161,6 +163,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 isFlightHeaderVisible = bottom > 35
             }
             .onChange(of: step) { _, _ in
+                filters = IumrahFlightFilterState()
                 withAnimation(.easeInOut(duration: 0.28)) {
                     proxy.scrollTo("flight-results", anchor: .top)
                 }
@@ -185,8 +188,6 @@ struct IumrahGuidedFlightSelectionView: View {
         .navigationDestination(isPresented: $showTransferPicker) {
             NuiteeJourneyHotelsView()
         }
-        .onAppear { Task { await IumrahIntelligence.shared.detailAppeared("flight_builder") } }
-        .onDisappear { Task { await IumrahIntelligence.shared.detailDisappeared("flight_builder") } }
         .task { await loadFlights() }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
             Button(tr("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
@@ -206,8 +207,6 @@ struct IumrahGuidedFlightSelectionView: View {
             } label: {
                 HStack {
                     Text(tr("Выбрать обратный перелёт", "Choose return flight", "Qaytish reysini tanlash", "Қайтиш рейсини танлаш"))
-                    Spacer()
-                    Image(systemName: "arrow.right")
                 }
                 .frame(height: IumrahDesign.controlHeight)
             }
@@ -219,8 +218,6 @@ struct IumrahGuidedFlightSelectionView: View {
             Button(action: commitSelection) {
                 HStack {
                     Text(tr("Выбрать отель", "Choose hotel", "Mehmonxona tanlash", "Меҳмонхона танлаш"))
-                    Spacer()
-                    Image(systemName: "arrow.right")
                 }
                 .frame(height: IumrahDesign.controlHeight)
             }
@@ -375,117 +372,51 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func flightCard(_ choice: FlightChoice) -> some View {
-        let selected = (step == .outbound ? outbound?.id : inbound?.id) == choice.id
-        let offset = abs(dayOffset(for: choice))
-        return Button {
-            selectedDetail = choice
-            IumrahHaptics.soft()
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 14) {
-                    AirlineLogoView(airlineCode: choice.airlineCode, size: 36)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(choice.airlineName)
-                            .font(IumrahType.bold(16, relativeTo: .headline))
-                            .lineLimit(1)
-                        Text([choice.airlineCode, choice.flightNumber].filter { !$0.isEmpty }.joined(separator: " "))
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                    Image(systemName: selected ? "checkmark.circle.fill" : "chevron.right")
-                        .font(.system(size: selected ? 22 : 16, weight: .semibold))
-                        .foregroundStyle(selected ? Color.iumrahInk : Color.iumrahMuted)
-                }
-
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(timeText(choice.departureAt))
-                            .font(.system(size: 24, weight: .semibold))
-                            .monospacedDigit()
-                        Text(choice.origin)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 4)
-                    flightRouteGraphic(stops: choice.stops)
-                    Spacer(minLength: 4)
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(choice.arrivalAt.map(timeText) ?? "—")
-                            .font(.system(size: 24, weight: .semibold).monospacedDigit())
-                        Text(choice.destination)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                HStack(spacing: 9) {
-                    if choice.stops == 0 {
-                        Label(tr("Прямой рейс", "Non-stop", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри"), systemImage: "airplane")
-                            .foregroundStyle(Color.green)
-                    } else {
-                        Label(tr("С пересадкой", "Connecting", "Transferli", "Трансферли"), systemImage: "arrow.triangle.branch")
-                            .foregroundStyle(Color.iumrahInk)
-                    }
-                    if choice.duration > 0 {
-                        Text("·  \(choice.duration / 60)h \(choice.duration % 60)m")
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .font(.subheadline.weight(.semibold))
-
-                HStack(spacing: 10) {
-                    Text(dayTextFromISO(choice.departureAt))
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    if offset > 0 {
-                        Text("\(dayOffset(for: choice) > 0 ? "+" : "−")\(offset) d")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if let price = choice.price {
-                        Text(price.formatted(.currency(code: "USD").precision(.fractionLength(0))) + tr(" / чел.", " / person", " / kishi", " / киши"))
-                            .font(.title3.weight(.bold))
-                    } else {
-                        Text(tr("Цена при расчёте", "Price on quote", "Narx hisobda", "Нарх ҳисобда"))
-                            .font(.subheadline.weight(.semibold))
-                    }
-                }
+        IumrahFlightResultCard(airline: choice.airlineName, airlineCode: choice.airlineCode,
+            flightNumber: choice.flightNumber, origin: choice.origin, destination: choice.destination,
+            departureAt: choice.departureAt, arrivalAt: choice.arrivalAt, duration: choice.duration,
+            stops: choice.stops, price: choice.price, isAviasales: choice.source == .dataAPI,
+            selected: (step == .outbound ? outbound?.id : inbound?.id) == choice.id) {
+                selectedDetail = choice
+                IumrahHaptics.soft()
             }
-            .foregroundStyle(Color.iumrahInk)
-            .padding(16)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(selected ? Color.iumrahInk.opacity(0.64) : Color.primary.opacity(0.05), lineWidth: selected ? 1.2 : 0.8)
-            }
-        }
-        .buttonStyle(.plain)
     }
 
-    private func flightRouteGraphic(stops: Int) -> some View {
-        VStack(spacing: 5) {
-            HStack(spacing: 3) {
-                Capsule().fill(Color.iumrahInk.opacity(0.42)).frame(width: stops == 0 ? 65 : 29, height: 1.5)
-                if stops > 0 {
-                    Circle().fill(Color.iumrahInk).frame(width: 6, height: 6)
-                    Capsule().fill(Color.iumrahInk.opacity(0.42)).frame(width: 29, height: 1.5)
+    private var searchControls: some View {
+        IumrahFlightSearchControls(filters: $filters,
+            airlines: Array(Set(availableCandidates.map(\.airlineCode))).sorted(),
+            days: IumrahFlightSearchControls.priceDays(calendarOffers.map { ($0.departureAt, Optional($0.price)) }),
+            selectedDay: dayKey(IumrahFlightDiscoveryStore.dayFormatter.string(from: currentTarget)),
+            onSelectDay: { key in
+                guard let date = dateFromISODay(key) else { return }
+                if step == .outbound {
+                    journey.trip.departureDate = date
+                    outbound = nil; inbound = nil
+                    if journey.trip.returnDate <= date {
+                        journey.trip.returnDate = Calendar.current.date(byAdding: .day, value: 7, to: date) ?? date
+                    }
+                } else {
+                    guard date > journey.trip.departureDate else { return }
+                    journey.trip.returnDate = date; inbound = nil
                 }
-                Image(systemName: "airplane")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(stops == 0 ? Color.green : Color.iumrahInk)
-            }
-            if stops > 0 {
-                Text(tr("\(stops) перес.", "\(stops) stop(s)", "\(stops) transfer", "\(stops) трансфер"))
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
+                Task { await loadFlights() }
+            })
+    }
+    private var calendarOffers: [FlightDiscoveryOffer] {
+        guard selectedCabin == .economy, step != .inbound || outbound?.source != .published else { return [] }
+        return (step == .outbound ? dataOutbound : dataReturn).filter {
+            !$0.isRoundTrip && $0.origin == currentOrigin && $0.destination == currentDestination &&
+            filters.accepts(stops: $0.transfers, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false)
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(stops == 0 ? tr("Прямой рейс", "Non-stop flight", "To‘g‘ri reys", "Тўғри рейс") :
-                              tr("\(stops) пересадок", "\(stops) stops", "\(stops) transfer", "\(stops) трансфер"))
+    }
+    private var visibleCandidates: [FlightChoice] {
+        availableCandidates.filter {
+            filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false)
+        }.sorted { a, b in
+            if filters.sort == 1, a.price != b.price { return (a.price ?? .infinity) < (b.price ?? .infinity) }
+            if filters.sort == 2, a.duration != b.duration { return (a.duration > 0 ? a.duration : Int.max) < (b.duration > 0 ? b.duration : Int.max) }
+            return a.departureAt == b.departureAt ? a.id < b.id : a.departureAt < b.departureAt
+        }
     }
 
     private func choose(_ choice: FlightChoice) {
@@ -494,7 +425,6 @@ struct IumrahGuidedFlightSelectionView: View {
         case .outbound:
             outbound = choice
             inbound = nil
-            Task { await IumrahIntelligence.shared.record("flight_selected", screen: "flight_builder", element: "outbound") }
             // The next leg is opened only when the user taps the explicit CTA.
         case .inbound:
             guard let outbound, outbound.source == choice.source else {
@@ -502,7 +432,6 @@ struct IumrahGuidedFlightSelectionView: View {
                 return
             }
             inbound = choice
-            Task { await IumrahIntelligence.shared.record("flight_selected", screen: "flight_builder", element: "inbound") }
         }
     }
 
@@ -586,9 +515,9 @@ struct IumrahGuidedFlightSelectionView: View {
         }
     }
 
-    private var directExact: [FlightChoice] { availableCandidates.filter { $0.stops == 0 && dayOffset(for: $0) == 0 } }
-    private var directNearby: [FlightChoice] { availableCandidates.filter { dayOffset(for: $0) != 0 } }
-    private var connecting: [FlightChoice] { availableCandidates.filter { $0.stops > 0 && dayOffset(for: $0) == 0 } }
+    private var directExact: [FlightChoice] { visibleCandidates.filter { $0.stops == 0 && dayOffset(for: $0) == 0 } }
+    private var directNearby: [FlightChoice] { visibleCandidates.filter { dayOffset(for: $0) != 0 } }
+    private var connecting: [FlightChoice] { visibleCandidates.filter { $0.stops > 0 && dayOffset(for: $0) == 0 } }
 
     private func rank(_ choice: FlightChoice) -> Int {
         dayOffset(for: choice) == 0 ? (choice.stops == 0 ? 0 : 1) : 2
@@ -625,7 +554,6 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func loadFlights() async {
-        await IumrahIntelligence.shared.record("search_started", screen: "flight_builder", element: "published_flights")
         editingSearch = false
         let requestID = UUID()
         loadingRequestID = requestID
@@ -640,7 +568,6 @@ struct IumrahGuidedFlightSelectionView: View {
             let result = try await curatedService.load(trip: trip)
             guard !Task.isCancelled, loadingRequestID == requestID else { return }
             published = result
-            await IumrahIntelligence.shared.record("search_results", screen: "flight_builder", element: result.isEmpty ? "empty" : "available")
         } catch {
             guard loadingRequestID == requestID else { return }
             published = []
@@ -725,7 +652,6 @@ struct IumrahGuidedFlightSelectionView: View {
         journey.prepareFlightFirstHotelStage()
         journey.usesLocalJourney = true
         journey.localJourneyRooms = [:]
-        journey.localPendingHotels = [:]
         journey.localJourneyFlights = [outbound, inbound].map { flight in
             LocalJourneyFlight(id: flight.id, origin: flight.origin, destination: flight.destination,
                 airline: flight.airlineName, flightNumber: flight.flightNumber, airlineCode: flight.airlineCode,
@@ -733,7 +659,6 @@ struct IumrahGuidedFlightSelectionView: View {
                 arrivalAt: flight.arrivalAt, displayedPrice: flight.price)
         }
         IumrahHaptics.success()
-        Task { await IumrahIntelligence.shared.record("tap", screen: "flight_builder", element: "continue_to_hotels") }
         showTransferPicker = true
     }
 
@@ -909,8 +834,6 @@ private struct IumrahGuidedFlightDetailView: View {
                 } label: {
                     HStack {
                         Text(tr("Выбрать авиабилет", "Select flight", "Reysni tanlash", "Рейсни танлаш"))
-                        Spacer()
-                        Image(systemName: "checkmark")
                     }
                     .frame(height: 56)
                 }
@@ -920,6 +843,8 @@ private struct IumrahGuidedFlightDetailView: View {
             .padding(.vertical, 10)
             .background(.regularMaterial)
         }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { IumrahPageHelpButton() } }
+        .modifier(IumrahHelpOverlayHost(enabled: true))
         .navigationTitle(tr("Авиабилет", "Flight details", "Aviachipta", "Авиачипта"))
         .navigationBarTitleDisplayMode(.inline)
     }

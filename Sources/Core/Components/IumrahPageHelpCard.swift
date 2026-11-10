@@ -31,8 +31,8 @@ enum IumrahPageHelp {
         "account.guest": [.init(title: "Войдите в свой аккаунт", body: "Выберите доступный способ входа. Если аккаунта ещё нет, переключитесь на регистрацию; язык приложения можно настроить и без входа."), .init(title: "Sign in to your account", body: "Choose an available sign-in method. If you have no account, switch to registration. You can change the app language without signing in."), .init(title: "Akkauntingizga kiring", body: "Mavjud kirish usulini tanlang. Akkauntingiz bo‘lmasa, ro‘yxatdan o‘tishga o‘ting. Ilova tilini akkauntga kirmasdan ham o‘zgartirish mumkin."), .init(title: "Аккаунтингизга киринг", body: "Мавжуд кириш усулини танланг. Аккаунтингиз бўлмаса, рўйхатдан ўтишга ўтинг. Илова тилини аккаунтга кирмасдан ҳам ўзгартириш мумкин.")],
         "account.signed_in": [.init(title: "Проверьте данные путешественников", body: "Откройте свои данные и данные попутчиков. Здесь также доступны ваш iumrah ID, поездки и настройки приложения."), .init(title: "Check traveler details", body: "Open your personal details and travel companions. Your iumrah ID, trips and app settings are also available here."), .init(title: "Yo‘lovchilar ma’lumotlarini tekshiring", body: "Shaxsiy ma’lumotlaringiz va hamrohlaringizni oching. Bu yerda iumrah ID, safarlar va ilova sozlamalari ham mavjud."), .init(title: "Ёъловчилар маълумотларини текширинг", body: "Шахсий маълумотларингиз ва ҳамроҳларингизни очинг. Бу йерда iumrah ID, сафарлар ва илова созламалари ҳам мавжуд.")],
         "account.sms": [.init(title: "Введите код из SMS", body: "Проверьте указанный номер, введите код из SMS и нажмите «Подтвердить и войти»."), .init(title: "Enter the SMS code", body: "Check the phone number, enter your SMS code and tap “Confirm and sign in”."), .init(title: "SMS kodni kiriting", body: "Telefon raqamini tekshiring, SMS kodni kiriting va «Tasdiqlab kirish» tugmasini bosing."), .init(title: "SMS кодни киритинг", body: "Телефон рақамини текширинг, SMS кодни киритинг ва «Тасдиқлаб кириш» тугмасини босинг.")],
-        "calendar.departure": [.init(title: "Выберите дату вылета", body: "Нажмите на подходящую доступную дату в календаре. Затем выберите дату обратного перелёта."), .init(title: "Choose your departure date", body: "Tap an available departure date in the calendar. Then choose the date of your return flight."), .init(title: "Jo‘nash sanasini tanlang", body: "Taqvimda mavjud jo‘nash sanasini bosing. Keyin qaytish sanasini tanlang."), .init(title: "Жўнаш санасини танланг", body: "Тақвимда мавжуд жўнаш санасини босинг. Кейин қайтиш санасини танланг.")],
-        "calendar.return": [.init(title: "Выберите дату возвращения", body: "Выберите доступную дату обратного перелёта после вылета. Проверьте обе даты перед применением."), .init(title: "Choose your return date", body: "Choose an available return date after departure. Check both dates before applying them."), .init(title: "Qaytish sanasini tanlang", body: "Jo‘nashdan keyingi mavjud qaytish sanasini tanlang. Tasdiqlashdan oldin ikkala sanani tekshiring."), .init(title: "Қайтиш санасини танланг", body: "Жўнашдан кейинги мавжуд қайтиш санасини танланг. Тасдиқлашдан олдин иккала санани текширинг.")],
+        "calendar.departure": [.init(title: "Выберите дату вылета", body: "Выберите любую будущую дату. Зелёным отмечены даты с прямыми рейсами. Затем выберите возвращение."), .init(title: "Choose your departure date", body: "Choose any future date. Green dates have non-stop flights. Then choose your return date."), .init(title: "Jo‘nash sanasini tanlang", body: "Istalgan kelgusi sanani tanlang. Yashil sanalarda to‘g‘ridan-to‘g‘ri reyslar bor. Keyin qaytish sanasini tanlang."), .init(title: "Жўнаш санасини танланг", body: "Исталган келгуси санани танланг. Яшил саналарда тўғридан-тўғри рейслар бор. Кейин қайтиш санасини танланг.")],
+        "calendar.return": [.init(title: "Выберите дату возвращения", body: "Выберите дату позже вылета. Зелёные даты подсказывают прямые рейсы; остальные будущие даты тоже доступны. Проверьте обе даты и продолжайте."), .init(title: "Choose your return date", body: "Choose a date after departure. Green dates indicate non-stop flights; other future dates are selectable too. Check both dates and continue."), .init(title: "Qaytish sanasini tanlang", body: "Jo‘nashdan keyingi sanani tanlang. Yashil sanalar to‘g‘ridan-to‘g‘ri reyslarni bildiradi; boshqa kelgusi sanalarni ham tanlash mumkin. Sanalarni tekshirib, davom eting."), .init(title: "Қайтиш санасини танланг", body: "Жўнашдан кейинги санани танланг. Яшил саналар тўғридан-тўғри рейсларни билдиради; бошқа келгуси саналарни ҳам танлаш мумкин. Саналарни текшириб, давом этинг.")],
         "home.passengers": [.init(title: "Укажите всех пассажиров", body: "Укажите взрослых, детей и младенцев, которые поедут с вами. Выберите класс перелёта и примените изменения."), .init(title: "Include every traveler", body: "Enter the adults, children and infants traveling with you. Choose a cabin class and apply your changes."), .init(title: "Barcha yo‘lovchilarni kiriting", body: "Siz bilan boradigan kattalar, bolalar va chaqaloqlar sonini kiriting. Parvoz klassini tanlab, o‘zgarishlarni tasdiqlang."), .init(title: "Барча ёъловчиларни киритинг", body: "Сиз билан борадиган катталар, болалар ва чақалоқлар сонини киритинг. Парвоз классини танлаб, ўзгаришларни тасдиқланг.")],
         "flights.outbound": [.init(title: "Выберите перелёт в Саудовскую Аравию", body: "Откройте подходящий рейс и проверьте время, аэропорты и пересадки. Выберите его, затем переходите к обратному перелёту."), .init(title: "Choose your flight to Saudi Arabia", body: "Open a flight and check its times, airports and stops. Select it, then continue to the return flight."), .init(title: "Saudiya Arabistoniga reysni tanlang", body: "Reysni ochib, vaqtlar, aeroportlar va almashib o‘tishlarni tekshiring. Uni tanlab, qaytish reysiga o‘ting."), .init(title: "Саудия Арабистонига рейсни танланг", body: "Рейсни очиб, вақтлар, аеропортлар ва алмашиб ўтишларни текширинг. Уни танлаб, қайтиш рейсига ўтинг.")],
         "flights.inbound": [.init(title: "Выберите возвращение домой", body: "Откройте подходящий обратный рейс и проверьте дату и аэропорт вылета. После выбора обоих перелётов нажмите «Выбрать отель»."), .init(title: "Choose your flight home", body: "Open a return flight and check its date and departure airport. Once both flights are selected, tap “Choose hotel”."), .init(title: "Uyga qaytish reysini tanlang", body: "Qaytish reysini ochib, sana va jo‘nash aeroportini tekshiring. Ikkala reys tanlangach, «Mehmonxona tanlash» tugmasini bosing."), .init(title: "Уйга қайтиш рейсини танланг", body: "Қайтиш рейсини очиб, сана ва жўнаш аеропортини текширинг. Иккала рейс танлангач, «Меҳмонхона танлаш» тугмасини босинг.")],
@@ -49,8 +49,8 @@ enum IumrahPageHelp {
         "hotel.details": [.init(title: "Сравните номера и условия", body: "Посмотрите фотографии, удобства и доступные номера. Перед добавлением проверьте питание, условия отмены и сумму за весь срок проживания."), .init(title: "Compare rooms and conditions", body: "View photos, amenities and rooms. Before adding a room, check meals, cancellation conditions and the price for the entire stay."), .init(title: "Xonalar va shartlarni solishtiring", body: "Rasmlar, qulayliklar va xonalarni ko‘ring. Xonani qo‘shishdan oldin ovqatlanish, bekor qilish shartlari va butun muddat narxini tekshiring."), .init(title: "Хоналар ва шартларни солиштиринг", body: "Расмлар, қулайликлар ва хоналарни кўринг. Хонани қўшишдан олдин овқатланиш, бекор қилиш шартлари ва бутун муддат нархини текширинг.")],
         "hotel.rate_details": [.init(title: "Проверьте условия номера", body: "Посмотрите условия отмены и возможные сборы, которые оплачиваются в отеле. Если вариант подходит, добавьте его в план умры."), .init(title: "Check the room conditions", body: "Review cancellation conditions and any fees payable at the hotel. If this option suits you, add it to your Umrah plan."), .init(title: "Xona shartlarini tekshiring", body: "Bekor qilish shartlari va mehmonxonada to‘lanadigan qo‘shimcha yig‘imlarni ko‘ring. Variant mos bo‘lsa, Umra rejangizga qo‘shing."), .init(title: "Хона шартларини текширинг", body: "Бекор қилиш шартлари ва меҳмонхонада тўланадиган қўшимча йиғимларни кўринг. Вариант мос бўлса, Умра режангизга қўшинг.")],
         "hotel.loading": [.init(title: "Дождитесь стоимости номеров", body: "Цены на выбранные даты ещё загружаются. Пока можно посмотреть фотографии и описание отеля."), .init(title: "Wait for room prices", body: "Prices for your dates are still loading. You can view the hotel’s photos and description while you wait."), .init(title: "Xona narxlarini kuting", body: "Tanlangan sanalar uchun narxlar hali yuklanmoqda. Kutish vaqtida mehmonxona rasmlari va tavsifini ko‘rishingiz mumkin."), .init(title: "Хона нархларини кутинг", body: "Танланган саналар учун нархлар ҳали юкланмоқда. Кутиш вақтида меҳмонхона расмлари ва тавсифини кўришингиз мумкин.")],
-        "hotel.no_rates": [.init(title: "Уточните варианты проживания", body: "На выбранные даты номера с ценой не получены. Измените даты проживания или нажмите «Уточнить цену», чтобы обратиться в поддержку."), .init(title: "Ask about accommodation", body: "No room prices were returned for these dates. Change your stay dates or tap “Request price” to contact support."), .init(title: "Joylashuvni aniqlashtiring", body: "Bu sanalar uchun xona narxlari olinmadi. Yashash sanalarini o‘zgartiring yoki yordam xizmatiga murojaat qilish uchun «Narxni aniqlash» tugmasini bosing."), .init(title: "Жойлашувни аниқлаштиринг", body: "Бу саналар учун хона нархлари олинмади. Яшаш саналарини ўзгартиринг ёки ёрдам хизматига мурожаат қилиш учун «Нархни аниқлаш» тугмасини босинг.")],
-        "hotel.rates_error": [.init(title: "Попробуйте загрузить цены снова", body: "Не удалось получить стоимость номеров. Нажмите «Повторить»; если нужна помощь с этим отелем, обратитесь в поддержку."), .init(title: "Try loading prices again", body: "Room prices could not be loaded. Tap “Retry”; contact support if you need help with this hotel."), .init(title: "Narxlarni qayta yuklang", body: "Xona narxlarini yuklab bo‘lmadi. «Qayta urinish» tugmasini bosing; shu mehmonxona bo‘yicha yordam kerak bo‘lsa, yordam xizmatiga murojaat qiling."), .init(title: "Нархларни қайта юкланг", body: "Хона нархларини юклаб бўлмади. «Қайта уриниш» тугмасини босинг; шу меҳмонхона бўйича ёрдам керак бўлса, ёрдам хизматига мурожаат қилинг.")],
+        "hotel.no_rates": [.init(title: "Проверьте другие даты", body: "API не вернул тарифы на выбранные даты. Измените даты проживания и дождитесь нового ответа."), .init(title: "Check other dates", body: "The API returned no rates for these dates. Change your stay dates and wait for the new results."), .init(title: "Boshqa sanalarni tekshiring", body: "API tanlangan sanalar uchun tariflarni qaytarmadi. Yashash sanalarini o‘zgartirib, yangi natijani kuting."), .init(title: "Бошқа саналарни текширинг", body: "API танланган саналар учун тарифларни қайтармади. Яшаш саналарини ўзгартириб, янги натижани кутинг.")],
+        "hotel.rates_error": [.init(title: "Повторите загрузку цен", body: "Запрос цен завершился ошибкой. Нажмите «Повторить», чтобы снова запросить тарифы API."), .init(title: "Load prices again", body: "The price request failed. Tap “Retry” to request rates from the API again."), .init(title: "Narxlarni qayta yuklang", body: "Narx so‘rovi xato bilan tugadi. API tariflarini yana olish uchun «Qayta urinish» tugmasini bosing."), .init(title: "Нархларни қайта юкланг", body: "Нарх сўрови хато билан тугади. API тарифларини яна олиш учун «Қайта уриниш» тугмасини босинг.")],
         "hotel.saved": [.init(title: "Номер добавлен в план", body: "Вы сохранили выбранный вариант проживания. Это ещё не подтверждённое бронирование."), .init(title: "Room added to your plan", body: "You have saved your chosen accommodation. This is not yet a confirmed booking."), .init(title: "Xona rejangizga qo‘shildi", body: "Tanlagan turar joyingiz saqlandi. Bu hali tasdiqlangan bron emas."), .init(title: "Хона режангизга қўшилди", body: "Танлаган турар жойингиз сақланди. Бу ҳали тасдиқланган брон эмас.")],
         "transfer.default": [.init(title: "Выберите автомобиль для поездки", body: "Листайте автомобили и сравните места для пассажиров, багаж и изменение суммы. Раскройте верхнюю карточку, чтобы проверить маршрут трансфера."), .init(title: "Choose a car for your trip", body: "Swipe between cars and compare passenger space, luggage and price changes. Expand the summary above to check your transfer route."), .init(title: "Safar uchun avtomobil tanlang", body: "Avtomobillarni surib ko‘rib, yo‘lovchi joylari, bagaj va narx o‘zgarishini solishtiring. Transfer yo‘nalishini tekshirish uchun yuqoridagi kartani oching."), .init(title: "Сафар учун автомобил танланг", body: "Автомобилларни суриб кўриб, ёъловчи жойлари, багаж ва нарх ўзгаришини солиштиринг. Трансфер ёъналишини текшириш учун юқоридаги картани очинг.")],
         "transfer.train": [.init(title: "Выберите переезд между городами", body: "При желании добавьте поезд между Меккой и Мединой и проверьте число билетов. Автомобильные поездки до станции и после прибытия остаются частью трансфера."), .init(title: "Choose travel between cities", body: "You can add a train between Makkah and Madinah. Check ticket counts; car transfers to and from the stations remain included in your transfer route."), .init(title: "Shaharlararo safarni tanlang", body: "Makka va Madina orasidagi poyezdni qo‘shishingiz mumkin. Chiptalar sonini tekshiring; vokzalgacha va undan keyingi avtomobil qatnovlari transfer yo‘nalishida qoladi."), .init(title: "Шаҳарлараро сафарни танланг", body: "Макка ва Мадина орасидаги пойездни қўшишингиз мумкин. Чипталар сонини текширинг; вокзалгача ва ундан кейинги автомобил қатновлари трансфер ёъналишида қолади.")],
@@ -66,53 +66,187 @@ enum IumrahPageHelp {
         "legacy.final": [.init(title: "Проверьте пакет перед бронированием", body: "Сверьте состав поездки и сумму за всех путешественников. Нажмите «Забронировать поездку», чтобы перейти к следующему этапу оформления."), .init(title: "Review your package before booking", body: "Check the trip details and total for all travelers. Tap “Book this trip” to continue with booking."), .init(title: "Bron qilishdan oldin paketni tekshiring", body: "Safar tarkibi va barcha yo‘lovchilar uchun jami narxni tekshiring. Davom etish uchun «Safarni bron qilish» tugmasini bosing."), .init(title: "Брон қилишдан олдин пакетни текширинг", body: "Сафар таркиби ва барча ёъловчилар учун жами нархни текширинг. Давом этиш учун «Сафарни брон қилиш» тугмасини босинг.")],
         "legacy.recalculate": [.init(title: "Обновите расчёт поездки", body: "Нажмите «Повторить расчёт», чтобы проверить стоимость выбранного пакета. Продолжить оформление можно после успешного расчёта."), .init(title: "Update your trip price", body: "Tap “Retry pricing” to check the cost of your selected package. You can continue after pricing succeeds."), .init(title: "Safar narxini yangilang", body: "Tanlangan paket narxini tekshirish uchun «Qayta hisoblash» tugmasini bosing. Hisoblash muvaffaqiyatli tugagach, davom etishingiz mumkin."), .init(title: "Сафар нархини янгиланг", body: "Танланган пакет нархини текшириш учун «Қайта ҳисоблаш» тугмасини босинг. Ҳисоблаш муваффақиятли тугагач, давом этишингиз мумкин.")],
         "care.request": [.init(title: "Расскажите, какую поездку хотите", body: "Укажите даты или удобный месяц, состав группы, маршрут и пожелания. Оставьте контакты и отправьте запрос, чтобы команда помогла подобрать поездку."), .init(title: "Tell us about your trip", body: "Enter dates or a preferred month, your group, route and wishes. Leave your contacts and send a request so the team can help plan your trip."), .init(title: "Safaringiz haqida aytib bering", body: "Sanalar yoki qulay oy, guruh, yo‘nalish va istaklaringizni kiriting. Jamoa safarni tanlashda yordam berishi uchun aloqa ma’lumotlarini qoldirib, ariza yuboring."), .init(title: "Сафарингиз ҳақида айтиб беринг", body: "Саналар ёки қулай ой, гуруҳ, ёъналиш ва истакларингизни киритинг. Жамоа сафарни танлашда ёрдам бериши учун алоқа маълумотларини қолдириб, ариза юборинг.")],
-        "hotel.package_no_rates": [.init(title: "Проверьте другой отель или уточните цену", body: "Для этого отеля не получены тарифы на даты поездки. Вернитесь к списку и посмотрите другой отель или нажмите «Уточнить цену», чтобы обратиться в поддержку."), .init(title: "Try another hotel or ask for a price", body: "No rates were returned for this hotel on your trip dates. Return to the list to try another hotel, or tap “Request price” to contact support."), .init(title: "Boshqa mehmonxonani ko‘ring yoki narxni so‘rang", body: "Safar sanalaringiz uchun bu mehmonxonadan tariflar olinmadi. Boshqa mehmonxonani ko‘rish uchun ro‘yxatga qayting yoki «Narxni aniqlash» tugmasini bosing."), .init(title: "Бошқа меҳмонхонани кўринг ёки нархни сўранг", body: "Сафар саналарингиз учун бу меҳмонхонадан тарифлар олинмади. Бошқа меҳмонхонани кўриш учун рўйхатга қайтинг ёки «Нархни аниқлаш» тугмасини босинг.")],
+        "hotel.package_no_rates": [.init(title: "Посмотрите другой отель", body: "API не вернул тарифы этого отеля на даты поездки. Вернитесь к списку и выберите другой отель."), .init(title: "Try another hotel", body: "The API returned no rates for this hotel on your trip dates. Return to the list and choose another hotel."), .init(title: "Boshqa mehmonxonani ko‘ring", body: "API safar sanalari uchun bu mehmonxona tariflarini qaytarmadi. Ro‘yxatga qaytib, boshqa mehmonxonani tanlang."), .init(title: "Бошқа меҳмонхонани кўринг", body: "API сафар саналари учун бу меҳмонхона тарифларини қайтармади. Рўйхатга қайтиб, бошқа меҳмонхонани танланг.")],
         "transfer.confirm": [.init(title: "Подтвердите выбранный трансфер", body: "Проверьте автомобиль, маршрут и добавленные билеты на поезд. Подтвердите выбор нижней кнопкой, чтобы перейти к итогу поездки."), .init(title: "Confirm your transfer", body: "Check your car, route and added train tickets. Confirm using the button below to continue to your trip review."), .init(title: "Transferni tasdiqlang", body: "Avtomobil, yo‘nalish va qo‘shilgan poyezd chiptalarini tekshiring. Safar yakuniga o‘tish uchun pastdagi tugma bilan tasdiqlang."), .init(title: "Трансферни тасдиқланг", body: "Автомобил, ёъналиш ва қўшилган пойезд чипталарини текширинг. Сафар якунига ўтиш учун пастдаги тугма билан тасдиқланг.")],
     ]
 }
 
+struct IumrahHelpContext: Equatable { let key: String; var extraKey: String? = nil }
+private struct IumrahHelpContextKey: PreferenceKey {
+    static var defaultValue: IumrahHelpContext? = nil
+    static func reduce(value: inout IumrahHelpContext?, nextValue: () -> IumrahHelpContext?) {
+        if let next = nextValue() { value = next }
+    }
+}
+private struct HelpInHeaderKey: EnvironmentKey { static let defaultValue = false }
+private struct ShowPageHelpKey: EnvironmentKey { static let defaultValue: () -> Void = {} }
+extension EnvironmentValues {
+    var iumrahHelpInHeader: Bool {
+        get { self[HelpInHeaderKey.self] }
+        set { self[HelpInHeaderKey.self] = newValue }
+    }
+    var iumrahShowPageHelp: () -> Void {
+        get { self[ShowPageHelpKey.self] }
+        set { self[ShowPageHelpKey.self] = newValue }
+    }
+}
+enum IumrahHelpLabel {
+    static func title(_ language: AppSettingsStore.Language) -> String {
+        switch language {
+        case .russian: return "Что делать здесь?"
+        case .uzbek: return "Bu yerda nima qilish kerak?"
+        case .uzbekCyrillic: return "Бу ерда нима қилиш керак?"
+        default: return "What can I do here?"
+        }
+    }
+}
+struct IumrahPageHelpButton: View {
+    @Environment(\.iumrahShowPageHelp) private var show
+    @EnvironmentObject private var settings: AppSettingsStore
+    var body: some View {
+        Button(action: show) {
+            Image(systemName: "questionmark").font(.system(size: 19, weight: .semibold))
+                .frame(width: 24, height: 24)
+        }
+        .modifier(IumrahNativeChromeButton())
+        .frame(width: 48, height: 48)
+        .accessibilityLabel(IumrahHelpLabel.title(settings.language))
+    }
+}
+struct IumrahTypedHelpText: View {
+    let copy: IumrahPageHelp.Copy
+    var extra: String? = nil
+    var onComplete: () -> Void = {}
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @State private var visible = ""
+    private var full: String { copy.body + (extra.map { "\n\n" + $0 } ?? "") }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(copy.title).font(IumrahType.bold(22, relativeTo: .title2))
+            ZStack(alignment: .topLeading) {
+                // Reserve the final text height: typing must never shake the page.
+                Text(full).hidden().accessibilityHidden(true)
+                Text(visible).accessibilityLabel(full)
+            }.font(IumrahType.regular(17, relativeTo: .body))
+        }.fixedSize(horizontal: false, vertical: true)
+            .task(id: full) {
+                visible = ""
+                if reduceMotion || voiceOver { visible = full; onComplete(); return }
+                let letters = Array(full)
+                for end in stride(from: 1, through: letters.count, by: 3) {
+                    guard !Task.isCancelled else { return }
+                    visible = String(letters.prefix(min(end + 2, letters.count)))
+                    do { try await Task.sleep(for: .milliseconds(18)) } catch { return }
+                }
+                visible = full
+                onComplete()
+            }
+    }
+}
 struct IumrahPageHelpCard: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var expanded = false
+    @Environment(\.iumrahHelpInHeader) private var headerMode
+    @State private var expanded = true
     let key: String
     var extraKey: String? = nil
     init(_ key: String, extraKey: String? = nil) { self.key = key; self.extraKey = extraKey }
-    private var label: String {
-        switch settings.language {
-        case .russian: return "Что делать сейчас?"
-        case .uzbek: return "Hozir nima qilish kerak?"
-        case .uzbekCyrillic: return "Ҳозир нима қилиш керак?"
-        default: return "What should I do now?"
-        }
-    }
     var body: some View {
-        if let copy = IumrahPageHelp.text(key, language: settings.language) {
-            VStack(alignment: .leading, spacing: 0) {
+        if headerMode {
+            Color.clear.frame(height: 0)
+                .preference(key: IumrahHelpContextKey.self, value: .init(key: key, extraKey: extraKey))
+                .accessibilityHidden(true)
+        } else if let copy = IumrahPageHelp.text(key, language: settings.language) {
+            VStack(alignment: .leading, spacing: 12) {
                 Button {
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { expanded.toggle() }
                 } label: {
-                    HStack(spacing: 12) {
-                        Text(label).font(IumrahType.bold(17, relativeTo: .headline)).multilineTextAlignment(.leading)
+                    HStack {
+                        Text(IumrahHelpLabel.title(settings.language)).font(IumrahType.bold(17, relativeTo: .headline))
                         Spacer(minLength: 8)
                         Image(systemName: "chevron.down").rotationEffect(.degrees(expanded ? 180 : 0))
-                    }.foregroundStyle(Color.iumrahInk).frame(minHeight: 44)
-                        .contentShape(Rectangle())
+                    }.frame(minHeight: 44).contentShape(Rectangle())
                 }.buttonStyle(.plain)
                 if expanded {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(copy.title).font(IumrahType.bold(22, relativeTo: .title2))
-                        Text(copy.body).font(IumrahType.regular(17, relativeTo: .body))
-                        if let extraKey, let extra = IumrahPageHelp.text(extraKey, language: settings.language) {
-                            Text(extra.body).font(IumrahType.regular(17, relativeTo: .body))
-                        }
-                    }.foregroundStyle(Color.iumrahInk)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 12).padding(.bottom, 8)
+                    IumrahTypedHelpText(copy: copy, extra: extraKey.flatMap { IumrahPageHelp.text($0, language: settings.language)?.body })
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-            }.padding(.horizontal, 20).padding(.vertical, 10)
-                .modifier(IumrahAnimatedSearchBorder())
+            }.foregroundStyle(Color.iumrahInk).padding(18)
+                .modifier(IumrahAnimatedSearchBorder(guidance: true))
+        }
+    }
+}
+struct IumrahHelpOverlayHost: ViewModifier {
+    let enabled: Bool
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @State private var context: IumrahHelpContext?
+    @State private var showing = false
+    @State private var automaticShown = false
+    @State private var closeTask: Task<Void, Never>?
+    func body(content: Content) -> some View {
+        content
+            .environment(\.iumrahHelpInHeader, enabled)
+            .environment(\.iumrahShowPageHelp, { present() })
+            .onPreferenceChange(IumrahHelpContextKey.self) { value in
+                if showing && context != value { closeTask?.cancel() }
+                context = value
+                if enabled && value != nil && !automaticShown {
+                    automaticShown = true
+                    present()
+                }
+            }
+            .overlay(alignment: .top) {
+                if enabled && showing, let context,
+                   let copy = IumrahPageHelp.text(context.key, language: settings.language) {
+                    GeometryReader { viewport in
+                        ZStack(alignment: .topTrailing) {
+                            Color.black.opacity(0.30).ignoresSafeArea()
+                                .onTapGesture { dismiss() }
+                                .accessibilityLabel(IumrahHelpLabel.title(settings.language))
+                                .accessibilityAddTraits(.isButton)
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    Text(IumrahHelpLabel.title(settings.language)).font(.headline)
+                                    IumrahTypedHelpText(copy: copy, extra: context.extraKey.flatMap { IumrahPageHelp.text($0, language: settings.language)?.body }) {
+                                        scheduleDismiss()
+                                    }
+                                }.foregroundStyle(Color.iumrahInk).padding(22)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .modifier(IumrahAnimatedSearchBorder(guidance: true))
+                            }.fixedSize(horizontal: false, vertical: true)
+                                .frame(maxHeight: viewport.size.height * 0.75)
+                                .padding(.horizontal, 18)
+                                .padding(.top, max(12, viewport.safeAreaInsets.top) + 52)
+                                .transition(.scale(scale: 0.08, anchor: .topTrailing).combined(with: .opacity))
+                        }
+                    }.zIndex(100)
+                }
+            }
+            .onChange(of: enabled) { _, active in
+                automaticShown = false
+                dismiss()
+                if active && context != nil { automaticShown = true; present() }
+            }
+            .onDisappear { closeTask?.cancel(); showing = false; automaticShown = false }
+    }
+    private func present() {
+        closeTask?.cancel()
+        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.88)) { showing = true }
+    }
+    private func dismiss() {
+        closeTask?.cancel()
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { showing = false }
+    }
+    private func scheduleDismiss() {
+        guard !voiceOver else { return }
+        closeTask?.cancel()
+        closeTask = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(2500)) } catch { return }
+            guard !Task.isCancelled else { return }
+            dismiss()
         }
     }
 }

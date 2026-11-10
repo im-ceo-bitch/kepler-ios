@@ -55,7 +55,7 @@ struct ESIMView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 110)
             }
-            .refreshable { await refresh() }
+            
         }
         .task(id: activeSession?.id) {
             guard activeSession != nil else { return }
@@ -358,10 +358,10 @@ private struct ESIMProfileCard: View {
                         activate()
                     } label: {
                         HStack {
-                            Image(systemName: "iphone.gen3")
+                            
                             Text(ESIMCopy.text("activate", language))
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
+                            
+                            
                         }
                     }
                     .buttonStyle(IumrahPrimaryButtonStyle())

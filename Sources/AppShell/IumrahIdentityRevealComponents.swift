@@ -308,10 +308,10 @@ struct IumrahIdentityUnlockSheet: View {
                     }
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "person.crop.circle.badge.plus")
+                        
                         Text(primaryCTA)
-                        Spacer()
-                        Image(systemName: "arrow.forward")
+                        
+                        
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())

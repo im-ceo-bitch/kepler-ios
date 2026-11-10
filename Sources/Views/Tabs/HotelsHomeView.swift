@@ -59,7 +59,7 @@ struct HotelsHomeView: View {
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, headerHelp: mode != .hotels, header: {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
@@ -317,8 +317,6 @@ struct HotelsHomeView: View {
                 Text(mode == .hotels
                     ? copy("Найти отели", "Search hotels", "Mehmonxona qidirish", "Меҳмонхона қидириш")
                     : copy("Найти авиабилеты", "Search flights", "Reyslarni qidirish", "Рейсларни қидириш"))
-                Spacer()
-                Image(systemName: "arrow.right").font(.system(size: 18, weight: .semibold))
             }
             .font(.system(size: 16, weight: .bold))
             .foregroundStyle(.white)

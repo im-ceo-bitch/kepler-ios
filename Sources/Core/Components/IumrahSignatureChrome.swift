@@ -149,9 +149,9 @@ struct IumrahSignaturePinnedBar: View {
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(.white)
                     .frame(width: 40, height: 40)
-                    .background(Color.white.opacity(0.10), in: Circle())
+                    
             }
-            .buttonStyle(.plain)
+            .modifier(IumrahNativeChromeButton())
             .accessibilityLabel("Notifications")
 
             if navigationChromeStyle == .drawer {
@@ -160,9 +160,9 @@ struct IumrahSignaturePinnedBar: View {
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.white)
                         .frame(width: 40, height: 40)
-                        .background(Color.white.opacity(0.10), in: Circle())
+                        
                 }
-                .buttonStyle(.plain)
+                .modifier(IumrahNativeChromeButton())
                 .accessibilityLabel("Menu")
             }
         }
@@ -345,6 +345,7 @@ struct IumrahAnimatedSearchBorder: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     var radius: CGFloat = 34
+    var guidance: Bool = false
     func body(content: Content) -> some View {
         content
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
@@ -354,7 +355,7 @@ struct IumrahAnimatedSearchBorder: ViewModifier {
                                          paused: reduceMotion || scenePhase != .active)) { timeline in
                     let rotation = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * 72
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(AngularGradient(colors: [.black, .black, .white, .gray, .black, .white, .black],
+                        .strokeBorder(AngularGradient(colors: guidance ? [.black, .gray.opacity(0.7), .black, Color(white: 0.35), .black] : [.black, .black, .white, .gray, .black, .white, .black],
                             center: .center, startAngle: .degrees(rotation), endAngle: .degrees(rotation + 360)), lineWidth: 3)
                         .allowsHitTesting(false)
                 }

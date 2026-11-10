@@ -42,8 +42,8 @@ struct FlightSearchGateView: View {
                     Button(action: onRetry) {
                         HStack {
                             Text(retryTitle)
-                            Spacer()
-                            Image(systemName: "arrow.clockwise")
+                            
+                            
                         }
                         .frame(maxWidth: .infinity)
                     }

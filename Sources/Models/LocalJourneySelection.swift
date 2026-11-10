@@ -26,18 +26,6 @@ struct LocalJourneyRoom: Codable, Identifiable {
     let childrenAges: [Int]
 }
 
-/// A request, never a priced room. No amount or offer ID exists until confirmed.
-struct LocalJourneyPendingHotel: Codable, Identifiable {
-    let id: String
-    let city: String
-    let hotel: NuiteeHotel
-    let checkin: Date
-    let checkout: Date
-    let adults: Int
-    let childrenAges: [Int]
-    let requestedAt: Date
-}
-
 struct LocalJourneyPriceLine: Identifiable {
     let id: String
     let title: String
@@ -48,7 +36,7 @@ extension JourneyStore {
     var localRoomsComplete: Bool {
         let cities = trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"]
         return cities.allSatisfy { city in
-            (0..<trip.rooms).allSatisfy { localJourneyRooms["\(city):\($0)"] != nil || localPendingHotels["\(city):\($0)"] != nil }
+            (0..<trip.rooms).allSatisfy { localJourneyRooms["\(city):\($0)"] != nil }
         }
     }
 
@@ -111,7 +99,6 @@ struct LocalJourneyRequestSnapshot: Codable {
     let trip: TripDraft
     let flights: [LocalJourneyFlight]
     let rooms: [LocalJourneyRoom]
-    var pendingHotels: [LocalJourneyPendingHotel]? = nil
     let transfer: String
     let trainTickets: Int
     let trainClass: String

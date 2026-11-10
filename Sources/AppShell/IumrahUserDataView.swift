@@ -607,11 +607,11 @@ struct IumrahUserDataView: View {
         } label: {
             HStack(spacing: 10) {
                 if isSaving { ProgressView().tint(.white) }
-                Image(systemName: "checkmark.circle.fill")
+                
                 Text(selectedSection == .booking
                      ? tr("Save booking details", "Сохранить данные бронирования", "Bron ma’lumotlarini saqlash", "Брон маълумотларини сақлаш")
                      : tr("Save account details", "Сохранить данные аккаунта", "Akkaunt ma’lumotlarini saqlash", "Аккаунт маълумотларини сақлаш"))
-                Spacer(minLength: 8)
+                
             }
         }
         .buttonStyle(IumrahPrimaryButtonStyle())

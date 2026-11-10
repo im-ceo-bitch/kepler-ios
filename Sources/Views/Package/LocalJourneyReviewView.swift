@@ -14,7 +14,7 @@ struct LocalJourneyReviewView: View {
             VStack(spacing: 18) {
                 IumrahJourneyHeader(showsNotifications: true) {
                     IumrahJourneyDisclosureCard(title: "Ваша поездка", total: total,
-                        subtitle: "\(journey.trip.travelerCount) чел. · \(journey.trip.rooms) ном.", priceCaption: journey.localPendingHotels.isEmpty ? "Расчёт за всех" : "Без отелей на уточнении") {
+                        subtitle: "\(journey.trip.travelerCount) чел. · \(journey.trip.rooms) ном.", priceCaption: "Расчёт за всех") {
                         if let lines = journey.localPriceLines {
                             ForEach(lines) { line in
                                 HStack(alignment: .top) {
@@ -57,19 +57,6 @@ struct LocalJourneyReviewView: View {
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                         }
-                    }
-                    ForEach(journey.localPendingHotels.values.sorted { $0.id < $1.id }) { pending in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(pending.hotel.name).font(.headline)
-                            Text("Уточнить цену · не включён в сумму пакета")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                            Text("\(pending.checkin.formatted(date: .abbreviated, time: .omitted)) — \(pending.checkout.formatted(date: .abbreviated, time: .omitted))")
-                                .font(.caption)
-                            ShareLink(item: "\(pending.hotel.name) · \(pending.checkin.formatted(date: .abbreviated, time: .omitted)) — \(pending.checkout.formatted(date: .abbreviated, time: .omitted)) · \(pending.adults) гостей. Прошу уточнить наличие и стоимость.") {
-                                Label("Поделиться запросом", systemImage: "square.and.arrow.up")
-                            }
-                        }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
                     }
                     HStack(spacing: 10) {
                         service("Гид", "person.fill", .guide)
@@ -158,11 +145,10 @@ private struct LocalJourneyRequestView: View {
         defer { sending = false }
         let trip = journey.trip
         let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd"; formatter.locale = Locale(identifier: "en_US_POSIX")
-        var snapshot = LocalJourneyRequestSnapshot(version: 2, trip: trip, flights: journey.localJourneyFlights,
+        let snapshot = LocalJourneyRequestSnapshot(version: 3, trip: trip, flights: journey.localJourneyFlights,
             rooms: Array(journey.localJourneyRooms.values), transfer: journey.selectedTransferVehicle?.rawValue ?? "carnival",
             trainTickets: journey.haramainTrainSelected ? journey.haramainTicketCount : 0,
             trainClass: journey.haramainFareClass.rawValue, estimatedTotalUSD: journey.quote?.totalPackagePrice)
-        snapshot.pendingHotels = Array(journey.localPendingHotels.values)
         var request = IumrahCarePackageRequest(locale: settings.language.rawValue, firstName: firstName, lastName: lastName,
             phone: phone, telegram: "", accountID: account.iumrahID, originCode: trip.originCode, timingMode: .exactDates,
             preferredMonth: nil, flexibleWindowDays: nil, exactStartDate: formatter.string(from: trip.departureDate),

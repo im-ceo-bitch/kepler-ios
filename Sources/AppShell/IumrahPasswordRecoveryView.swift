@@ -128,8 +128,8 @@ struct IumrahPasswordRecoveryView: View {
                 HStack {
                     if isWorking { ProgressView().tint(.white) }
                     Text(tr("Send recovery code", "Отправить код", "Tiklash kodini yuborish", "Тиклаш кодини юбориш"))
-                    Spacer()
-                    Image(systemName: "arrow.forward")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -169,8 +169,8 @@ struct IumrahPasswordRecoveryView: View {
             } label: {
                 HStack {
                     Text(tr("Continue", "Продолжить", "Davom etish", "Давом этиш"))
-                    Spacer()
-                    Image(systemName: "arrow.forward")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -216,8 +216,8 @@ struct IumrahPasswordRecoveryView: View {
                 HStack {
                     if isWorking { ProgressView().tint(.white) }
                     Text(tr("Set new password", "Установить новый пароль", "Yangi parol o‘rnatish", "Янги парол ўрнатиш"))
-                    Spacer()
-                    Image(systemName: "checkmark.shield.fill")
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())

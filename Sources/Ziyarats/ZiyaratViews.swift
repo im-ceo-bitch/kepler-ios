@@ -118,7 +118,7 @@ struct ZiyaratJourneyView: View {
         .navigationTitle("iumrah Ziyarats")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .refreshable { await load(city: selectedCity) }
+        
         .task(id: selectedCity) { await load(city: selectedCity) }
         .sheet(item: $selectedPlace) { place in
             ZiyaratPlaceDetailSheet(place: place, copy: copy)

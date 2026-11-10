@@ -1095,8 +1095,8 @@ struct BookingDetailView: View {
                     HStack {
                         if isRequestingConfirmation { ProgressView().tint(.white) }
                         Text(L10n.text("booking_request_confirmation", settings.language))
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
+                        
+                        
                     }
                     .frame(maxWidth: .infinity)
                 }

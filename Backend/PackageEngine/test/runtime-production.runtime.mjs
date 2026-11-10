@@ -889,3 +889,21 @@ test('Data API forced fare recheck bypasses its public edge TTL', async () => {
     globalThis.fetch = previousFetch;
   }
 });
+
+
+test('Data API preserves supplier arrival timestamps and leaves absent arrivals unknown', async () => {
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ success: true, currency: 'usd', data: [
+    { origin: 'TAS', destination: 'JED', price: 320, airline: 'XY', flight_number: '634',
+      departure_at: '2027-03-03T14:30:00+05:00', arrival_at: '2027-03-03T19:15:00+03:00', duration: 405 },
+    { origin: 'TAS', destination: 'JED', price: 350, airline: 'HY', flight_number: '335',
+      departure_at: '2027-03-04T14:30:00+05:00', duration: 405 }
+  ] });
+  try {
+    const response = await publicAviasalesData(new URL('https://iumrah.app/api/package/flights/data?origin=TAS&destination=JED&departure=2027-03&view=offers'), { TRAVELPAYOUTS_API_TOKEN: 'test' });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.offers.find(x => x.flightNumber === '634').arrivalAt, '2027-03-03T19:15:00+03:00');
+    assert.equal(body.offers.find(x => x.flightNumber === '335').arrivalAt, null);
+  } finally { globalThis.fetch = previousFetch; }
+});

@@ -819,6 +819,7 @@ struct HotelStorefrontCard: View {
                 .clipped()
 
                 VStack(alignment: .leading, spacing: 7) {
+                    Text("iumrah Direct").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
                     Text(hotel.name)
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .tracking(-0.2)
@@ -1658,12 +1659,11 @@ struct StorefrontUmrahPackageDetailView: View {
                     showMadinahFirstCityPicker = true
                 } label: {
                     HStack {
-                        Image(systemName: "plus.circle.fill")
+                        
                         Text(addMadinahTitle)
                             .font(.headline)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
+                        
+                        
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
@@ -2038,10 +2038,10 @@ struct StorefrontUmrahPackageDetailView: View {
                 presentPackageShare(invitation: true)
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "person.badge.plus")
+                    
                     Text(invitePilgrimTitle)
-                    Spacer()
-                    Image(systemName: "square.and.arrow.up")
+                    
+                    
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -2153,9 +2153,9 @@ struct StorefrontUmrahPackageDetailView: View {
                             .opacity(0.76)
                     }
                 }
-                Spacer(minLength: 8)
+                
                 if !isSubmitting {
-                    Image(systemName: "arrow.right")
+                    
                 }
             }
             .frame(maxWidth: .infinity)
@@ -3850,8 +3850,8 @@ struct StorefrontPackageInformationSheet: View {
             Link(destination: URL(string: "https://visa.visitsaudi.com/")!) {
                 HStack {
                     Label(officialVisaSourceTitle, systemImage: "safari.fill")
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
+                    
+                    
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -3930,7 +3930,7 @@ struct StorefrontPackageInformationSheet: View {
             Link(destination: URL(string: "https://t.me/saudiclub966")!) {
                 HStack {
                     Label(tr("Написать Абдулазизу", "Message Abdulaziz", "Abdulazizga yozish", "Абдулазизга ёзиш"), systemImage: "paperplane.fill")
-                    Spacer()
+                    
                     Text("Telegram")
                         .font(.caption.weight(.semibold))
                         .opacity(0.74)
@@ -3942,7 +3942,7 @@ struct StorefrontPackageInformationSheet: View {
             Link(destination: URL(string: "tel:+998508898845")!) {
                 HStack {
                     Label(callTitle, systemImage: "phone.fill")
-                    Spacer()
+                    
                     Text("+998 50 889 88 45")
                         .font(.caption.weight(.semibold))
                         .opacity(0.74)
@@ -3994,8 +3994,8 @@ struct StorefrontPackageInformationSheet: View {
                 } label: {
                     HStack {
                         Label(tr("Открыть политику возврата", "Open refund policy", "Qaytarish siyosatini ochish", "Қайтариш сиёсатини очиш"), systemImage: "arrow.uturn.backward.circle.fill")
-                        Spacer()
-                        Image(systemName: "chevron.right")
+                        
+                        
                     }
                     .frame(maxWidth: .infinity)
                 }

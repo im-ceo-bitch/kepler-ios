@@ -578,8 +578,8 @@ struct PilgrimCheckoutView: View {
                 HStack {
                     if isSubmittingAccount { ProgressView().tint(.white) }
                     Text(activationPrimaryTitle)
-                    Spacer()
-                    Image(systemName: activationMethod == .sms ? "message.badge" : (activationMethod == .email && activationEmailChallengeID.isEmpty ? "envelope.badge.fill" : "arrow.right"))
+                    
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -797,7 +797,7 @@ struct PilgrimCheckoutView: View {
                     Text(existingLoginChallengePending
                         ? tr("Confirm code and sign in", "Подтвердить код и войти", "Kodni tasdiqlab kirish", "Кодни тасдиқлаб кириш")
                         : tr("Send sign-in code", "Отправить код для входа", "Kirish kodini yuborish", "Кириш кодини юбориш"))
-                    Spacer(); Image(systemName: "arrow.forward")
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1066,10 +1066,10 @@ struct PilgrimCheckoutView: View {
                         PhotosPicker(selection: $receiptPhoto, matching: .images) {
                             HStack {
                                 if isUploadingReceipt { ProgressView().tint(.white) }
-                                Image(systemName: "paperclip")
+                                
                                 Text(tr("Attach payment receipt", "Прикрепить чек оплаты", "To‘lov chekini biriktirish", "Тўлов чекини бириктириш"))
-                                Spacer()
-                                Image(systemName: "arrow.up")
+                                
+                                
                             }
                         }
                         .buttonStyle(IumrahPrimaryButtonStyle())
@@ -1120,10 +1120,10 @@ struct PilgrimCheckoutView: View {
             if let url = receipt.url, !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Button { Task { await openReceipt(receipt) } } label: {
                     HStack {
-                        if isLoadingDocument { ProgressView().tint(.white) } else { Image(systemName: "doc.text.image.fill") }
+                        if isLoadingDocument { ProgressView().tint(.white) }
                         Text(tr("Open payment receipt", "Открыть чек оплаты", "To‘lov chekini ochish", "Тўлов чекини очиш"))
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
+                        
+                        
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
@@ -2041,9 +2041,9 @@ private struct TravelerFormEditorSheet: View {
                     Button { Task { await save() } } label: {
                         HStack(spacing: 10) {
                             if isSaving { ProgressView().tint(.white) }
-                            Image(systemName: "checkmark.circle.fill")
+                            
                             Text(tr("Save pilgrim", "Сохранить анкету", "Anketani saqlash", "Анкетани сақлаш"))
-                            Spacer(minLength: 10)
+                            
                         }
                     }
                     .buttonStyle(IumrahPrimaryButtonStyle())

@@ -19,6 +19,7 @@ struct FlightDiscoveryOffer: Codable, Hashable, Identifiable {
     let durationMinutes: Int
     let returnDurationMinutes: Int?
     let bookingUrl: String?
+    var arrivalAt: String? = nil
     // Future-compatible segment details. Missing fields are never fabricated.
     var outboundSegments: [FlightDiscoveryVerifiedSegment]? = nil
     var inboundSegments: [FlightDiscoveryVerifiedSegment]? = nil
@@ -71,6 +72,7 @@ struct FlightDiscoveryCalendarDay: Codable, Hashable, Identifiable {
     let durationMinutes: Int
     let returnDurationMinutes: Int?
     let bookingUrl: String?
+    var arrivalAt: String? = nil
 
     var offer: FlightDiscoveryOffer {
         FlightDiscoveryOffer(
@@ -90,7 +92,8 @@ struct FlightDiscoveryCalendarDay: Codable, Hashable, Identifiable {
             returnTransfers: returnTransfers,
             durationMinutes: durationMinutes,
             returnDurationMinutes: returnDurationMinutes,
-            bookingUrl: bookingUrl
+            bookingUrl: bookingUrl,
+            arrivalAt: arrivalAt
         )
     }
 }

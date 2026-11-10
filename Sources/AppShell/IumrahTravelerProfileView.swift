@@ -222,10 +222,10 @@ struct IumrahTravelerProfileView: View {
                 } label: {
                     HStack(spacing: 10) {
                         if isUploading { ProgressView().tint(.white) }
-                        Image(systemName: "arrow.up.doc.fill")
+                        
                         Text(tr("Attach passport", "Прикрепить паспорт", "Pasportni biriktirish", "Паспортни бириктириш"))
-                        Spacer()
-                        Image(systemName: "arrow.forward")
+                        
+                        
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
@@ -313,9 +313,9 @@ struct IumrahTravelerProfileView: View {
             } label: {
                 HStack(spacing: 10) {
                     if isSavingManual { ProgressView().tint(.white) }
-                    Image(systemName: "checkmark")
+                    
                     Text(tr("Save manual details", "Сохранить ручные данные", "Qo‘lda kiritilganlarni saqlash", "Қўлда киритилганларни сақлаш"))
-                    Spacer()
+                    
                 }
             }
             .buttonStyle(IumrahPrimaryButtonStyle())

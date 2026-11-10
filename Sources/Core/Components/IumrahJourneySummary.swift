@@ -68,8 +68,8 @@ struct IumrahTransferRouteDetails: View {
     private var madinahFirst: Bool { includesMadinah && journey.trip.arrivalAirport == .madinah }
     private var firstHotel: String { madinahFirst ? madinahHotel : makkahHotel }
     private var lastHotel: String { includesMadinah && !madinahFirst ? madinahHotel : makkahHotel }
-    private var makkahHotel: String { journey.localJourneyRooms["makkah:0"]?.hotel.name ?? journey.localPendingHotels["makkah:0"]?.hotel.name ?? journey.selectedHotel?.name ?? city(false) }
-    private var madinahHotel: String { journey.localJourneyRooms["madinah:0"]?.hotel.name ?? journey.localPendingHotels["madinah:0"]?.hotel.name ?? journey.selectedMadinahHotel?.name ?? city(true) }
+    private var makkahHotel: String { journey.localJourneyRooms["makkah:0"]?.hotel.name ?? journey.selectedHotel?.name ?? city(false) }
+    private var madinahHotel: String { journey.localJourneyRooms["madinah:0"]?.hotel.name ?? journey.selectedMadinahHotel?.name ?? city(true) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {

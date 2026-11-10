@@ -59,9 +59,7 @@ struct AccountNotificationsView: View {
         .navigationTitle(signalTitle)
         .navigationBarTitleDisplayMode(.inline)
         .iumrahInternalNavigation()
-        .refreshable {
-            await clientNotifications.refresh(accountToken: account.bearerToken)
-        }
+        
         .task {
             await clientNotifications.refresh(accountToken: account.bearerToken)
         }

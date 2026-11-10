@@ -97,8 +97,6 @@ struct IumrahFlightFirstTransferPickerView: View {
                 } label: {
                     HStack {
                         Text(tr("Далее: выбрать отели", "Next: choose hotels", "Keyingi: mehmonxonalar", "Кейинги: меҳмонхоналар"))
-                        Spacer()
-                        Image(systemName: "arrow.right")
                     }
                     .frame(height: 56)
                 }

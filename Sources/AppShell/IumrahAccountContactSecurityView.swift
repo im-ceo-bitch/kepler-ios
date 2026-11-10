@@ -1054,10 +1054,10 @@ private struct IumrahAccountRecoveryHelpView: View {
                         DispatchQueue.main.async { openCare() }
                     } label: {
                         HStack(spacing: 10) {
-                            Image(systemName: "heart.fill")
+                            
                             Text(tr("Open iumrah Care", "Открыть iumrah Care", "iumrah Care’ni ochish", "iumrah Care’ни очиш"))
-                            Spacer(minLength: 8)
-                            Image(systemName: "arrow.forward")
+                            
+                            
                         }
                     }
                     .buttonStyle(IumrahPrimaryButtonStyle())

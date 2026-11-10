@@ -61,7 +61,7 @@ struct IumrahAccountSecurityView: View {
         .navigationTitle(tr("Security", "Безопасность", "Xavfsizlik", "Хавфсизлик"))
         .navigationBarTitleDisplayMode(.inline)
         .iumrahInternalNavigation()
-        .refreshable { await load() }
+        
         .task { await load() }
         .sheet(isPresented: $showingPrimarySheet) { primaryDeviceSheet }
         .sheet(isPresented: $showingEmailSheet, onDismiss: { Task { await load() } }) {
@@ -616,7 +616,7 @@ struct IumrahAccountSecurityView: View {
                     HStack {
                         if isClaimingPrimary { ProgressView().tint(.white) }
                         Label(tr("Confirm and protect", "Подтвердить и защитить", "Tasdiqlash va himoyalash", "Тасдиқлаш ва ҳимоялаш"), systemImage: "checkmark.shield.fill")
-                        Spacer()
+                        
                     }
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())

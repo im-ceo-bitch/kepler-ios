@@ -59,13 +59,11 @@ test('booking and support feature functional hero capsules', () => {
 test('all five mastheads scroll offscreen upward and never stretch on refresh pull', () => {
   const scrolling = read('Sources/Core/Components/IumrahRootScrollingPage.swift');
   assert.match(scrolling, /ScrollView\(showsIndicators: false\)/);
-  assert.match(scrolling, /masthead[\s\S]*?\.offset\(y: -overscroll\)/);
-  assert.match(scrolling, /max\(0, scrollTop\)/);
-  assert.match(scrolling, /if refreshing \|\| overscroll > 18/);
-  assert.match(scrolling, /ProgressView\(\)/);
-  assert.match(scrolling, /distance >= 76, !refreshing/);
-  assert.match(scrolling, /IumrahPullObserver/);
-  assert.match(scrolling, /await onRefresh\(\)/);
+  assert.match(scrolling, /IumrahNoVerticalBounce/);
+  assert.match(chrome, /scroll\.bounces = false/);
+  assert.match(chrome, /scroll\.alwaysBounceVertical = false/);
+  assert.doesNotMatch(scrolling, /ProgressView\(\)|IumrahPullObserver|await onRefresh\(\)/);
+  assert.doesNotMatch(scrolling, /offset\(y: -overscroll\)/);
   assert.doesNotMatch(scrolling, /\.refreshable\s*\{/);
   assert.match(home, /IumrahRootScrollingPage\(onRefresh:/);
   assert.match(home, /presentation: \.header/);

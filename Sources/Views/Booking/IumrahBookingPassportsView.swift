@@ -70,7 +70,7 @@ struct IumrahBookingPassportsView: View {
         .navigationTitle(tr("Passports", "Паспорта", "Pasportlar", "Паспортлар"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .refreshable { await loadCheckout(showLoader: false) }
+        
         .task { await loadCheckout(showLoader: true) }
     }
 

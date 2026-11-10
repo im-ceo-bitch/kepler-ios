@@ -40,8 +40,7 @@ struct IumrahPasswordSecurityView: View {
                         HStack {
                             if isWorking { ProgressView().tint(.white) }
                             Text(tr("Change password", "Изменить пароль", "Parolni o‘zgartirish", "Паролни ўзгартириш"))
-                            Spacer()
-                            if !isWorking { Image(systemName: "checkmark.shield.fill") }
+
                         }
                         .frame(maxWidth: .infinity)
                     }

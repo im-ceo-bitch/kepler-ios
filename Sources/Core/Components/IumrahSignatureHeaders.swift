@@ -20,6 +20,7 @@ struct IumrahPrimaryHeaderBrandRow: View {
     @EnvironmentObject private var chrome: AppChromeStore
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
+    @Environment(\.iumrahHelpInHeader) private var helpInHeader
     @ObservedObject private var notifications = ClientNotificationCenter.shared
 
     var body: some View {
@@ -52,6 +53,7 @@ struct IumrahPrimaryHeaderBrandRow: View {
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
 
+            if helpInHeader { IumrahPageHelpButton() } else {
             Button { chrome.openNotifications() } label: {
                 Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
                     .font(.system(size: 17, weight: .medium))
@@ -62,6 +64,7 @@ struct IumrahPrimaryHeaderBrandRow: View {
                 ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar",
                 cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
             .frame(width: 48, height: 48)
+            }
         }
         .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
         .foregroundStyle(.white)

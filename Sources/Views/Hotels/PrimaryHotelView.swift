@@ -217,7 +217,6 @@ struct PrimaryHotelView: View {
         HStack(spacing: 10) {
             if isPreparingPublishedPackage { ProgressView().tint(.white) }
             Text(text)
-            if !isPreparingPublishedPackage { Image(systemName: "arrow.forward") }
         }
         .frame(maxWidth: .infinity)
     }

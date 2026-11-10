@@ -284,12 +284,11 @@ struct IumrahTransferServiceView: View {
                     }
                 } label: {
                     HStack(spacing: 10) {
-                        Image(systemName: "car.fill")
+                        
                         Text(localized("Заказать автомобиль", "Book vehicle", "Avtomobil buyurtma qilish", "Автомобиль буюртма қилиш"))
                             .font(.headline)
-                        Spacer()
-                        Image(systemName: "arrow.right")
-                            .font(.caption.weight(.bold))
+                        
+                        
                     }
                     .frame(maxWidth: .infinity)
                 }

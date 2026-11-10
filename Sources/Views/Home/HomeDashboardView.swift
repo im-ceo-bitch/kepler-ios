@@ -108,16 +108,10 @@ struct HomeDashboardView: View {
                 await clientNotifications.refresh(accountToken: account.bearerToken)
                 await storefront.refresh()
             }, searchCardOverlap: 40, header: {
-                IumrahHomeJourneySearchHero(onSearch: {
-                    Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "start_trip_search") }
-                    showGuidedFlightSelection = true
-                }, presentation: .header)
+                IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header)
             }, content: {
                 LazyVStack(spacing: 30) {
-                    IumrahHomeJourneySearchHero(onSearch: {
-                    Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "start_trip_search") }
-                    showGuidedFlightSelection = true
-                }, presentation: .search)
+                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
                     IumrahPageHelpCard("home.default")
@@ -445,8 +439,7 @@ struct HomeDashboardView: View {
 
                     HStack(spacing: 6) {
                         Text(ziyaratsHomeCTA)
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.top, 2)
@@ -619,7 +612,6 @@ struct HomeDashboardView: View {
 
     private var allPackagesCard: some View {
         Button {
-            Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "open_flights") }
             chrome.openHotels(board: .flights)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
@@ -647,9 +639,7 @@ struct HomeDashboardView: View {
 
                     HStack {
                         Text(allPackagesCTA)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 15)
@@ -743,7 +733,6 @@ struct HomeDashboardView: View {
     private var allHotelFirstPackagesCard: some View {
         Button {
             IumrahHaptics.selection()
-            Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "open_hotels") }
             chrome.openHotels(board: .hotels)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
@@ -764,9 +753,7 @@ struct HomeDashboardView: View {
                     Spacer(minLength: 0)
                     HStack {
                         Text(hotelFirstAllCTA)
-                        Spacer()
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.subheadline.weight(.bold))
                 }
                 .padding(14)
@@ -970,9 +957,7 @@ struct HomeDashboardView: View {
 
                     HStack(spacing: 10) {
                         Text(careRequestCardCTA)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.headline)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 18)
@@ -1424,9 +1409,7 @@ struct HomeDashboardView: View {
 
                     HStack(spacing: 10) {
                         Text(configuratorHeroCTA)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.headline)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 18)
@@ -1818,9 +1801,7 @@ struct HomeDashboardView: View {
 
                     HStack(spacing: 10) {
                         Text(homeAboutCTA)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.system(size: 15.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.iumrahPrimaryButtonText)
                     .padding(.horizontal, 17)
@@ -1930,9 +1911,7 @@ struct HomeDashboardView: View {
 
                     HStack(spacing: 8) {
                         Text(sundayClubProductCTA)
-                        Spacer(minLength: 8)
-                        Image(systemName: "arrow.right")
-                    }
+                    }.frame(maxWidth: .infinity)
                     .font(.system(size: 15.5, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 17)
@@ -2054,10 +2033,7 @@ struct HomeDashboardView: View {
 
                         HStack(spacing: 8) {
                             Text(homeAdvisorProductCTA)
-                            Spacer(minLength: 8)
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 13, weight: .bold))
-                        }
+                        }.frame(maxWidth: .infinity)
                         .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 17)
@@ -2421,7 +2397,7 @@ private struct IumrahHomeJourneySearchHero: View {
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var chrome: AppChromeStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
-    @State private var searchExpanded = false
+    @State private var searchExpanded = true
     @State private var showingCalendar = false
     @State private var showingPassengers = false
 
@@ -2541,15 +2517,6 @@ private struct IumrahHomeJourneySearchHero: View {
 
     private var searchFields: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(headlineOptions[headlineIndex])
-                .id(headlineIndex)
-                .transition(.opacity)
-                .lineLimit(2)
-                .frame(minHeight: 26, alignment: .leading)
-                .font(IumrahType.bold(22, relativeTo: .title2))
-                .foregroundStyle(Color.iumrahInk)
-
-            Divider()
             VStack(alignment: .leading, spacing: 5) {
                 AirportSelectorButton(airport: $journey.trip.originAirport,
                                       fallbackCode: $journey.trip.origin,
@@ -2624,8 +2591,6 @@ private struct IumrahHomeJourneySearchHero: View {
             Button(action: { searchExpanded = false; findFlights() }) {
                 HStack(spacing: 10) {
                     Text(tr("Найти авиабилеты", "Find flights", "Reyslarni topish", "Рейсларни топиш"))
-                    Spacer()
-                    Image(systemName: "arrow.right")
                 }
                 .font(IumrahType.bold(16, relativeTo: .headline))
                 .foregroundStyle(.white)
@@ -2639,12 +2604,7 @@ private struct IumrahHomeJourneySearchHero: View {
             .disabled(!isValidSearch)
             .opacity(isValidSearch ? 1 : 0.5)
 
-            Text(tr("Рейс → Отель → Трансфер → Итог", "Flight → Hotel → Transfer → Review",
-                    "Reys → Mehmonxona → Transfer → Yakun", "Рейс → Меҳмонхона → Трансфер → Якун"))
-                .font(IumrahType.regular(12, relativeTo: .caption))
-                .foregroundStyle(Color.iumrahMuted)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
+
         }
         .padding(18)
 

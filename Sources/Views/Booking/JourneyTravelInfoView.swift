@@ -164,9 +164,7 @@ struct JourneyTravelInfoView: View {
         .onChange(of: page) { _, _ in
             IumrahHaptics.selection()
         }
-        .refreshable {
-            await model.refresh(city: city, force: true)
-        }
+        
     }
 
     private var holyCityPicker: some View {
@@ -1356,7 +1354,7 @@ struct IumrahWeatherFullScreenView: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 20)
             }
-            .refreshable { await model.refresh(city: city, force: true) }
+            
         }
         .task(id: city.rawValue) { await model.refresh(city: city) }
         .preferredColorScheme(.dark)

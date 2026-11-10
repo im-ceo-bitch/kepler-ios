@@ -241,9 +241,8 @@ struct ReturnFlightView: View {
         } label: {
             HStack(spacing: 10) {
                 Text(continueToTransferTitle)
-                Spacer(minLength: 12)
-                Image(systemName: "arrow.forward")
-                    .font(.system(size: 16, weight: .bold))
+                
+                
             }
             .padding(.horizontal, 20)
             .frame(height: 58)

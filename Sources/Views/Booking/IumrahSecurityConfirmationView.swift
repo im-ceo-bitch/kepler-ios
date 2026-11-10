@@ -459,8 +459,8 @@ struct IumrahSecurityConfirmationView: View {
                         HStack {
                             if isSMSBusy { ProgressView().tint(.white) }
                             Text(tr("Send SMS code", "Отправить SMS-код", "SMS kodini yuborish", "SMS кодини юбориш"))
-                            Spacer()
-                            Image(systemName: "arrow.up.message.fill")
+                            
+                            
                         }
                     }
                     .buttonStyle(IumrahPrimaryButtonStyle())
@@ -497,8 +497,8 @@ struct IumrahSecurityConfirmationView: View {
                         HStack {
                             if isSMSBusy { ProgressView().tint(.white) }
                             Text(tr("Confirm number", "Подтвердить номер", "Raqamni tasdiqlash", "Рақамни тасдиқлаш"))
-                            Spacer()
-                            Image(systemName: "checkmark.shield.fill")
+                            
+                            
                         }
                     }
                     .buttonStyle(IumrahPrimaryButtonStyle())

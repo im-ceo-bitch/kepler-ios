@@ -97,9 +97,7 @@ struct TransferSelectionView: View {
                             title: localized("Ваш трансфер", "Your transfer", "Transferingiz", "Трансферингиз"),
                             total: currentPackagePriceTitle,
                             subtitle: "\(journey.trip.travelerCount) · " + routeTitle,
-                            priceCaption: !journey.localPendingHotels.isEmpty
-                                ? localized("Без отелей на уточнении", "Excludes pending hotels", "Aniqlanayotgan mehmonxonalarsiz", "Аниқланаётган меҳмонхоналарсиз")
-                                : journey.hasFinalGeneratorQuote
+                            priceCaption: journey.hasFinalGeneratorQuote
                                 ? localized("Итого за пакет", "Package total", "Paket jami", "Пакет жами")
                                 : localized("Предварительно за пакет", "Estimated package total", "Taxminiy paket jami", "Тахминий пакет жами")
                         ) {
@@ -495,7 +493,7 @@ struct TransferSelectionView: View {
         } label: {
             HStack(spacing: 10) {
                 if isConfirming { ProgressView().tint(.white) }
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .center, spacing: 2) {
                     Text(isConfirming ? confirmingTitle : (familyFlow ? localized("Собрать пакет","Build package","Paketni yig‘ish","Пакетни йиғиш") : confirmTitle))
                     if !isConfirming {
                         Text(currentPackagePriceTitle)
@@ -503,8 +501,7 @@ struct TransferSelectionView: View {
                             .opacity(0.74)
                     }
                 }
-                Spacer(minLength: 10)
-                if !isConfirming { Image(systemName: "arrow.forward") }
+
             }
             .frame(maxWidth: .infinity)
         }

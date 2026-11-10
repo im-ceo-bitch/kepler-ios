@@ -205,7 +205,7 @@ struct AirportRouteMapPickerView: View {
                     commitRoute()
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "airplane")
+                        
                         Text(tr("Использовать маршрут", "Use this route", "Yo‘nalishni tanlash", "Йўналишни танлаш"))
                     }
                 }

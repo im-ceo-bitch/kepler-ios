@@ -46,7 +46,7 @@ struct IumrahTravelCompanionsView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .refreshable { await loadTravelers() }
+        
         .task { await loadTravelers() }
     }
 

@@ -1366,11 +1366,16 @@ struct HomeDashboardView: View {
                 ZStack {
                     Color.black
 
-                    Image("StoreConfiguratorPhones")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
+                    IumrahOrbitIconRing(
+                        mode: .showcase,
+                        diameter: 196,
+                        lightOnDark: true,
+                        rotationDuration: 11,
+                        revealDuration: 1.3
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 215)
+                    .accessibilityIdentifier("iumrah.orbit.home.configurator")
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 220)

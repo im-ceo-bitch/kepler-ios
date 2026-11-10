@@ -26,6 +26,8 @@ export type PricingHotelInput = {
 };
 
 export type GeneratorPricingSnapshot = {
+  nuiteeRooms?: import("./nuitee-hotels").NuiteePackageRoom[];
+  bookingAllowed?: boolean;
   quoteId: string;
   pricingVersion: string;
   currency: "USD";

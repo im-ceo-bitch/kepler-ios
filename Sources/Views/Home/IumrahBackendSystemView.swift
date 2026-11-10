@@ -261,7 +261,7 @@ struct IumrahBackendSystemHomeCard: View {
                     diameter: 214,
                     lightOnDark: true,
                     rotationDuration: IumrahFoundation.Motion.orbitRevolution,
-                    revealDuration: IumrahFoundation.Motion.orbitReveal
+                    revealDuration: 1.3
                 )
                 .frame(maxWidth: .infinity)
                 .frame(height: 220)

@@ -46,6 +46,7 @@ function sameNumber(a: unknown, b: unknown, tolerance = 0.011) {
 }
 
 function assertBookingMatchesSnapshot(booking: Record<string, any>, snapshot: GeneratorPricingSnapshot) {
+  if (snapshot.bookingAllowed === false) throw new Error("SANDBOX_QUOTE_NOT_BOOKABLE");
   if (!sameNumber(booking.totalUsd, snapshot.totals.publicTotalUsd)) throw new Error("BOOKING_QUOTE_TOTAL_MISMATCH");
   if (!sameNumber(booking.perPilgrimUsd, snapshot.totals.publicPricePerPilgrimUsd)) throw new Error("BOOKING_QUOTE_PER_PERSON_MISMATCH");
   if (String(booking.planId ?? booking.input?.preferredPlan ?? "") !== snapshot.context.tier) throw new Error("BOOKING_QUOTE_TIER_MISMATCH");

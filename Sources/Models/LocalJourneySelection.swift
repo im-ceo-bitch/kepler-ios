@@ -41,68 +41,47 @@ extension JourneyStore {
     }
 
     var localPriceLines: [LocalJourneyPriceLine]? {
-        guard localJourneyFlights.count == 2, localRoomsComplete,
-              localJourneyFlights.allSatisfy({ ($0.displayedPrice ?? 0) > 0 }) else { return nil }
-        // Data API flight amounts are adult-unit quotes. It is unsafe to
-        // multiply by children/infants: their fare class and ticketing terms
-        // are different. In that case no fabricated aggregate is displayed.
-        guard trip.children == 0, trip.infants == 0, trip.adults > 0 else { return nil }
-        let people = Decimal(trip.adults)
-        var lines = localJourneyFlights.enumerated().map { index, flight in
-            LocalJourneyPriceLine(id: "flight:\(index)", title: "\(flight.origin) → \(flight.destination)",
-                                  amount: Decimal(flight.displayedPrice!) * people)
-        }
-        for room in localJourneyRooms.values.sorted(by: { $0.id < $1.id }) {
-            guard room.rate.currency == "USD", room.rate.price.isFinite, room.rate.price > 0 else { return nil }
-            lines.append(.init(id: room.id, title: room.hotel.name + " · " + room.rate.roomName, amount: Decimal(room.rate.price)))
-        }
-        // Existing service costs, markup and fee are preserved from pricing.ts v9.
-        let both = trip.scope == .makkahAndMadinah
-        lines.append(.init(id: "visa", title: "Визы", amount: 120 * people))
-        lines.append(.init(id: "transfer", title: "Трансфер", amount: 300))
-        lines.append(.init(id: "guide", title: "Сопровождение", amount: both ? 300 : 100))
-        lines.append(.init(id: "ziyarat", title: "Зияраты", amount: both ? 200 : 100))
-        let stay = TripStayPlanner.breakdown(for: trip)
-        let diners = Decimal(trip.adults + trip.children)
-        var meals: Decimal = 0
-        if trip.packageTier == .economy || trip.packageTier == .standard {
-            meals = 15 * Decimal(stay.totalDays) * diners
-        } else {
-            let unit: Decimal = trip.packageTier == .luxury ? 50 : 30
-            if isMealEnabled(.lunch, city: .makkah) { meals += unit * Decimal(stay.makkahNights) * diners }
-            if isMealEnabled(.dinner, city: .makkah) { meals += unit * Decimal(stay.makkahNights) * diners }
-            if both && isMealEnabled(.dinner, city: .madinah) { meals += unit * Decimal(stay.madinahNights) * diners }
-        }
-        lines.append(.init(id: "meals", title: "Питание и обслуживание", amount: meals))
-        let subtotal = lines.reduce(Decimal.zero) { $0 + $1.amount }
-        let marked = subtotal * (trip.packageTier == .luxury ? Decimal(string: "1.35")! : Decimal(string: "1.25")!)
-        let selling = marked / Decimal(string: "0.98")!
-        let perPerson = NSDecimalNumber(decimal: selling / people / 5).doubleValue.rounded() * 5
-        let rounded = Decimal(max(5, perPerson)) * people
-        lines.append(.init(id: "organization", title: "Организация, комиссия и округление", amount: rounded - subtotal))
-        let upgrade = (selectedTransferVehicle ?? recommendedTransferVehicle()).publicUpgradeUsd(for: trip.scope)
-        if upgrade > 0 { lines.append(.init(id: "vehicle", title: "Класс трансфера", amount: upgrade)) }
-        if both && haramainTrainSelected { lines.append(.init(id: "train", title: "Haramain", amount: haramainTrainAddOnUsd)) }
-        return lines
+        guard hasFinalGeneratorQuote, let quote else { return nil }
+        return [.init(id: "server-total", title: "iumrah", amount: quote.totalPackagePrice)]
     }
 
-    func rebuildLocalJourneyQuote() {
-        guard let lines = localPriceLines else { quote = nil; return }
-        let total = lines.reduce(Decimal.zero) { $0 + $1.amount }
-        quote = PackageQuote(totalPackagePrice: total, pricePerPerson: total / Decimal(trip.travelerCount),
-                             currency: "USD", isEstimated: true, quoteId: "local-\(UUID().uuidString)")
+    /// Selection changes invalidate the server quote. The phone never prices a package.
+    func invalidateLocalJourneyQuote() {
+        quote = nil
     }
+
+    var localBookingRooms: [BookingNuiteeRoomSelection] {
+        localJourneyRooms.values.sorted { $0.id < $1.id }.map(\.bookingSelection)
+    }
+    var localBookingInputKey: String {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        let rooms = (try? encoder.encode(localBookingRooms)).flatMap { String(data:$0,encoding:.utf8) } ?? ""
+        return rooms + "|" + String(trip.hashValue) + "|" + (selectedTransferVehicle?.rawValue ?? "") + "|" + String(haramainTrainSelected) + "|" + String(haramainTicketCount) + "|" + haramainFareClass.rawValue
+    }
+    var localPackageTier: PackageTier? {
+        let stars = localJourneyRooms.values.map { $0.hotel.roundedStars }
+        guard !stars.isEmpty, stars.allSatisfy({ (1...5).contains($0) }), let highest = stars.max() else { return nil }
+        return highest <= 2 ? .economy : highest <= 4 ? .standard : .luxury
+    }
+
 }
 
-struct LocalJourneyRequestSnapshot: Codable {
-    let version: Int
-    let trip: TripDraft
-    let flights: [LocalJourneyFlight]
-    let rooms: [LocalJourneyRoom]
-    let transfer: String
-    let trainTickets: Int
-    let trainClass: String
-    let estimatedTotalUSD: Decimal?
+extension LocalJourneyRoom {
+    var bookingSelection: BookingNuiteeRoomSelection {
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+        return .init(id:id, city:city, hotelId:hotel.id, offerId:rate.offerId, roomId:rate.roomId,
+                     checkin:f.string(from:checkin), checkout:f.string(from:checkout), adults:adults, children:childrenAges)
+    }
+    var bookingHotel: HotelSummary {
+        HotelSummary(id:hotel.id, name:hotel.name, city:city == "madinah" ? "Madinah" : "Makkah",
+            stars:hotel.roundedStars, rating:nil, reviewCount:nil, status:"available", coverImageURL:hotel.coverImageURL,
+            imageCount:hotel.previewImages?.count ?? 0, roomCount:1, price:nil, updatedAt:"")
+    }
+    var bookingRoom: HotelRoom {
+        HotelRoom(id:rate.roomId, name:rate.roomName, maxGuests:adults + childrenAges.count,
+            sizeM2:nil, beds:nil, view:nil, description:rate.mealPlan, amenities:[])
+    }
 }
 
 /// Supplier revalidation used by Hotels, Transfer and Review pull-to-refresh.
@@ -140,6 +119,21 @@ extension JourneyStore {
                 }
             }
         }
-        rebuildLocalJourneyQuote()
+        invalidateLocalJourneyQuote()
+    }
+}
+
+
+enum ConfiguratorBookingCopy {
+    static func message(_ code: String, language: AppSettingsStore.Language) -> String {
+        let values: [String]
+        if code.contains("AVIASALES_PARTY_FARE_UNAVAILABLE") {
+            values = ["Для этого рейса API не подтвердил тарифы детей и младенцев. Выберите опубликованный рейс с тарифом для вашего состава поездки.", "The API has not confirmed child and infant fares for this flight. Choose a published flight priced for your party.", "API bu reys uchun bolalar va chaqaloqlar tariflarini tasdiqlamadi. Guruhingiz uchun tarifi bor e’lon qilingan reysni tanlang.", "API бу рейс учун болалар ва чақалоқлар тарифларини тасдиқламади. Гуруҳингиз учун тарифи бор эълон қилинган рейсни танланг."]
+        } else if code.contains("NUITEE_SELECTED_RATE_EXPIRED") || code.contains("NUITEE_RATE_TERMS_CHANGED") {
+            values = ["Тариф или условия номера изменились. Вернитесь к выбору отеля и выберите актуальный номер.", "The room rate or terms changed. Return to hotels and select a current room offer.", "Xona tarifi yoki shartlari o‘zgardi. Mehmonxonalarga qaytib, amaldagi xonani tanlang.", "Хона тарифи ёки шартлари ўзгарди. Меҳмонхоналарга қайтиб, амалдаги хонани танланг."]
+        } else if code.contains("NUITEE_") || code.contains("HOTEL_STARS_REQUIRED") {
+            values = ["Не удалось подтвердить выбранные номера. Проверьте даты и гостей, затем повторите расчёт или выберите номера заново.", "Could not confirm the selected rooms. Check dates and guests, then retry pricing or select rooms again.", "Tanlangan xonalar tasdiqlanmadi. Sanalar va mehmonlarni tekshirib, narxni qayta hisoblang yoki xonalarni qayta tanlang.", "Танланган хоналар тасдиқланмади. Саналар ва меҳмонларни текшириб, нархни қайта ҳисобланг ёки хоналарни қайта танланг."]
+        } else { return code }
+        switch language { case .russian: return values[0]; case .uzbek: return values[2]; case .uzbekCyrillic: return values[3]; default: return values[1] }
     }
 }

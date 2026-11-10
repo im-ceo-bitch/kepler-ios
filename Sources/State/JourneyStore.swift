@@ -660,12 +660,14 @@ final class JourneyStore: ObservableObject {
     }
 
     private func aviasalesProviderIdentity(outbound: FlightDiscoveryOffer, inbound: FlightDiscoveryOffer?) -> String {
-        [
+        var parts = [
             "aviasales", inbound == nil ? "ow" : "pair", token(outbound.origin), token(outbound.destination),
             String(outbound.departureAt.prefix(10)), inbound.map { String($0.departureAt.prefix(10)) } ?? "-",
             token(outbound.airlineCode), token(outbound.flightNumber),
             token(inbound?.airlineCode ?? "-"), token(inbound?.flightNumber ?? "-")
-        ].joined(separator: ":")
+        ]
+        if let inbound { parts += [token(inbound.origin), token(inbound.destination)] }
+        return parts.joined(separator: ":")
     }
 
     private func token(_ value: String) -> String {
@@ -1107,8 +1109,48 @@ final class JourneyStore: ObservableObject {
         return id.hasPrefix("server-") && !proof.isEmpty && quote.totalPackagePrice > 0 && quote.pricePerPerson > 0
     }
 
+    private func buildNuiteeJourneyQuote() async {
+        guard localRoomsComplete, let tier = localPackageTier else {
+            quote = nil; errorMessage = "NUITEE_ROOM_SELECTION_INCOMPLETE"; return
+        }
+        trip.packageTier = tier
+        let identity = localBookingInputKey
+        let requestedTrip = trip
+        let selectedRooms = localBookingRooms
+        quote = nil
+        do {
+            let pair: (outbound: FlightOffer, inbound: FlightOffer?)
+            if packageFlightPath == .aviasalesSelected {
+                guard let value = makeAviasalesFlightPair() else { throw LocalPricingError.invalidFlightFare }
+                pair = value
+            } else {
+                let resolved = try await CuratedFlightRecommendationService.shared.resolvePublishedSelection(trip: requestedTrip, selection: publishedFlightSelection)
+                pair = (resolved.outbound, resolved.inbound)
+            }
+            guard localBookingInputKey == identity, !Task.isCancelled,
+                  let makkah = localJourneyRooms["makkah:0"], let inbound = pair.inbound else { return }
+            let madinah = localJourneyRooms["madinah:0"]
+            let resolved = try await packageEngine.packageQuote(trip: requestedTrip, pricingOffer: inbound,
+                outboundOffer: pair.outbound, inboundOffer: inbound, makkahHotelID: makkah.hotel.id,
+                makkahRoomID: makkah.rate.roomId, madinahHotelID: madinah?.hotel.id, madinahRoomID: madinah?.rate.roomId,
+                includeHaramainTrain: haramainTrainSelected, transferVehicle: selectedTransferVehicle,
+                haramainFareClass: haramainFareClass, haramainTicketCount: haramainTicketCount,
+                nuiteeRooms: selectedRooms)
+            guard localBookingInputKey == identity, !Task.isCancelled else { return }
+            guard resolved.resolvedTier == tier.rawValue else { throw APIError.invalidResponse }
+            selectedOutbound = pair.outbound; selectedInbound = inbound
+            selectedHotel = makkah.bookingHotel; selectedRoom = makkah.bookingRoom
+            selectedRoomCategory = nil; selectedMadinahRoomCategory = nil
+            selectedMadinahHotel = madinah?.bookingHotel; selectedMadinahRoom = madinah?.bookingRoom
+            quote = resolved; errorMessage = nil
+        } catch {
+            guard localBookingInputKey == identity else { return }
+            quote = nil; errorMessage = error.localizedDescription
+        }
+    }
+
     func buildQuote(forceHotelRefresh: Bool = false) async {
-        if usesLocalJourney { rebuildLocalJourneyQuote(); return }
+        if usesLocalJourney { await buildNuiteeJourneyQuote(); return }
         let revision = packageQuoteRevision
         let tripForQuote = trip
         guard let hotel = selectedHotel,

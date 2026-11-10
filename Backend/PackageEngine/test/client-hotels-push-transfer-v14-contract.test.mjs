@@ -20,9 +20,10 @@ test('native hotel storefront admits ready priced server snapshots without the o
   assert.match(storefront, /standardQuotes\[hotel\.id\] \?\? comfortQuotes\[hotel\.id\] \?\? luxuryQuotes\[hotel\.id\]/);
 });
 
-test('home configurator is a white card and matches the paired Care card height', () => {
+test('home configurator keeps the white card geometry and displays Orbit', () => {
   assert.match(home, /let cardHeight: CGFloat = 540/);
-  assert.match(home, /Image\("StoreConfiguratorPhones"\)/);
+  assert.match(home, /IumrahOrbitIconRing\(/);
+  assert.match(home, /accessibilityIdentifier\("iumrah\.orbit\.home\.configurator"\)/);
   assert.match(home, /private var hero: some View[\s\S]*?Color\.white/);
 });
 

@@ -106,16 +106,19 @@ struct NuiteeJourneyHotelsView: View {
             NuiteeHotelDetailView(hotel: hotel, checkin: window.checkIn, nights: window.nights,
                 adults: roomAdults, sandbox: sandbox, childrenAges: roomChildren, onSelectRate: { rate in
                     guard rate.currency == "USD", rate.price.isFinite, rate.price > 0 else { return }
+                    // A canonical booking has one hotel per city; changing it resets that city's room choices.
+                    journey.localJourneyRooms = journey.localJourneyRooms.filter { $0.value.city != city || $0.value.hotel.id == hotel.id }
                     journey.localJourneyRooms[key] = LocalJourneyRoom(id: key, city: city, hotel: hotel, rate: rate,
                         checkin: window.checkIn, checkout: window.checkOut, adults: roomAdults, childrenAges: roomChildren)
+                    if let tier = journey.localPackageTier { journey.trip.packageTier = tier }
                     journey.transferSelectionConfirmed = false
-                    journey.rebuildLocalJourneyQuote()
+                    journey.invalidateLocalJourneyQuote()
                 })
         }
         .navigationDestination(isPresented: $showTransfer) { TransferSelectionView() }
         .safeAreaInset(edge: .bottom) {
             if journey.localRoomsComplete {
-                Button("Выбрать трансфер") { journey.rebuildLocalJourneyQuote(); showTransfer = true }
+                Button("Выбрать трансфер") { journey.invalidateLocalJourneyQuote(); showTransfer = true }
                     .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
             }
         }

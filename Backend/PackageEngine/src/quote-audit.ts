@@ -64,7 +64,7 @@ export async function sealPricingSnapshot(snapshot: GeneratorPricingSnapshot, en
   const envelope: SealedQuoteEnvelope = {
     v: 1,
     issuedAt: issuedAt.toISOString(),
-    expiresAt: new Date(issuedAt.getTime() + QUOTE_TTL_MS).toISOString(),
+    expiresAt: new Date(issuedAt.getTime() + (snapshot.nuiteeRooms ? 10 * 60 * 1000 : QUOTE_TTL_MS)).toISOString(),
     snapshot,
   };
   const nonce = crypto.getRandomValues(new Uint8Array(12));

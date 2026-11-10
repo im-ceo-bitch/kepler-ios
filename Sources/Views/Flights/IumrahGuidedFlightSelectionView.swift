@@ -176,12 +176,13 @@ struct IumrahGuidedFlightSelectionView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .navigationDestination(item: $selectedDetail) { choice in
-            IumrahOTAFlightDetailPage(
-                flight: presentation(for: choice),
+            IumrahGuidedFlightDetailView(
+                choice: choice,
                 language: settings.language,
-                actionTitle: tr("Выбрать авиабилет", "Select flight", "Reysni tanlash", "Рейсни танлаш"),
-                onChoose: { choose(choice) },
-                externalURL: ticketURL(for: choice)
+                adults: journey.trip.adults,
+                children: journey.trip.children,
+                infants: journey.trip.infants,
+                onChoose: { choose(choice) }
             )
         }
         .navigationDestination(isPresented: $showTransferPicker) {
@@ -371,65 +372,15 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func flightCard(_ choice: FlightChoice) -> some View {
-        let selected = (step == .outbound ? outbound?.id : inbound?.id) == choice.id
-        return Button {
-            selectedDetail = choice
-            IumrahHaptics.soft()
-        } label: {
-            IumrahOTAFlightCard(flight: presentation(for: choice), language: settings.language, isSelected: selected)
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Visual mapping only: keeps published flights, cached fares and verified
-    /// itinerary segments distinct. Search, filtering and booking remain intact.
-    private func presentation(for choice: FlightChoice) -> IumrahOTAFlightSnapshot {
-        var cabin: String?
-        var segments: [IumrahOTAFlightLeg] = []
-        if case .published(let item, let isReturn) = choice {
-            let leg = isReturn ? (item.inbound ?? item.outbound) : item.outbound
-            if leg.stops == 0 && !leg.arrivalAt.isEmpty {
-                segments = [IumrahOTAFlightLeg(origin: leg.origin, destination: leg.destination,
-                    departureAt: leg.departureAt, arrivalAt: leg.arrivalAt,
-                    airlineCode: leg.airlineCode, flightNumber: leg.flightNumber)]
+        IumrahFlightResultCard(airline: choice.airlineName, airlineCode: choice.airlineCode,
+            flightNumber: choice.flightNumber, origin: choice.origin, destination: choice.destination,
+            departureAt: choice.departureAt, arrivalAt: choice.arrivalAt, duration: choice.duration,
+            stops: choice.stops, price: choice.price, isAviasales: choice.source == .dataAPI,
+            selected: (step == .outbound ? outbound?.id : inbound?.id) == choice.id) {
+                selectedDetail = choice
+                IumrahHaptics.soft()
             }
-            if !leg.cabinClass.isEmpty { cabin = leg.cabinClass.replacingOccurrences(of: "_", with: " ").capitalized }
-        } else if case .dataAPI(let cached) = choice,
-                  let verified = FlightDiscoveryItineraryValidator.verified(cached.outboundSegments,
-                      origin: cached.origin, destination: cached.destination, transfers: cached.transfers) {
-            segments = verified.map {
-                IumrahOTAFlightLeg(origin: $0.originAirport, destination: $0.destinationAirport,
-                    departureAt: $0.departureAt, arrivalAt: $0.arrivalAt,
-                    airlineCode: $0.airlineCode, flightNumber: $0.flightNumber)
-            }
-        }
-        return IumrahOTAFlightSnapshot(id: choice.id,
-            airline: choice.airlineName, airlineCode: choice.airlineCode,
-            flightNumber: choice.flightNumber,
-            origin: choice.origin, destination: choice.destination,
-            departureAt: choice.departureAt, arrivalAt: choice.arrivalAt,
-            durationMinutes: choice.duration, stops: choice.stops,
-            priceUSD: choice.price,
-            source: choice.source == .published ? .published : .cachedSearch,
-            cabin: cabin, segments: segments)
     }
-
-    private func ticketURL(for choice: FlightChoice) -> URL? {
-        if case .dataAPI(let cached) = choice,
-           let raw = cached.bookingUrl,
-           let url = URL(string: raw),
-           ["https", "http"].contains(url.scheme?.lowercased() ?? ""),
-           url.host != nil {
-            return url
-        }
-        return AviasalesSearchLinkBuilder.searchURL(
-            origin: choice.origin, destination: choice.destination,
-            departureAt: choice.departureAt, returnAt: nil,
-            adults: journey.trip.adults, children: journey.trip.children,
-            infants: journey.trip.infants
-        )
-    }
-
 
     private var searchControls: some View {
         IumrahFlightSearchControls(filters: $filters,

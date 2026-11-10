@@ -54,7 +54,7 @@ function priceOf(v: any): number | null {
 async function provider(env: Env, path: string, params?: URLSearchParams, data?: unknown): Promise<Json> {
   const key = apiKey(env);
   if (!key) throw new Error('NUITEE_NOT_CONFIGURED');
-  const url = `${BASE}${path}${params ? `?${params}` : ''}`;
+  const url = `${path.startsWith('/rates/') ? 'https://book.liteapi.travel/v3.0' : BASE}${path}${params ? `?${params}` : ''}`;
   // Shared across isolates via D1: respect provider backoff rather than retrying
   // once per visible card/user. Static cache reads still work during cooldown.
   const cooldown = await read(env, 'provider:cooldown:v1');
@@ -66,7 +66,7 @@ async function provider(env: Env, path: string, params?: URLSearchParams, data?:
       method: data ? 'POST' : 'GET', headers: {
         'X-API-Key': key, 'accept': 'application/json', ...(data ? { 'content-type': 'application/json' } : {}),
       }, body: data ? JSON.stringify(data) : undefined,
-      signal: path.startsWith('/hotels/') ? undefined : AbortSignal.timeout(22000),
+      signal: path.startsWith('/hotels/') || path.startsWith('/rates/') ? undefined : AbortSignal.timeout(22000),
     });
   } catch (e) {
     const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
@@ -344,7 +344,7 @@ async function rates(request: Request, env: Env) {
   const key = `rates:v2:${id}:${checkin}:${checkout}:${adults}:${children.join(",")}:UZ:USD`;
   const cached = await read(env, key);
   // Detail prices are limited to 10 min. NEVER use a stale rate as a bookable offer.
-  if (cached?.fresh) return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: await localizedRates(env,cached.data,language,key), cached: true });
+  if (cached?.fresh && body.forceRefresh !== true) return output({ ok: true, sandbox: isSandbox(env), checkin, checkout, adults, rates: await localizedRates(env,cached.data,language,key), cached: true });
   const response = await provider(env, '/hotels/rates', undefined, {
     hotelIds: [id], checkin, checkout, occupancies: [{ adults, children }],
     currency: 'USD', guestNationality: 'UZ', roomMapping: true,
@@ -423,4 +423,59 @@ export async function refreshNuiteeHotelCatalog(env: Env, refreshPrices = true):
       // Existing hotel and price snapshots remain intact.
     }
   }
+}
+
+
+export type NuiteePackageRoom = {
+  id: string; city: "makkah" | "madinah"; hotelId: string; offerId: string; roomId: string;
+  checkin: string; checkout: string; adults: number; children: number[];
+  prebookId?: string;
+};
+export function packageTierForStars(stars: number): "economy" | "standard" | "luxury" {
+  if (!Number.isInteger(stars) || stars < 1 || stars > 5) throw new Error("HOTEL_STARS_REQUIRED");
+  return stars <= 2 ? "economy" : stars <= 4 ? "standard" : "luxury";
+}
+
+/** Prices/stars are read from supplier and server catalogue, never accepted from iOS. */
+export async function resolveNuiteePackageHotels(env: Env, values: NuiteePackageRoom[], travelers: {adults:number;children:number;infants:number;rooms:number}, includeMadinah: boolean) {
+  if (!Array.isArray(values) || values.length !== travelers.rooms * (includeMadinah ? 2 : 1)) throw new Error("NUITEE_ROOM_SELECTION_INCOMPLETE");
+  await ensure(env);
+  const cities = includeMadinah ? ["makkah", "madinah"] : ["makkah"];
+  const result: Record<string, import("./pricing").PricingHotelInput> = {};
+  const selected: NuiteePackageRoom[] = [];
+  let highestStars = 0;
+  const verifiedOffers = new Map<string, Json>();
+  for (const city of cities) {
+    const rooms = values.filter(room => room?.city === city);
+    if (rooms.length !== travelers.rooms || new Set(rooms.map(x => x.id)).size !== rooms.length) throw new Error("NUITEE_ROOM_SELECTION_INCOMPLETE");
+    if (new Set(rooms.map(x => x.hotelId)).size !== 1 || new Set(rooms.map(x => x.checkin + ":" + x.checkout)).size !== 1) throw new Error("NUITEE_CITY_SELECTION_MISMATCH");
+    if (rooms.reduce((n,r)=>n+Number(r.adults),0) !== travelers.adults || rooms.reduce((n,r)=>n+(Array.isArray(r.children)?r.children.length:0),0) !== travelers.children+travelers.infants) throw new Error("NUITEE_OCCUPANCY_MISMATCH");
+    const catalog = await read(env, `catalog:v1:${city}`);
+    const hotel = Array.isArray(catalog?.data) ? catalog!.data.find((h:Json)=>h.id===rooms[0].hotelId) : null;
+    if (!hotel) throw new Error("HOTEL_NOT_IN_CATALOG");
+    const stars = Math.round(Number(hotel.stars)); packageTierForStars(stars); highestStars = Math.max(highestStars, stars);
+    let total = 0;
+    for (const room of rooms) {
+      if (!room.offerId || typeof room.offerId !== "string" || room.offerId.length > 20000 || typeof room.roomId !== "string" || !Number.isInteger(room.adults) || room.adults < 1 || room.adults > 8 || !Array.isArray(room.children) || room.children.some(age=>!Number.isInteger(age) || age<0 || age>17) || !dateParam(room.checkin) || !dateParam(room.checkout) || !stayDates(room.checkin,room.checkout)) throw new Error("NUITEE_INVALID_SELECTED_RATE");
+      // Bind an opaque offer to server-observed hotel/dates/occupancy before
+      // prebooking it. Re-searching creates new offer IDs and is not validation.
+      const anchorKey = `rates:v2:${room.hotelId}:${room.checkin}:${room.checkout}:${room.adults}:${room.children.join(",")}:UZ:USD`;
+      const anchor = await read(env, anchorKey);
+      const original = Array.isArray(anchor?.data) ? anchor!.data.find((r:Json)=>r.offerId===room.offerId && r.roomId===room.roomId) : null;
+      if (!original) throw new Error("NUITEE_SELECTED_RATE_EXPIRED");
+      let current = verifiedOffers.get(room.offerId);
+      if (!current) {
+        const response = await provider(env, '/rates/prebook', undefined, {offerId:room.offerId,usePaymentSdk:false});
+        current = response.data;
+        if (!current || !current.prebookId || current.hotelId!==room.hotelId || current.currency!=="USD" || !Number.isFinite(current.price) || current.price<=0) throw new Error("NUITEE_RATE_RECHECK_FAILED");
+        if (current.cancellationChanged || current.boardChanged) throw new Error("NUITEE_RATE_TERMS_CHANGED");
+        verifiedOffers.set(room.offerId,current);
+      }
+      total += current.price;
+      selected.push({id:room.id,city:room.city,hotelId:room.hotelId,offerId:room.offerId,roomId:room.roomId,checkin:room.checkin,checkout:room.checkout,adults:room.adults,children:[...room.children],prebookId:current.prebookId});
+    }
+    const nights = Math.round((Date.parse(rooms[0].checkout)-Date.parse(rooms[0].checkin))/86400000);
+    result[city] = {hotelId:rooms[0].hotelId, roomId:rooms[0].roomId, amountUsd:total/nights/travelers.rooms, unit:"perRoomNight", nights, pricingMode:"nuiteeRevalidated"};
+  }
+  return {makkah:result.makkah, madinah:result.madinah ?? null, tier:packageTierForStars(highestStars), rooms:selected, bookingAllowed:!isSandbox(env)};
 }

@@ -24,6 +24,7 @@ struct BookingDraftRequest: Encodable {
 
 
 struct BookingGeneratorTrace: Codable, Hashable {
+    var nuiteeRooms: [BookingNuiteeRoomSelection]? = nil
     let quoteId: String?
     let outbound: BookingGeneratorFlightSnapshot
     let inbound: BookingGeneratorFlightSnapshot?
@@ -488,4 +489,18 @@ struct BookingCustomizationUpdateRequest: Encodable {
     let ziyaratMakkah: Bool?
     let ziyaratMadinah: Bool?
     let esim: Bool?
+}
+
+
+/// Exact supplier room identities travel with the canonical booking, not a Care request.
+struct BookingNuiteeRoomSelection: Codable, Hashable {
+    let id: String
+    let city: String
+    let hotelId: String
+    let offerId: String
+    let roomId: String
+    let checkin: String
+    let checkout: String
+    let adults: Int
+    let children: [Int]
 }

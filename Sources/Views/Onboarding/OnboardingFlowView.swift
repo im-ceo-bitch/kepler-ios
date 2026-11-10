@@ -456,7 +456,7 @@ struct OnboardingFlowView: View {
                     isActive: isActive && scenePhase == .active,
                     lightOnDark: colorScheme == .dark,
                     rotationDuration: IumrahFoundation.Motion.orbitRevolution,
-                    revealDuration: IumrahFoundation.Motion.orbitReveal
+                    revealDuration: 1.3
                 )
                 .frame(maxWidth: .infinity)
                 .scaleEffect(isActive || reduceMotion ? 1 : 0.96)

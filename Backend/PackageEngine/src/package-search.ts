@@ -1,3 +1,4 @@
+import { resolveNuiteePackageHotels, type NuiteePackageRoom } from "./nuitee-hotels";
 import type { Env } from "./env";
 import { readFlightSearchCache, type NormalizedFlightSearch } from "./flight-cache";
 import { resolveServerHotelPricing } from "./hotel-costs";
@@ -6,6 +7,7 @@ import { sealPricingSnapshot } from "./quote-audit";
 import { deriveAuthoritativeStayPlan, type StayPolicy, type VerifiedFlightSchedule } from "./itinerary-planner";
 
 type QuoteRequest = {
+  nuiteeRooms?: NuiteePackageRoom[];
   tier?: unknown;
   tripType?: unknown;
   includeMadinah?: unknown;
@@ -140,6 +142,8 @@ async function resolveCuratedFare(providerItineraryId: string, travelerCount: nu
 
 type AviasalesIdentity = {
   mode: "ow" | "rt" | "pair";
+  returnOrigin: string;
+  returnDestination: string;
   origin: string;
   destination: string;
   departureDate: string;
@@ -194,7 +198,7 @@ function nullableIdentityToken(value: string): string | null {
 
 function parseAviasalesIdentity(providerItineraryId: string): AviasalesIdentity {
   const parts = providerItineraryId.split(":");
-  if (parts.length !== 10 || parts[0] !== "aviasales") throw new Error("AVIASALES_IDENTITY_INVALID");
+  if (![10,12].includes(parts.length) || parts[0] !== "aviasales") throw new Error("AVIASALES_IDENTITY_INVALID");
   const mode = parts[1] as AviasalesIdentity["mode"];
   if (!(["ow", "rt", "pair"] as string[]).includes(mode)) throw new Error("AVIASALES_IDENTITY_INVALID");
   const origin = parts[2].toUpperCase();
@@ -206,7 +210,11 @@ function parseAviasalesIdentity(providerItineraryId: string): AviasalesIdentity 
   }
   if (returnDate && !DATE.test(returnDate)) throw new Error("AVIASALES_IDENTITY_INVALID");
   if (mode !== "ow" && !returnDate) throw new Error("AVIASALES_RETURN_REQUIRED");
+  const returnOrigin = parts.length === 12 ? parts[10].toUpperCase() : destination;
+  const returnDestination = parts.length === 12 ? parts[11].toUpperCase() : origin;
+  if (!IATA.test(returnOrigin) || returnDestination !== origin || returnOrigin === returnDestination || (parts.length===12 && mode!=="pair")) throw new Error("AVIASALES_IDENTITY_INVALID");
   return {
+    returnOrigin, returnDestination,
     mode,
     origin,
     destination,
@@ -404,7 +412,7 @@ export async function resolveAviasalesSelection(providerItineraryId: string, env
 
   const returnDate = identity.returnDate!;
   const returnRows = await fetchAviasalesRows(
-    travelpayoutsDateURL(identity, identity.destination, identity.origin, returnDate, null),
+    travelpayoutsDateURL(identity, identity.returnOrigin, identity.returnDestination, returnDate, null),
     env,
   );
   const inbound = pickAviasalesRow(returnRows, returnDate, identity.returnAirlineCode, identity.returnFlightNumber);
@@ -422,8 +430,8 @@ export async function resolveAviasalesSelection(providerItineraryId: string, env
       arrivalAt: addMinutes(outboundAt, Number(outbound.duration_to ?? outbound.duration ?? 0)),
     },
     inbound: {
-      origin: identity.destination,
-      destination: identity.origin,
+      origin: identity.returnOrigin,
+      destination: identity.returnDestination,
       departureAt: inboundAt,
       arrivalAt: addMinutes(inboundAt, Number(inbound.duration_to ?? inbound.duration ?? 0)),
     },
@@ -603,7 +611,7 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
   catch { return json({ ok: false, error: "INVALID_JSON" }, 400); }
 
   try {
-    const tier = parseTier(raw.tier);
+    let tier = parseTier(raw.tier);
     const tripType = parseTripType(raw.tripType);
     const includeMadinah = bool(raw.includeMadinah);
     const adults = int(raw.travelers?.adults, 1, 9);
@@ -613,6 +621,12 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
     const travelerCount = adults + children + infants;
     if (travelerCount > 9) throw new Error("INVALID_TRAVELERS");
 
+    if (raw.nuiteeRooms && text(raw.flight?.providerItineraryId,220).startsWith("aviasales:") && (children>0 || infants>0)) throw new Error("AVIASALES_PARTY_FARE_UNAVAILABLE");
+    if (raw.nuiteeRooms && text(raw.flight?.providerItineraryId,220).startsWith("aviasales:")) {
+      const identity=parseAviasalesIdentity(text(raw.flight?.providerItineraryId,220));
+      const legs=raw.flight?.legs ?? [];
+      if (legs[0]?.origin!==identity.origin || legs[0]?.destination!==identity.destination || legs[0]?.departureDate!==identity.departureDate || legs[1]?.origin!==identity.returnOrigin || legs[1]?.destination!==identity.returnDestination || legs[1]?.departureDate!==identity.returnDate) throw new Error("AVIASALES_ROUTE_MISMATCH");
+    }
     const flightLegCount = Array.isArray(raw.flight?.legs) ? raw.flight!.legs!.length : 0;
     if (tripType === "roundTrip" && flightLegCount !== 2) throw new Error("ROUND_TRIP_REQUIRES_TWO_LEGS");
     if (tripType === "oneWay" && flightLegCount !== 1 && !text(raw.flight?.providerItineraryId, 220).startsWith("curated:")) throw new Error("ONE_WAY_REQUIRES_ONE_LEG");
@@ -630,7 +644,31 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
       stayPolicy: parseStayPolicy(raw.stayPolicy),
       schedule: verifiedSchedule,
     });
-    const [makkahHotel, madinahHotel] = await Promise.all([
+    const nuitee = raw.nuiteeRooms ? await resolveNuiteePackageHotels(env, raw.nuiteeRooms, {adults,children,infants,rooms}, includeMadinah) : null;
+    if (nuitee) {
+      tier = nuitee.tier;
+      if (nuitee.makkah.hotelId !== makkahRequest.hotelId || (nuitee.madinah?.hotelId ?? "") !== (madinahRequest?.hotelId ?? "")) throw new Error("NUITEE_CITY_SELECTION_MISMATCH");
+      const first = nuitee.rooms.find(r=>r.city==="makkah")!;
+      const second = nuitee.rooms.find(r=>r.city==="madinah");
+      const stays = [first,second].filter((r): r is NuiteePackageRoom => !!r).sort((a,b)=>a.checkin.localeCompare(b.checkin));
+      if (second && stays[0].checkout !== stays[1].checkin) throw new Error("NUITEE_STAY_GAP_OR_OVERLAP");
+      const departureDay = String(raw.flight?.legs?.[0]?.departureDate ?? "");
+      const returnDay = String(raw.flight?.legs?.[1]?.departureDate ?? "");
+      if (!DATE.test(departureDay) || !DATE.test(returnDay) || stays[0].checkin < departureDay || stays[stays.length-1].checkout !== returnDay) throw new Error("NUITEE_STAY_OUTSIDE_FLIGHTS");
+      const firstAirport = String(raw.flight?.legs?.[0]?.destination ?? "");
+      if (includeMadinah && stays[0].city !== (firstAirport === "MED" ? "madinah" : "makkah")) throw new Error("NUITEE_CITY_ORDER_MISMATCH");
+      // Preserve the actual supplier reservations selected by the traveler. Do
+      // not silently add a hotel night or move a room offer onto different dates.
+      stayPlan.source = "selectedSupplierStays";
+      stayPlan.makkahCheckIn=first.checkin; stayPlan.makkahCheckOut=first.checkout;
+      stayPlan.madinahCheckIn=second?.checkin ?? null; stayPlan.madinahCheckOut=second?.checkout ?? null;
+      stayPlan.makkahNights=nuitee.makkah.nights; stayPlan.madinahNights=nuitee.madinah?.nights ?? 0;
+      stayPlan.totalNights=stayPlan.makkahNights+stayPlan.madinahNights; stayPlan.totalDays=stayPlan.totalNights+1;
+      stayPlan.firstCity=stays[0].city === "makkah" ? "Makkah" : "Madinah";
+      stayPlan.lastCity=stays[stays.length-1].city === "makkah" ? "Makkah" : "Madinah";
+
+    }
+    const [makkahHotel, madinahHotel] = nuitee ? [nuitee.makkah,nuitee.madinah] : await Promise.all([
       resolveServerHotelPricing(env.HOTELS_DB, makkahRequest.hotelId, makkahRequest.roomId, stayPlan.makkahNights),
       madinahRequest ? resolveServerHotelPricing(env.HOTELS_DB, madinahRequest.hotelId, madinahRequest.roomId, stayPlan.madinahNights) : Promise.resolve(null),
     ]);
@@ -655,6 +693,10 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
       madinahHotel,
     };
     const calculated = calculatePackageQuote(quoteInput);
+    if (nuitee) {
+      calculated.snapshot.nuiteeRooms = nuitee.rooms;
+      calculated.snapshot.bookingAllowed = nuitee.bookingAllowed;
+    }
     const quoteProof = await sealPricingSnapshot(calculated.snapshot, env);
 
     // Confidential supplier components, markup and estimated profit intentionally
@@ -669,6 +711,8 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
         isEstimated: calculated.isEstimated,
         quoteId: calculated.quoteId,
         quoteProof,
+        bookingAllowed: nuitee?.bookingAllowed ?? true,
+        resolvedTier: tier,
         stayPlan,
       },
     });

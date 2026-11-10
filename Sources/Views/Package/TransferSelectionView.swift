@@ -583,9 +583,9 @@ struct TransferSelectionView: View {
 
         await journey.buildQuote(forceHotelRefresh: false)
 
-        guard journey.hasFinalGeneratorQuote || (journey.usesLocalJourney && journey.localRoomsComplete) else {
+        guard journey.hasFinalGeneratorQuote else {
             journey.transferSelectionConfirmed = false
-            confirmationError = journey.errorMessage ?? localized(
+            confirmationError = journey.errorMessage.map { ConfiguratorBookingCopy.message($0, language: settings.language) } ?? localized(
                 "Не удалось подтвердить итоговую конфигурацию поездки. Попробуйте ещё раз.",
                 "The trip configuration could not be confirmed. Please try again.",
                 "Safar konfiguratsiyasini tasdiqlab bo‘lmadi. Qayta urinib ko‘ring.",

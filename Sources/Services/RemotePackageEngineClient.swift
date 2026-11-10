@@ -50,7 +50,8 @@ struct RemotePackageEngineClient {
         haramainFareClass: HaramainFareClass,
         haramainTicketCount: Int,
         makkahNightsOverride: Int? = nil,
-        madinahNightsOverride: Int? = nil
+        madinahNightsOverride: Int? = nil,
+        nuiteeRooms: [BookingNuiteeRoomSelection]? = nil
     ) async throws -> PackageQuote {
         let rawProviderItineraryID = pricingOffer.providerItineraryID?.trimmingCharacters(in: .whitespacesAndNewlines)
         let providerItineraryID: String
@@ -109,6 +110,7 @@ struct RemotePackageEngineClient {
         let infantsOnLap = infantSeating == .lap ? min(trip.infants, trip.adults) : 0
         let infantsInSeat = infantSeating == .lap ? max(0, trip.infants - trip.adults) : trip.infants
         let request = ServerPackageQuoteRequest(
+            nuiteeRooms: nuiteeRooms,
             tier: trip.packageTier.rawValue,
             tripType: trip.resolvedFlightTripType.rawValue,
             includeMadinah: trip.scope == .makkahAndMadinah,
@@ -133,10 +135,10 @@ struct RemotePackageEngineClient {
                 madinah: trip.scope == .makkahAndMadinah ? madinahHotelID.map { .init(hotelId: $0, roomId: madinahRoomID, nights: stay.madinahNights) } : nil
             )
         )
-        let response: ServerPackageQuoteEnvelope = try await api.post(
+        let response: ServerPackageQuoteEnvelope = try await (nuiteeRooms == nil ? api : APIClient.hotelPrices).post(
             "/api/package/quote",
             body: request,
-            timeoutInterval: 15
+            timeoutInterval: nuiteeRooms == nil ? 15 : 604800
         )
         guard response.ok else { throw APIError.invalidResponse }
         return response.quote.publicQuote
@@ -181,9 +183,11 @@ private struct ServerPackageQuote: Decodable {
     let quoteId: String
     let quoteProof: String
     let stayPlan: PackageStayPlan?
+    let bookingAllowed: Bool?
+    let resolvedTier: String?
 
     var publicQuote: PackageQuote {
-        PackageQuote(
+        var result = PackageQuote(
             totalPackagePrice: totalPackagePrice,
             pricePerPerson: pricePerPerson,
             currency: currency,
@@ -192,10 +196,14 @@ private struct ServerPackageQuote: Decodable {
             quoteProof: quoteProof,
             stayPlan: stayPlan
         )
+        result.bookingAllowed = bookingAllowed
+        result.resolvedTier = resolvedTier
+        return result
     }
 }
 
 private struct ServerPackageQuoteRequest: Encodable {
+    let nuiteeRooms: [BookingNuiteeRoomSelection]?
     struct Travelers: Encodable { let adults: Int; let children: Int; let infants: Int; let rooms: Int }
     struct Meals: Encodable { let makkahLunch: Bool; let makkahDinner: Bool; let madinahDinner: Bool }
     struct Haramain: Encodable { let enabled: Bool; let fareClass: String; let ticketCount: Int }

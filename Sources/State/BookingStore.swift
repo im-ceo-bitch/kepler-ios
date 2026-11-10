@@ -52,9 +52,10 @@ final class BookingStore: ObservableObject {
         inbound: FlightOffer?,
         quote: PackageQuote,
         language: AppSettingsStore.Language,
-        pilgrimProfile: BookingPilgrimProfile?
+        pilgrimProfile: BookingPilgrimProfile?,
+        nuiteeRooms: [BookingNuiteeRoomSelection]? = nil
     ) async throws -> StoredBookingSession {
-        guard let quoteID = quote.quoteId,
+        guard quote.bookingAllowed != false, let quoteID = quote.quoteId,
               quoteID.hasPrefix("server-"),
               let quoteProof = quote.quoteProof,
               !quoteProof.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -76,7 +77,8 @@ final class BookingStore: ObservableObject {
             inbound: inbound,
             quote: quote,
             language: language,
-            pilgrimProfile: pilgrimProfile
+            pilgrimProfile: pilgrimProfile,
+            nuiteeRooms: nuiteeRooms
         )
         let response = try await bookingService.createBooking(payload)
         guard let token = response.accessToken?.trimmingCharacters(in: .whitespacesAndNewlines), !token.isEmpty else {

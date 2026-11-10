@@ -23,19 +23,22 @@ struct LegacyFinalPackageView: View {
     @State private var isCalculatingPrice = false
     @State private var createdSession: StoredBookingSession?
     @State private var showCreatedBooking = false
+    @State private var pendingBookingSession: StoredBookingSession?
     @State private var errorMessage: String?
     @State private var infoSheet: StorefrontPackageInfoSheet?
     @State private var showTransferDetails = false
     @State private var showTransferSelection = false
+    @State private var localHotelForDetails: LocalJourneyRoom?
     @State private var hotelForDetails: HotelSummary?
 
     private var needsMadinah: Bool { journey.trip.scope == .makkahAndMadinah }
     private var roomsComplete: Bool {
-        (journey.selectedRoom != nil || journey.selectedRoomCategory != nil) &&
+        if journey.usesLocalJourney { return journey.localRoomsComplete }
+        return (journey.selectedRoom != nil || journey.selectedRoomCategory != nil) &&
         (!needsMadinah || journey.selectedMadinahRoom != nil || journey.selectedMadinahRoomCategory != nil)
     }
     private var canBook: Bool {
-        journey.hasFinalGeneratorQuote && !isCalculatingPrice &&
+        journey.hasFinalGeneratorQuote && journey.quote?.bookingAllowed != false && !isCalculatingPrice &&
         journey.transferSelectionConfirmed && roomsComplete &&
         journey.selectedHotel != nil &&
         journey.selectedOutbound?.isVerifiedForBooking == true &&
@@ -43,7 +46,8 @@ struct LegacyFinalPackageView: View {
         (!needsMadinah || journey.selectedMadinahHotel != nil)
     }
     private var quoteInputKey: String {
-        [journey.selectedHotel?.id ?? "", journey.selectedMadinahHotel?.id ?? "",
+        if journey.usesLocalJourney { return journey.localBookingInputKey }
+        return [journey.selectedHotel?.id ?? "", journey.selectedMadinahHotel?.id ?? "",
          journey.selectedRoom?.id ?? "", journey.selectedMadinahRoom?.id ?? "",
          journey.selectedRoomCategory?.displayName ?? "", journey.selectedMadinahRoomCategory?.displayName ?? "",
          String(journey.trip.hashValue), journey.selectedTransferVehicle?.rawValue ?? "",
@@ -78,8 +82,13 @@ struct LegacyFinalPackageView: View {
                     VStack(spacing: 0) {
                         IumrahJourneyHeader(showsNotifications: true) { packageSummary }
                         VStack(alignment: .leading, spacing: 18) {
+                            IumrahOrbitPackageAssemblyCard(services: IumrahOrbitService.selectedForJourney(journey))
                             IumrahPageHelpCard(journey.hasFinalGeneratorQuote ? "legacy.final" : "legacy.recalculate")
                             if !journey.hasFinalGeneratorQuote { pricingStatus }
+                            if journey.quote?.bookingAllowed == false {
+                                Text(tr("Поставщик вернул тестовые тарифы. Реальное бронирование станет доступно после подключения production API.", "The supplier returned test rates. Real booking requires the production API.", "Yetkazib beruvchi sinov tariflarini qaytardi. Haqiqiy bron uchun production API kerak.", "Етказиб берувчи синов тарифларини қайтарди. Ҳақиқий брон учун production API керак."))
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
                             Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")).font(.title2.bold())
                             if let outbound = journey.selectedOutbound {
                                 PackageFlightLegDetailCard(leg: flightLeg(outbound), direction: tr("Туда", "Outbound", "Borish", "Бориш"), language: settings.language)
@@ -88,8 +97,23 @@ struct LegacyFinalPackageView: View {
                                 PackageFlightLegDetailCard(leg: flightLeg(inbound), direction: tr("Обратно", "Return", "Qaytish", "Қайтиш"), language: settings.language)
                             }
                             Text(tr("Отели и номера", "Hotels and rooms", "Mehmonxonalar va xonalar", "Меҳмонхоналар ва хоналар")).font(.title2.bold())
-                            if let hotel = journey.selectedHotel { hotelCard(hotel, role: .makkah) }
-                            if needsMadinah, let hotel = journey.selectedMadinahHotel { hotelCard(hotel, role: .madinah) }
+                            if journey.usesLocalJourney {
+                                ForEach(journey.localJourneyRooms.values.sorted { $0.id < $1.id }) { room in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        PackageHotelDetailCard(hotel: StorefrontPackageHotel(id: room.hotel.id, name: room.hotel.name,
+                                            city: room.city == "madinah" ? "Madinah" : "Makkah", stars: room.hotel.roundedStars,
+                                            coverImageURL: room.hotel.coverImageURL, nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights),
+                                            selectedRoomName: room.rate.roomName, chooseRoomText: room.rate.roomName,
+                                            language: settings.language, onOpen: { localHotelForDetails = room })
+                                        Text(dateRange(room.checkin, room.checkout)).font(.caption).foregroundStyle(.secondary)
+                                        Text(room.rate.mealPlan).font(.caption)
+                                        Text(room.rate.cancellationDescription).font(.footnote).foregroundStyle(.secondary)
+                                    }.frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
+                                }
+                            } else {
+                                if let hotel = journey.selectedHotel { hotelCard(hotel, role: .makkah) }
+                                if needsMadinah, let hotel = journey.selectedMadinahHotel { hotelCard(hotel, role: .madinah) }
+                            }
                             Text(tr("В вашем пакете", "Your package includes", "Paketingizga kiradi", "Пакетингизга киради")).font(.title2.bold())
                             serviceKit
                             servicesList
@@ -132,6 +156,23 @@ struct LegacyFinalPackageView: View {
             HotelDetailView(hotel: hotel, selectionFlow: true,
                 selectionRole: hotel.id == journey.selectedMadinahHotel?.id ? .madinah : .makkah)
         }
+        .sheet(item: $localHotelForDetails) { room in
+            NavigationStack {
+                NuiteeHotelDetailView(hotel: room.hotel, checkin: room.checkin,
+                    nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights,
+                    adults: room.adults, sandbox: journey.quote?.bookingAllowed == false,
+                    childrenAges: room.childrenAges, onSelectRate: { rate in
+                        journey.localJourneyRooms[room.id] = LocalJourneyRoom(id: room.id, city: room.city,
+                            hotel: room.hotel, rate: rate, checkin: room.checkin, checkout: room.checkout,
+                            adults: room.adults, childrenAges: room.childrenAges)
+                        journey.quote = nil
+                        localHotelForDetails = nil
+                    })
+                    .toolbar { ToolbarItem(placement: .topBarLeading) {
+                        Button(tr("Закрыть", "Close", "Yopish", "Ёпиш")) { localHotelForDetails = nil }
+                    } }
+            }
+        }
         .sheet(item: $infoSheet) { kind in
             StorefrontPackageInformationSheet(kind: kind, language: settings.language)
                 .modifier(IumrahJourneySheetStyle())
@@ -165,6 +206,7 @@ struct LegacyFinalPackageView: View {
             priceCaption: tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")
         ) {
             VStack(alignment: .leading, spacing: 12) {
+                Text(journey.trip.packageTier.title(settings.language)).font(.headline)
                 Label(journey.trip.scope.title(settings.language), systemImage: "map")
                 Label(dateRange(journey.trip.departureDate, journey.trip.returnDate), systemImage: "calendar")
                 if let outbound = journey.selectedOutbound {
@@ -329,7 +371,7 @@ struct LegacyFinalPackageView: View {
         defer { isCalculatingPrice = false }
         await journey.buildQuote(forceHotelRefresh: false)
         guard !Task.isCancelled else { return }
-        errorMessage = journey.hasFinalGeneratorQuote ? nil : journey.errorMessage
+        errorMessage = journey.hasFinalGeneratorQuote ? nil : journey.errorMessage.map { ConfiguratorBookingCopy.message($0, language: settings.language) }
     }
     private func flightLeg(_ offer: FlightOffer) -> StorefrontFlightLeg {
         let formatter = ISO8601DateFormatter()
@@ -363,10 +405,11 @@ struct LegacyFinalPackageView: View {
     }
     @MainActor
     private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
+        if let pendingBookingSession { return pendingBookingSession }
         guard !isSubmitting, canBook,
               let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
-              let quote = journey.quote else { throw BookingStoreError.authoritativeQuoteRequired }
+              var quote = journey.quote else { throw BookingStoreError.authoritativeQuoteRequired }
         let inbound = journey.selectedInbound
         guard outbound.isVerifiedForBooking,
               (!journey.trip.isRoundTripFlight || inbound?.isVerifiedForBooking == true) else {
@@ -381,6 +424,19 @@ struct LegacyFinalPackageView: View {
         errorMessage = nil
         defer { isSubmitting = false }
         do {
+            if journey.usesLocalJourney {
+                let acceptedTotal = quote.totalPackagePrice
+                let acceptedInput = journey.localBookingInputKey
+                await journey.buildQuote()
+                guard let fresh = journey.quote, journey.hasFinalGeneratorQuote,
+                      fresh.bookingAllowed == true, acceptedInput == journey.localBookingInputKey else {
+                    throw BookingStoreError.authoritativeQuoteRequired
+                }
+                guard fresh.totalPackagePrice == acceptedTotal else {
+                    throw ConfiguratorBookingError.priceChanged(tr("Цена изменилась. Вернитесь к итогу поездки и проверьте новую сумму.", "The price changed. Return to the trip review and check the new total.", "Narx o‘zgardi. Safar yakuniga qaytib, yangi summani tekshiring.", "Нарх ўзгарди. Сафар якунига қайтиб, янги суммани текширинг."))
+                }
+                quote = fresh
+            }
             let session = try await bookings.create(
                 trip: journey.trip,
                 hotel: hotel,
@@ -395,9 +451,10 @@ struct LegacyFinalPackageView: View {
                 inbound: inbound,
                 quote: quote,
                 language: settings.language,
-                pilgrimProfile: profile
+                pilgrimProfile: profile,
+                nuiteeRooms: journey.usesLocalJourney ? journey.localBookingRooms : nil
             )
-            createdSession = session
+            pendingBookingSession = session
             if let deviceToken = push.deviceToken {
                 await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
             }
@@ -410,4 +467,9 @@ struct LegacyFinalPackageView: View {
         }
     }
 
+}
+
+private enum ConfiguratorBookingError: LocalizedError {
+    case priceChanged(String)
+    var errorDescription: String? { if case .priceChanged(let message) = self { return message }; return nil }
 }

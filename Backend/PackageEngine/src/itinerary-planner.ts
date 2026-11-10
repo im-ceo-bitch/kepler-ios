@@ -21,7 +21,7 @@ export type VerifiedFlightSchedule = {
 
 export type AuthoritativeStayPlan = {
   timezone: "Asia/Riyadh";
-  source: "verifiedFlightTimes" | "requestedNightsFallback";
+  source: "verifiedFlightTimes" | "requestedNightsFallback" | "selectedSupplierStays";
   firstCity: SaudiCity;
   lastCity: SaudiCity;
   totalNights: number;

@@ -409,6 +409,8 @@ struct PackageQuote: Hashable, Codable {
     /// after a real booking exists so PackageEngine can persist the Business audit.
     let quoteProof: String?
     let stayPlan: PackageStayPlan?
+    var bookingAllowed: Bool? = nil
+    var resolvedTier: String? = nil
     init(
         totalPackagePrice: Decimal,
         pricePerPerson: Decimal,

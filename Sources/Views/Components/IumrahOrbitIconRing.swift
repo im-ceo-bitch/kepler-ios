@@ -56,7 +56,10 @@ struct IumrahOrbitIconRing: View {
             let step = max(0.35, revealDuration)
             let tick = Int(orbitTime / step)
             let revealPhase = (orbitTime / step).truncatingRemainder(dividingBy: 1)
-            let expansion = pow(max(0, sin(.pi * revealPhase)), 0.86)
+            // Hold the enlarged service long enough for the icon to be recognised.
+            // 0..0.24 expansion; 0.24..0.73 hold; 0.73..1 contraction.
+            let expansion = smoothStep(revealPhase / 0.24) *
+                (1 - smoothStep((revealPhase - 0.73) / 0.27))
             let progress = modeProgress
             let merge = smoothStep((assemblyTime - 0.65) / 1.7)
             let completed = smoothStep((assemblyTime - 2.15) / 0.55)
@@ -72,7 +75,7 @@ struct IumrahOrbitIconRing: View {
                         let radius = outerRadius * (1 - CGFloat(ring) * 0.145)
                         for dot in 0..<24 {
                             // The expanding service is drawn as a real SF Symbol overlay.
-                            if ring == 0 && mode == .showcase && dot == tick % 24 && !reduceMotion { continue }
+                            if ring == 0 && mode == .showcase && dot == tick % 24 { continue }
                             let angle = Double(dot) * 2 * .pi / 24 + rotation + Double(ring) * 0.11
                             let wobble = 1 + 0.09 * sin(orbitTime * 3 - Double(dot) * 0.5 + Double(ring))
                             let x = center.x + radius * CGFloat(cos(angle))
@@ -98,10 +101,11 @@ struct IumrahOrbitIconRing: View {
                     }
                 }
 
-                if mode == .showcase && !reduceMotion && !services.isEmpty {
+                if mode == .showcase && !services.isEmpty {
                     let angle = Double(tick % 24) * 2 * .pi / 24 + orbitTime * 2 * .pi / max(3, rotationDuration)
                     let radius = diameter * 0.39
-                    let bubble = CGFloat(max(5.0, 28.0 * expansion)) * diameter / 240
+                    // The point is ~7pt at rest and up to ~68pt when active (240pt ring).
+                    let bubble = CGFloat(3.5 + 30.5 * (reduceMotion ? 1 : expansion)) * diameter / 240
                     Circle()
                         .fill(foreground)
                         .frame(width: bubble * 2, height: bubble * 2)
@@ -109,8 +113,8 @@ struct IumrahOrbitIconRing: View {
                             Image(systemName: services[tick % count].symbol)
                                 .font(.system(size: bubble * 0.95, weight: .semibold))
                                 .foregroundStyle(background)
-                                .opacity(smoothStep((revealPhase - 0.16) / 0.18) *
-                                         (1 - smoothStep((revealPhase - 0.72) / 0.18)))
+                                .opacity((reduceMotion ? 1 : smoothStep((revealPhase - 0.13) / 0.17) *
+                                         (1 - smoothStep((revealPhase - 0.78) / 0.18))))
                         }
                         .position(x: diameter / 2 + radius * CGFloat(cos(angle)),
                                   y: diameter / 2 + radius * CGFloat(sin(angle)))
@@ -211,5 +215,72 @@ struct IumrahOrbitIconRing: View {
     private func smoothStep(_ input: Double) -> Double {
         let t = min(1, max(0, input))
         return t * t * (3 - 2 * t)
+    }
+}
+
+
+// MARK: - Production journey assembly
+
+extension IumrahOrbitService {
+    /// Only include services selected in the real JourneyStore. This is a visual
+    /// summary, not a booking/quote confirmation or an inventory guarantee.
+    static func selectedForJourney(_ journey: JourneyStore) -> [IumrahOrbitService] {
+        var result: [IumrahOrbitService] = []
+        if journey.selectedOutbound != nil || journey.selectedInbound != nil ||
+            !journey.localJourneyFlights.isEmpty || !journey.stagedUmrahFlights.isEmpty {
+            result.append(.init(id: "flight", symbol: "airplane"))
+        }
+        if journey.selectedHotel != nil || journey.selectedMadinahHotel != nil ||
+            !journey.localJourneyRooms.isEmpty {
+            result.append(.init(id: "hotel", symbol: "building.2.fill"))
+        }
+        if journey.transferSelectionConfirmed {
+            result.append(.init(id: "transfer", symbol: "car.side.fill"))
+        }
+        if journey.haramainTrainSelected {
+            result.append(.init(id: "train", symbol: "tram.fill"))
+        }
+        return result
+    }
+}
+
+struct IumrahOrbitPackageAssemblyCard: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let services: [IumrahOrbitService]
+
+    private func copy(_ ru: String, _ en: String, _ uz: String, _ uzc: String) -> String {
+        switch settings.language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return uzc
+        default: return en
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            IumrahOrbitIconRing(
+                mode: reduceMotion ? .progress(completed: services.count, active: 0) : .assembling,
+                services: services,
+                diameter: 205,
+                lightOnDark: true
+            )
+            .frame(height: 215)
+            .accessibilityIdentifier("iumrah.orbit.package.assembly")
+
+            Text(copy("Всё объединяется в один пакет", "Everything becomes one package", "Barcha xizmatlar bitta paketda", "Барча хизматлар битта пакетда"))
+                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white)
+            Text(copy("Ваши выбранные услуги · бронирование ещё не создано", "Your selected services · booking not created yet", "Tanlangan xizmatlaringiz · bron hali yaratilmagan", "Танланган хизматларингиз · брон ҳали яратилмаган"))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.63))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+        .padding(.horizontal, 12)
+        .background(Color(red: 0.034, green: 0.034, blue: 0.044), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }

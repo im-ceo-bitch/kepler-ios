@@ -16,7 +16,8 @@ enum BookingDraftBuilder {
         inbound: FlightOffer?,
         quote: PackageQuote,
         language: AppSettingsStore.Language,
-        pilgrimProfile: BookingPilgrimProfile?
+        pilgrimProfile: BookingPilgrimProfile?,
+        nuiteeRooms: [BookingNuiteeRoomSelection]? = nil
     ) -> BookingCreateEnvelope {
         let stay: TripStayBreakdown
         let dates: StayDates
@@ -115,6 +116,7 @@ enum BookingDraftBuilder {
             flight: flightSummary(outbound: outbound, inbound: inbound),
             pilgrimProfile: pilgrimProfile,
             generatorTrace: .init(
+                nuiteeRooms: nuiteeRooms,
                 quoteId: quote.quoteId ?? inbound?.quoteId ?? outbound.quoteId,
                 outbound: generatorFlight(outbound),
                 inbound: inbound.map(generatorFlight),

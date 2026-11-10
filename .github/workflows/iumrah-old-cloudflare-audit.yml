@@ -260,6 +260,220 @@ jobs:
               main()
           PYTHON_AUDIT
           python "$RUNNER_TEMP/iumrah_d1_audit.py"
+      - name: Export current published flight identities (no prices or private data)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/export_active_flights.py" <<'PYTHON_FLIGHTS'
+          #!/usr/bin/env python3
+          """Export active public flight identities from old iumrah D1. Never export prices, PII, hotels or secrets."""
+          from __future__ import annotations
+          import importlib.util, json, os, re, sys
+          from datetime import datetime, timedelta
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+          
+          SRC=Path(os.environ['RUNNER_TEMP'])/'iumrah_d1_audit.py'
+          if not SRC.is_file():
+              raise SystemExit('Audit script missing: run the existing audit step first.')
+          spec=importlib.util.spec_from_file_location('old_iumrah_d1_audit',SRC)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          account=os.environ.get('OLD_CLOUDFLARE_ACCOUNT_ID','').strip()
+          token=os.environ.get('OLD_CLOUDFLARE_API_TOKEN','').strip()
+          if not account or not token:
+              raise SystemExit('Existing OLD CLOUDFLARE credentials unavailable in kepler-ios repository.')
+          cf=mod.CF(account,token)
+          
+          def quote(name):
+              return '"'+name.replace('"','""')+'"'
+          
+          def scalar(value):
+              if not isinstance(value,str):
+                  return ''
+              return value.strip().upper()
+          
+          def read_first(obj, *names):
+              if not isinstance(obj,dict):
+                  return None
+              for name in names:
+                  val=obj.get(name)
+                  if val is not None and val != '':
+                      return val
+              return None
+          
+          def legs_from_offer(obj):
+              if not isinstance(obj,dict):
+                  return []
+              direct=read_first(obj,'legs','segments')
+              if isinstance(direct,list) and direct:
+                  return direct
+              itin=read_first(obj,'itinerary','trip')
+              if isinstance(itin,dict):
+                  nested=read_first(itin,'legs','segments')
+                  if isinstance(nested,list) and nested:
+                      return nested
+              return []
+          
+          def iso_day(v):
+              s=str(v or '')
+              day=s[:10]
+              if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',day):
+                  return ''
+              try:
+                  datetime.strptime(day,'%Y-%m-%d')
+              except ValueError:
+                  return ''
+              return day
+          
+          def timezone_timestamp(v):
+              if not isinstance(v,str):
+                  return None
+              if not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})',v,re.I):
+                  return None
+              try:
+                  datetime.fromisoformat(v.replace('Z','+00:00'))
+              except ValueError:
+                  return None
+              return v
+          
+          def normalise(leg, parent):
+              if not isinstance(leg,dict):
+                  return None
+              num=scalar(read_first(leg,'flight_number','flightNumber','number'))
+              num=re.sub(r'[\s\-]+','',num)
+              if not re.fullmatch(r'[A-Z0-9]{2}\d{1,5}[A-Z]?',num):
+                  return None
+              carrier=scalar(read_first(leg,'airline_code','airlineCode','carrier_code','carrierCode','marketing_carrier')) or num[:2]
+              if not re.fullmatch(r'[A-Z0-9]{2}',carrier) or not num.startswith(carrier):
+                  return None
+              origin=scalar(read_first(leg,'origin','departure_airport','departureAirport','from'))
+              destination=scalar(read_first(leg,'destination','arrival_airport','arrivalAirport','to'))
+              if not re.fullmatch(r'[A-Z]{3}',origin) or not re.fullmatch(r'[A-Z]{3}',destination) or origin==destination:
+                  return None
+              dep=read_first(leg,'departure_at','departureAt','scheduled_departure','scheduledDeparture')
+              arr=read_first(leg,'arrival_at','arrivalAt','scheduled_arrival','scheduledArrival')
+              day=iso_day(read_first(leg,'departure_date','departureDate') or dep or read_first(parent,'date','outbound_date','outboundDate'))
+              if not day or day < TODAY or day > LAST:
+                  return None
+              result={'airline_code':carrier,'flight_number':num,'origin':origin,
+                      'destination':destination,'departure_date':day}
+              dt=timezone_timestamp(dep)
+              at=timezone_timestamp(arr)
+              if dt and dt[:10] == day:
+                  result['departure_at']=dt
+              if at:
+                  result['arrival_at']=at
+              return result
+          
+          def parse_offer(obj):
+              if not isinstance(obj,dict):
+                  return []
+              legs=legs_from_offer(obj)
+              if not legs:
+                  nums=read_first(obj,'flight_numbers','flightNumbers')
+                  if isinstance(nums,str):
+                      try: nums=json.loads(nums)
+                      except ValueError: nums=[]
+                  if isinstance(nums,list) and len(nums)==1:
+                      # Accept a single direct segment only. Never invent departure time.
+                      legs=[{'flight_number':nums[0],
+                          'airline_code':(read_first(obj,'airline_code','airlineCode') or str(nums[0]).strip()[:2]),
+                          'origin':read_first(obj,'from','origin','outbound_origin'),
+                          'destination':read_first(obj,'to','destination','outbound_destination'),
+                          'departure_date':read_first(obj,'date','outbound_date')}]
+              return [r for leg in legs if (r:=normalise(leg,obj))]
+          
+          now=datetime.now(ZoneInfo('Asia/Tashkent')).date()
+          TODAY=now.isoformat()
+          LAST=(now+timedelta(days=30)).isoformat()
+          seen=set()
+          records=[]
+          summary={'range_start':TODAY,'range_end':LAST,
+                   'sources':{},'candidate_offers':0,'flight_snapshots':0,
+                   'invalid_or_out_of_range_legs':0,'duplicates':0,'accepted':0,
+                   'prices_exported':False,'personal_data_exported':False,'hotel_data_exported':False}
+          
+          def add(candidate, source):
+              if not isinstance(candidate,dict):
+                  summary['invalid_or_out_of_range_legs']+=1
+                  return
+              k='|'.join([candidate[x] for x in ('airline_code','flight_number','origin','destination','departure_date')])
+              if k in seen:
+                  summary['duplicates']+=1
+                  return
+              seen.add(k)
+              records.append(candidate)
+              summary['sources'][source]=summary['sources'].get(source,0)+1
+          
+          inventory_path=Path(os.environ.get('OUTDIR','/tmp/iumrah-d1-audit'))/'inventory.json'
+          if not inventory_path.exists():
+              raise SystemExit('Previous schema audit inventory missing')
+          inv=json.loads(inventory_path.read_text())
+          found=0
+          for db in inv.get('databases',[]):
+              tables={t['table'] for t in db.get('tables',[])}
+              if not {'curated_flight_offers','business_flight_sync_feeds'}.intersection(tables):
+                  continue
+              db_id=db.get('database_uuid','')
+              if not re.fullmatch(r'[0-9a-f-]{32,36}',str(db_id),re.I):
+                  raise SystemExit('Invalid database UUID in audit inventory')
+              found+=1
+              if 'curated_flight_offers' in tables:
+                  # Read only the flight itinerary column. Never read prices or user columns.
+                  for offset in range(0,30000,100):
+                      sql=("SELECT itinerary_json FROM curated_flight_offers WHERE published=1 AND "
+                           f"(outbound_date BETWEEN '{TODAY}' AND '{LAST}' OR inbound_date BETWEEN '{TODAY}' AND '{LAST}') "
+                           f"ORDER BY outbound_date,id LIMIT 100 OFFSET {offset}")
+                      rows=cf.query(db_id,sql)
+                      for row in rows:
+                          summary['candidate_offers']+=1
+                          try: offer=json.loads(row.get('itinerary_json') or 'null')
+                          except (ValueError,TypeError):
+                              summary['invalid_or_out_of_range_legs']+=1
+                              continue
+                          for item in parse_offer(offer): add(item,'curated_flight_offers')
+                      if len(rows)<100:
+                          break
+                  else:
+                      raise SystemExit('Exceeded safe curated flight pagination cap; no partial export')
+              if 'business_flight_sync_feeds' in tables:
+                  # Only the published-flight snapshot. Never read token_hash / owner_login.
+                  rows=cf.query(db_id,"SELECT snapshot_json FROM business_flight_sync_feeds WHERE enabled=1")
+                  for row in rows:
+                      try: snapshot=json.loads(row.get('snapshot_json') or 'null')
+                      except (ValueError,TypeError):
+                          summary['invalid_or_out_of_range_legs']+=1
+                          continue
+                      flights=snapshot.get('flights',[]) if isinstance(snapshot,dict) else snapshot
+                      if not isinstance(flights,list):
+                          continue
+                      summary['flight_snapshots']+=len(flights)
+                      for flight in flights:
+                          for item in parse_offer(flight):add(item,'business_flight_sync_feeds')
+          if not found:
+              raise SystemExit('Old aviation D1 tables not found: check kepler-ios still uses OLD Cloudflare credentials.')
+          records.sort(key=lambda x:(x['departure_date'],x['airline_code'],x['flight_number'],x['origin'],x['destination']))
+          summary['accepted']=len(records)
+          out=Path(os.environ.get('FLIGHTS_EXPORT_DIR','/tmp/iumrah-active-flights'))
+          out.mkdir(parents=True,exist_ok=True)
+          (out/'flight-identities.json').write_text(json.dumps({'version':1,'generated_at_utc':datetime.now().astimezone().isoformat(),
+              'scope':'public_flight_identities_only','range_start':TODAY,'range_end':LAST,
+              'records':records},indent=2,ensure_ascii=False)+'\n')
+          (out/'export-summary.json').write_text(json.dumps(summary,indent=2,ensure_ascii=False)+'\n')
+          (out/'README.txt').write_text('Safe export of future public flight identities only. Contains no hotel data, customer data or prices.\n'
+              'Send this artifact to prepare an import into the NEW iumrah-flights D1. Do not import as live-verified fares.\n')
+          print(json.dumps(summary,ensure_ascii=False,indent=2))
+          print(f'Active public identities exported: {len(records)}. No old prices exported.')
+          PYTHON_FLIGHTS
+          python3 "$RUNNER_TEMP/export_active_flights.py"
+      - name: Upload active-flight identities artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iumrah-active-flights-from-kepler-ios
+          path: /tmp/iumrah-active-flights/
+          retention-days: 7
+          if-no-files-found: error
       - name: Upload schema-only diagnostic artifact
         uses: actions/upload-artifact@v4
         with:

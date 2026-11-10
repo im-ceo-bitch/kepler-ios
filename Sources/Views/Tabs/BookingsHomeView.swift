@@ -42,21 +42,36 @@ struct BookingsHomeView: View {
         activeSessions.first
     }
 
-    var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, header: {
-            bookingHeader(hasActiveBooking: activeSession != nil)
-        }, content: {
-            VStack(spacing: 12) {
-                IumrahPageHelpCard(activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : "bookings.schedule")
-                    .padding(.horizontal, IumrahDesign.pagePadding).padding(.top, 12)
-                if let activeSession {
-                    activeBookingHub(activeSession)
-                } else {
-                    emptyBookingHome
-                }
+    // The iOS 27 crash logs (build 222) show swift_getTypeByMangledName
+    // recursing on the main thread until SIGSEGV while building this tab.
+    // Erase the large generic scroll-view body *before* applying navigation,
+    // task and dialog modifiers. This is a runtime metadata boundary, not a
+    // visual change; both active and empty booking flows remain intact.
+    private var bookingScrollRoot: AnyView {
+        AnyView(
+            IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, header: {
+                AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
+            }, content: {
+                AnyView(bookingTabContent)
+            })
+            .modifier(IumrahPrimaryTabScrollChrome())
+        )
+    }
+
+    private var bookingTabContent: some View {
+        VStack(spacing: 12) {
+            IumrahPageHelpCard(activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : "bookings.schedule")
+                .padding(.horizontal, IumrahDesign.pagePadding).padding(.top, 12)
+            if let activeSession {
+                AnyView(activeBookingHub(activeSession))
+            } else {
+                AnyView(emptyBookingHome)
             }
-        })
-        .modifier(IumrahPrimaryTabScrollChrome())
+        }
+    }
+
+    var body: some View {
+        bookingScrollRoot
         .task {
             await bookings.refreshAll()
             await loadActiveCheckout()
@@ -123,46 +138,14 @@ struct BookingsHomeView: View {
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 0) {
             LazyVStack(spacing: 0) {
-                JourneyTravelInfoView()
-                    .padding(.bottom, 18)
-
-                bookingIdentity(session)
-                    .padding(.bottom, 18)
-
-                if bookingPanel == .booking {
-                    bookingProgress(session)
-                        .padding(.bottom, 38)
-                } else if bookingPanel == .status {
-                    bookingTimerOverview(session)
-                        .padding(.bottom, 28)
-
-                    bookingFulfillmentCenter(session, checkout: activeCheckout)
-                        .padding(.bottom, 34)
-
-                    if shouldShowTravelReadyFlights(session) {
-                        bookingStatusFlights(session)
-                            .padding(.bottom, 34)
-                    }
-
-                    tripPlanPreview(session)
-                        .padding(.bottom, 34)
-
-                    tripManagement(session)
-                        .padding(.bottom, activeSessions.count > 1 ? 36 : 12)
-                } else {
-                    BookingItineraryCalendarView(
-                        bookingID: session.id,
-                        startDate: session.booking.input.startDate,
-                        endDate: session.booking.input.endDate,
-                        booking: session.booking,
-                        presentation: .fullScreen
-                    )
-                    .padding(.bottom, 28)
-                }
+                // Isolate complex child views from the surrounding SwiftUI
+                // generic metadata. Do not eagerly allocate the other panels.
+                AnyView(JourneyTravelInfoView().padding(.bottom, 18))
+                AnyView(bookingIdentity(session).padding(.bottom, 18))
+                bookingPanelContent(session)
 
                 if activeSessions.count > 1 {
-                    otherTrips(excluding: session.id)
-                        .padding(.bottom, 12)
+                    AnyView(otherTrips(excluding: session.id).padding(.bottom, 12))
                 }
 
                 if let deleteError {
@@ -175,12 +158,14 @@ struct BookingsHomeView: View {
                         .padding(.top, 8)
                 }
 
-                IumrahTelegramConnectCard(
-                    session: session,
-                    accountToken: account.bearerToken,
-                    style: .compact
+                AnyView(
+                    IumrahTelegramConnectCard(
+                        session: session,
+                        accountToken: account.bearerToken,
+                        style: .compact
+                    )
+                    .padding(.top, 28)
                 )
-                .padding(.top, 28)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 10)
@@ -188,6 +173,41 @@ struct BookingsHomeView: View {
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .animation(.snappy(duration: 0.34), value: session.effectiveStatus)
+    }
+
+    // Keep the three booking panels separate. The previous @ViewBuilder
+    // embedded all three large view trees in the same LazyVStack generic
+    // signature, even when only the progress panel was actually shown.
+    private func bookingPanelContent(_ session: StoredBookingSession) -> AnyView {
+        switch bookingPanel {
+        case .booking:
+            return AnyView(bookingProgress(session).padding(.bottom, 38))
+        case .status:
+            return AnyView(bookingStatusPanel(session))
+        case .schedule:
+            return AnyView(
+                BookingItineraryCalendarView(
+                    bookingID: session.id,
+                    startDate: session.booking.input.startDate,
+                    endDate: session.booking.input.endDate,
+                    booking: session.booking,
+                    presentation: .fullScreen
+                )
+                .padding(.bottom, 28)
+            )
+        }
+    }
+
+    private func bookingStatusPanel(_ session: StoredBookingSession) -> some View {
+        VStack(spacing: 0) {
+            AnyView(bookingTimerOverview(session).padding(.bottom, 28))
+            AnyView(bookingFulfillmentCenter(session, checkout: activeCheckout).padding(.bottom, 34))
+            if shouldShowTravelReadyFlights(session) {
+                AnyView(bookingStatusFlights(session).padding(.bottom, 34))
+            }
+            AnyView(tripPlanPreview(session).padding(.bottom, 34))
+            AnyView(tripManagement(session).padding(.bottom, activeSessions.count > 1 ? 36 : 12))
+        }
     }
 
     /// The top deliberately avoids another large card. Like the reference flow,
@@ -640,7 +660,7 @@ struct BookingsHomeView: View {
             }
 
             if let outbound = session.outboundFlight {
-                bookingStatusFlightCard(outbound, label: localized("Туда", "Outbound", "Borish", "Бориш"))
+                AnyView(bookingStatusFlightCard(outbound, label: localized("Туда", "Outbound", "Borish", "Бориш")))
             } else {
                 bookingStatusLegacyFlightCard(
                     title: localized("Туда", "Outbound", "Borish", "Бориш"),
@@ -651,7 +671,7 @@ struct BookingsHomeView: View {
             }
 
             if let inbound = session.inboundFlight {
-                bookingStatusFlightCard(inbound, label: localized("Обратно", "Return", "Qaytish", "Қайтиш"))
+                AnyView(bookingStatusFlightCard(inbound, label: localized("Обратно", "Return", "Qaytish", "Қайтиш")))
             } else {
                 bookingStatusLegacyFlightCard(
                     title: localized("Обратно", "Return", "Qaytish", "Қайтиш"),
@@ -1643,7 +1663,7 @@ struct BookingsHomeView: View {
     private var emptyBookingHome: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 18) {
-                bookingEmptyStatusCard
+                AnyView(bookingEmptyStatusCard)
 
                 NavigationLink {
                     IumrahTelegramIntegrationView()
@@ -1652,10 +1672,10 @@ struct BookingsHomeView: View {
                 }
                 .buttonStyle(.plain)
 
-                explorePackagesButton
+                AnyView(explorePackagesButton)
 
-                emptyConfiguratorCard
-                emptyCareCard
+                AnyView(emptyConfiguratorCard)
+                AnyView(emptyCareCard)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 10)
@@ -1797,7 +1817,9 @@ struct BookingsHomeView: View {
 
                     HStack(spacing: 10) {
                         Text(cta)
-                    }.frame(maxWidth: .infinity)
+                        Spacer(minLength: 8)
+                        Image(systemName: "arrow.right")
+                    }
                     .font(.headline)
                     .foregroundStyle(dark ? .black : .white)
                     .padding(.horizontal, 18)

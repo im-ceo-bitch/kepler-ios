@@ -23,6 +23,16 @@ struct BookingCheckoutView: View {
             .padding(.bottom, 42)
         }
         .background(Color.iumrahPageBackground)
+        .onAppear {
+            Task {
+                await IumrahIntelligence.shared.detailAppeared("checkout")
+                await IumrahIntelligence.shared.record("checkout_started", screen: "checkout")
+                await IumrahIntelligence.shared.record("price_viewed", screen: "checkout", element: "package_total")
+            }
+        }
+        .onDisappear {
+            Task { await IumrahIntelligence.shared.detailDisappeared("checkout") }
+        }
         .iumrahInternalNavigation(progress: .ready)
         .navigationDestination(item: $createdSession) { session in
             BookingDetailView(bookingID: session.id)
@@ -129,7 +139,8 @@ struct BookingCheckoutView: View {
             }
 
             Button {
-                // Open a full screen, passport-name + guest SMS confirmation flow.
+                // Track the action, never the passport-name or guest SMS values.
+                Task { await IumrahIntelligence.shared.record("tap", screen: "checkout", element: "continue_booking") }
                 showProfileSheet = true
             } label: {
                 if isSubmitting {
@@ -159,7 +170,9 @@ struct BookingCheckoutView: View {
               let quote = journey.quote else { throw BookingStoreError.authoritativeQuoteRequired }
         let inbound = journey.selectedInbound
         guard !journey.trip.isRoundTripFlight || inbound != nil else { throw BookingStoreError.authoritativeQuoteRequired }
-        return try await bookings.create(
+        await IumrahIntelligence.shared.record("tap", screen: "checkout", element: "submit_booking")
+        do {
+            let saved = try await bookings.create(
             trip: journey.trip,
             hotel: hotel,
             madinahHotel: journey.selectedMadinahHotel,
@@ -173,7 +186,14 @@ struct BookingCheckoutView: View {
             quote: quote,
             language: settings.language,
             pilgrimProfile: profile
-        )
+            )
+            // Creating a booking request is not a paid/confirmed sale.
+            await IumrahIntelligence.shared.record("booking_submitted", screen: "checkout")
+            return saved
+        } catch {
+            await IumrahIntelligence.shared.record("error", screen: "checkout", element: "booking_submit")
+            throw error
+        }
     }
 
 }

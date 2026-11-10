@@ -53,6 +53,7 @@ struct IumrahFlightDiscoveryView: View {
     @State private var hasSearched = false
     @State private var searchProgress = 0.0
     @State private var searchRunID = UUID()
+    @State private var lastReportedSearchRunID: UUID?
     @State private var recommendedFlights: [CuratedFlightRecommendation] = []
     @State private var recommendedLoading = false
     @State private var recommendedError: String?
@@ -80,6 +81,8 @@ struct IumrahFlightDiscoveryView: View {
             }
             }
         }
+        .onAppear { Task { await IumrahIntelligence.shared.detailAppeared("flight_search") } }
+        .onDisappear { Task { await IumrahIntelligence.shared.detailDisappeared("flight_search") } }
         .task {
             seedFromJourneyIfNeeded()
             // The home form is authoritative in guided mode. Do not write stale
@@ -160,6 +163,7 @@ struct IumrahFlightDiscoveryView: View {
                 onSelect: { record in
                     favoritesPresented = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        Task { await IumrahIntelligence.shared.record("flight_selected", screen: "flights", element: "favorites") }
                         selectedOffer = record.offer
                     }
                 },
@@ -188,6 +192,12 @@ struct IumrahFlightDiscoveryView: View {
         }
         .onChange(of: store.offers) { _, offers in
             favorites.reconcile(offers: offers, currency: store.currency, language: settings.language)
+        }
+        .onChange(of: store.isLoading) { _, loading in
+            guard !loading, hasSearched, lastReportedSearchRunID != searchRunID else { return }
+            lastReportedSearchRunID = searchRunID
+            let result = store.offers.isEmpty ? "empty" : "available"
+            Task { await IumrahIntelligence.shared.record("search_results", screen: "flights", element: result) }
         }
     }
 
@@ -842,6 +852,7 @@ struct IumrahFlightDiscoveryView: View {
                             isFavorite: favorites.isFavorite(offer),
                             onFavorite: { favorites.toggle(offer, currency: store.currency, language: settings.language) }
                         ) {
+                            Task { await IumrahIntelligence.shared.record("flight_selected", screen: "flights", element: "search_result") }
                             selectedOffer = offer
                         }
                     }
@@ -1456,6 +1467,7 @@ struct IumrahFlightDiscoveryView: View {
     }
 
     private func performGlobalSearch() {
+        Task { await IumrahIntelligence.shared.record("search_started", screen: "flights", element: "global") }
         searchRunID = UUID()
         searchProgress = 1
         hasSearched = true
@@ -1465,6 +1477,7 @@ struct IumrahFlightDiscoveryView: View {
 
     @MainActor
     private func loadRecommendedFlights() async {
+        await IumrahIntelligence.shared.record("search_started", screen: "flights", element: "recommended")
         recommendedLoading = true
         recommendedError = nil
         defer { recommendedLoading = false }
@@ -1476,6 +1489,7 @@ struct IumrahFlightDiscoveryView: View {
             let flights = try await CuratedFlightRecommendationService.shared.load(trip: trip)
             guard !Task.isCancelled else { return }
             recommendedFlights = flights
+            await IumrahIntelligence.shared.record("search_results", screen: "flights", element: flights.isEmpty ? "empty" : "available")
         } catch {
             guard !Task.isCancelled else { return }
             recommendedFlights = []
@@ -1488,6 +1502,7 @@ struct IumrahFlightDiscoveryView: View {
     }
 
     private func stageRecommendedFlight(_ recommendation: CuratedFlightRecommendation) {
+        Task { await IumrahIntelligence.shared.record("flight_selected", screen: "flights", element: "recommended") }
         journey.stagedAviasalesOffers = [:]
         syncSearchConfigurationToJourney()
         let role = recommendation.effectiveJourneyRole

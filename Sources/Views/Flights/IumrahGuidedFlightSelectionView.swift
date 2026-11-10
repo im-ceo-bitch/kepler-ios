@@ -185,6 +185,8 @@ struct IumrahGuidedFlightSelectionView: View {
         .navigationDestination(isPresented: $showTransferPicker) {
             NuiteeJourneyHotelsView()
         }
+        .onAppear { Task { await IumrahIntelligence.shared.detailAppeared("flight_builder") } }
+        .onDisappear { Task { await IumrahIntelligence.shared.detailDisappeared("flight_builder") } }
         .task { await loadFlights() }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
             Button(tr("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
@@ -492,6 +494,7 @@ struct IumrahGuidedFlightSelectionView: View {
         case .outbound:
             outbound = choice
             inbound = nil
+            Task { await IumrahIntelligence.shared.record("flight_selected", screen: "flight_builder", element: "outbound") }
             // The next leg is opened only when the user taps the explicit CTA.
         case .inbound:
             guard let outbound, outbound.source == choice.source else {
@@ -499,6 +502,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 return
             }
             inbound = choice
+            Task { await IumrahIntelligence.shared.record("flight_selected", screen: "flight_builder", element: "inbound") }
         }
     }
 
@@ -621,6 +625,7 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func loadFlights() async {
+        await IumrahIntelligence.shared.record("search_started", screen: "flight_builder", element: "published_flights")
         editingSearch = false
         let requestID = UUID()
         loadingRequestID = requestID
@@ -635,6 +640,7 @@ struct IumrahGuidedFlightSelectionView: View {
             let result = try await curatedService.load(trip: trip)
             guard !Task.isCancelled, loadingRequestID == requestID else { return }
             published = result
+            await IumrahIntelligence.shared.record("search_results", screen: "flight_builder", element: result.isEmpty ? "empty" : "available")
         } catch {
             guard loadingRequestID == requestID else { return }
             published = []
@@ -727,6 +733,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 arrivalAt: flight.arrivalAt, displayedPrice: flight.price)
         }
         IumrahHaptics.success()
+        Task { await IumrahIntelligence.shared.record("tap", screen: "flight_builder", element: "continue_to_hotels") }
         showTransferPicker = true
     }
 

@@ -72,10 +72,14 @@ struct OnboardingFlowView: View {
         .ignoresSafeArea()
         .task {
             await runIntroSequence()
+            await IumrahIntelligence.shared.record("onboarding_step", screen: "onboarding", element: "step_0")
         }
         .onChange(of: pageID) { oldValue, newValue in
             guard oldValue != nil, newValue != nil, oldValue != newValue, !showIntro else { return }
             IumrahHaptics.selection()
+            Task {
+                await IumrahIntelligence.shared.record("onboarding_step", screen: "onboarding", element: "step_\(page)")
+            }
         }
     }
 
@@ -135,6 +139,7 @@ struct OnboardingFlowView: View {
     private func topBar(topInset: CGFloat) -> some View {
         HStack(spacing: 12) {
             Button {
+                Task { await IumrahIntelligence.shared.record("tap", screen: "onboarding", element: "skip") }
                 finishOnboarding()
             } label: {
                 Text(settings.language == .russian ? "Пропустить" :

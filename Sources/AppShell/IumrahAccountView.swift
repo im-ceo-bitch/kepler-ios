@@ -51,6 +51,7 @@ struct IumrahAccountView: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @ObservedObject private var push = PushNotificationManager.shared
 
+    @AppStorage(IumrahIntelligence.enabledKey) private var analyticsEnabled = true
     @State private var guestAccountMode: IumrahGuestAccountMode = .signIn
     @State private var guestAuthMethod: IumrahGuestAuthMethod = .sms
     @State private var loginID = ""
@@ -158,6 +159,9 @@ struct IumrahAccountView: View {
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
+        .onChange(of: analyticsEnabled) { _, enabled in
+            Task { await IumrahIntelligence.shared.setEnabled(enabled) }
+        }
         .task {
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
@@ -1231,6 +1235,10 @@ struct IumrahAccountView: View {
                 )
             }
             .buttonStyle(.plain)
+
+            Divider().padding(.leading, 54)
+
+            analyticsPrivacyControl
         }
         .iumrahCard()
     }
@@ -1789,6 +1797,25 @@ struct IumrahAccountView: View {
         .buttonStyle(.plain)
     }
 
+    private var analyticsPrivacyControl: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Toggle(isOn: $analyticsEnabled) {
+                Label(tr("Usage analytics", "Аналитика использования", "Foydalanish tahlili", "Фойдаланиш таҳлили"), systemImage: "chart.bar.xaxis")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .tint(Color.iumrahRoyalViolet)
+            Text(tr(
+                "Helps improve screens and bookings. No names, passports, messages or payment details.",
+                "Помогает улучшать экраны и бронирование. Без имён, паспортов, переписки и платёжных данных.",
+                "Ekranlar va bandlovni yaxshilaydi. Ism, pasport, xabar va to‘lov ma’lumotlarisiz.",
+                "Экранлар ва бронни яхшилайди. Исм, паспорт, хабар ва тўлов маълумотларисиз."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 8)
+    }
+
     private var guestSettingsSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             sectionHeader(
@@ -1840,6 +1867,10 @@ struct IumrahAccountView: View {
                 )
             }
             .buttonStyle(.plain)
+
+            Divider().padding(.leading, 54)
+
+            analyticsPrivacyControl
         }
         .iumrahCard()
     }

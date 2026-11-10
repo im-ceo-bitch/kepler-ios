@@ -108,10 +108,16 @@ struct HomeDashboardView: View {
                 await clientNotifications.refresh(accountToken: account.bearerToken)
                 await storefront.refresh()
             }, searchCardOverlap: 40, header: {
-                IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header)
+                IumrahHomeJourneySearchHero(onSearch: {
+                    Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "start_trip_search") }
+                    showGuidedFlightSelection = true
+                }, presentation: .header)
             }, content: {
                 LazyVStack(spacing: 30) {
-                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search)
+                    IumrahHomeJourneySearchHero(onSearch: {
+                    Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "start_trip_search") }
+                    showGuidedFlightSelection = true
+                }, presentation: .search)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
                     IumrahPageHelpCard("home.default")
@@ -613,6 +619,7 @@ struct HomeDashboardView: View {
 
     private var allPackagesCard: some View {
         Button {
+            Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "open_flights") }
             chrome.openHotels(board: .flights)
         } label: {
             VStack(alignment: .leading, spacing: 0) {
@@ -736,6 +743,7 @@ struct HomeDashboardView: View {
     private var allHotelFirstPackagesCard: some View {
         Button {
             IumrahHaptics.selection()
+            Task { await IumrahIntelligence.shared.record("tap", screen: "home", element: "open_hotels") }
             chrome.openHotels(board: .hotels)
         } label: {
             VStack(alignment: .leading, spacing: 0) {

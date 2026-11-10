@@ -26,6 +26,13 @@ struct RootView: View {
             .environmentObject(bookings)
             .environmentObject(account)
             .environmentObject(hotelStorefront)
+            .task {
+                await IumrahIntelligence.shared.start(initialScreen: telemetryScreen)
+            }
+            .onChange(of: chrome.currentTab) { _, next in
+                let screen = telemetryName(for: next)
+                Task { await IumrahIntelligence.shared.screenChanged(to: screen) }
+            }
             .onChange(of: chrome.requestedTab) { _, newValue in
                 guard let newValue else { return }
                 chrome.currentTab = newValue
@@ -86,6 +93,10 @@ struct RootView: View {
             .onChange(of: hasCompletedOnboarding) { _, completed in
                 guard completed else { return }
                 Task {
+                    await IumrahIntelligence.shared.record("onboarding_completed", screen: "onboarding")
+                    await IumrahIntelligence.shared.screenChanged(to: telemetryName(for: chrome.currentTab))
+                }
+                Task {
                     await bootstrapAfterOnboardingIfNeeded()
                     syncWidgets()
                     await push.ensureAuthorizationForClientNotifications()
@@ -117,6 +128,14 @@ struct RootView: View {
                 handleDeepLink(url)
             }
             .onChange(of: scenePhase) { _, phase in
+                let screen = telemetryScreen
+                Task {
+                    switch phase {
+                    case .background: await IumrahIntelligence.shared.enterBackground()
+                    case .active: await IumrahIntelligence.shared.resume(initialScreen: screen)
+                    default: break
+                    }
+                }
                 guard phase == .active, hasCompletedOnboarding else { return }
                 syncWidgets()
                 Task {
@@ -345,6 +364,20 @@ struct RootView: View {
         }
     }
 
+
+    private var telemetryScreen: String {
+        hasCompletedOnboarding ? telemetryName(for: chrome.currentTab) : "onboarding"
+    }
+
+    private func telemetryName(for tab: AppTab) -> String {
+        switch tab {
+        case .home: return "home"
+        case .hotels: return "hotels"
+        case .booking: return "bookings"
+        case .care: return "care"
+        case .account: return "account"
+        }
+    }
 
     private var rootContent: some View {
         Group {

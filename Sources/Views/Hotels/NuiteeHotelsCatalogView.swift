@@ -287,7 +287,10 @@ struct NuiteeHotelsCatalogView: View {
                         NuiteeHotelListingCard(
                             hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
                             favorite: favorites.contains(hotel.id),
-                            onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
+                            onOpen: {
+                                Task { await IumrahIntelligence.shared.record("tap", screen: "hotels", element: "hotel_card") }
+                                opened = hotel
+                            }, onFavorite: { toggleFavorite(hotel.id) }
                         )
                     }
                     if matchingHotels.count > visibleCount {
@@ -302,7 +305,10 @@ struct NuiteeHotelsCatalogView: View {
                             NuiteeHotelListingCard(
                                 hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
                                 favorite: favorites.contains(hotel.id),
-                                onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
+                                onOpen: {
+                                    Task { await IumrahIntelligence.shared.record("tap", screen: "hotels", element: "hotel_card") }
+                                    opened = hotel
+                                }, onFavorite: { toggleFavorite(hotel.id) }
                             )
                         }
                     }
@@ -354,7 +360,14 @@ struct NuiteeHotelsCatalogView: View {
 
     private func reload() async {
         visibleCount = 20
+        await IumrahIntelligence.shared.record("search_started", screen: "hotels", element: "catalog")
         await model.reload(city: city, checkin: checkin, checkout: checkout, adults: adults)
+        guard !Task.isCancelled else { return }
+        if model.errorMessage == nil {
+            await IumrahIntelligence.shared.record("search_results", screen: "hotels", element: model.hotels.isEmpty ? "empty" : "available")
+        } else {
+            await IumrahIntelligence.shared.record("error", screen: "hotels", element: "catalog_load")
+        }
     }
     private func toggleFavorite(_ id: String) {
         if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
@@ -631,6 +644,12 @@ struct NuiteeHotelDetailView: View {
         } }
         .task(id: settings.language.rawValue) { await refreshDetail() }
         .task(id: reloadID) { pendingSaved = false; await refreshRates() }
+        .onAppear { Task { await IumrahIntelligence.shared.detailAppeared("hotel_details") } }
+        .onDisappear { Task { await IumrahIntelligence.shared.detailDisappeared("hotel_details") } }
+        .onChange(of: rates.isEmpty) { _, empty in
+            guard !empty else { return }
+            Task { await IumrahIntelligence.shared.record("price_viewed", screen: "hotel_details", element: "room_rates") }
+        }
         .sheet(isPresented: $showSupport) {
             NavigationStack {
                 CareHomeView()
@@ -724,6 +743,7 @@ struct NuiteeHotelDetailView: View {
     }
 
     private func savePendingHotel() {
+        Task { await IumrahIntelligence.shared.record("hotel_selected", screen: "hotel_details", element: "pending_price") }
         let name = hotel.city.lowercased()
         let city = name.contains("mad") || name.contains("med") || name.contains("المدينة") ? "madinah" : "makkah"
         let selection = LocalJourneyPendingHotel(id: "\(city):0", city: city, hotel: hotel,
@@ -734,6 +754,7 @@ struct NuiteeHotelDetailView: View {
     }
 
     private func saveRate(_ rate: NuiteeRoomRate) {
+        Task { await IumrahIntelligence.shared.record("hotel_selected", screen: "hotel_details", element: "confirmed_rate") }
         if let onSelectRate { onSelectRate(rate); dismiss(); return }
         NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
             provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,

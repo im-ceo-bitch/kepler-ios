@@ -37,7 +37,7 @@ test('guest email OTP is independent of login, status mail is localized and only
     const again=await call(f.env,'/api/package/booking-contact/email/confirm',{challengeID:first.value.challengeID,code});assert.equal(again.status,400);
     const noToken=await call(f.env,`/api/package/booking/${f.id}/verified-email`,{verificationToken:conf.value.verificationToken});assert.equal(noToken.status,401);
     const connected=await call(f.env,`/api/package/booking/${f.id}/verified-email`,{verificationToken:conf.value.verificationToken,locale:'uz-cyrl'},f.token);
-    assert.equal(connected.status,200);assert.equal(sent.length,2);assert.match(sent[1].html,/#1234/);assert.match(sent[1].subject,/Умра пакетингиз/);assert.match(sent[1].html,/\$1,625/);
+    assert.equal(connected.status,200);assert.equal(sent.length,2);assert.match(sent[1].html,/#1234/);assert.match(sent[1].subject,/Умра учун аризангиз қабул қилинди/);assert.match(sent[1].html,/\$1,625/);
     assert.equal(await sendBookingEmailStatus(f.env,f.id),'skipped');
     for(const [status,title] of [['payment_pending','Мавжудлик'],['paid','Тўлов'],['documents_ready','Ҳужжатлар'],['in_trip','Сиз сафардасиз']]){f.state.trip.status=status;assert.equal(await sendBookingEmailStatus(f.env,f.id),'sent');assert.match(sent.at(-1).subject,new RegExp(title));}
     assert.equal(sent.length,6);

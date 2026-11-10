@@ -15,6 +15,10 @@ export type Env = {
   RESEND_API_KEY?: string;
   ACCOUNT_EMAIL_FROM?: string;
   ACCOUNT_EMAIL_REPLY_TO?: string;
+  BOOKING_SUPPORT_PHONE_UZ?: string;
+  BOOKING_SUPPORT_PHONE_SA?: string;
+  BOOKING_SUPPORT_TELEGRAM?: string;
+  BOOKING_SUPPORT_WHATSAPP?: string;
   DEVSMS_API_TOKEN?: string;
   WALLET_PASS_TYPE_ID?: string;
   WALLET_TEAM_ID?: string;

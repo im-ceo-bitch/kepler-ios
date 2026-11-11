@@ -100,10 +100,10 @@ private struct GeneratorProgressStrip: View {
 
             HStack(spacing: 7) {
                 ForEach(TripProgressStage.allCases, id: \.rawValue) { item in
-                    Circle()
+                    Capsule(style: .continuous)
                         .fill(segmentColor(item))
-                        .frame(width: item == stage ? 8 : 5, height: item == stage ? 8 : 5)
                         .frame(maxWidth: .infinity)
+                        .frame(height: item == stage ? 5 : 3.5)
                 }
             }
         }
@@ -122,34 +122,6 @@ private struct GeneratorProgressStrip: View {
         if item.rawValue < stage.rawValue { return Color.iumrahCareLight }
         if item == stage { return Color.primary }
         return Color.secondary.opacity(0.18)
-    }
-}
-
-/// Actual navigation progress as compact native icon circles, not an
-/// endlessly spinning 3D carousel that could be confused with changing steps.
-private struct GeneratorStageDots: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let stage: TripProgressStage
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(TripProgressStage.allCases, id: \.rawValue) { item in
-                let isCurrent = item == stage
-                let finished = item.rawValue < stage.rawValue
-                Image(systemName: finished ? "checkmark" : item.carouselSymbol)
-                    .font(.system(size: isCurrent ? 17 : 12, weight: .semibold))
-                    .foregroundStyle(isCurrent ? Color.white : Color.primary.opacity(finished ? 0.87 : 0.40))
-                    .frame(width: isCurrent ? 46 : 35, height: isCurrent ? 46 : 35)
-                    .background(isCurrent ? Color.primary : Color.primary.opacity(finished ? 0.10 : 0.045), in: Circle())
-                    .overlay {
-                        Circle().strokeBorder(Color.primary.opacity(isCurrent ? 0 : 0.08), lineWidth: 1)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .accessibilityLabel(item.localizationKey)
-            }
-        }
-        .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.8), value: stage)
-        .accessibilityIdentifier("iumrah.orbit.generator.stages")
     }
 }
 
@@ -392,8 +364,8 @@ struct IumrahGeneratorHeader: View {
         IumrahGlassGroup(spacing: 8) {
             VStack(spacing: 6) {
                 ZStack(alignment: .leading) {
-                    GeneratorStageDots(stage: stage)
-                        .padding(.horizontal, 49)
+                    GeneratorStageCarousel(stage: stage)
+                        .padding(.horizontal, 48)
 
                     nativeBackButton
                         .padding(.leading, 2)

@@ -135,7 +135,6 @@ struct IumrahAccountView: View {
                         settingsSection
                         signOutButton
                     } else {
-                        guestOrbitEntryCard
                         IumrahLockedIdentityCard(language: settings.language) {
                             showIdentityUnlockSheet = true
                         }
@@ -1251,59 +1250,6 @@ struct IumrahAccountView: View {
             .background(Color.red.opacity(0.075), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    /// Visible guest introduction. Both CTAs reuse the existing sign-in/register
-    /// form and account service. No parallel authentication route is created.
-    private var guestOrbitEntryCard: some View {
-        VStack(spacing: 10) {
-            IumrahOrbitIconRing(
-                mode: .showcase,
-                diameter: 213,
-                lightOnDark: true,
-                revealDuration: 1.3
-            )
-            .frame(height: 224)
-            .accessibilityIdentifier("iumrah.orbit.account.guest")
-
-            Text(tr("Your Umrah. One account.", "Ваша Умра. Один аккаунт.", "Umrangiz. Bitta akkaunt.", "Умрангиз. Битта аккаунт."))
-                .font(.system(size: 23, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-            Text(tr("Trips, bookings and services in one place", "Поездки, бронирования и услуги в одном месте", "Safarlar, bronlar va xizmatlar bir joyda", "Сафарлар, бронлар ва хизматлар бир жойда"))
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.68))
-                .multilineTextAlignment(.center)
-            HStack(spacing: 10) {
-                Button {
-                    guestAccountMode = .signIn
-                    loginScrollNonce += 1
-                } label: {
-                    Text(tr("Sign in", "Войти", "Kirish", "Кириш"))
-                        .frame(maxWidth: .infinity).frame(height: 50)
-                }
-                .foregroundStyle(.black)
-                .background(.white, in: Capsule())
-                .accessibilityIdentifier("iumrah.orbit.account.signin")
-
-                Button {
-                    guestAccountMode = .register
-                    loginScrollNonce += 1
-                } label: {
-                    Text(tr("Register", "Регистрация", "Ro‘yxatdan o‘tish", "Рўйхатдан ўтиш"))
-                        .frame(maxWidth: .infinity).frame(height: 50)
-                }
-                .foregroundStyle(.white)
-                .overlay(Capsule().strokeBorder(.white.opacity(0.50)))
-                .accessibilityIdentifier("iumrah.orbit.account.register")
-            }
-            .font(.system(size: 15, weight: .semibold))
-            .buttonStyle(.plain)
-            .padding(.top, 10)
-        }
-        .padding(20)
-        .frame(maxWidth: .infinity)
-        .background(Color(red: 0.034, green: 0.034, blue: 0.044), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
     }
 
     private var guestCard: some View {

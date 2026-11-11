@@ -15,6 +15,7 @@ struct IumrahFlightResultCard: View {
     let price: Double?
     let isAviasales: Bool
     var selected = false
+    var onSelect: (() -> Void)? = nil
     let action: () -> Void
 
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
@@ -44,9 +45,10 @@ struct IumrahFlightResultCard: View {
                             .foregroundStyle(isAviasales ? Color.blue : Color.iumrahInk)
                             .padding(.horizontal, 8).padding(.vertical, 5)
                             .background((isAviasales ? Color.blue : Color.primary).opacity(0.08), in: Capsule())
-                        if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green) }
+                        if selected && onSelect == nil { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green) }
                     }
                 }
+                .padding(.trailing, onSelect == nil ? 0 : 44)
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(IumrahFlightClock.time(localDeparture)).font(.title2.weight(.bold)).monospacedDigit()
@@ -95,6 +97,21 @@ struct IumrahFlightResultCard: View {
             .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(selected ? Color.green : Color.primary.opacity(0.04), lineWidth: selected ? 1.5 : 1))
             .contentShape(RoundedRectangle(cornerRadius: 28))
         }.buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            if let onSelect {
+                Button(action: onSelect) {
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 27, weight: .medium))
+                        .foregroundStyle(selected ? Color.green : Color.secondary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Выбрать рейс", "Select flight", "Reysni tanlash", "Рейсни танлаш"))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .padding(12)
+            }
+        }
     }
 }
 

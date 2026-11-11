@@ -76,3 +76,30 @@ test('server quote seals Nuitee identities, uses existing package engine, and de
   assert.equal(body.quote.stayPlan.makkahCheckIn,checkin);assert.equal(body.quote.stayPlan.makkahCheckOut,checkout);
  });
 });
+
+test('Aviasales accepts legacy, extended and open-jaw identities without changing return airports', async () => {
+ const { resolveAviasalesSelection } = await import('../.runtime-dist/package-search.js');
+ for (const suffix of ['', ':JED:TAS', ':MED:TAS']) {
+  const routes=[];
+  await mockFetch(async(raw)=>{
+   const url=new URL(raw);const origin=url.searchParams.get('origin'),destination=url.searchParams.get('destination');
+   routes.push(`${origin}-${destination}`);
+   const reverse=origin!=='TAS';
+   return Response.json({success:true,currency:'usd',data:[{origin,destination,airline:'HY',flight_number:reverse?'336':'335',departure_at:`${reverse?checkout:checkin}T12:00:00+03:00`,duration:360,price:reverse?320:300}]});
+  },async()=>{
+   const result=await resolveAviasalesSelection(`aviasales:pair:TAS:JED:${checkin}:${checkout}:HY:335:HY:336${suffix}`,{TRAVELPAYOUTS_API_TOKEN:'test'});
+   const airport=suffix.startsWith(':MED')?'MED':'JED';
+   assert.deepEqual(routes,['TAS-JED',`${airport}-TAS`]);
+   assert.equal(result.inbound.origin,airport);
+   assert.equal(result.perTravelerUsd,620);
+  });
+ }
+});
+test('Aviasales rejects malformed identities before sending supplier requests',async()=>{
+ const { resolveAviasalesSelection } = await import('../.runtime-dist/package-search.js');
+ await mockFetch(async()=>{throw Error('Unexpected supplier request');},async()=>{
+  for(const value of [`aviasales:pair:TAS:JED:${checkin}:${checkout}:HY:335:HY:336:MED`, `aviasales:pair:TAS:JED:${checkin}:${checkout}:HY:335:HY:336:MED:SKD`]) {
+   await assert.rejects(resolveAviasalesSelection(value,{TRAVELPAYOUTS_API_TOKEN:'test'}),/AVIASALES_IDENTITY_INVALID/);
+  }
+ });
+});

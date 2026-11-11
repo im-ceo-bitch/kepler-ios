@@ -15,6 +15,7 @@ struct NuiteeJourneyHotelsView: View {
     @State private var error: String?
     @State private var opened: NuiteeHotel?
     @State private var showTransfer = false
+    @State private var advanceAfterRoomSelection = false
     @State private var ages: [Int] = []
     @State private var requestID = UUID()
     private let service = NuiteeHotelService()
@@ -113,7 +114,13 @@ struct NuiteeJourneyHotelsView: View {
                     if let tier = journey.localPackageTier { journey.trip.packageTier = tier }
                     journey.transferSelectionConfirmed = false
                     journey.invalidateLocalJourneyQuote()
+                    advanceAfterRoomSelection = true
                 })
+                .onDisappear {
+                    guard advanceAfterRoomSelection else { return }
+                    advanceAfterRoomSelection = false
+                    advanceToNextSelection()
+                }
         }
         .navigationDestination(isPresented: $showTransfer) { TransferSelectionView() }
         .safeAreaInset(edge: .bottom) {
@@ -122,6 +129,22 @@ struct NuiteeJourneyHotelsView: View {
                     .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
             }
         }
+    }
+
+    private func advanceToNextSelection() {
+        // Advance only after the detail view has popped. Never mutate its city/date bindings mid-dismissal.
+        let cities = journey.trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"]
+        let orderedCities = [city] + cities.filter { $0 != city }
+        for nextCity in orderedCities {
+            if let nextRoom = (0..<journey.trip.rooms).first(where: { journey.localJourneyRooms["\(nextCity):\($0)"] == nil }) {
+                city = nextCity
+                roomIndex = nextRoom
+                stars = 0
+                visibleCount = 20
+                return
+            }
+        }
+        if journey.localRoomsComplete { showTransfer = true }
     }
 
     private func invalidateRooms() {

@@ -82,7 +82,6 @@ struct LegacyFinalPackageView: View {
                     VStack(spacing: 0) {
                         IumrahJourneyHeader(showsNotifications: true) { packageSummary }
                         VStack(alignment: .leading, spacing: 18) {
-                            IumrahOrbitPackageAssemblyCard(services: IumrahOrbitService.selectedForJourney(journey))
                             IumrahPageHelpCard(journey.hasFinalGeneratorQuote ? "legacy.final" : "legacy.recalculate")
                             if !journey.hasFinalGeneratorQuote { pricingStatus }
                             if journey.quote?.bookingAllowed == false {

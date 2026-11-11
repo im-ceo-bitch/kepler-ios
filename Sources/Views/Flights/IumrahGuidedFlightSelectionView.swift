@@ -376,7 +376,8 @@ struct IumrahGuidedFlightSelectionView: View {
             flightNumber: choice.flightNumber, origin: choice.origin, destination: choice.destination,
             departureAt: choice.departureAt, arrivalAt: choice.arrivalAt, duration: choice.duration,
             stops: choice.stops, price: choice.price, isAviasales: choice.source == .dataAPI,
-            selected: (step == .outbound ? outbound?.id : inbound?.id) == choice.id) {
+            selected: (step == .outbound ? outbound?.id : inbound?.id) == choice.id,
+            onSelect: { choose(choice) }) {
                 selectedDetail = choice
                 IumrahHaptics.soft()
             }
@@ -423,8 +424,8 @@ struct IumrahGuidedFlightSelectionView: View {
         IumrahHaptics.selection()
         switch step {
         case .outbound:
+            if outbound?.id != choice.id { inbound = nil }
             outbound = choice
-            inbound = nil
             // The next leg is opened only when the user taps the explicit CTA.
         case .inbound:
             guard let outbound, outbound.source == choice.source else {

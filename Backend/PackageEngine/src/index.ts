@@ -1,7 +1,6 @@
 import { handleGuestBookingEmail } from "./booking-email-verification";
 import { flushBookingStatusEmails } from "./booking-email";
 import { bookingLogoResponse } from "./booking-email-logo";
-import { bookingEmailAvatarResponse } from "./booking-email-avatar";
 import { requirePackageAdmin } from "./admin-auth";
 import { handleGuestBookingPhone } from "./booking-contact-verification";
 import { applyPilgrimFriendCredit, deleteAdminBooking, deletePilgrimBooking, getPilgrimFriendsSummary, redeemPilgrimFriendGift, updatePilgrimContact, updatePilgrimCustomization, updatePilgrimHotel } from "./booking-control";
@@ -185,7 +184,6 @@ export default {
 
 
     if (request.method === "GET" && url.pathname === "/api/package/email-brand/logo.png") return bookingLogoResponse();
-    if (request.method === "GET" && url.pathname === "/api/package/email-brand/avatar.png") return bookingEmailAvatarResponse();
     if (url.pathname === "/api/package/booking-contact/email/start" ||
         url.pathname === "/api/package/booking-contact/email/confirm" ||
         /^\/api\/package\/booking\/IUM-\d{4}-[A-Z2-9]{7}\/verified-email$/.test(url.pathname)) {

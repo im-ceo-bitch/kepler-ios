@@ -666,7 +666,11 @@ final class JourneyStore: ObservableObject {
             token(outbound.airlineCode), token(outbound.flightNumber),
             token(inbound?.airlineCode ?? "-"), token(inbound?.flightNumber ?? "-")
         ]
-        if let inbound { parts += [token(inbound.origin), token(inbound.destination)] }
+        // Keep the original 10-field contract when the return reverses the outbound.
+        // Open-jaw journeys must retain their real return airports (12-field contract).
+        if let inbound, token(inbound.origin) != token(outbound.destination) || token(inbound.destination) != token(outbound.origin) {
+            parts += [token(inbound.origin), token(inbound.destination)]
+        }
         return parts.joined(separator: ":")
     }
 

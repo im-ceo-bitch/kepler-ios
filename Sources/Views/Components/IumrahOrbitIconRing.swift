@@ -224,6 +224,7 @@ struct IumrahOrbitIconRing: View {
 extension IumrahOrbitService {
     /// Only include services selected in the real JourneyStore. This is a visual
     /// summary, not a booking/quote confirmation or an inventory guarantee.
+    @MainActor
     static func selectedForJourney(_ journey: JourneyStore) -> [IumrahOrbitService] {
         var result: [IumrahOrbitService] = []
         if journey.selectedOutbound != nil || journey.selectedInbound != nil ||

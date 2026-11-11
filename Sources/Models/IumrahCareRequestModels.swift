@@ -64,6 +64,19 @@ struct IumrahCarePackageRequest: Encodable {
     var configuration: LocalJourneyRequestSnapshot? = nil
 }
 
+// Compatibility for legacy optional care request configuration payloads.
+// Does not calculate prices or create bookings.
+struct LocalJourneyRequestSnapshot: Codable {
+    let version: Int
+    let trip: TripDraft
+    let flights: [LocalJourneyFlight]
+    let rooms: [LocalJourneyRoom]
+    let transfer: String
+    let trainTickets: Int
+    let trainClass: String
+    let estimatedTotalUSD: Decimal?
+}
+
 struct IumrahCarePackageRequestResponse: Decodable, Hashable {
     let ok: Bool
     let requestID: String

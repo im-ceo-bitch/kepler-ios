@@ -163,3 +163,23 @@ final class NuiteeStaySelectionStore {
         return decoded
     }
 }
+
+struct NuiteeGuestReview: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let country: String
+    let date: String
+    let rating: Double?
+    let headline: String
+    let pros: String
+    let cons: String
+    let source: String
+    let language: String
+}
+struct NuiteeReviewsEnvelope: Decodable {
+    let ok: Bool
+    let reviews: [NuiteeGuestReview]
+    let total: Int?
+    let nextOffset: Int?
+    let stale: Bool
+}

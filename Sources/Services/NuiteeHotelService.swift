@@ -30,6 +30,14 @@ struct NuiteeHotelService {
         return response.hotel
     }
 
+    func reviews(hotelID: String, language: String, offset: Int = 0) async throws -> NuiteeReviewsEnvelope {
+        try await api.get("/api/package/nuitee/reviews", query: [
+            URLQueryItem(name: "hotelId", value: hotelID),
+            URLQueryItem(name: "language", value: language),
+            URLQueryItem(name: "offset", value: String(offset))
+        ], timeoutInterval: 35)
+    }
+
     func rates(hotelID: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], language: String = "en") async throws -> NuiteeRatesEnvelope {
         struct Request: Encodable {
             let hotelId: String
@@ -42,6 +50,16 @@ struct NuiteeHotelService {
         return try await APIClient.hotelPrices.post("/api/package/nuitee/rates", body: Request(
             hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges, language: language
         ), timeoutInterval: 604800)
+    }
+
+    static func deadlineText(_ value: String, locale: String) -> String {
+        let parser = DateFormatter(); parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = TimeZone(secondsFromGMT: 0)
+        parser.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        guard let date = parser.date(from: value) else { return value }
+        let display = DateFormatter(); display.locale = Locale(identifier: locale)
+        display.timeZone = parser.timeZone; display.dateStyle = .medium; display.timeStyle = .short
+        return display.string(from: date)
     }
 
     static func usd(_ value: Double) -> String {

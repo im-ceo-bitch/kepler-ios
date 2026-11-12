@@ -507,6 +507,7 @@ struct NuiteeHotelDetailView: View {
     var onSelectMeals: ((HotelMealChoices) -> Void)? = nil
     @State var selectedMeals = HotelMealChoices()
 
+    @State private var showAllAmenities = false
     @State private var detail: NuiteeHotelDetail?
     @State private var rates: [NuiteeRoomRate] = []
     @State private var detailError: String?
@@ -549,20 +550,40 @@ struct NuiteeHotelDetailView: View {
                     if !detail.amenities.isEmpty {
                         sectionTitle(NuiteeCopy.text("Удобства отеля", "Mehmonxona imkoniyatlari", "Hotel amenities", settings.language))
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
-                            ForEach(detail.amenities, id: \.self) { label in
+                            ForEach(Array(showAllAmenities ? detail.amenities : Array(detail.amenities.prefix(8))), id: \.self) { label in
                                 Label(label, systemImage: "checkmark.circle")
                                     .font(.footnote).frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
+                    }
+                    if detail.amenities.count > 8 {
+                        Button(NuiteeCopy.text(showAllAmenities ? "Скрыть удобства" : "Все удобства", showAllAmenities ? "Yashirish" : "Barcha qulayliklar", showAllAmenities ? "Show less" : "All amenities", settings.language)) {
+                            withAnimation { showAllAmenities.toggle() }
+                        }.tint(.primary)
                     }
                     if !detail.description.isEmpty {
                         sectionTitle(NuiteeCopy.text("Об отеле", "Mehmonxona haqida", "About this hotel", settings.language))
                         Text(detail.description).font(.subheadline)
                     }
                 }
-                if onSelectRate != nil {
-                    IumrahHotelStaySummary(checkin: checkin, checkout: checkout, nights: nights)
-                } else { staySelector }
+                IumrahHotelStaySummary(checkin: checkin, checkout: checkout, nights: nights)
+                if onSelectRate == nil { staySelector }
+                Label("\(adults) " + NuiteeCopy.text("взрослых", "kattalar", "adults", settings.language)
+                      + (childrenAges.isEmpty ? "" : " · \(childrenAges.count) " + NuiteeCopy.text("детей", "bolalar", "children", settings.language)), systemImage: "person.2")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                if let detail, !(detail.checkin ?? "").isEmpty || !(detail.checkout ?? "").isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(NuiteeCopy.text("Время заселения", "Joylashish vaqti", "Property check-in hours", settings.language)).font(.headline)
+                        if let time = detail.checkin, !time.isEmpty {
+                            LabeledContent(NuiteeCopy.text("Заезд", "Kirish", "Check-in", settings.language), value: time)
+                        }
+                        if let time = detail.checkout, !time.isEmpty {
+                            LabeledContent(NuiteeCopy.text("Выезд", "Chiqish", "Check-out", settings.language), value: time)
+                        }
+                    }.padding(20).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
+                }
+                IumrahHotelReviewsSection(hotelID: hotel.id, rating: detail?.rating ?? hotel.rating,
+                                          reviewCount: detail?.reviewCount ?? hotel.reviewCount)
                 IumrahPageHelpCard(ratesLoading || !ratesCompleted ? "hotel.loading" : ratesError != nil ? "hotel.rates_error" : rates.isEmpty ? (onSelectRate == nil ? "hotel.no_rates" : "hotel.package_no_rates") : chosenOffer != nil ? "hotel.saved" : "hotel.details")
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language))
                 if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
@@ -577,7 +598,19 @@ struct NuiteeHotelDetailView: View {
                     if ratesSandbox {
                         Text(NuiteeCopy.text("Тестовые тарифы", "Sinov tariflari", "Test rates", settings.language)).font(.caption)
                     }
-                    ForEach(rates) { rate in rateCard(rate) }
+                    ForEach(rates) { rate in
+                        rateCard(rate)
+                        if onSelectRate != nil {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(rate.roomName).font(.caption).foregroundStyle(.secondary)
+                                IumrahHotelMealsEditor(selection: $selectedMeals, stars: hotel.roundedStars,
+                                    city: hotel.city, included: rate.supplierMeals)
+                            }
+                            .padding(20)
+                            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26))
+                        }
+                        rateSelectionButton(rate)
+                    }
                 }
                 cancellationAndPrivacy
                 if let detail {
@@ -741,10 +774,6 @@ struct NuiteeHotelDetailView: View {
                 Label(rate.mealPlan, systemImage: "fork.knife")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if onSelectRate != nil {
-                IumrahHotelMealsEditor(selection: $selectedMeals, stars: hotel.roundedStars,
-                    city: hotel.city, included: rate.supplierMeals)
-            }
             cancellationView(rate)
             Text(NuiteeHotelService.usd(rate.price))
                 .font(.title2.weight(.bold))
@@ -760,6 +789,13 @@ struct NuiteeHotelDetailView: View {
                 }.font(.subheadline.weight(.semibold)).padding(.vertical, 8)
             }
             .buttonStyle(.plain)
+
+        }
+        .padding(16)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func rateSelectionButton(_ rate: NuiteeRoomRate) -> some View {
             Button { saveRate(rate) } label: {
                 Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
                     .font(.subheadline.weight(.bold))
@@ -767,9 +803,6 @@ struct NuiteeHotelDetailView: View {
             }
             .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
             .disabled(rate.offerId.isEmpty)
-        }
-        .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private func cancellationView(_ rate: NuiteeRoomRate) -> some View {
@@ -781,7 +814,7 @@ struct NuiteeHotelDetailView: View {
             if !rate.cancellationDescription.isEmpty { Text(rate.cancellationDescription).font(.footnote) }
             ForEach(Array(rate.cancellationDeadlines.enumerated()), id: \.offset) { entry in
                 Text(NuiteeCopy.text("Срок отмены: ", "Bekor qilish muddati: ", "Cancel by: ", settings.language)
-                     + entry.element.until
+                     + NuiteeHotelService.deadlineText(entry.element.until, locale: settings.language.localeIdentifier)
                      + (entry.element.amount.map {
                         NuiteeCopy.text(" · штраф ", " · jarima ", " · penalty ", settings.language)
                         + NuiteeHotelService.usd($0)
@@ -791,6 +824,12 @@ struct NuiteeHotelDetailView: View {
             if !rate.chargeOnArrival.isEmpty {
                 Text(NuiteeCopy.text("Некоторые налоги/сборы оплачиваются отдельно в отеле.", "Baʼzi soliqlar va yig‘imlar mehmonxonada alohida to‘lanadi.", "Some taxes and fees are paid at the hotel.", settings.language))
                     .font(.caption).foregroundStyle(.secondary)
+                ForEach(Array(rate.chargeOnArrival.enumerated()), id: \.offset) { entry in
+                    if let amount = entry.element.amount {
+                        Text(amount.formatted(.currency(code: entry.element.currency)))
+                            .font(.subheadline.weight(.semibold))
+                    }
+                }
             }
         }
     }
@@ -1005,8 +1044,14 @@ private struct NuiteeRoomDetailsPage: View {
                         .font(.headline)
                     if !rate.cancellationDescription.isEmpty { Text(rate.cancellationDescription) }
                     ForEach(rate.cancellationDeadlines, id: \.until) { deadline in
-                        Text(deadline.until + (deadline.amount.map { " · " + NuiteeHotelService.usd($0) } ?? ""))
+                        Text(NuiteeHotelService.deadlineText(deadline.until, locale: settings.language.localeIdentifier) + (deadline.amount.map { " · " + NuiteeHotelService.usd($0) } ?? ""))
                             .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if !rate.chargeOnArrival.isEmpty {
+                        Text(NuiteeCopy.text("Оплачивается в отеле", "Mehmonxonada to‘lanadi", "Pay at property", settings.language)).font(.headline)
+                        ForEach(Array(rate.chargeOnArrival.enumerated()), id: \.offset) { entry in
+                            if let amount = entry.element.amount { Text(amount.formatted(.currency(code: entry.element.currency))) }
+                        }
                     }
                     Text(NuiteeHotelService.usd(rate.price))
                         .font(.system(size: 30, weight: .bold, design: .rounded))

@@ -52,6 +52,35 @@ export async function translateHotelText(env: Env, source: Json, language: strin
 export function localizeKnownAmenities(source: Json, language: string): Json {
   if (language === 'en') return source;
   const names: Record<string, [string,string]> = {
+    "wifi available":["Wi-Fi доступен", "Wi-Fi mavjud"],
+    "meeting/banquet facilities":["Конференц-залы и банкетные залы", "Konferensiya va banket zallari"],
+    "non smoking throughout":["Курение запрещено на всей территории", "Butun hududda chekish taqiqlangan"],
+    "accessible parking":["Парковка для гостей с ограниченной подвижностью", "Harakatlanishi cheklangan mehmonlar uchun avtoturargoh"],
+    "shuttle service (free)":["Бесплатный трансфер", "Bepul transfer"],
+    "staff adhere to local safety protocols":["Персонал соблюдает местные правила безопасности", "Xodimlar mahalliy xavfsizlik qoidalariga amal qiladi"],
+    "physical distancing rules followed":["Соблюдается физическая дистанция", "Jismoniy masofa saqlanadi"],
+    "hand sanitizer in guest room and key areas":["Антисептик в номерах и общественных зонах", "Xonalarda va umumiy joylarda antiseptik"],
+    "cashless payment available":["Доступна безналичная оплата", "Naqdsiz to‘lov mavjud"],
+    "first aid kit available":["Есть аптечка первой помощи", "Birinchi yordam qutisi mavjud"],
+    "contactless check in/check out":["Бесконтактный заезд и выезд", "Kontaktsiz kirish va chiqish"],
+    "shared stationery like menus, pens are removed":["Общие меню и письменные принадлежности убраны", "Umumiy menyu va yozuv anjomlari olib tashlangan"],
+    "process in place to check health of guests":["Предусмотрена проверка здоровья гостей", "Mehmonlar salomatligini tekshirish tartibi mavjud"],
+    "access to health care professionals":["Доступ к медицинским специалистам", "Tibbiyot mutaxassislariga murojaat qilish imkoniyati"],
+    "screens / barriers between staff and guests for safety":["Защитные экраны между персоналом и гостями", "Xodimlar va mehmonlar orasida himoya to‘siqlari"],
+    "face masks for guests available":["Маски для гостей", "Mehmonlar uchun niqoblar mavjud"],
+    "thermometers for guests provided by property":["Отель предоставляет гостям термометры", "Mehmonlar uchun termometrlar mavjud"],
+    "mobile app for room service":["Заказ обслуживания номера через приложение", "Ilova orqali xonaga xizmat buyurtma qilish"],
+    "single room":["Одноместный номер", "Bir kishilik xona"],
+    "double room":["Двухместный номер", "Ikki kishilik xona"],
+    "twin room":["Номер с двумя отдельными кроватями", "Ikkita alohida karavotli xona"],
+    "triple room":["Трёхместный номер", "Uch kishilik xona"],
+    "quad room":["Четырёхместный номер", "To‘rt kishilik xona"],
+    "quadruple room":["Четырёхместный номер", "To‘rt kishilik xona"],
+    "room only":["Без питания", "Ovqatlanishsiz"],
+    "half board":["Полупансион", "Yarim pansion"],
+    "full board":["Полный пансион", "To‘liq pansion"],
+    "all inclusive":["Всё включено", "Barchasi kiritilgan"],
+    "no meals":["Без питания", "Ovqatlanishsiz"],
     'free wifi':['Бесплатный Wi-Fi','Bepul Wi-Fi'], 'wifi':['Wi-Fi','Wi-Fi'],
     'free wi fi':['Бесплатный Wi-Fi','Bepul Wi-Fi'], 'wireless internet':['Беспроводной интернет','Simsiz internet'],
     'bar':['Бар','Bar'], 'restaurant':['Ресторан','Restoran'], 'room service':['Обслуживание номеров','Xonaga xizmat ko‘rsatish'],
@@ -81,6 +110,7 @@ export function localizeKnownAmenities(source: Json, language: string): Json {
     if (language === 'uz' || language === 'uz-cyrl') return language === 'uz' ? pair[1] : uzbekCyrillic(pair[1]);
     return value;
   };
-  return {...source, amenities:(source.amenities ?? []).map(translate),
-    rooms:(source.rooms ?? []).map((room:Json)=>({...room,amenities:(room.amenities ?? []).map(translate)}))};
+  return {...source, amenities:[...new Set((source.amenities ?? []).map(translate))],
+    rooms:(source.rooms ?? []).map((room:Json)=>({...room,name:typeof room.name === 'string' ? translate(room.name) : room.name,amenities:[...new Set((room.amenities ?? []).map(translate))]})),
+    rates:(source.rates ?? []).map((rate:Json)=>({...rate,roomName:translate(rate.roomName ?? ''),mealPlan:translate(rate.mealPlan ?? '')}))};
 }

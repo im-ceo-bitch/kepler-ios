@@ -322,7 +322,10 @@ final class JourneyStore: ObservableObject {
         }
     }
 
+    @Published var mixedFlightIdentity: String? = nil
+
     func clearStagedUmrahFlights() {
+        mixedFlightIdentity = nil
         stagedUmrahFlights = []
         stagedAviasalesOffers = [:]
         trip.selectedReturnAirport = nil
@@ -621,7 +624,8 @@ final class JourneyStore: ObservableObject {
         price: Double,
         currency: String,
         bookingURL: String?,
-        providerID: String
+        providerID: String,
+        sourceLabel: String = "Aviasales Data"
     ) -> FlightOffer {
         let normalizedCode = airlineCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         let normalizedNumber = flightNumber.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -639,7 +643,7 @@ final class JourneyStore: ObservableObject {
             durationMinutes: max(45, durationMinutes),
             totalPackagePrice: Decimal(max(0, price)),
             currency: currency.uppercased(),
-            sourceLabel: "Aviasales Data",
+            sourceLabel: sourceLabel,
             airlineCode: normalizedCode.isEmpty ? nil : normalizedCode,
             fareAmount: Decimal(max(0, price)),
             fareScope: .perPassenger,
@@ -1124,7 +1128,18 @@ final class JourneyStore: ObservableObject {
         quote = nil
         do {
             let pair: (outbound: FlightOffer, inbound: FlightOffer?)
-            if packageFlightPath == .aviasalesSelected {
+            if let identity = mixedFlightIdentity {
+                guard localJourneyFlights.count == 2 else { throw LocalPricingError.invalidFlightFare }
+                let offers = try localJourneyFlights.enumerated().map { index, flight -> FlightOffer in
+                    guard let departure = aviasalesDate(flight.departureAt) else { throw LocalPricingError.invalidFlightFare }
+                    return makeAviasalesFlightOffer(id: flight.id, direction: index == 0 ? .outbound : .inbound,
+                        origin: flight.origin, destination: flight.destination, airlineCode: flight.airlineCode,
+                        flightNumber: flight.flightNumber, departure: departure, durationMinutes: flight.durationMinutes,
+                        stops: flight.stops, price: flight.displayedPrice ?? 0, currency: "USD", bookingURL: nil, providerID: identity,
+                        sourceLabel: identity.dropFirst("mixed:".count).components(separatedBy: "~")[index].hasPrefix("curated:") ? "iumrah Published" : "Aviasales Data")
+                }
+                pair = (offers[0], offers[1])
+            } else if packageFlightPath == .aviasalesSelected {
                 guard let value = makeAviasalesFlightPair() else { throw LocalPricingError.invalidFlightFare }
                 pair = value
             } else {
@@ -1562,9 +1577,14 @@ final class JourneyStore: ObservableObject {
                   !outboundID.isEmpty, outboundID == inboundID,
                   outbound.origin.uppercased() == inbound.destination.uppercased(),
                   inbound.departureAt > outbound.departureAt else { return false }
+            if let mixedFlightIdentity, outboundID == mixedFlightIdentity {
+                return ["JED", "MED"].contains(outbound.destination.uppercased()) &&
+                    ["JED", "MED"].contains(inbound.origin.uppercased())
+            }
             if packageFlightPath == .aviasalesSelected {
                 return outboundID.hasPrefix("aviasales:") &&
-                    outbound.destination.uppercased() == inbound.origin.uppercased()
+                    (outbound.destination.uppercased() == inbound.origin.uppercased() ||
+                     (["JED", "MED"].contains(outbound.destination.uppercased()) && ["JED", "MED"].contains(inbound.origin.uppercased())))
             }
             return outboundID.hasPrefix("curated:") &&
                 ["JED", "MED"].contains(inbound.origin.uppercased())

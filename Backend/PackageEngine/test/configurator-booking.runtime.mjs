@@ -208,3 +208,43 @@ test('room-only and explicit breakfast exclusions are never treated as supplier-
  }
  assert.equal(supplierMealInclusions('BB').breakfast,true);
 });
+
+test('mixed one-way suppliers resolve both directions, preserve open-jaw and sum server fares', async()=>{
+ const {resolveMixedSelection}=await import('../.runtime-dist/package-search.js');
+ const curatedLeg={origin:'TAS',destination:'JED',departure_at:'2027-01-03T10:00:00Z',arrival_at:'2027-01-03T16:00:00Z'};
+ const row={id:'direct',currency:'USD',per_traveler_fare:200,observed_at:'2026-11-12T00:00:00Z',itinerary_json:JSON.stringify({legs:[curatedLeg]})};
+ const env={TRAVELPAYOUTS_API_TOKEN:'test',HOTELS_DB:{prepare(){return{bind(){return this;},async first(){return row;}};}}};
+ const api='aviasales:ow:MED:TAS:2027-01-10:-:HY:338:-:-';
+ await mockFetch(async()=>Response.json({success:true,data:[{price:300,airline:'HY',flight_number:'338',departure_at:'2027-01-10T10:00:00Z',duration:360}]}),async()=>{
+  const value=await resolveMixedSelection('mixed:curated:direct~'+api,2,env);
+  assert.equal(value.fare.normalizedGroupUsd,1000);assert.equal(value.schedule.inbound.origin,'MED');
+  row.itinerary_json=JSON.stringify({legs:[curatedLeg,{origin:'MED',destination:'TAS',departure_at:'2027-01-10T10:00:00Z',arrival_at:'2027-01-10T16:00:00Z'}]});
+  await assert.rejects(resolveMixedSelection('mixed:curated:direct~'+api,2,env),/ONE_WAY/);
+  await assert.rejects(resolveMixedSelection('mixed:curated:direct+other~'+api,2,env),/IDENTITY/);
+ });
+});
+test('mixed API outbound and published inbound work without carrier matching',async()=>{
+ const {resolveMixedSelection}=await import('../.runtime-dist/package-search.js');
+ const row={currency:'USD',per_traveler_fare:180,observed_at:'2026-11-12',itinerary_json:JSON.stringify({legs:[{origin:'MED',destination:'TAS',departure_at:'2027-01-10T10:00:00Z',arrival_at:'2027-01-10T16:00:00Z'}]})};
+ const env={TRAVELPAYOUTS_API_TOKEN:'test',HOTELS_DB:{prepare(){return{bind(){return this;},async first(){return row;}};}}};
+ await mockFetch(async()=>Response.json({success:true,data:[{price:250,airline:'XY',flight_number:'634',departure_at:'2027-01-03T10:00:00Z',duration:360}]}),async()=>{
+  const result=await resolveMixedSelection('mixed:aviasales:ow:TAS:JED:2027-01-03:-:XY:634:-:-~curated:return',2,env);
+  assert.equal(result.fare.normalizedGroupUsd,860);
+  assert.equal(result.schedule.outbound.destination,'JED');assert.equal(result.schedule.inbound.origin,'MED');
+ });
+});
+
+test('mixed supplier quote seals authoritative fare and rejects altered routes',async()=>{
+ const env=fixture({sandbox:true});
+ const originalPrepare=env.HOTELS_DB.prepare;
+ env.HOTELS_DB.prepare=(sql)=>sql.includes('curated_flight_offers')?{bind(){return this;},async first(){return {currency:'USD',per_traveler_fare:200,observed_at:new Date().toISOString(),itinerary_json:JSON.stringify({legs:[{origin:'TAS',destination:'JED',departure_at:checkin+'T09:00:00Z',arrival_at:checkin+'T15:00:00Z'}]})};}}:originalPrepare(sql);
+ const body={tier:'standard',tripType:'roundTrip',includeMadinah:false,travelers:party,hotels:{makkah:{hotelId:'lp123',roomId:'room',nights:7}},flight:{providerItineraryId:`mixed:curated:direct~aviasales:ow:JED:TAS:${checkout}:-:HY:338:-:-`,legs:[{origin:'TAS',destination:'JED',departureDate:checkin},{origin:'JED',destination:'TAS',departureDate:checkout}]},nuiteeRooms:[room()]};
+ await mockFetch(async()=>Response.json({success:true,data:[{price:300,airline:'HY',flight_number:'338',departure_at:checkout+'T15:00:00Z',duration:360}]}),async()=>{
+  const send=()=>generatePackageQuote(new Request('https://fixture/api/package/quote',{method:'POST',body:JSON.stringify(body)}),env);
+  const response=await send();const payload=await response.json();assert.equal(response.status,200,JSON.stringify(payload));
+  const sealed=await unsealPricingSnapshot(payload.quote.quoteProof,env);
+  assert.equal(sealed.components.find(x=>x.code==='flight_roundtrip').supplierCostUsd,1000);
+  body.flight.legs[1].origin='MED';
+  const rejected=await send();assert.notEqual(rejected.status,200);assert.match(JSON.stringify(await rejected.json()),/MIXED_ROUTE_MISMATCH/);
+ });
+});

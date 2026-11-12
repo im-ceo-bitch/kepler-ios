@@ -411,7 +411,7 @@ struct IumrahGuidedFlightSelectionView: View {
             })
     }
     private var calendarOffers: [FlightDiscoveryOffer] {
-        guard selectedCabin == .economy, step != .inbound || outbound?.source != .published else { return [] }
+        guard selectedCabin == .economy else { return [] }
         return (step == .outbound ? dataOutbound : dataReturn).filter {
             !$0.isRoundTrip && $0.origin == currentOrigin && $0.destination == currentDestination &&
             filters.accepts(stops: $0.transfers, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false)
@@ -435,7 +435,7 @@ struct IumrahGuidedFlightSelectionView: View {
             outbound = choice
 
         case .inbound:
-            guard let outbound, outbound.source == choice.source else {
+            guard let outbound, !outbound.isCompletePublishedPair || choice.isCompletePublishedPair else {
                 isShowingSourceHelp = true
                 return
             }
@@ -489,7 +489,6 @@ struct IumrahGuidedFlightSelectionView: View {
             }
         }
         if step == .inbound, let outbound {
-            candidates = candidates.filter { $0.source == outbound.source }
             if case .published(let paired, _) = outbound, paired.inbound != nil {
                 candidates = candidates.filter {
                     if case .published(let item, _) = $0 {
@@ -498,7 +497,7 @@ struct IumrahGuidedFlightSelectionView: View {
                     }
                     return false
                 }
-            } else if outbound.source == .published {
+            } else {
                 candidates = candidates.filter { !$0.isCompletePublishedPair }
             }
         }
@@ -615,7 +614,7 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func commitSelection() {
-        guard let outbound, let inbound, outbound.source == inbound.source else {
+        guard let outbound, let inbound else {
             isShowingSourceHelp = true
             return
         }
@@ -660,8 +659,14 @@ struct IumrahGuidedFlightSelectionView: View {
             journey.stageUmrahFlight(makeStaged(inbound, kind: .inbound))
             journey.stageAviasalesOffer(inboundOffer, kind: .inbound)
         } else {
-            isShowingSourceHelp = true
-            return
+            guard !outbound.isCompletePublishedPair, !inbound.isCompletePublishedPair else {
+                isShowingSourceHelp = true
+                return
+            }
+            journey.stageUmrahFlight(makeStaged(outbound, kind: .outbound))
+            journey.stageUmrahFlight(makeStaged(inbound, kind: .inbound))
+            journey.clearPublishedFlightSelection()
+            journey.mixedFlightIdentity = "mixed:" + independentIdentity(outbound) + "~" + independentIdentity(inbound)
         }
         guard journey.hasCompleteStagedFlightSelection else { return }
         journey.prepareFlightFirstHotelStage()
@@ -675,6 +680,16 @@ struct IumrahGuidedFlightSelectionView: View {
         }
         IumrahHaptics.success()
         showTransferPicker = true
+    }
+
+    private func independentIdentity(_ flight: FlightChoice) -> String {
+        switch flight {
+        case .published(let item, _): return "curated:" + item.id
+        case .dataAPI(let offer):
+            return ["aviasales", "ow", offer.origin.uppercased(), offer.destination.uppercased(),
+                    String(offer.departureAt.prefix(10)), "-", offer.airlineCode.uppercased(),
+                    offer.flightNumber.uppercased().filter { $0.isLetter || $0.isNumber }, "-", "-"].joined(separator: ":")
+        }
     }
 
     private func makeStaged(_ flight: FlightChoice, kind: StagedUmrahFlightKind,

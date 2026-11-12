@@ -270,12 +270,12 @@ async function isListedHotel(env: Env, id: string): Promise<boolean> {
   return false;
 }
 
-async function detail(url: URL, env: Env) {
+async function detail(url: URL, env: Env): Promise<Response> {
   const id = text(url.searchParams.get('hotelId'));
   const language = hotelLanguage(url.searchParams.get('language'));
   if (!/^lp[a-zA-Z0-9]{1,50}$/.test(id)) return error('INVALID_HOTEL_ID');
   if (!await isListedHotel(env, id)) return error('HOTEL_NOT_IN_CATALOG', 404);
-  const cacheKey = language === 'en' ? `detail:v1:${id}` : `detail:v4:${id}:${language}`;
+  const cacheKey = language === 'en' ? `detail:v1:${id}` : `detail:v5:${id}:${language}`;
   const cached = await read(env, cacheKey);
   if (cached?.fresh) return output({ok:true,sandbox:isSandbox(env),hotel:cached.data});
   try {
@@ -292,6 +292,7 @@ async function detail(url: URL, env: Env) {
       const raw = (await provider(env, '/data/hotel', new URLSearchParams({hotelId:id,language:supplierLanguage}))).data;
       if (!raw?.id) throw new Error('NUITEE_HOTEL_NOT_FOUND');
       h = normalizedDetail(raw, hotelItem(raw) || {id,name:text(raw.name),city:text(raw.city)});
+      h = localizeKnownAmenities(h, language === 'uz-cyrl' ? 'uz' : language);
       if (language === 'uz-cyrl') {
         // Native provider Uzbek is Latin. Transform text only, not identifiers/URLs.
         h.description = uzbekCyrillic(h.description);
@@ -312,26 +313,30 @@ async function detail(url: URL, env: Env) {
     }
     if (language !== 'en') {
       const englishURL = new URL(url); englishURL.searchParams.set('language','en');
-      return detail(englishURL,env);
+      const response = await detail(englishURL,env);
+      const body = await response.json() as Json;
+      if (body.hotel) body.hotel = localizeKnownAmenities(body.hotel,language);
+      return output(body, response.status);
     }
     throw e;
   }
 }
 async function localizedRates(env: Env, offers: Json[], language: string, key: string): Promise<Json[]> {
   offers = offers.map(rate=>({...rate,includedMeals:supplierMealInclusions(rate.mealPlan)}));
-  if (language === 'en' || !env.HOTEL_TRANSLATION_API_KEY) return offers;
-  const cached = await read(env, `${key}:text:${language}`);
+  const fallback = () => localizeKnownAmenities({rates:offers},language).rates;
+  if (language === 'en' || !env.HOTEL_TRANSLATION_API_KEY) return fallback();
+  const cached = await read(env, `${key}:text:v2:${language}`);
   // Translation cache holds strings only; never restore stale prices/offer IDs.
   const signature = JSON.stringify(offers.map(r=>[r.roomName,r.mealPlan,r.cancellationDescription]));
   if (cached?.fresh && cached.data.signature === signature) {
-    return offers.map((rate,i)=>({...rate,...cached.data.text[i]}));
+    return localizeKnownAmenities({rates:offers.map((rate,i)=>({...rate,...cached.data.text[i]}))},language).rates;
   }
   try {
     const localized = (await translateHotelText(env,{rates:offers},language)).rates;
     const text = localized.map((rate:Json)=>({roomName:rate.roomName,mealPlan:rate.mealPlan,cancellationDescription:rate.cancellationDescription}));
-    await save(env,`${key}:text:${language}`,{signature,text},7 * DAY);
-    return offers.map((rate,i)=>({...rate,...text[i]}));
-  } catch { return offers; }
+    await save(env,`${key}:text:v2:${language}`,{signature,text},7 * DAY);
+    return localizeKnownAmenities({rates:offers.map((rate,i)=>({...rate,...text[i]}))},language).rates;
+  } catch { return fallback(); }
 }
 async function rates(request: Request, env: Env) {
   const body = await request.json().catch(() => null) as Json | null;
@@ -370,12 +375,48 @@ async function coalesced(env: Env, key: string, work: () => Promise<Response>): 
   try { return (await running).clone(); }
   finally { if (active.get(key) === running) active.delete(key); }
 }
+/** Reviews are fetched only for an opened hotel, in small locale-specific pages. */
+async function reviews(url: URL, env: Env): Promise<Response> {
+  const id = text(url.searchParams.get('hotelId'));
+  if (!/^lp[a-zA-Z0-9]{1,50}$/.test(id)) return error('INVALID_HOTEL_ID');
+  const offset = Number(url.searchParams.get('offset') ?? 0);
+  if (!Number.isInteger(offset) || offset < 0 || offset > 5000) return error('INVALID_OFFSET');
+  if (!await isListedHotel(env,id)) return error('HOTEL_NOT_IN_CATALOG',404);
+  const language = hotelLanguage(url.searchParams.get('language'));
+  const key = `reviews:v1:${id}:${language}:${offset}`;
+  const cached = await read(env,key);
+  if (cached?.fresh) return output({...cached.data,cached:true});
+  try {
+    const params = new URLSearchParams({hotelId:id,limit:'10',offset:String(offset)});
+    if (language !== 'en') params.set('language',language === 'uz-cyrl' ? 'uz' : language);
+    const raw = await provider(env,'/data/reviews',params);
+    if (!Array.isArray(raw.data)) throw new Error('NUITEE_REVIEWS_INVALID');
+    const items = raw.data.slice(0,10).map((item:Json,index:number)=>{
+      const convert = (value:unknown) => language === 'uz-cyrl' ? uzbekCyrillic(plain(value)) : plain(value);
+      const score = num(item.averageScore);
+      return {id:String(item.reviewId ?? `${id}:${offset+index}`),name:plain(item.name),country:plain(item.country),
+        date:plain(item.date),rating:score !== null && score <= 10 ? score : null,
+        headline:convert(item.headline),pros:convert(item.pros),cons:convert(item.cons),
+        source:plain(item.source),language:text(item.language)};
+    });
+    const total = num(raw.total);
+    const nextOffset = offset + raw.data.length;
+    const body = {ok:true,reviews:items,total,nextOffset:raw.data.length >= 10 && (total === null || nextOffset < total) && nextOffset <= 5000 ? nextOffset : null,stale:false};
+    await save(env,key,body,DAY);
+    return output(body);
+  } catch(e) {
+    if (cached) return output({...cached.data,stale:true});
+    throw e;
+  }
+}
+
 export async function handleNuiteeHotelRequest(request: Request, env: Env, url: URL): Promise<Response> {
   if (!env.HOTELS_DB) return error('HOTELS_DB_NOT_CONFIGURED', 503);
   try {
     await ensure(env);
     if (url.pathname === '/api/package/nuitee/hotels' && request.method === 'GET') return await coalesced(env, url.pathname + url.search, () => listing(url, env));
     if (url.pathname === '/api/package/nuitee/hotel' && request.method === 'GET') return await coalesced(env, url.pathname + url.search, () => detail(url, env));
+    if (url.pathname === '/api/package/nuitee/reviews' && request.method === 'GET') return await coalesced(env,url.pathname + url.search,()=>reviews(url,env));
     if (url.pathname === '/api/package/nuitee/rates' && request.method === 'POST') return await rates(request, env);
     return error('NOT_FOUND', 404);
   } catch (e) {

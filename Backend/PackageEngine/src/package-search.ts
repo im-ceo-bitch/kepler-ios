@@ -508,6 +508,35 @@ async function resolveIgnavFare(request: QuoteRequest, travelers: { adults: numb
   };
 }
 
+/** Independent one-way tickets may use different suppliers. Resolve both on the
+ * server; never split a published return fare or accept client display prices. */
+export async function resolveMixedSelection(providerID: string, travelerCount: number, env: Env) {
+  const ids = providerID.slice("mixed:".length).split("~");
+  if (!providerID.startsWith("mixed:") || ids.length !== 2 ||
+      ids.filter(id => id.startsWith("curated:")).length !== 1 ||
+      ids.filter(id => id.startsWith("aviasales:")).length !== 1) throw new Error("MIXED_IDENTITY_INVALID");
+  const legs = await Promise.all(ids.map(async id => {
+    if (id.startsWith("curated:")) {
+      if (!/^curated:[A-Za-z0-9_-]+$/.test(id)) throw new Error("MIXED_IDENTITY_INVALID");
+      const schedule = await resolveCuratedSchedule(id, env);
+      if (!schedule || schedule.inbound) throw new Error("MIXED_REQUIRES_ONE_WAY_FARES");
+      const fare = await resolveCuratedFare(id, travelerCount, env);
+      return {leg:schedule.outbound, amount:fare.normalizedGroupUsd};
+    }
+    if (parseAviasalesIdentity(id).mode !== "ow") throw new Error("MIXED_REQUIRES_ONE_WAY_FARES");
+    const selection = await resolveAviasalesSelection(id, env);
+    return {leg:selection.outbound, amount:selection.perTravelerUsd * travelerCount};
+  }));
+  if (legs[1].leg.destination !== legs[0].leg.origin ||
+      !["JED","MED"].includes(legs[0].leg.destination) || !["JED","MED"].includes(legs[1].leg.origin) ||
+      Date.parse(legs[1].leg.departureAt) <= Date.parse(legs[0].leg.arrivalAt)) throw new Error("MIXED_ROUTE_MISMATCH");
+  const total = Math.round(legs.reduce((sum,item)=>sum+item.amount,0)*100)/100;
+  const fare: VerifiedJourneyFare = { candidateId:providerID, amount:total, normalizedGroupUsd:total,
+    currency:"USD", fareScope:"totalParty", providerId:"iumrah Published + Aviasales",
+    observedAt:new Date().toISOString(), travelDate:legs[0].leg.departureAt.slice(0,10) };
+  return {fare, schedule:{outbound:legs[0].leg,inbound:legs[1].leg}};
+}
+
 async function resolveJourneyFare(request: QuoteRequest, travelerCount: number, travelers: { adults: number; children: number; infants: number }, env: Env) {
   const providerID = text(request.flight?.providerItineraryId, 220);
   if (providerID.startsWith("curated:")) return resolveCuratedFare(providerID, travelerCount, env);
@@ -633,7 +662,18 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
 
     const makkahRequest = parseHotel(raw.hotels?.makkah, "MAKKAH");
     const madinahRequest = includeMadinah ? parseHotel(raw.hotels?.madinah, "MADINAH") : null;
-    const [journeyFare, verifiedSchedule] = await Promise.all([
+    const providerID = text(raw.flight?.providerItineraryId,220);
+    const mixed = providerID.startsWith("mixed:")
+      ? await resolveMixedSelection(providerID, travelerCount, env) : null;
+    if (mixed) {
+      if (children > 0 || infants > 0) throw new Error("AVIASALES_PARTY_FARE_UNAVAILABLE");
+      const selected = raw.flight?.legs ?? [];
+      [mixed.schedule.outbound,mixed.schedule.inbound].forEach((leg,index)=>{
+        if (selected[index]?.origin !== leg.origin || selected[index]?.destination !== leg.destination ||
+            selected[index]?.departureDate !== leg.departureAt.slice(0,10)) throw new Error("MIXED_ROUTE_MISMATCH");
+      });
+    }
+    const [journeyFare, verifiedSchedule] = mixed ? [mixed.fare,mixed.schedule] : await Promise.all([
       resolveJourneyFare(raw, travelerCount, { adults, children, infants }, env),
       resolveJourneySchedule(raw, { adults, children, infants }, env),
     ]);

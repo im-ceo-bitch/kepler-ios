@@ -1378,6 +1378,8 @@ struct HomeDashboardView: View {
 
                 VStack(alignment: .leading, spacing: 15) {
                     HStack(spacing: 8) {
+                        IumrahOrbitIconRing(diameter: 44, lightOnDark: false)
+                            .accessibilityIdentifier("iumrah.orbit.home.configurator")
                         Label("Iumrah Configurator", systemImage: "slider.horizontal.3")
                             .font(.caption.weight(.bold))
                             .tracking(0.45)

@@ -47,3 +47,40 @@ export async function translateHotelText(env: Env, source: Json, language: strin
   for (const slot of slots) slot.object[slot.key] = map.get(slot.text);
   return copy;
 }
+
+// Stable facility names remain localized even when the provider omits translations.
+export function localizeKnownAmenities(source: Json, language: string): Json {
+  if (language === 'en') return source;
+  const names: Record<string, [string,string]> = {
+    'free wifi':['Бесплатный Wi-Fi','Bepul Wi-Fi'], 'wifi':['Wi-Fi','Wi-Fi'],
+    'free wi fi':['Бесплатный Wi-Fi','Bepul Wi-Fi'], 'wireless internet':['Беспроводной интернет','Simsiz internet'],
+    'bar':['Бар','Bar'], 'restaurant':['Ресторан','Restoran'], 'room service':['Обслуживание номеров','Xonaga xizmat ko‘rsatish'],
+    '24 hour front desk':['Круглосуточная стойка регистрации','24 soatlik qabulxona'],
+    '24 hour reception':['Круглосуточная стойка регистрации','24 soatlik qabulxona'],
+    'air conditioning':['Кондиционер','Konditsioner'], 'parking':['Парковка','Avtoturargoh'],
+    'free parking':['Бесплатная парковка','Bepul avtoturargoh'], 'private parking':['Частная парковка','Xususiy avtoturargoh'],
+    'fitness centre':['Фитнес-центр','Fitnes markazi'], 'fitness center':['Фитнес-центр','Fitnes markazi'],
+    'gym':['Тренажёрный зал','Trenajyor zali'], 'swimming pool':['Бассейн','Basseyn'],
+    'indoor pool':['Крытый бассейн','Yopiq basseyn'], 'outdoor pool':['Открытый бассейн','Ochiq basseyn'],
+    'spa':['Спа','Spa'], 'sauna':['Сауна','Sauna'], 'laundry':['Прачечная','Kir yuvish xizmati'],
+    'dry cleaning':['Химчистка','Kimyoviy tozalash'], 'daily housekeeping':['Ежедневная уборка','Kundalik tozalash'],
+    'non smoking rooms':['Номера для некурящих','Chekilmaydigan xonalar'], 'family rooms':['Семейные номера','Oilaviy xonalar'],
+    'airport shuttle':['Трансфер из аэропорта','Aeroport transferi'], 'shuttle service':['Трансфер','Transfer xizmati'],
+    'luggage storage':['Хранение багажа','Bagaj saqlash'], 'concierge service':['Консьерж','Konsyerj xizmati'],
+    'currency exchange':['Обмен валюты','Valyuta ayirboshlash'], 'business centre':['Бизнес-центр','Biznes markazi'],
+    'business center':['Бизнес-центр','Biznes markazi'], 'lift':['Лифт','Lift'], 'elevator':['Лифт','Lift'],
+    'facilities for disabled guests':['Удобства для гостей с ограниченной подвижностью','Harakatlanishi cheklangan mehmonlar uchun qulayliklar'],
+    'safety deposit box':['Сейф','Seyf'], 'terrace':['Терраса','Terrasa'], 'garden':['Сад','Bog‘'],
+    'breakfast':['Завтрак','Nonushta'], 'breakfast included':['Завтрак включён','Nonushta kiritilgan']
+  };
+  const translate = (value: string) => {
+    const key = value.toLowerCase().replace(/[-–_]/g,' ').replace(/\s+/g,' ').trim();
+    const pair = names[key];
+    if (!pair) return value;
+    if (language === 'ru') return pair[0];
+    if (language === 'uz' || language === 'uz-cyrl') return language === 'uz' ? pair[1] : uzbekCyrillic(pair[1]);
+    return value;
+  };
+  return {...source, amenities:(source.amenities ?? []).map(translate),
+    rooms:(source.rooms ?? []).map((room:Json)=>({...room,amenities:(room.amenities ?? []).map(translate)}))};
+}

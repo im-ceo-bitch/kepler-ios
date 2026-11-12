@@ -16,6 +16,7 @@ struct NuiteeJourneyHotelsView: View {
     @State private var opened: NuiteeHotel?
     @State private var showTransfer = false
     @State private var advanceAfterRoomSelection = false
+    @State private var selectedMeals = HotelMealChoices()
     @State private var ages: [Int] = []
     @State private var requestID = UUID()
     private let service = NuiteeHotelService()
@@ -34,6 +35,7 @@ struct NuiteeJourneyHotelsView: View {
     private var searchID: String { "\(city):\(roomAdults):\(window.checkIn):\(window.checkOut)" }
 
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             VStack(spacing: 18) {
                 IumrahJourneyHeader {
@@ -49,6 +51,7 @@ struct NuiteeJourneyHotelsView: View {
                         }
                     }
                 }
+                .id("hotels-top")
                 LazyVStack(alignment: .leading, spacing: 14) {
                     IumrahPageHelpCard(!ready ? "hotels.child_ages" : journey.localRoomsComplete ? "hotels.complete" : journey.trip.rooms > 1 ? "hotels.multiple_rooms" : city == "madinah" ? "hotels.madinah" : "hotels.makkah")
                     if journey.trip.scope == .makkahAndMadinah {
@@ -87,6 +90,9 @@ struct NuiteeJourneyHotelsView: View {
                 }.padding(.horizontal, 18).padding(.bottom, 24)
             }
         }
+        .onChange(of: key) { _, _ in proxy.scrollTo("hotels-top", anchor: .top) }
+        .onAppear { proxy.scrollTo("hotels-top", anchor: .top) }
+        }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
@@ -110,12 +116,12 @@ struct NuiteeJourneyHotelsView: View {
                     // A canonical booking has one hotel per city; changing it resets that city's room choices.
                     journey.localJourneyRooms = journey.localJourneyRooms.filter { $0.value.city != city || $0.value.hotel.id == hotel.id }
                     journey.localJourneyRooms[key] = LocalJourneyRoom(id: key, city: city, hotel: hotel, rate: rate,
-                        checkin: window.checkIn, checkout: window.checkOut, adults: roomAdults, childrenAges: roomChildren)
+                        checkin: window.checkIn, checkout: window.checkOut, adults: roomAdults, childrenAges: roomChildren, meals: selectedMeals)
                     if let tier = journey.localPackageTier { journey.trip.packageTier = tier }
                     journey.transferSelectionConfirmed = false
                     journey.invalidateLocalJourneyQuote()
                     advanceAfterRoomSelection = true
-                })
+                }, onSelectMeals: { selectedMeals = $0 })
                 .onDisappear {
                     guard advanceAfterRoomSelection else { return }
                     advanceAfterRoomSelection = false

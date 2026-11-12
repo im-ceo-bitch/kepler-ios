@@ -84,10 +84,6 @@ struct LegacyFinalPackageView: View {
                         VStack(alignment: .leading, spacing: 18) {
                             IumrahPageHelpCard(journey.hasFinalGeneratorQuote ? "legacy.final" : "legacy.recalculate")
                             if !journey.hasFinalGeneratorQuote { pricingStatus }
-                            if journey.quote?.bookingAllowed == false {
-                                Text(tr("Поставщик вернул тестовые тарифы. Реальное бронирование станет доступно после подключения production API.", "The supplier returned test rates. Real booking requires the production API.", "Yetkazib beruvchi sinov tariflarini qaytardi. Haqiqiy bron uchun production API kerak.", "Етказиб берувчи синов тарифларини қайтарди. Ҳақиқий брон учун production API керак."))
-                                    .font(.footnote).foregroundStyle(.secondary)
-                            }
                             Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")).font(.title2.bold())
                             if let outbound = journey.selectedOutbound {
                                 PackageFlightLegDetailCard(leg: flightLeg(outbound), direction: tr("Туда", "Outbound", "Borish", "Бориш"), language: settings.language)
@@ -97,17 +93,8 @@ struct LegacyFinalPackageView: View {
                             }
                             Text(tr("Отели и номера", "Hotels and rooms", "Mehmonxonalar va xonalar", "Меҳмонхоналар ва хоналар")).font(.title2.bold())
                             if journey.usesLocalJourney {
-                                ForEach(journey.localJourneyRooms.values.sorted { $0.id < $1.id }) { room in
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        PackageHotelDetailCard(hotel: StorefrontPackageHotel(id: room.hotel.id, name: room.hotel.name,
-                                            city: room.city == "madinah" ? "Madinah" : "Makkah", stars: room.hotel.roundedStars,
-                                            coverImageURL: room.hotel.coverImageURL, nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights),
-                                            selectedRoomName: room.rate.roomName, chooseRoomText: room.rate.roomName,
-                                            language: settings.language, onOpen: { localHotelForDetails = room })
-                                        Text(dateRange(room.checkin, room.checkout)).font(.caption).foregroundStyle(.secondary)
-                                        Text(room.rate.mealPlan).font(.caption)
-                                        Text(room.rate.cancellationDescription).font(.footnote).foregroundStyle(.secondary)
-                                    }.frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
+                                ForEach(journey.localJourneyRooms.values.sorted { $0.checkin == $1.checkin ? $0.id < $1.id : $0.checkin < $1.checkin }) { room in
+                                    localHotelCard(room)
                                 }
                             } else {
                                 if let hotel = journey.selectedHotel { hotelCard(hotel, role: .makkah) }
@@ -139,7 +126,7 @@ struct LegacyFinalPackageView: View {
         }
         .task(id: quoteInputKey) {
             guard createdSession == nil else { return }
-            if !journey.hasFinalGeneratorQuote { await recalculatePrice() }
+            if !journey.hasFinalGeneratorQuote || journey.quote?.bookingAllowed == false { await recalculatePrice() }
         }
         .task { await push.refreshAndRegisterIfAllowed() }
         .navigationDestination(isPresented: $isProfileSheetPresented) {
@@ -163,14 +150,19 @@ struct LegacyFinalPackageView: View {
                     childrenAges: room.childrenAges, onSelectRate: { rate in
                         journey.localJourneyRooms[room.id] = LocalJourneyRoom(id: room.id, city: room.city,
                             hotel: room.hotel, rate: rate, checkin: room.checkin, checkout: room.checkout,
-                            adults: room.adults, childrenAges: room.childrenAges)
+                            adults: room.adults, childrenAges: room.childrenAges,
+                            meals: journey.localJourneyRooms[room.id]?.meals)
                         journey.quote = nil
                         localHotelForDetails = nil
-                    })
+                    }, onSelectMeals: { meals in
+                        journey.localJourneyRooms[room.id]?.meals = meals
+                    }, selectedMeals: room.meals ?? HotelMealChoices())
                     .toolbar { ToolbarItem(placement: .topBarLeading) {
                         Button(tr("Закрыть", "Close", "Yopish", "Ёпиш")) { localHotelForDetails = nil }
                     } }
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(item: $infoSheet) { kind in
             StorefrontPackageInformationSheet(kind: kind, language: settings.language)
@@ -252,11 +244,50 @@ struct LegacyFinalPackageView: View {
         return journey.selectedMadinahRoom?.name ?? journey.selectedMadinahRoomCategory?.displayName ?? chooseRoomTitle
     }
 
-    private var serviceKit: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) { serviceTiles }
-            VStack(spacing: 10) { serviceTiles }
+    private func localHotelCard(_ room: LocalJourneyRoom) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                AsyncImage(url: room.hotel.coverImageURL.flatMap(URL.init(string:))) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { Color.secondary.opacity(0.12) }
+                .frame(width: 86, height: 100).clipShape(RoundedRectangle(cornerRadius: 16))
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(room.hotel.name).font(.headline)
+                    Text(String(repeating: "★", count: max(0, min(5, room.hotel.roundedStars))) + " · " + L10n.city(room.city == "madinah" ? "Madinah" : "Makkah", settings.language))
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text(room.rate.roomName).font(.subheadline)
+                }
+                Spacer(minLength: 0)
+            }
+            IumrahHotelStaySummary(checkin: room.checkin, checkout: room.checkout,
+                nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights)
+            Button(tr("Изменить номер", "Change room", "Xonani o‘zgartirish", "Хонани ўзгартириш")) { localHotelForDetails = room }
+                .buttonStyle(IumrahSecondaryButtonStyle())
+            Divider()
+            IumrahHotelMealsEditor(selection: Binding(
+                get: { journey.localJourneyRooms[room.id]?.meals ?? HotelMealChoices() },
+                set: { value in
+                    journey.localJourneyRooms[room.id]?.meals = value
+                    journey.invalidateLocalJourneyQuote()
+                }), stars: room.hotel.roundedStars, city: room.city, included: room.rate.supplierMeals)
         }
+        .padding(18)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
+    }
+    private var bookingBlockedReason: String? {
+        if isCalculatingPrice { return tr("Обновляем стоимость…", "Updating price…", "Narx yangilanmoqda…", "Нарх янгиланмоқда…") }
+        if !roomsComplete { return chooseRoomTitle }
+        if !journey.hasFinalGeneratorQuote || journey.quote?.bookingAllowed == false {
+            return tr("Для продолжения обновите расчёт поездки.", "Refresh the trip price to continue.", "Davom etish uchun safar narxini yangilang.", "Давом этиш учун сафар нархини янгиланг.")
+        }
+        if !journey.transferSelectionConfirmed { return tr("Подтвердите выбранный трансфер.", "Confirm your transfer.", "Transferni tasdiqlang.", "Трансферни тасдиқланг.") }
+        if !canBook { return tr("Проверьте выбранные рейсы и отели перед бронированием.", "Review your flights and hotels before booking.", "Bron qilishdan oldin reyslar va mehmonxonalarni tekshiring.", "Брон қилишдан олдин рейслар ва меҳмонхоналарни текширинг.") }
+        return nil
+    }
+
+    private var serviceKit: some View {
+        VStack(spacing: 0) { serviceTiles }
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
     }
     @ViewBuilder private var serviceTiles: some View {
         serviceTile("iumrah Guide", icon: "person.crop.circle.badge.checkmark", role: .care) { infoSheet = .guide }
@@ -265,15 +296,16 @@ struct LegacyFinalPackageView: View {
     }
     private func serviceTile(_ title: String, icon: String, role: IumrahIconRole, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 12) {
-                IumrahIconBadge(systemName: icon, role: role, size: 40, symbolSize: 17, cornerRadius: 13)
-                Text(title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                IumrahIconBadge(systemName: icon, role: role, size: 36, symbolSize: 16, cornerRadius: 11)
+                Text(title).font(.subheadline.weight(.semibold))
+                Spacer(minLength: 8)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
             .foregroundStyle(Color.iumrahInk)
-            .frame(minWidth: 75, maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .contentShape(Rectangle())
         }.buttonStyle(.plain)
     }
     private var servicesList: some View {
@@ -284,10 +316,10 @@ struct LegacyFinalPackageView: View {
             Divider()
             serviceRow(tr("Питание", "Meals", "Ovqatlanish", "Овқатланиш"), icon: "fork.knife", detail: mealsText)
             Divider()
-            serviceRow(tr("Зияраты в Мекке", "Makkah ziyarat", "Makka ziyoratlari", "Макка зиёратлари"), icon: "mappin.and.ellipse", detail: nil)
+            serviceRow(tr("Зияраты в Мекке", "Makkah ziyarat", "Makka ziyoratlari", "Макка зиёратлари"), icon: "mappin.and.ellipse", detail: ziyaratDetail)
             if needsMadinah {
                 Divider()
-                serviceRow(tr("Зияраты в Медине", "Madinah ziyarat", "Madina ziyoratlari", "Мадина зиёратлари"), icon: "mappin.and.ellipse", detail: nil)
+                serviceRow(tr("Зияраты в Медине", "Madinah ziyarat", "Madina ziyoratlari", "Мадина зиёратлари"), icon: "mappin.and.ellipse", detail: ziyaratDetail)
             }
             if needsMadinah && journey.haramainTrainSelected {
                 Divider()
@@ -309,6 +341,10 @@ struct LegacyFinalPackageView: View {
             Spacer(minLength: 0)
         }.padding(.vertical, 14).foregroundStyle(Color.iumrahInk)
     }
+    private var ziyaratDetail: String {
+        let included = FlowCopy.text(.included, settings.language)
+        return journey.trip.packageTier == .economy || journey.trip.packageTier == .standard ? included + " · $0" : included
+    }
     private var trainText: String {
         "\(journey.haramainTicketCount) · " + (journey.haramainFareClass == .business ? tr("Бизнес", "Business", "Biznes", "Бизнес") : tr("Стандарт", "Standard", "Standart", "Стандарт"))
     }
@@ -320,7 +356,13 @@ struct LegacyFinalPackageView: View {
         return needsMadinah ? first + "\n" + L10n.city("Madinah", settings.language) + " · \(madinah) " + unit : first
     }
     private func mealCount(_ city: HotelMealCity) -> Int {
-        [HotelMealKind.breakfast, .lunch, .dinner].filter { journey.isMealEnabled($0, city: city) }.count
+        if journey.usesLocalJourney, let room = journey.localJourneyRooms.values.first(where: { $0.city == city.rawValue }) {
+            let included = room.rate.supplierMeals
+            let selected = room.meals ?? HotelMealChoices()
+            return [included.breakfast || room.hotel.roundedStars >= 4 || selected.breakfast,
+                city == .makkah && (included.lunch || selected.lunch), included.dinner || selected.dinner].filter { $0 }.count
+        }
+        return [HotelMealKind.breakfast, .lunch, .dinner].filter { journey.isMealEnabled($0, city: city) }.count
     }
 
     private var pricingStatus: some View {
@@ -339,12 +381,14 @@ struct LegacyFinalPackageView: View {
                 Spacer()
                 Text(totalText).font(.title3.bold()).monospacedDigit()
             }
-            if !roomsComplete { Text(chooseRoomTitle).font(.caption).foregroundStyle(.secondary) }
+            if let reason = bookingBlockedReason {
+                Text(reason).font(.caption).foregroundStyle(.secondary)
+            }
             if !journey.transferSelectionConfirmed {
                 Button(tr("Подтвердить трансфер", "Confirm transfer", "Transferni tasdiqlash", "Трансферни тасдиқлаш")) {
                     showTransferSelection = true
                 }.buttonStyle(IumrahPrimaryButtonStyle())
-            } else if journey.hasFinalGeneratorQuote {
+            } else if journey.hasFinalGeneratorQuote && journey.quote?.bookingAllowed != false {
                 Button {
                     guard canBook else { return }
                     isProfileSheetPresented = true
@@ -355,6 +399,7 @@ struct LegacyFinalPackageView: View {
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())
                 .disabled(!canBook || isSubmitting)
+                .opacity(canBook && !isSubmitting ? 1 : 0.45)
             } else {
                 Button(tr("Повторить расчёт", "Retry pricing", "Qayta hisoblash", "Қайта ҳисоблаш")) {
                     Task { await recalculatePrice() }

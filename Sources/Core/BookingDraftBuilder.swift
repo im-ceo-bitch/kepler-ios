@@ -42,12 +42,16 @@ enum BookingDraftBuilder {
         // Haramain is an explicit hybrid-route add-on. Package tier never enables
         // it implicitly; the transfer stage passes the selected intercity mode.
         let usesHaramain = includeMadinah && intercityTransport == .haramainTrain
+        let includesMeals = nuiteeRooms.map { rooms in rooms.contains { room in
+            guard let meals = room.meals else { return false }
+            return meals.breakfast || meals.lunch || meals.dinner
+        } } ?? true
         let services = [
             "flight",
             "makkahHotel",
             includeMadinah ? "madinahHotel" : nil,
             "visa",
-            "meals",
+            includesMeals ? "meals" : nil,
             "transfer",
             usesHaramain ? "haramainTrain" : nil,
             "accompaniment",
@@ -105,7 +109,7 @@ enum BookingDraftBuilder {
                 guideMeetingPoint: "airport",
                 ziyaratMakkah: true,
                 ziyaratMadinah: includeMadinah,
-                meals: true,
+                meals: includesMeals,
                 esim: true
             ),
             includedServices: services,

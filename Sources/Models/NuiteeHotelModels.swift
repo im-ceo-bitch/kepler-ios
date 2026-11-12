@@ -106,6 +106,7 @@ struct NuiteeRoomRate: Codable, Hashable, Identifiable {
     let cancellationDescription: String
     let cancellationDeadlines: [NuiteeCancellationDeadline]
     let chargeOnArrival: [NuiteeArrivalCharge]
+    var includedMeals: HotelMealChoices? = nil
 
     var id: String { offerId + "|" + roomId + "|" + roomName }
 }

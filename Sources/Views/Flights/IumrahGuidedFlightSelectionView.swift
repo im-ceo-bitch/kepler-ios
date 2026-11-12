@@ -18,6 +18,7 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var isLoading = false
     @State private var loadingRequestID = UUID()
     @State private var loadError: String?
+    @State private var advanceAfterFlightDetail = false
     @State private var selectedDetail: FlightChoice?
     @State private var showTransferPicker = false
     @State private var isFlightHeaderVisible = true
@@ -145,7 +146,7 @@ struct IumrahGuidedFlightSelectionView: View {
                         }
                     VStack(alignment: .leading, spacing: 16) {
                         IumrahPageHelpCard(isLoading ? "flights.loading" : loadError != nil && availableCandidates.isEmpty ? "flights.error" : availableCandidates.isEmpty ? (step == .inbound ? "flights.inbound_empty" : "flights.empty") : step == .outbound ? "flights.outbound" : "flights.inbound")
-                        stepSelector
+                        stepSelector.id("flight-step-selector")
                         searchControls
                         resultsSection
                             .id("flight-results")
@@ -165,7 +166,7 @@ struct IumrahGuidedFlightSelectionView: View {
             .onChange(of: step) { _, _ in
                 filters = IumrahFlightFilterState()
                 withAnimation(.easeInOut(duration: 0.28)) {
-                    proxy.scrollTo("flight-results", anchor: .top)
+                    proxy.scrollTo("flight-step-selector", anchor: .top)
                 }
             }
         }
@@ -184,6 +185,12 @@ struct IumrahGuidedFlightSelectionView: View {
                 infants: journey.trip.infants,
                 onChoose: { choose(choice) }
             )
+            .onDisappear {
+                if advanceAfterFlightDetail {
+                    advanceAfterFlightDetail = false
+                    advanceFlightSelection()
+                }
+            }
         }
         .navigationDestination(isPresented: $showTransferPicker) {
             NuiteeJourneyHotelsView()
@@ -426,7 +433,7 @@ struct IumrahGuidedFlightSelectionView: View {
         case .outbound:
             if outbound?.id != choice.id { inbound = nil }
             outbound = choice
-            // The next leg is opened only when the user taps the explicit CTA.
+
         case .inbound:
             guard let outbound, outbound.source == choice.source else {
                 isShowingSourceHelp = true
@@ -434,6 +441,13 @@ struct IumrahGuidedFlightSelectionView: View {
             }
             inbound = choice
         }
+        if selectedDetail != nil { advanceAfterFlightDetail = true }
+        else { advanceFlightSelection() }
+    }
+
+    private func advanceFlightSelection() {
+        if step == .outbound { withAnimation { step = .inbound } }
+        else { commitSelection() }
     }
 
     private var availableCandidates: [FlightChoice] {

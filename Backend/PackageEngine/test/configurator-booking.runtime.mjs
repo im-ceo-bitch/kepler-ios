@@ -35,9 +35,14 @@ test('prebook validates exact server-bound offer; ignores caller price and tier'
   assert.equal(result.rooms[0].prebookId,'prebook');assert.equal(result.bookingAllowed,true);
  });
 });
-test('sandbox tariffs never authorize a real booking',async()=>{
- await mockFetch(async()=>Response.json(prebook()),async()=>{
-  assert.equal((await resolveNuiteePackageHotels(fixture({sandbox:true}),[room()],party,false)).bookingAllowed,false);
+test('sandbox tariffs permit internal booking with server price and explicit source, never supplier reservation',async()=>{
+ await mockFetch(async()=>{throw Error('Sandbox must not prebook a real supplier room');},async()=>{
+  const result=await resolveNuiteePackageHotels(fixture({sandbox:true}),[room({price:1,tariffSource:'production',supplierReservationConfirmed:true})],party,false);
+  assert.equal(result.bookingAllowed,true);
+  assert.equal(result.makkah.amountUsd*7,200);
+  assert.equal(result.rooms[0].tariffSource,'sandbox');
+  assert.equal(result.rooms[0].supplierReservationConfirmed,false);
+  assert.equal(result.rooms[0].prebookId,undefined);
  });
 });
 test('expired/mismatched room identity is rejected before supplier call',async()=>{
@@ -102,4 +107,104 @@ test('Aviasales rejects malformed identities before sending supplier requests',a
    await assert.rejects(resolveAviasalesSelection(value,{TRAVELPAYOUTS_API_TOKEN:'test'}),/AVIASALES_IDENTITY_INVALID/);
   }
  });
+});
+
+
+test('hotel meals use server stars and board inclusion; existing engine units apply only to optional meals',async()=>{
+ await mockFetch(async()=>Response.json(prebook()),async()=>{
+  for(const stars of [1,2,3,4,5]) {
+   const env=fixture({stars});
+   const result=await resolveNuiteePackageHotels(env,[room({meals:{breakfast:true,lunch:true,dinner:true},includedMeals:{breakfast:true,lunch:true,dinner:true}})],party,false);
+   const cost=(meal)=>result.mealComponents.find(x=>x.code.endsWith('_'+meal)).supplierCostUsd;
+   const unit=stars===5?50:15;
+   assert.equal(cost('breakfast'),stars>=4?0:unit*7*2);
+   assert.equal(cost('lunch'),unit*7*2);assert.equal(cost('dinner'),unit*7*2);
+  }
+  const env=fixture({stars:2});
+  env.put(`rates:v2:lp123:${checkin}:${checkout}:2::UZ:USD`,[{offerId:'offer',roomId:'room',price:200,currency:'USD',mealPlan:'Full board'}]);
+  const result=await resolveNuiteePackageHotels(env,[room({meals:{breakfast:true,lunch:true,dinner:true}})],party,false);
+  assert.equal(result.mealComponents.length,3);
+  assert.equal(result.mealComponents.reduce((s,x)=>s+x.supplierCostUsd,0),0);
+ });
+});
+test('Madinah excludes lunch; different city stars price their own meals',async()=>{
+ const mid=new Date(Date.parse(checkin)+3*86400000).toISOString().slice(0,10);
+ const env=fixture({stars:4,sandbox:true});
+ env.put('catalog:v1:madinah',[{id:'lp456',name:'Hotel Medina',stars:5,city:'Madinah'}]);
+ env.put(`rates:v2:lp123:${checkin}:${mid}:2::UZ:USD`,[{offerId:'offer',roomId:'room',price:200,currency:'USD',mealPlan:'Room only'}]);
+ env.put(`rates:v2:lp456:${mid}:${checkout}:2::UZ:USD`,[{offerId:'med',roomId:'room',price:400,currency:'USD',mealPlan:'Room only'}]);
+ const rooms=[room({checkout:mid,meals:{breakfast:false,lunch:true,dinner:false}}),room({id:'madinah:0',city:'madinah',hotelId:'lp456',offerId:'med',checkin:mid,meals:{breakfast:false,lunch:true,dinner:true}})];
+ const result=await resolveNuiteePackageHotels(env,rooms,party,true);
+ assert.equal(result.rooms[1].meals.lunch,false);
+ assert.equal(result.rooms[1].meals.breakfast,true);
+ assert.equal(result.mealComponents.reduce((sum,x)=>sum+x.supplierCostUsd,0),15*3*2+50*4*2);
+});
+test('Economy and Standard retain included ziyarat rows at zero; Comfort/Luxury retain engine costs',()=>{
+ const hotel={hotelId:'lp123',roomId:'room',amountUsd:100,unit:'perRoomNight',nights:3,pricingMode:'test'};
+ const fare={candidateId:'flight',amount:600,currency:'USD',fareScope:'totalParty',providerId:'test',observedAt:new Date().toISOString(),travelDate:checkin,normalizedGroupUsd:600};
+ for(const tier of ['economy','standard','comfort','luxury']) {
+  const q=calculatePackageQuote({tier,tripType:'roundTrip',includeMadinah:true,travelers:party,meals:{makkahLunch:false,makkahDinner:false,madinahDinner:false},hotelMealComponents:[],transferVehicle:'carnival',includeHaramainTrain:false,haramainFareClass:'economy',haramainTicketCount:0,journeyFare:fare,makkahHotel:hotel,madinahHotel:{...hotel,hotelId:'lp456'}});
+  const lines=q.snapshot.components.filter(x=>x.code.startsWith('ziyarat_'));
+  assert.equal(lines.length,2);
+  assert.equal(lines.reduce((sum,x)=>sum+x.supplierCostUsd,0),['economy','standard'].includes(tier)?0:200);
+  assert.equal(q.snapshot.totals.supplierCostUsd,q.snapshot.components.reduce((sum,x)=>sum+x.supplierCostUsd,0));
+ }
+});
+test('known hotel and room amenities are localized without changing identifiers',async()=>{
+ const {localizeKnownAmenities}=await import('../.runtime-dist/hotel-localization.js');
+ const hotel={id:'lp123',amenities:['Free Wi-Fi','Bar','Room service'],rooms:[{id:'r',amenities:['Air conditioning']}]};
+ const ru=localizeKnownAmenities(hotel,'ru');
+ assert.deepEqual(ru.amenities,['Бесплатный Wi-Fi','Бар','Обслуживание номеров']);
+ assert.equal(ru.rooms[0].amenities[0],'Кондиционер');assert.equal(ru.rooms[0].id,'r');
+ assert.equal(localizeKnownAmenities(hotel,'uz').amenities[2],'Xonaga xizmat ko‘rsatish');
+ assert.equal(localizeKnownAmenities(hotel,'uz-cyrl').amenities[1],'Бар');
+});
+
+test('sandbox package quote seals the real selections and commits or queues a Business cost report under the booking ID',async()=>{
+ const {commitPackageQuoteReport}=await import('../.runtime-dist/booking-gateway.js');
+ const env=fixture({stars:4,sandbox:true});
+ const provider=`aviasales:pair:TAS:JED:${checkin}:${checkout}:HY:335:HY:336`;
+ let body;
+ await mockFetch(async(raw)=>{
+  assert.ok(!String(raw).includes('/rates/prebook'));
+  const u=new URL(raw),reverse=u.searchParams.get('origin')==='JED';
+  return Response.json({success:true,currency:'usd',data:[{airline:'HY',flight_number:reverse?'336':'335',departure_at:`${reverse?checkout:checkin}T12:00:00+03:00`,duration:360,price:300}]});
+ },async()=>{
+  const response=await generatePackageQuote(new Request('https://fixture/api/package/quote',{method:'POST',body:JSON.stringify({tier:'standard',tripType:'roundTrip',includeMadinah:false,travelers:party,hotels:{makkah:{hotelId:'lp123',roomId:'room',nights:7}},flight:{providerItineraryId:provider,legs:[{origin:'TAS',destination:'JED',departureDate:checkin},{origin:'JED',destination:'TAS',departureDate:checkout}]},nuiteeRooms:[room({meals:{breakfast:true,lunch:false,dinner:true}})]})}),env);
+  body=await response.json();assert.equal(response.status,200,JSON.stringify(body));
+ });
+ const snapshot=await unsealPricingSnapshot(body.quote.quoteProof,env);
+ assert.equal(snapshot.supplierMode,'sandbox');assert.equal(snapshot.supplierReservationConfirmed,false);
+ assert.equal(snapshot.components.find(x=>x.code==='makkah_hotel').supplierCostUsd,200);
+ assert.equal(snapshot.components.find(x=>x.code==='ziyarat_makkah').supplierCostUsd,0);
+ assert.equal(snapshot.nuiteeRooms[0].meals.dinner,true);
+ assert.equal(snapshot.components.find(x=>x.code.endsWith('_dinner')).supplierCostUsd,210);
+ const bookingID='IUM-2026-ABCDEFG',token='a-test-booking-token-long-enough';
+ const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token))),b=>b.toString(16).padStart(2,'0')).join('');
+ const booking={totalUsd:body.quote.totalPackagePrice,perPilgrimUsd:body.quote.pricePerPerson,planId:'standard',input:{travelers:party},selection:{makkahHotelId:'lp123'},stay:{makkahNights:7,madinahNights:0},generatorTrace:{quoteId:body.quote.quoteId}};
+ for(const tripExists of [true,false]) {
+  const writes=[];
+  const db={prepare(sql){let args;return {bind(...a){args=a;return this;},async first(){
+   if(sql.includes('FROM bookings'))return args[0]===bookingID && args[1]===hash?{id:bookingID,payload_json:JSON.stringify(booking)}:null;
+   if(sql.includes('FROM pilgrim_trips'))return tripExists?{id:'business-trip',pricing_snapshot_json:null}:null;
+   return null;
+  },async run(){writes.push({sql,args});return {meta:{changes:1}};}};}};
+  const response=await commitPackageQuoteReport(new Request('https://fixture/commit',{method:'POST',headers:{'x-booking-token':token},body:JSON.stringify({quoteProof:body.quote.quoteProof})}),bookingID,{...env,BOOKINGS_DB:db,HOTELS_DB:db});
+  assert.equal(response.status,tripExists?200:202,JSON.stringify(await response.clone().json()));
+  const stored=writes.find(x=>tripExists?x.sql.startsWith('UPDATE pilgrim_trips'):x.sql.startsWith('INSERT INTO pending_package_pricing_reports'));
+  assert.ok(stored);
+  const report=JSON.parse(stored.args[tripExists?0:3]);
+  assert.equal(report.quoteId,snapshot.quoteId);assert.equal(report.totals.publicTotalUsd,body.quote.totalPackagePrice);
+  assert.equal(report.supplierMode,'sandbox');assert.equal(report.nuiteeRooms[0].meals.dinner,true);
+  const rejected=await commitPackageQuoteReport(new Request('https://fixture/commit',{method:'POST',headers:{'x-booking-token':'wrong-token-long-enough-to-check'},body:JSON.stringify({quoteProof:body.quote.quoteProof})}),bookingID,{...env,BOOKINGS_DB:db,HOTELS_DB:db});
+  assert.equal(rejected.status,404);
+ }
+});
+
+test('room-only and explicit breakfast exclusions are never treated as supplier-included breakfast',async()=>{
+ const {supplierMealInclusions}=await import('../.runtime-dist/pricing.js');
+ for(const board of ['Room only','Breakfast not included','Without breakfast','No breakfast']) {
+  assert.deepEqual(supplierMealInclusions(board),{breakfast:false,lunch:false,dinner:false});
+ }
+ assert.equal(supplierMealInclusions('BB').breakfast,true);
 });

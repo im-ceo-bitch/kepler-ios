@@ -26,7 +26,7 @@ assert.match(pricing, /const LUXURY_MARKUP = 0\.35/);
 assert.match(pricing, /const PAYMENT_FEE = 0\.02/);
 assert.match(pricing, /const VISA = 120/);
 assert.match(pricing, /const TRANSFER = 300/);
-assert.match(pricing, /server-expedia-package-v9/);
+assert.match(pricing, /server-expedia-package-v10/);
 assert.match(pricing, /supplierCostUsd/);
 assert.match(pricing, /estimatedProfitUsd/);
 assert.doesNotMatch(localPricing, /0\.25|0\.35|PAYMENT_FEE|supplierCostUsd|estimatedProfitUsd|static func calculate/);
@@ -79,8 +79,8 @@ assert.match(flightCard, /deltaDisplay/);
 assert.ok(!flightCard.includes('Тариф Ignav'));
 assert.ok(!finalPackage.includes('Ignav'));
 assert.ok(!primaryHotel.includes('providerDisplayName'));
-// The new final review labels the server-confirmed total for all travelers.
-assert.match(finalPackage, /Text\(tr\("Итого за всех"/);
-assert.match(finalPackage, /quote\.totalPackagePrice/);
+assert.match(finalPackage, /Итого за всех/);
+assert.match(finalPackage, /IumrahBookingConfirmationView/);
+assert.match(finalPackage, /journey.hasFinalGeneratorQuote/);
 
 console.log('secure server generator + post-booking Business report contract OK');

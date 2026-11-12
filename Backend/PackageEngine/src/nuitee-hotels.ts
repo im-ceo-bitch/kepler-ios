@@ -1,6 +1,7 @@
+import { hotelMealUnit, supplierMealInclusions, type HotelMealChoices } from "./pricing";
 /** Nuitee Hotels V1 — server-only supplier adapter. No supplier keys leave this worker. */
 import type { Env } from './env';
-import { hotelLanguage, translateHotelText, uzbekCyrillic } from './hotel-localization';
+import { localizeKnownAmenities, hotelLanguage, translateHotelText, uzbekCyrillic } from './hotel-localization';
 
 type Json = Record<string, any>;
 type Entry = { payload: string; expires_at: number; updated_at: number };
@@ -219,6 +220,7 @@ function normalizedRates(result: Json, hotelId: string) {
       offers.push({
         offerId: text(type.offerId || rate.offerId), roomId: String(rate.mappedRoomId ?? ''),
         roomName: plain(rate.name || type.name || 'Room'), mealPlan: plain(rate.boardName || rate.boardType || ''),
+        includedMeals: supplierMealInclusions(rate.boardName || rate.boardType),
         price: total, currency: text((Array.isArray(retail.total) ? retail.total[0]?.currency : retail.total?.currency)) || 'USD',
         refundable: text(cancellation.refundableTag) === 'RFN',
         cancellationTag: text(cancellation.refundableTag),
@@ -273,7 +275,7 @@ async function detail(url: URL, env: Env) {
   const language = hotelLanguage(url.searchParams.get('language'));
   if (!/^lp[a-zA-Z0-9]{1,50}$/.test(id)) return error('INVALID_HOTEL_ID');
   if (!await isListedHotel(env, id)) return error('HOTEL_NOT_IN_CATALOG', 404);
-  const cacheKey = language === 'en' ? `detail:v1:${id}` : `detail:v3:${id}:${language}`;
+  const cacheKey = language === 'en' ? `detail:v1:${id}` : `detail:v4:${id}:${language}`;
   const cached = await read(env, cacheKey);
   if (cached?.fresh) return output({ok:true,sandbox:isSandbox(env),hotel:cached.data});
   try {
@@ -299,6 +301,7 @@ async function detail(url: URL, env: Env) {
         h.rooms = h.rooms.map((r:Json)=>({...r,name:uzbekCyrillic(r.name),description:uzbekCyrillic(r.description),amenities:r.amenities.map(uzbekCyrillic)}));
       }
     }
+    h = localizeKnownAmenities(h, language);
     await save(env,cacheKey,h,7 * DAY);
     return output({ok:true,sandbox:isSandbox(env),hotel:h});
   } catch (e) {
@@ -315,6 +318,7 @@ async function detail(url: URL, env: Env) {
   }
 }
 async function localizedRates(env: Env, offers: Json[], language: string, key: string): Promise<Json[]> {
+  offers = offers.map(rate=>({...rate,includedMeals:supplierMealInclusions(rate.mealPlan)}));
   if (language === 'en' || !env.HOTEL_TRANSLATION_API_KEY) return offers;
   const cached = await read(env, `${key}:text:${language}`);
   // Translation cache holds strings only; never restore stale prices/offer IDs.
@@ -430,6 +434,11 @@ export type NuiteePackageRoom = {
   id: string; city: "makkah" | "madinah"; hotelId: string; offerId: string; roomId: string;
   checkin: string; checkout: string; adults: number; children: number[];
   prebookId?: string;
+  meals?: HotelMealChoices;
+  includedMeals?: HotelMealChoices;
+  tariffSource?: "sandbox" | "production";
+  stars?: number;
+  supplierReservationConfirmed?: boolean;
 };
 export function packageTierForStars(stars: number): "economy" | "standard" | "luxury" {
   if (!Number.isInteger(stars) || stars < 1 || stars > 5) throw new Error("HOTEL_STARS_REQUIRED");
@@ -444,6 +453,7 @@ export async function resolveNuiteePackageHotels(env: Env, values: NuiteePackage
   const result: Record<string, import("./pricing").PricingHotelInput> = {};
   const selected: NuiteePackageRoom[] = [];
   let highestStars = 0;
+  const mealComponents: Array<{code:string;label:string;supplierCostUsd:number}> = [];
   const verifiedOffers = new Map<string, Json>();
   for (const city of cities) {
     const rooms = values.filter(room => room?.city === city);
@@ -462,20 +472,36 @@ export async function resolveNuiteePackageHotels(env: Env, values: NuiteePackage
       const anchorKey = `rates:v2:${room.hotelId}:${room.checkin}:${room.checkout}:${room.adults}:${room.children.join(",")}:UZ:USD`;
       const anchor = await read(env, anchorKey);
       const original = Array.isArray(anchor?.data) ? anchor!.data.find((r:Json)=>r.offerId===room.offerId && r.roomId===room.roomId) : null;
-      if (!original) throw new Error("NUITEE_SELECTED_RATE_EXPIRED");
+      if (!original || !anchor?.fresh) throw new Error("NUITEE_SELECTED_RATE_EXPIRED");
       let current = verifiedOffers.get(room.offerId);
       if (!current) {
-        const response = await provider(env, '/rates/prebook', undefined, {offerId:room.offerId,usePaymentSdk:false});
-        current = response.data;
-        if (!current || !current.prebookId || current.hotelId!==room.hotelId || current.currency!=="USD" || !Number.isFinite(current.price) || current.price<=0) throw new Error("NUITEE_RATE_RECHECK_FAILED");
+        // Internal iumrah bookings may use a server-observed sandbox tariff.
+        // It is not a supplier reservation and does not call the supplier book API.
+        current = isSandbox(env) ? {...original, hotelId:room.hotelId} :
+          (await provider(env, '/rates/prebook', undefined, {offerId:room.offerId,usePaymentSdk:false})).data;
+        if (!current || (!isSandbox(env) && !current.prebookId) || current.hotelId!==room.hotelId || current.currency!=="USD" || !Number.isFinite(current.price) || current.price<=0) throw new Error("NUITEE_RATE_RECHECK_FAILED");
         if (current.cancellationChanged || current.boardChanged) throw new Error("NUITEE_RATE_TERMS_CHANGED");
         verifiedOffers.set(room.offerId,current);
       }
       total += current.price;
-      selected.push({id:room.id,city:room.city,hotelId:room.hotelId,offerId:room.offerId,roomId:room.roomId,checkin:room.checkin,checkout:room.checkout,adults:room.adults,children:[...room.children],prebookId:current.prebookId});
+      const included = supplierMealInclusions(original.mealPlan);
+      included.breakfast ||= stars >= 4;
+      const choices: HotelMealChoices = {
+        breakfast: included.breakfast || room.meals?.breakfast === true,
+        lunch: city === "makkah" && (included.lunch || room.meals?.lunch === true),
+        dinner: included.dinner || room.meals?.dinner === true,
+      };
+      const nights = Math.round((Date.parse(room.checkout)-Date.parse(room.checkin))/86400000);
+      const people = room.adults + room.children.filter(age=>age>=2).length;
+      for (const meal of ["breakfast","lunch","dinner"] as const) {
+        if (!choices[meal]) continue;
+        mealComponents.push({code:`meal_${city}_${room.id}_${meal}`,label:`${city === "makkah" ? "Мекка" : "Медина"} · ${room.id} · ${{breakfast:"Завтрак",lunch:"Обед",dinner:"Ужин"}[meal]}${included[meal] ? " · включено" : ""}`,
+          supplierCostUsd:included[meal] ? 0 : hotelMealUnit(packageTierForStars(stars))*people*nights});
+      }
+      selected.push({meals:choices,includedMeals:included,stars,tariffSource:isSandbox(env)?"sandbox":"production",supplierReservationConfirmed:false,id:room.id,city:room.city,hotelId:room.hotelId,offerId:room.offerId,roomId:room.roomId,checkin:room.checkin,checkout:room.checkout,adults:room.adults,children:[...room.children],prebookId:current.prebookId});
     }
     const nights = Math.round((Date.parse(rooms[0].checkout)-Date.parse(rooms[0].checkin))/86400000);
-    result[city] = {hotelId:rooms[0].hotelId, roomId:rooms[0].roomId, amountUsd:total/nights/travelers.rooms, unit:"perRoomNight", nights, pricingMode:"nuiteeRevalidated"};
+    result[city] = {hotelId:rooms[0].hotelId, roomId:rooms[0].roomId, amountUsd:total/nights/travelers.rooms, unit:"perRoomNight", nights, pricingMode:isSandbox(env)?"nuiteeSandbox":"nuiteeRevalidated"};
   }
-  return {makkah:result.makkah, madinah:result.madinah ?? null, tier:packageTierForStars(highestStars), rooms:selected, bookingAllowed:!isSandbox(env)};
+  return {makkah:result.makkah, madinah:result.madinah ?? null, tier:packageTierForStars(highestStars), rooms:selected, mealComponents, supplierMode:isSandbox(env)?"sandbox" as const:"production" as const, bookingAllowed:true};
 }

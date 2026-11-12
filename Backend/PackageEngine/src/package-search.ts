@@ -684,6 +684,7 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
         makkahDinner: raw.meals?.makkahDinner === true,
         madinahDinner: raw.meals?.madinahDinner === true,
       },
+      hotelMealComponents: nuitee?.mealComponents,
       transferVehicle: parseTransfer(raw.transferVehicle),
       includeHaramainTrain: includeMadinah && raw.haramain?.enabled === true,
       haramainFareClass: fareClass,
@@ -696,6 +697,13 @@ export async function generatePackageQuote(request: Request, env: Env): Promise<
     if (nuitee) {
       calculated.snapshot.nuiteeRooms = nuitee.rooms;
       calculated.snapshot.bookingAllowed = nuitee.bookingAllowed;
+      calculated.snapshot.supplierMode = nuitee.supplierMode;
+      calculated.snapshot.supplierReservationConfirmed = false;
+      if (nuitee.supplierMode === "sandbox") {
+        for (const component of calculated.snapshot.components) {
+          if (component.code === "makkah_hotel" || component.code === "madinah_hotel") component.label += " · Sandbox";
+        }
+      }
     }
     const quoteProof = await sealPricingSnapshot(calculated.snapshot, env);
 

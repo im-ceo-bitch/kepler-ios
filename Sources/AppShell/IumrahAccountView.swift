@@ -52,22 +52,26 @@ struct IumrahAccountView: View {
 
     @State private var guestAccountMode: IumrahGuestAccountMode = .signIn
     @State private var guestAuthMethod: IumrahGuestAuthMethod = .sms
+    @State private var loginID = ""
     @State private var loginEmail = ""
     @State private var loginPhone = "+998"
     @State private var loginSMSCode = ""
     @State private var loginSMSChallengeID = ""
-    @State private var loginEmailChallengeID = ""
-    @State private var loginEmailCode = ""
+    @State private var loginPassword = ""
     @State private var loginEmailServerIssue: IumrahFieldIssue?
     @State private var registrationFirstName = ""
     @State private var registrationLastName = ""
     @State private var registrationEmail = ""
     @State private var registrationEmailCode = ""
     @State private var registrationEmailIssue: IumrahFieldIssue?
+    @State private var loginEmailChallengeID = ""
+    @State private var loginEmailCode = ""
     @State private var registrationEmailChallengeID = ""
     @State private var registrationPhone = "+998"
     @State private var registrationSMSCode = ""
     @State private var registrationSMSChallengeID = ""
+    @State private var registrationPassword = ""
+    @State private var registrationPasswordConfirm = ""
     @State private var isRegistering = false
     @State private var showSignOutConfirmation = false
     @State private var isLoggingIn = false
@@ -1286,7 +1290,6 @@ struct IumrahAccountView: View {
                 loginEmailServerIssue = nil
                 resetPhoneLoginState()
                 resetPhoneRegistrationState()
-                resetEmailLoginState()
                 registrationEmailChallengeID = ""
                 registrationEmailCode = ""
                 registrationEmailIssue = nil
@@ -1302,7 +1305,6 @@ struct IumrahAccountView: View {
                 loginEmailServerIssue = nil
                 resetPhoneLoginState()
                 resetPhoneRegistrationState()
-                resetEmailLoginState()
             }
 
             if guestAccountMode == .signIn {
@@ -1362,36 +1364,23 @@ struct IumrahAccountView: View {
         switch guestAuthMethod {
         case .email:
             accountInputField(symbol: "envelope.fill", placeholder: "name@example.com", text: $loginEmail, keyboard: .emailAddress, contentType: .emailAddress) { raw in
-                let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-                if cleaned != raw { loginEmail = cleaned }
+                loginEmail = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 loginEmailServerIssue = nil
-                // A code is bound to the exact email used to request it.
-                if !loginEmailChallengeID.isEmpty { resetEmailLoginState() }
             }
             .disabled(!loginEmailChallengeID.isEmpty)
-
-            if let issue = loginEmailFieldIssue {
-                fieldIssueView(issue)
-            }
+            if let issue = loginEmailFieldIssue { fieldIssueView(issue) }
             if !loginEmailChallengeID.isEmpty {
                 accountInputField(symbol: "number.square.fill", placeholder: tr("6-digit code", "Код из 6 цифр", "6 xonali kod", "6 хонали код"), text: $loginEmailCode, keyboard: .numberPad, contentType: .oneTimeCode) { raw in
-                    let digits = String(raw.filter(\.isNumber).prefix(6))
-                    if digits != raw { loginEmailCode = digits }
+                    loginEmailCode = String(raw.filter(\.isNumber).prefix(6))
+                }
+                Button(tr("Change email", "Изменить email", "Emailni o‘zgartirish", "Emailни ўзгартириш")) {
+                    loginEmailChallengeID = ""; loginEmailCode = ""
                 }
             }
-
-            Button {
-                Task {
-                    if loginEmailChallengeID.isEmpty { await startGuestEmailLogin() }
-                    else { await confirmGuestEmailLogin() }
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    if isLoggingIn { ProgressView().tint(.white) }
-                    Text(loginEmailChallengeID.isEmpty
-                         ? tr("Send email code", "Отправить код на почту", "Email kodini yuborish", "Email кодини юбориш")
-                         : tr("Confirm and sign in", "Подтвердить и войти", "Tasdiqlab kirish", "Тасдиқлаб кириш"))
-                }
+            Button { Task { await login() } } label: {
+                Text(loginEmailChallengeID.isEmpty
+                    ? tr("Send code", "Отправить код", "Kodni yuborish", "Кодни юбориш")
+                    : tr("Confirm and sign in", "Подтвердить и войти", "Tasdiqlab kirish", "Тасдиқлаб кириш"))
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
             .disabled(!guestLoginReady || isLoggingIn || isAppleSigningIn || isGoogleSigningIn)
@@ -1474,6 +1463,8 @@ struct IumrahAccountView: View {
                     let digits = String(raw.filter(\.isNumber).prefix(6))
                     if digits != raw { registrationEmailCode = digits }
                 }
+
+
             }
 
             Button {
@@ -1538,10 +1529,10 @@ struct IumrahAccountView: View {
                         "Доимий iumrah аккаунтингизни 6 хонали SMS коди билан яратинг. +998 Ўзбекистон рақамлари қўлланади."
                      )
                      : tr(
-                        "Enter the 6-digit code from the SMS to activate your account.",
-                        "Введите 6-значный код из SMS для активации аккаунта.",
-                        "Akkauntingizni faollashtirish uchun SMS kodni kiriting.",
-                        "Аккаунтингизни фаоллаштириш учун SMS кодни киритинг."
+                        "Enter the SMS code, then create a password for iumrah ID sign-in as a backup.",
+                        "Введите SMS-код, затем создайте пароль для резервного входа по iumrah ID.",
+                        "Akkauntni tasdiqlash uchun SMS kodni kiriting.",
+                        "Аккаунтни тасдиқлаш учун SMS кодни киритинг."
                      ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -1559,6 +1550,7 @@ struct IumrahAccountView: View {
                     let digits = String(raw.filter(\.isNumber).prefix(6))
                     if digits != raw { registrationSMSCode = digits }
                 }
+
 
             }
 
@@ -1694,9 +1686,7 @@ struct IumrahAccountView: View {
     private var guestLoginReady: Bool {
         switch guestAuthMethod {
         case .email:
-            guard loginEmailFieldIssue == nil,
-                  !loginEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-            return loginEmailChallengeID.isEmpty || loginEmailCode.count == 6
+            return loginEmailFieldIssue == nil && !loginEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && (loginEmailChallengeID.isEmpty || loginEmailCode.count == 6)
         case .sms:
             let phoneReady = normalizedUZPhoneInput(loginPhone).count == 13 && normalizedUZPhoneInput(loginPhone).hasPrefix("+998")
             if !phoneReady { return false }
@@ -1714,6 +1704,7 @@ struct IumrahAccountView: View {
         if registrationEmailChallengeID.isEmpty { return true }
         return registrationEmailCode.count == 6
     }
+
 
     private var guestSMSRegistrationReady: Bool {
         let phone = normalizedUZPhoneInput(registrationPhone)
@@ -1819,7 +1810,7 @@ struct IumrahAccountView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(session.booking.route.originCode) → \(session.booking.route.outboundDestination)")
                     .font(.subheadline.weight(.bold))
-                Text("\(L10n.format("booking_number_short", settings.language, session.displayBookingNumber)) · \(L10n.date(session.booking.input.startDate, settings.language))")
+                Text(L10n.format("booking_number_short", settings.language, session.displayBookingNumber) + " · " + L10n.date(session.booking.input.startDate, settings.language))
                     .font(.caption.monospaced().weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -1981,52 +1972,24 @@ struct IumrahAccountView: View {
         IumrahBookingStatusVisual.color(for: status)
     }
 
-    private func resetEmailLoginState() {
-        loginEmailChallengeID = ""
-        loginEmailCode = ""
-    }
-
     @MainActor
-    private func startGuestEmailLogin() async {
+    private func login() async {
+        guard !isLoggingIn, guestLoginReady else { return }
         isLoggingIn = true
         loginError = nil
-        loginEmailServerIssue = nil
         defer { isLoggingIn = false }
         do {
-            let response = try await account.startEmailLogin(
-                email: loginEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                locale: settings.language.rawValue
-            )
-            loginEmailChallengeID = response.challengeID
-            loginEmailCode = ""
-            IumrahHaptics.success()
-        } catch {
-            if let issue = serverIssueForEmailLogin(error) {
-                loginEmailServerIssue = issue
+            if loginEmailChallengeID.isEmpty {
+                let response = try await account.startEmailLogin(email: loginEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), locale: settings.language.rawValue)
+                loginEmailChallengeID = response.challengeID
             } else {
-                loginError = smartLoginError(error)
+                let profile = try await account.confirmEmailLogin(challengeID: loginEmailChallengeID, code: loginEmailCode, locale: settings.language.rawValue)
+                await completeAuthenticatedLogin(profile)
+                loginEmailChallengeID = ""; loginEmailCode = ""
             }
-            IumrahHaptics.error()
-        }
-    }
-
-    @MainActor
-    private func confirmGuestEmailLogin() async {
-        guard !loginEmailChallengeID.isEmpty else { return }
-        isLoggingIn = true
-        loginError = nil
-        defer { isLoggingIn = false }
-        do {
-            let profile = try await account.confirmEmailLogin(
-                challengeID: loginEmailChallengeID,
-                code: loginEmailCode,
-                locale: settings.language.rawValue
-            )
-            await completeAuthenticatedLogin(profile)
-            resetEmailLoginState()
             IumrahHaptics.success()
         } catch {
-            loginError = smartLoginError(error)
+            loginError = IumrahAccountSecurityCopy.message(for: error, language: settings.language)
             IumrahHaptics.error()
         }
     }
@@ -2105,6 +2068,8 @@ struct IumrahAccountView: View {
                 locale: settings.language.rawValue
             )
             await completeAuthenticatedLogin(profile)
+            registrationPassword = ""
+            registrationPasswordConfirm = ""
             resetPhoneRegistrationState()
             IumrahHaptics.success()
         } catch {
@@ -2157,6 +2122,8 @@ struct IumrahAccountView: View {
             // push registration and trip restore follow the same path as every login.
             let profile = await account.acceptVerifiedSession(response, locale: settings.language.rawValue)
             await completeAuthenticatedLogin(profile)
+            registrationPassword = ""
+            registrationPasswordConfirm = ""
             registrationEmailCode = ""
             IumrahHaptics.success()
         } catch {

@@ -28,6 +28,8 @@ export type PricingHotelInput = {
 export type GeneratorPricingSnapshot = {
   nuiteeRooms?: import("./nuitee-hotels").NuiteePackageRoom[];
   bookingAllowed?: boolean;
+  supplierMode?: "sandbox" | "production";
+  supplierReservationConfirmed?: boolean;
   quoteId: string;
   pricingVersion: string;
   currency: "USD";
@@ -69,6 +71,7 @@ export type ServerQuoteInput = {
   includeMadinah: boolean;
   travelers: PricingTravelers;
   meals: PricingMeals;
+  hotelMealComponents?: Array<{code:string;label:string;supplierCostUsd:number}>;
   transferVehicle: TransferVehicle;
   includeHaramainTrain: boolean;
   haramainFareClass: "economy" | "business";
@@ -170,9 +173,10 @@ export function calculatePackageQuote(input: ServerQuoteInput): CalculatedPackag
     ? input.madinahHotel.amountUsd * rooms * madinahNights
     : 0;
   const visa = VISA * travelers;
-  const meals = mealCost(input, totalDays, makkahNights, madinahNights);
+  const meals = input.hotelMealComponents ? input.hotelMealComponents.reduce((sum, item) => sum + item.supplierCostUsd, 0) : mealCost(input, totalDays, makkahNights, madinahNights);
   const guide = input.includeMadinah ? ACCOMPANIMENT_WITH_MADINAH : ACCOMPANIMENT_MAKKAH_ONLY;
-  const ziyarat = MAKKAH_ZIYARAT + (input.includeMadinah ? MADINAH_ZIYARAT : 0);
+  const freeZiyarat = input.tier === "economy" || input.tier === "standard";
+  const ziyarat = freeZiyarat ? 0 : MAKKAH_ZIYARAT + (input.includeMadinah ? MADINAH_ZIYARAT : 0);
   const supplierCost = flights + makkahHotelCost + madinahHotelCost + visa + meals + TRANSFER + guide + ziyarat;
   if (!Number.isFinite(supplierCost) || supplierCost <= 0) throw new Error("INVALID_COMPONENTS");
 
@@ -208,13 +212,17 @@ export function calculatePackageQuote(input: ServerQuoteInput): CalculatedPackag
   if (vehicleUpgrade > 0) components.push({ code: "vip_transfer_upgrade", label: "GMC Yukon · VIP upgrade (+$750 public)", supplierCostUsd: 0 });
   if (trainAddOn > 0) components.push({ code: "haramain_train_addon", label: `Поезд Haramain · public add-on +$${money(trainAddOn)}`, supplierCostUsd: 0 });
   components.push({ code: "accompaniment", label: "Сопровождение", supplierCostUsd: guide });
-  components.push({ code: "ziyarat_makkah", label: "Зиярат в Мекке", supplierCostUsd: MAKKAH_ZIYARAT });
-  if (input.includeMadinah) components.push({ code: "ziyarat_madinah", label: "Зиярат в Медине", supplierCostUsd: MADINAH_ZIYARAT });
+  components.push({ code: "ziyarat_makkah", label: "Зиярат в Мекке", supplierCostUsd: freeZiyarat ? 0 : MAKKAH_ZIYARAT });
+  if (input.includeMadinah) components.push({ code: "ziyarat_madinah", label: "Зиярат в Медине", supplierCostUsd: freeZiyarat ? 0 : MADINAH_ZIYARAT });
   components.push({ code: "care", label: "iumrah Care", supplierCostUsd: 0 });
 
+  if (input.hotelMealComponents) {
+    const index = components.findIndex(item => item.code === "meals");
+    components.splice(index, 1, ...input.hotelMealComponents);
+  }
   const snapshot: GeneratorPricingSnapshot = {
     quoteId,
-    pricingVersion: "server-expedia-package-v9",
+    pricingVersion: "server-expedia-package-v10",
     currency: "USD",
     context: {
       tier: input.tier,
@@ -288,7 +296,7 @@ export function calculateStorefrontPreviewQuote(input: StorefrontPreviewQuoteInp
   const meals = input.tier === "economy" || input.tier === "standard"
     ? ECONOMY_STANDARD_MEAL * (nights + 1) * travelers
     : 0;
-  const supplierCost = flights + hotel + visa + meals + TRANSFER + ACCOMPANIMENT_WITH_MADINAH + MAKKAH_ZIYARAT + MADINAH_ZIYARAT;
+  const supplierCost = flights + hotel + visa + meals + TRANSFER + ACCOMPANIMENT_WITH_MADINAH + ((input.tier === "economy" || input.tier === "standard") ? 0 : MAKKAH_ZIYARAT + MADINAH_ZIYARAT);
   if (!Number.isFinite(supplierCost) || supplierCost <= 0) throw new Error("INVALID_STOREFRONT_COMPONENTS");
 
   const markupRate = input.tier === "luxury" ? LUXURY_MARKUP : STANDARD_MARKUP;
@@ -303,4 +311,18 @@ export function calculateStorefrontPreviewQuote(input: StorefrontPreviewQuoteInp
     isEstimated: true as const,
     quoteId: `storefront-server-${crypto.randomUUID().toLowerCase()}`,
   };
+}
+
+// Uses the existing service-engine rates; no client-provided meal amount is accepted.
+export function hotelMealUnit(tier: PackageTier): number {
+  return tier === "luxury" ? LUXURY_OPTIONAL_MEAL : tier === "comfort" ? COMFORT_OPTIONAL_MEAL : ECONOMY_STANDARD_MEAL;
+}
+export type HotelMealChoices = { breakfast: boolean; lunch: boolean; dinner: boolean };
+export function supplierMealInclusions(value: unknown): HotelMealChoices {
+  const board = String(value ?? "").trim().toLowerCase();
+  if (/room only|no meals|without meals|breakfast not included|without breakfast|no breakfast/.test(board)) return {breakfast:false,lunch:false,dinner:false};
+  const full = /^(fb|ai|all inclusive|full board)$/.test(board) || /full board|all.?inclusive/.test(board);
+  const half = /^(hb)$/.test(board) || /half board/.test(board);
+  return {breakfast: full || half || /^(bb|bed and breakfast)$/.test(board) || /breakfast/.test(board),
+    lunch: full, dinner: full || half || /dinner/.test(board)};
 }

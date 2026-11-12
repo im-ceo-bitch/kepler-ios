@@ -11,7 +11,7 @@ assert.match(index, /generatePackageQuote/);
 assert.match(index, /\/api\/package\/quote/);
 assert.match(packageSearch, /calculatePackageQuote/);
 assert.match(packageSearch, /sealPricingSnapshot/);
-assert.match(pricing, /server-expedia-package-v9/);
+assert.match(pricing, /server-expedia-package-v10/);
 assert.match(remote, /"\/api\/package\/quote"/);
 assert.match(remote, /quoteProof/);
 assert.doesNotMatch(localPricing, /enum LocalPackagePricingEngine/);

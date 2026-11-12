@@ -504,6 +504,8 @@ struct NuiteeHotelDetailView: View {
     let sandbox: Bool
     var childrenAges: [Int] = []
     var onSelectRate: ((NuiteeRoomRate) -> Void)? = nil
+    var onSelectMeals: ((HotelMealChoices) -> Void)? = nil
+    @State var selectedMeals = HotelMealChoices()
 
     @State private var detail: NuiteeHotelDetail?
     @State private var rates: [NuiteeRoomRate] = []
@@ -547,7 +549,7 @@ struct NuiteeHotelDetailView: View {
                     if !detail.amenities.isEmpty {
                         sectionTitle(NuiteeCopy.text("Удобства отеля", "Mehmonxona imkoniyatlari", "Hotel amenities", settings.language))
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
-                            ForEach(detail.amenities.prefix(12), id: \.self) { label in
+                            ForEach(detail.amenities, id: \.self) { label in
                                 Label(label, systemImage: "checkmark.circle")
                                     .font(.footnote).frame(maxWidth: .infinity, alignment: .leading)
                             }
@@ -558,7 +560,9 @@ struct NuiteeHotelDetailView: View {
                         Text(detail.description).font(.subheadline)
                     }
                 }
-                staySelector.disabled(onSelectRate != nil)
+                if onSelectRate != nil {
+                    IumrahHotelStaySummary(checkin: checkin, checkout: checkout, nights: nights)
+                } else { staySelector }
                 IumrahPageHelpCard(ratesLoading || !ratesCompleted ? "hotel.loading" : ratesError != nil ? "hotel.rates_error" : rates.isEmpty ? (onSelectRate == nil ? "hotel.no_rates" : "hotel.package_no_rates") : chosenOffer != nil ? "hotel.saved" : "hotel.details")
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language))
                 if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
@@ -706,7 +710,7 @@ struct NuiteeHotelDetailView: View {
     }
 
     private func saveRate(_ rate: NuiteeRoomRate) {
-        if let onSelectRate { onSelectRate(rate); dismiss(); return }
+        if let onSelectRate { onSelectMeals?(selectedMeals); onSelectRate(rate); dismiss(); return }
         NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
             provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
             checkin: dateISO(checkin), checkout: dateISO(checkout), adults: adults,
@@ -736,6 +740,10 @@ struct NuiteeHotelDetailView: View {
             if !rate.mealPlan.isEmpty {
                 Label(rate.mealPlan, systemImage: "fork.knife")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+            if onSelectRate != nil {
+                IumrahHotelMealsEditor(selection: $selectedMeals, stars: hotel.roundedStars,
+                    city: hotel.city, included: rate.supplierMeals)
             }
             cancellationView(rate)
             Text(NuiteeHotelService.usd(rate.price))

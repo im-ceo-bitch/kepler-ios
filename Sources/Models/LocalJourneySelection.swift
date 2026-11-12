@@ -24,6 +24,7 @@ struct LocalJourneyRoom: Codable, Identifiable {
     let checkout: Date
     let adults: Int
     let childrenAges: [Int]
+    var meals: HotelMealChoices? = nil
 }
 
 struct LocalJourneyPriceLine: Identifiable {
@@ -70,8 +71,12 @@ extension LocalJourneyRoom {
     var bookingSelection: BookingNuiteeRoomSelection {
         let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+        let included = rate.supplierMeals
+        let chosen = meals ?? HotelMealChoices()
+        let effective = HotelMealChoices(breakfast: included.breakfast || hotel.roundedStars >= 4 || chosen.breakfast,
+            lunch: city == "makkah" && (included.lunch || chosen.lunch), dinner: included.dinner || chosen.dinner)
         return .init(id:id, city:city, hotelId:hotel.id, offerId:rate.offerId, roomId:rate.roomId,
-                     checkin:f.string(from:checkin), checkout:f.string(from:checkout), adults:adults, children:childrenAges)
+                     checkin:f.string(from:checkin), checkout:f.string(from:checkout), adults:adults, children:childrenAges, meals:effective)
     }
     var bookingHotel: HotelSummary {
         HotelSummary(id:hotel.id, name:hotel.name, city:city == "madinah" ? "Madinah" : "Makkah",
@@ -111,7 +116,7 @@ extension JourneyStore {
                 localJourneyRooms[key] = LocalJourneyRoom(
                     id: room.id, city: room.city, hotel: room.hotel, rate: current,
                     checkin: room.checkin, checkout: room.checkout, adults: room.adults,
-                    childrenAges: room.childrenAges)
+                    childrenAges: room.childrenAges, meals: room.meals)
             } catch {
                 // A provider error is not proof of availability or of price.
                 if localJourneyRooms[key]?.rate.offerId == room.rate.offerId {
@@ -137,5 +142,22 @@ enum ConfiguratorBookingCopy {
             values = ["Не удалось подтвердить выбранные номера. Проверьте даты и гостей, затем повторите расчёт или выберите номера заново.", "Could not confirm the selected rooms. Check dates and guests, then retry pricing or select rooms again.", "Tanlangan xonalar tasdiqlanmadi. Sanalar va mehmonlarni tekshirib, narxni qayta hisoblang yoki xonalarni qayta tanlang.", "Танланган хоналар тасдиқланмади. Саналар ва меҳмонларни текшириб, нархни қайта ҳисобланг ёки хоналарни қайта танланг."]
         } else { return code }
         switch language { case .russian: return values[0]; case .uzbek: return values[2]; case .uzbekCyrillic: return values[3]; default: return values[1] }
+    }
+}
+
+struct HotelMealChoices: Codable, Hashable {
+    var breakfast = false
+    var lunch = false
+    var dinner = false
+}
+extension NuiteeRoomRate {
+    var supplierMeals: HotelMealChoices {
+        if let includedMeals { return includedMeals }
+        let board = mealPlan.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if ["room only", "no meals", "without meals", "breakfast not included", "without breakfast", "no breakfast"].contains(where: { board.contains($0) }) { return HotelMealChoices() }
+        let full = ["fb", "ai"].contains(board) || board.contains("full board") || board.contains("all inclusive")
+        let half = board == "hb" || board.contains("half board")
+        return HotelMealChoices(breakfast: full || half || board == "bb" || board.contains("breakfast"),
+            lunch: full, dinner: full || half || board.contains("dinner"))
     }
 }

@@ -42,35 +42,22 @@ struct BookingsHomeView: View {
         activeSessions.first
     }
 
-    // Keep the costly booking, status and itinerary trees out of the root
-    // generic type. This prevents SwiftUI's type checker from expanding the
-    // entire booking tab (including navigation destinations) as one expression.
-    private var bookingScrollRoot: AnyView {
-        AnyView(
-            IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, header: {
-                AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
-            }, content: {
-                AnyView(bookingTabContent)
-            })
-        )
-    }
-
     private var bookingTabContent: some View {
         VStack(spacing: 12) {
             IumrahPageHelpCard(activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : "bookings.schedule")
-                .padding(.horizontal, IumrahDesign.pagePadding)
-                .padding(.top, 12)
-            if let activeSession {
-                AnyView(activeBookingHub(activeSession))
-            } else {
-                AnyView(emptyBookingHome)
-            }
+                .padding(.horizontal, IumrahDesign.pagePadding).padding(.top, 12)
+            if let activeSession { AnyView(activeBookingHub(activeSession)) }
+            else { AnyView(emptyBookingHome) }
         }
     }
-
+    private var bookingScrollRoot: AnyView {
+        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, header: {
+            AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
+        }, content: { AnyView(bookingTabContent) })
+        .modifier(IumrahPrimaryTabScrollChrome()))
+    }
     var body: some View {
         bookingScrollRoot
-        .modifier(IumrahPrimaryTabScrollChrome())
         .task {
             await bookings.refreshAll()
             await loadActiveCheckout()
@@ -134,6 +121,37 @@ struct BookingsHomeView: View {
 
     // MARK: - Active booking
 
+    private func bookingPanelContent(_ session: StoredBookingSession) -> AnyView {
+        switch bookingPanel {
+        case .booking: return AnyView(bookingProgress(session).padding(.bottom, 38))
+        case .status: return AnyView(bookingStatusPanel(session))
+        case .schedule: return AnyView(BookingItineraryCalendarView(bookingID: session.id,
+            startDate: session.booking.input.startDate, endDate: session.booking.input.endDate,
+            booking: session.booking, presentation: .fullScreen).padding(.bottom, 28))
+        }
+    }
+    private func bookingStatusPanel(_ session: StoredBookingSession) -> some View {
+        VStack(spacing: 0) {
+
+                    bookingTimerOverview(session)
+                        .padding(.bottom, 28)
+
+                    bookingFulfillmentCenter(session, checkout: activeCheckout)
+                        .padding(.bottom, 34)
+
+                    if shouldShowTravelReadyFlights(session) {
+                        bookingStatusFlights(session)
+                            .padding(.bottom, 34)
+                    }
+
+                    tripPlanPreview(session)
+                        .padding(.bottom, 34)
+
+                    tripManagement(session)
+                        .padding(.bottom, activeSessions.count > 1 ? 36 : 12)
+                        }
+    }
+
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 0) {
             LazyVStack(spacing: 0) {
@@ -173,44 +191,6 @@ struct BookingsHomeView: View {
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .animation(.snappy(duration: 0.34), value: session.effectiveStatus)
-    }
-
-    // Only the selected panel is constructed. Non-selected panels can contain
-    // elaborate SwiftUI controls without complicating tab navigation.
-    private func bookingPanelContent(_ session: StoredBookingSession) -> AnyView {
-        switch bookingPanel {
-        case .booking:
-            return AnyView(bookingProgress(session).padding(.bottom, 38))
-        case .status:
-            return AnyView(bookingStatusPanel(session))
-        case .schedule:
-            return AnyView(
-                BookingItineraryCalendarView(
-                    bookingID: session.id,
-                    startDate: session.booking.input.startDate,
-                    endDate: session.booking.input.endDate,
-                    booking: session.booking,
-                    presentation: .fullScreen
-                ).padding(.bottom, 28)
-            )
-        }
-    }
-
-    private func bookingStatusPanel(_ session: StoredBookingSession) -> some View {
-        VStack(spacing: 0) {
-            bookingTimerOverview(session)
-                .padding(.bottom, 28)
-            bookingFulfillmentCenter(session, checkout: activeCheckout)
-                .padding(.bottom, 34)
-            if shouldShowTravelReadyFlights(session) {
-                bookingStatusFlights(session)
-                    .padding(.bottom, 34)
-            }
-            tripPlanPreview(session)
-                .padding(.bottom, 34)
-            tripManagement(session)
-                .padding(.bottom, activeSessions.count > 1 ? 36 : 12)
-        }
     }
 
     /// The top deliberately avoids another large card. Like the reference flow,

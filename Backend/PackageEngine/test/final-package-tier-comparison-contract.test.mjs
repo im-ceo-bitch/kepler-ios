@@ -56,19 +56,14 @@ test("comparison recomputes hotel room nights but does not silently add Luxury Y
   assert.match(pricing, /input\.tier === "luxury" \? LUXURY_MARKUP : STANDARD_MARKUP/);
 });
 
-test("current package review preserves server pricing, flight detail and an explicit booking action", () => {
-  // Package-tier comparisons still have their own price-policy tests above;
-  // the current checkout intentionally uses a single server-confirmed journey
-  // instead of the old carousel and routes local journeys through a wrapper.
-  assert.match(finalPackage, /if journey\.usesLocalJourney \{ LocalJourneyReviewView\(\) \}/);
-  assert.match(finalPackage, /LegacyFinalPackageView\(familyFlow: familyFlow\)/);
-  assert.match(finalPackage, /IumrahJourneyHeader\(showsNotifications: true\)/);
-  assert.match(finalPackage, /PackageFlightLegDetailCard\(leg: flightLeg\(outbound\)/);
-  assert.match(finalPackage, /PackageFlightLegDetailCard\(leg: flightLeg\(inbound\)/);
-  assert.match(finalPackage, /PackageHotelDetailCard\(/);
-  assert.match(finalPackage, /journey\.hasFinalGeneratorQuote/);
-  assert.match(finalPackage, /journey\.quote\?\.bookingAllowed != false/);
-  assert.match(finalPackage, /Text\(totalText\)/);
-  assert.match(finalPackage, /Text\(tr\("Забронировать поездку"/);
-  assert.match(finalPackage, /\.disabled\(!canBook \|\| isSubmitting\)/);
+test("selected-package review shows authoritative totals and explicit editing before OTP", () => {
+  assert.match(finalPackage, /IumrahBookingConfirmationView/);
+  assert.match(finalPackage, /journey.hasFinalGeneratorQuote/);
+  assert.match(finalPackage, /Изменить номер/);
+  assert.match(finalPackage, /localHotelForDetails = room/);
+  assert.match(finalPackage, /IumrahHotelMealsEditor/);
+  assert.match(finalPackage, /await journey.buildQuote/);
+  assert.match(finalPackage, /fresh.totalPackagePrice == acceptedTotal/);
+  assert.match(finalPackage, /bookings.create/);
+  assert.match(finalPackage, /bookingBlockedReason/);
 });

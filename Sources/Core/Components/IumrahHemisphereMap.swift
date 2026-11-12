@@ -86,18 +86,19 @@ private struct IumrahHemisphereSurface: View {
             let lightY = 0.29 + 0.08 * cos(phase)
             let breath = (1 + cos(phase - .pi / 3)) * 0.5
             let center = UnitPoint(x: lightX, y: lightY)
-            let oceanBright = dark ? 0.13 + 0.07 * intensity * breath : 0.95 - 0.04 * intensity * breath
-            let landBright = dark ? 0.42 + 0.20 * intensity * breath : 0.53 - 0.16 * intensity * breath
+            let oceanBright = dark ? 0.075 + 0.025 * intensity * breath : 0.97 - 0.02 * intensity * breath
+            let landBright = dark ? 0.72 + 0.18 * intensity * breath : 0.48 - 0.16 * intensity * breath
             let oceanDim = dark ? 0.045 : 0.98
-            let landDim = dark ? 0.15 : 0.80
+            let landDim = dark ? 0.25 : 0.70
             let oceanLight = RadialGradient(colors: [gray(oceanBright), gray(oceanDim)],
                                             center: center, startRadius: 0, endRadius: diameter * 0.84)
             let landLight = RadialGradient(colors: [gray(landBright), gray((landBright + landDim) / 2), gray(landDim)],
                                            center: center, startRadius: 0, endRadius: diameter * 0.78)
             ZStack {
                 Circle().fill(oceanLight)
-                IumrahHemisphereLandShape(unitPath: land)
-                    .fill(landLight, style: FillStyle(eoFill: false, antialiased: true))
+                IumrahHemisphereDotShape()
+                    .fill(landLight)
+                    .mask(IumrahHemisphereLandShape(unitPath: land).fill(.white))
                 Circle()
                     .fill(RadialGradient(stops: [
                         .init(color: .clear, location: 0.55),
@@ -109,6 +110,29 @@ private struct IumrahHemisphereSurface: View {
             // Render as a single native composited layer to avoid triangle seams.
             .drawingGroup()
         }
+    }
+}
+
+/// A single cached vector path; no individual SwiftUI views for the dots.
+private struct IumrahHemisphereDotShape: Shape {
+    private static let unit: Path = {
+        var path = Path()
+        let count = 144
+        let step = 1.0 / Double(count)
+        for row in 0..<count {
+            for col in 0..<count {
+                let x = (Double(col) + 0.5 + (row.isMultiple(of: 2) ? 0 : 0.5)) * step
+                let y = (Double(row) + 0.5) * step
+                let radiusSquared = (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5)
+                guard radiusSquared < 0.248 else { continue }
+                let radius = step * (0.22 + 0.14 * sqrt(max(0, 1 - radiusSquared * 4)))
+                path.addEllipse(in: CGRect(x: x-radius, y: y-radius, width: radius*2, height: radius*2))
+            }
+        }
+        return path
+    }()
+    func path(in rect: CGRect) -> Path {
+        Self.unit.applying(CGAffineTransform(a: rect.width, b: 0, c: 0, d: rect.height, tx: rect.minX, ty: rect.minY))
     }
 }
 

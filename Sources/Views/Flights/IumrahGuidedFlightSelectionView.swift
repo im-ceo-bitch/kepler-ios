@@ -763,18 +763,12 @@ private struct IumrahGuidedFlightDetailView: View {
                 }
                 Text(tr("Окончательный тариф, багаж и наличие мест подтверждаются перед оплатой.", "Final fare, baggage and availability are confirmed before payment.", "Yakuniy tarif, bagaj va joylar to‘lovdan oldin tasdiqlanadi.", "Якуний тариф, багаж ва жойлар тўловдан олдин тасдиқланади."))
                     .font(IumrahType.regular(13)).foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.bottom, IumrahDesign.pagePadding)
-        }
-        .background(IumrahFlightPalette.page)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 10) {
                 if let price = choice.price {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(tr("Ориентир за пассажира", "Indicative fare per traveler", "Bir yo‘lovchi uchun taxminiy narx", "Бир йўловчи учун тахминий нарх")).font(IumrahType.regular(12)).foregroundStyle(.secondary)
-                            Text(price.formatted(.currency(code: "USD"))).font(IumrahType.bold(28, relativeTo: .title))
+                            Text("$" + price.formatted(.number.precision(.fractionLength(0...2)))).font(IumrahType.bold(28, relativeTo: .title))
                         }
                         Spacer()
                     }
@@ -789,8 +783,12 @@ private struct IumrahGuidedFlightDetailView: View {
                             .font(IumrahType.bold(14)).frame(maxWidth: .infinity).frame(height: 42)
                     }.buttonStyle(IumrahSecondaryButtonStyle())
                 }
-            }.padding(.horizontal, IumrahDesign.pagePadding).padding(.vertical, 10).background(.regularMaterial)
+            }.padding(.vertical, 10)
+            }
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.bottom, IumrahDesign.pagePadding)
         }
+        .background(IumrahFlightPalette.page)
         .toolbar(.visible, for: .navigationBar)
         .navigationBarBackButtonHidden(false)
         .navigationTitle(choice.airlineName)

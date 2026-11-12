@@ -435,7 +435,7 @@ final class HotelStorefrontStore: ObservableObject {
     }
 
     func shareURL(for hotel: HotelSummary) -> URL {
-        AppConfig.apiBaseURL.appendingPathComponent("h").appendingPathComponent(HotelStorefrontService.publicHotelToken(hotel.id))
+        AppConfig.publicWebBaseURL.appendingPathComponent("h").appendingPathComponent(HotelStorefrontService.publicHotelToken(hotel.id))
     }
 
     /// Hotel catalogue, Flight First and Hotel First are independent server reads.

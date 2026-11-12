@@ -63,7 +63,7 @@ struct IumrahFlightResultCard: View {
                                 .font(.system(size: 16, weight: .medium)).foregroundStyle(.primary)
                         }.frame(height: 26).accessibilityHidden(true)
                         if stops >= 0 {
-                            Text(stops == 0 ? tr("Без пересадок", "Non-stop", "Transfersiz", "Трансферсиз") : tr("Пересадок: \(stops)", "Stops: \(stops)", "Transfer: \(stops)", "Трансфер: \(stops)"))
+                            Text(stops == 0 ? tr("Прямой", "Direct", "To‘g‘ri", "Тўғри") : tr("Пересадок: \(stops)", "Stops: \(stops)", "Transfer: \(stops)", "Трансфер: \(stops)"))
                                 .font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center)
                         }
                     }.frame(maxWidth: .infinity).padding(.top, 2)
@@ -73,12 +73,12 @@ struct IumrahFlightResultCard: View {
                 HStack(alignment: .center, spacing: 8) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(isAviasales ? "Aviasales" : "iumrah Direct")
-                            .font(IumrahType.bold(11)).foregroundStyle(.secondary)
+                            .font(IumrahType.regular(9, relativeTo: .caption2)).foregroundStyle(.secondary)
                         if usablePrice != nil { Text(tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун")).font(IumrahType.regular(11)).foregroundStyle(.secondary) }
                     }
                     Spacer(minLength: 6)
                     if let price = usablePrice {
-                        Text(price.formatted(.currency(code: "USD").precision(.fractionLength(0)))).font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit()
+                        Text("$" + price.formatted(.number.precision(.fractionLength(0)))).font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit()
                     } else {
                         Text(tr("Подробнее", "Details", "Batafsil", "Батафсил")).font(IumrahType.bold(15))
                     }
@@ -207,7 +207,7 @@ struct IumrahFlightSearchControls: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     Button { filters.directOnly.toggle() } label: {
-                        Text(tr("Без пересадок", "Non-stop", "Transfersiz", "Трансферсиз"))
+                        Text(tr("Прямой", "Direct", "To‘g‘ri", "Тўғри"))
                             .foregroundStyle(filters.directOnly ? Color.iumrahPrimaryButtonText : Color.primary)
                             .padding(.horizontal, 14).padding(.vertical, 10)
                             .background(filters.directOnly ? Color.iumrahPrimaryButtonBackground : IumrahFlightPalette.card, in: Capsule())

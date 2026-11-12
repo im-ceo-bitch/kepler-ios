@@ -3148,6 +3148,7 @@ private struct FlightDiscoveryOfferDetailView: View {
                 if activeOffer.transfers > 0 || (hasReturn && (activeOffer.returnTransfers ?? 0) > 0) { connectingFlightsNote }
                 monitoringCard
                 warningCard
+                purchaseBar
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
@@ -3160,7 +3161,6 @@ private struct FlightDiscoveryOfferDetailView: View {
         .navigationBarBackButtonHidden(false)
         .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: shareText) { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
         .iumrahFlightDetailChrome()
-        .safeAreaInset(edge: .bottom, spacing: 0) { purchaseBar }
         .task {
             await refreshCurrentFare()
         }
@@ -3382,7 +3382,7 @@ private struct FlightDiscoveryOfferDetailView: View {
                         .font(IumrahType.bold(14)).frame(maxWidth: .infinity).frame(height: 44)
                 }.buttonStyle(IumrahSecondaryButtonStyle()).disabled(cartAnimationVisible)
             }
-        }.padding(.horizontal, IumrahDesign.pagePadding).padding(.vertical, 10).background(.regularMaterial)
+        }.padding(.vertical, 10)
     }
 
     private var outboundCard: some View {

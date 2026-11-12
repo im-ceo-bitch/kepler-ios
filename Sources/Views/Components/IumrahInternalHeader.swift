@@ -436,7 +436,7 @@ struct IumrahGeneratorHeader: View {
 /// Keeps UINavigationController's native edge-swipe pop gesture available even
 /// though generator screens hide the stock navigation bar in favor of the
 /// in-content generator header above.
-private struct GeneratorInteractivePopRestorer: UIViewControllerRepresentable {
+struct GeneratorInteractivePopRestorer: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> Controller {
         Controller()
     }

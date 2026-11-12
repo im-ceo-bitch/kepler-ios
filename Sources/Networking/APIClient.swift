@@ -43,7 +43,7 @@ actor APIClient {
         configuration.timeoutIntervalForRequest = longRunning ? 604800 : 25
         configuration.timeoutIntervalForResource = longRunning ? 604800 : 60
         configuration.waitsForConnectivity = true
-        session = URLSession(configuration: configuration)
+        session = URLSession(configuration: configuration, delegate: IumrahAPIOriginDelegate(), delegateQueue: nil)
         decoder = JSONDecoder()
         encoder = JSONEncoder()
     }
@@ -54,7 +54,7 @@ actor APIClient {
         headers: [String: String] = [:],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> T {
-        let url = AppConfig.apiBaseURL.appending(path: path)
+        guard let url = AppConfig.apiURL(path) else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         if let timeoutInterval { request.timeoutInterval = timeoutInterval }
@@ -74,11 +74,7 @@ actor APIClient {
         headers: [String: String] = [:],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> T {
-        guard var components = URLComponents(url: AppConfig.apiBaseURL.appending(path: path), resolvingAgainstBaseURL: false) else {
-            throw APIError.invalidResponse
-        }
-        if !query.isEmpty { components.queryItems = query }
-        guard let url = components.url else { throw APIError.invalidResponse }
+        guard let url = AppConfig.apiURL(path, query: query) else { throw APIError.invalidResponse }
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -97,7 +93,7 @@ actor APIClient {
         headers: [String: String] = [:],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> T {
-        let url = AppConfig.apiBaseURL.appending(path: path)
+        guard let url = AppConfig.apiURL(path) else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         if let timeoutInterval { request.timeoutInterval = timeoutInterval }
@@ -116,7 +112,7 @@ actor APIClient {
         headers: [String: String] = [:],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> T {
-        let url = AppConfig.apiBaseURL.appending(path: path)
+        guard let url = AppConfig.apiURL(path) else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         if let timeoutInterval { request.timeoutInterval = timeoutInterval }
@@ -137,7 +133,7 @@ actor APIClient {
         headers: [String: String] = [:],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> T {
-        let url = AppConfig.apiBaseURL.appending(path: path)
+        guard let url = AppConfig.apiURL(path) else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         if let timeoutInterval { request.timeoutInterval = timeoutInterval }
@@ -155,12 +151,7 @@ actor APIClient {
         headers: [String: String] = [:],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> Data {
-        let url: URL
-        if let direct = URL(string: path), direct.scheme != nil {
-            url = direct
-        } else {
-            url = AppConfig.apiBaseURL.appending(path: path)
-        }
+        guard let url = AppConfig.apiURL(path) else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         if let timeoutInterval { request.timeoutInterval = timeoutInterval }
@@ -185,7 +176,7 @@ actor APIClient {
         headers: [String: String] = [:],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> T {
-        let url = AppConfig.apiBaseURL.appending(path: path)
+        guard let url = AppConfig.apiURL(path) else { throw APIError.invalidResponse }
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         if let timeoutInterval { request.timeoutInterval = timeoutInterval }

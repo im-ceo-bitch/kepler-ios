@@ -23,8 +23,8 @@ final class IgnavFlightInventoryProvider: FlightInventoryProviding {
     private let session: URLSession
     private let maxConcurrentDatePairs = 3
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(session: URLSession? = nil) {
+        self.session = session ?? URLSession(configuration: .ephemeral, delegate: IumrahAPIOriginDelegate(), delegateQueue: nil)
     }
 
     func searchJourney(
@@ -77,7 +77,7 @@ final class IgnavFlightInventoryProvider: FlightInventoryProviding {
         request: FlightJourneySearchRequest,
         pair: FlightJourneyDatePair
     ) async throws -> [LiveFlightJourneyCandidate] {
-        let url = AppConfig.apiBaseURL.appending(path: "api/package/flights/search")
+        guard let url = AppConfig.apiURL("/api/package/flights/search") else { throw IgnavFlightProviderError.invalidRequest }
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.timeoutInterval = 32

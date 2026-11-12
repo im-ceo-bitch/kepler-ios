@@ -12,7 +12,7 @@ actor IumrahIntelligence {
     static let enabledKey = "iumrah.intelligence.enabled"
     private static let visitorKey = "iumrah.intelligence.visitor.v1"
     private static let pendingKey = "iumrah.intelligence.pending.v1"
-    private static let endpoint = URL(string: "https://iumrah-backend.helloiumrah.workers.dev/api/catalog/hotels/intelligence/events")!
+    private static let endpoint = AppConfig.apiURL("/api/catalog/hotels/intelligence/events")!
     private static let maxPending = 150
 
     private struct Event: Codable {
@@ -67,7 +67,7 @@ actor IumrahIntelligence {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 12
         configuration.timeoutIntervalForResource = 18
-        session = URLSession(configuration: configuration)
+        session = URLSession(configuration: configuration, delegate: IumrahAPIOriginDelegate(), delegateQueue: nil)
     }
 
     func start(initialScreen: String) {

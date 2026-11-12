@@ -370,11 +370,6 @@ struct IumrahOTAFlightDetailPage: View {
                     Text(t("Ориентировочный тариф · ", "Indicative fare · ", "Taxminiy tarif · ", "Тахминий тариф · ") + IumrahOTAText.price(price)).font(IumrahType.bold(18))
                 }
                 Text(t("Перед оплатой подтверждаются цена, багаж и наличие мест.", "Final fare, baggage and availability are confirmed before payment.", "Narx, bagaj va joylar to‘lovdan oldin tasdiqlanadi.", "Нарх, багаж ва жойлар тўловдан олдин тасдиқланади.")).font(IumrahType.regular(13)).foregroundStyle(.secondary)
-            }.padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.bottom, IumrahDesign.pagePadding)
-        }
-        .background(IumrahFlightPalette.page)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
             if onChoose != nil || externalURL != nil {
                 VStack(spacing: 10) {
                     if let onChoose {
@@ -387,9 +382,12 @@ struct IumrahOTAFlightDetailPage: View {
                             Text(t("Проверить на Aviasales", "Check on Aviasales", "Aviasales’da tekshirish", "Aviasales’да текшириш")).font(IumrahType.bold(14)).frame(maxWidth: .infinity).frame(height: 44)
                         }.buttonStyle(IumrahSecondaryButtonStyle())
                     }
-                }.padding(.horizontal, IumrahDesign.pagePadding).padding(.vertical, 10).background(.regularMaterial)
+                }.padding(.vertical, 10)
             }
+            }.padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.bottom, IumrahDesign.pagePadding)
         }
+        .background(IumrahFlightPalette.page)
         .navigationTitle(flight.airline)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)

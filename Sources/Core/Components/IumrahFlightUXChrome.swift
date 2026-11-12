@@ -158,14 +158,8 @@ struct IumrahJourneyHeader<Summary: View>: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(alignment: .center, spacing: 12) {
                         Text(heading.origin).font(IumrahType.bold(36, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.7)
-                        VStack(spacing: 4) {
-                            Image(systemName: "airplane").font(.system(size: 19, weight: .medium))
-                            HStack(spacing: 0) {
-                                Circle().frame(width: 5, height: 5)
-                                Rectangle().frame(height: 1)
-                                Circle().frame(width: 5, height: 5)
-                            }.foregroundStyle(.white.opacity(0.65))
-                        }.frame(maxWidth: .infinity)
+                        Image(systemName: "airplane").font(.system(size: 22, weight: .medium))
+                            .frame(maxWidth: .infinity).accessibilityHidden(true)
                         Text(heading.destination).font(IumrahType.bold(36, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.7)
                     }.accessibilityElement(children: .combine)
                     Text(heading.title).font(IumrahType.bold(23, relativeTo: .title2))

@@ -190,7 +190,7 @@ enum IumrahPackageShareFactory {
     }
 
     private static func packageLink(_ payload: IumrahPackageSharePayload) -> URL {
-        AppConfig.apiBaseURL
+        AppConfig.publicWebBaseURL
             .appendingPathComponent("flights")
             .appendingPathComponent("package")
             .appendingPathComponent(payload.packageID)

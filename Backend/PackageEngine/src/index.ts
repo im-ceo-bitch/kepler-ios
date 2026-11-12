@@ -22,6 +22,7 @@ import { createCarePackageRequest, listCarePackageRequests, updateCarePackageReq
 import { createTelegramBookingLink, getTelegramBookingStatus } from "./telegram-bridge";
 import { getBookingItineraryPlan } from "./itinerary-planner";
 import { handleNuiteeHotelRequest, refreshNuiteeHotelCatalog } from "./nuitee-hotels";
+import { runPackageSchedule } from "./package-schedule";
 
 function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -337,11 +338,14 @@ export default {
     return json({ ok: false, error: "Not found" }, 404);
   },
 
-  async scheduled(controller: { cron?: string }, env: Env): Promise<void> {
-    if (controller.cron === "0 3 * * *") await refreshNuiteeHotelCatalog(env);
-    if (controller.cron === "23 * * * *") await refreshNuiteeHotelCatalog(env, false);
-    if (!env.HOTELS_DB) return;
-    if (controller.cron === "17 0 * * *") await cleanupExpiredFlightCache(env.HOTELS_DB);
-    if (controller.cron === "*/5 * * * *") await flushBookingStatusEmails(env);
+  async scheduled(controller: { cron?: string; scheduledTime: number }, env: Env): Promise<void> {
+    await runPackageSchedule(controller, {
+      flushBookingEmails: () => flushBookingStatusEmails(env),
+      refreshHotelCatalog: () => refreshNuiteeHotelCatalog(env, false),
+      refreshHotelPrices: () => refreshNuiteeHotelCatalog(env, true),
+      cleanupFlightCache: async () => {
+        if (env.HOTELS_DB) await cleanupExpiredFlightCache(env.HOTELS_DB);
+      },
+    });
   },
 };

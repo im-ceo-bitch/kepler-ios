@@ -3426,13 +3426,15 @@ struct PackageFlightLegDetailCard: View {
             HStack(spacing: 10) {
                 NavigationLink {
                     ScrollView(showsIndicators: false) {
-                        IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language)
-                            .padding(IumrahDesign.pagePadding)
+                        IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language, pageHeroInset: IumrahDesign.pagePadding)
+                            .padding(.horizontal, IumrahDesign.pagePadding)
+                            .padding(.bottom, IumrahDesign.pagePadding)
                     }
-                    .background(Color.iumrahPageBackground)
+                    .background(IumrahFlightPalette.page)
                     .iumrahInternalNavigation()
                     .navigationTitle(leg.airline)
-                    .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: IumrahPremiumFlightLeg(leg).share) { Image(systemName: "square.and.arrow.up") } } }
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: IumrahPremiumFlightLeg(leg).share) { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+                    .iumrahFlightDetailChrome()
                 } label: {
                     HStack(spacing: 14) {
                         AirlineLogoView(airlineCode: leg.airlineCode, size: 50)

@@ -1,10 +1,15 @@
 import SwiftUI
+import UIKit
 
 /// Shared native hero and airport / aircraft sections. Used by search, package
 /// selection and booked-flight details. No invented fare or telemetry fields.
 struct IumrahPremiumFlightDetail: View {
     let leg: IumrahPremiumFlightLeg
     let language: AppSettingsStore.Language
+    /// Outer page gutter to cancel for the first segment only; embedded legs stay cards.
+    var pageHeroInset: CGFloat? = nil
+    @State private var globeExpanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var details: IumrahFlightOperationalDetail?
     @State private var from: Airport?
     @State private var to: Airport?
@@ -14,7 +19,7 @@ struct IumrahPremiumFlightDetail: View {
     private func t(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         switch language { case .russian: return ru; case .uzbek: return uz; case .uzbekCyrillic: return cy; default: return en }
     }
-    private let graphite = Color(white: 0.065)
+    private let graphite = IumrahFlightPalette.hero
     private var live: Bool { ["EnRoute", "Approaching", "Departed"].contains(details?.status ?? "") }
     private var livePosition: IumrahFlightOperationalDetail.Position? {
         guard live, let p = details?.position, let date = IumrahPremiumFlightLeg.instant(p.reportedAt), Date().timeIntervalSince(date) < 900, Date().timeIntervalSince(date) > -60 else { return nil }
@@ -60,6 +65,7 @@ struct IumrahPremiumFlightDetail: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if live { TimelineView(.periodic(from: .now, by: 60)) { _ in hero } } else { hero }
+            if live { TimelineView(.periodic(from: .now, by: 60)) { _ in if let p = livePosition { liveMetrics(p).iumrahFlightCard() } } }
             airportSection
             if clean(details?.aircraft ?? leg.aircraft) != nil || clean(details?.registration) != nil || clean(leg.cabin) != nil || clean(leg.operatingCarrier) != nil { aircraftSection }
             if details != nil {
@@ -75,31 +81,64 @@ struct IumrahPremiumFlightDetail: View {
         .task(id: leg) { await load() }
     }
     private var hero: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                if !leg.airlineCode.isEmpty { AirlineLogoView(airlineCode: leg.airlineCode, size: 39) }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(leg.title).font(IumrahType.regular(14)).foregroundStyle(.white.opacity(0.72))
-                    if let number = leg.verifiedNumber, leg.stops == 0 { Text(number).font(IumrahType.bold(29, relativeTo: .title)).foregroundStyle(.white) }
+        VStack(spacing: 0) {
+            ZStack(alignment: .bottom) {
+                globe
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .center, spacing: 10) {
+                        if let number = leg.verifiedNumber, leg.stops == 0 {
+                            Text(number).font(IumrahType.bold(28, relativeTo: .title)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.75)
+                        } else {
+                            Text(leg.title).font(IumrahType.bold(20)).foregroundStyle(.white).lineLimit(2)
+                        }
+                        Spacer(minLength: 8)
+                        if let status { Text(status).font(IumrahType.bold(12, relativeTo: .caption)).foregroundStyle(statusColor).multilineTextAlignment(.trailing) }
+                    }
+                    HStack(alignment: .top, spacing: 8) {
+                        endpoint(leg.origin, raw: leg.departure, trailing: false)
+                        VStack(spacing: 4) {
+                            Image(systemName: leg.stops == 0 ? "airplane" : "arrow.triangle.branch")
+                                .font(.system(size: 19, weight: .medium)).foregroundStyle(livePosition == nil ? Color.white : Color.green)
+                            HStack(spacing: 0) {
+                                Circle().fill(Color.white.opacity(0.8)).frame(width: 4, height: 4)
+                                GeometryReader { proxy in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle().fill(Color.white.opacity(0.58))
+                                        if let route, let progress = route.progressIndex, route.livePoint != nil {
+                                            Rectangle().fill(Color.green).frame(width: proxy.size.width * CGFloat(progress) / CGFloat(max(1, route.points.count - 1)))
+                                        }
+                                    }
+                                }.frame(height: 1)
+                                Circle().fill(Color.white.opacity(0.8)).frame(width: 4, height: 4)
+                            }
+                            if leg.effectiveDuration > 0 { Text(durationText(leg.effectiveDuration)).font(IumrahType.regular(11, relativeTo: .caption)).foregroundStyle(.white.opacity(0.8)).lineLimit(2).multilineTextAlignment(.center) }
+                        }.padding(.top, 5).frame(maxWidth: .infinity)
+                        endpoint(leg.destination, raw: arrivalDisplay, trailing: true, estimated: arrivalEstimated)
+                    }
+                    if leg.stops >= 0 { Text(leg.stops == 0 ? t("Прямой рейс", "Non-stop", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри") : t("Пересадок: \(leg.stops)", "Stops: \(leg.stops)", "Ulanish: \(leg.stops)", "Уланиш: \(leg.stops)")).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.white.opacity(0.78)).frame(maxWidth: .infinity) }
+                    Color.clear.frame(height: globeExpanded ? 296 : 10).accessibilityHidden(true)
                 }
-                Spacer(minLength: 0)
-                if let status { Text(status).font(IumrahType.bold(12, relativeTo: .caption)).foregroundStyle(statusColor).multilineTextAlignment(.trailing) }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
             }
-            HStack(alignment: .top, spacing: 10) {
-                endpoint(leg.origin, city: city(leg.origin, airport: from ?? bundled(leg.origin)), raw: leg.departure, trailing: false)
-                VStack(spacing: 7) {
-                    Image(systemName: leg.stops == 0 ? "airplane" : "arrow.triangle.branch").font(.system(size: 18, weight: .medium)).foregroundStyle(.white.opacity(0.75))
-                    if leg.effectiveDuration > 0 { Text(durationText(leg.effectiveDuration)).font(IumrahType.regular(11, relativeTo: .caption)).foregroundStyle(.white.opacity(0.75)).multilineTextAlignment(.center) }
-                }.padding(.top, 12).frame(maxWidth: .infinity)
-                endpoint(leg.destination, city: city(leg.destination, airport: to ?? bundled(leg.destination)), raw: arrivalDisplay, trailing: true, estimated: arrivalEstimated)
+            Button {
+                withAnimation(reduceMotion ? nil : .spring(response: 0.48, dampingFraction: 0.86)) { globeExpanded.toggle() }
+                IumrahHaptics.soft()
+            } label: {
+                Image(systemName: globeExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 54, height: 44)
+                    .contentShape(Rectangle())
             }
-            if leg.stops >= 0 { Text(leg.stops == 0 ? t("Прямой рейс", "Non-stop", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри") : t("Пересадок: \(leg.stops)", "Stops: \(leg.stops)", "Ulanish: \(leg.stops)", "Уланиш: \(leg.stops)")).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.white.opacity(0.68)).frame(maxWidth: .infinity) }
-            globe
-            if let p = livePosition { liveMetrics(p) }
+            .buttonStyle(.plain)
+            .accessibilityLabel(globeExpanded ? t("Свернуть глобус", "Collapse globe", "Globusni yig‘ish", "Глобусни йиғиш") : t("Раскрыть глобус", "Expand globe", "Globusni ochish", "Глобусни очиш"))
+            .frame(maxWidth: .infinity)
         }
-        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(graphite, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(graphite)
+        .clipShape(RoundedRectangle(cornerRadius: pageHeroInset == nil ? 22 : 0, style: .continuous))
+        .padding(.horizontal, -(pageHeroInset ?? 0))
         .environment(\.colorScheme, .dark)
     }
     private var arrivalEstimate: IumrahFlightClock.Arrival? {
@@ -108,31 +147,33 @@ struct IumrahPremiumFlightDetail: View {
     }
     private var arrivalDisplay: String? {
         if let raw = leg.arrival, !raw.isEmpty { return raw }
-        if let raw = details?.arrivalScheduled, raw.count >= 16 { return String(raw.prefix(16)) }
+        if let raw = details?.arrivalScheduled, raw.count >= 16 { return raw.replacingOccurrences(of: " ", with: "T", options: [], range: raw.range(of: " ")) }
         return arrivalEstimate.map { $0.day + "T" + $0.time }
     }
     private var arrivalEstimated: Bool { arrivalEstimate != nil }
-    private func endpoint(_ code: String, city: String, raw: String?, trailing: Bool, estimated: Bool = false) -> some View {
+    private func endpoint(_ code: String, raw: String?, trailing: Bool, estimated: Bool = false) -> some View {
         VStack(alignment: trailing ? .trailing : .leading, spacing: 4) {
-            Text(code).font(IumrahType.bold(37, relativeTo: .largeTitle)).minimumScaleFactor(0.65).lineLimit(1).foregroundStyle(.white)
-            if city != code { Text(city).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.white.opacity(0.72)).lineLimit(2) }
+            Text(code).font(IumrahType.bold(38, relativeTo: .largeTitle)).minimumScaleFactor(0.65).lineLimit(1).foregroundStyle(.white)
             if let local = IumrahPremiumFlightLeg.localParts(raw, code: code) {
-                Text(local.time).font(IumrahType.bold(27, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(.white).padding(.top, 6)
-                Text(dateLabel(local.day)).font(IumrahType.regular(11, relativeTo: .caption)).foregroundStyle(.white.opacity(0.72))
-                if estimated { Text(t("Расчётное", "Estimated", "Hisoblangan", "Ҳисобланган")).font(IumrahType.regular(10)).foregroundStyle(.white.opacity(0.65)) }
-            } else if let raw, raw.count == 10 {
-                Text(dateLabel(raw)).font(IumrahType.regular(12)).foregroundStyle(.white.opacity(0.72))
+                Text(local.time).font(IumrahType.bold(30, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7).foregroundStyle(.white)
+                if estimated { Text(t("Расчётное", "Estimated", "Hisoblangan", "Ҳисобланган")).font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.white.opacity(0.78)) }
             }
         }.frame(maxWidth: .infinity, alignment: trailing ? .trailing : .leading)
     }
     private var globe: some View {
-        VStack(spacing: 4) {
+        GeometryReader { proxy in
+            let diameter = min(max(proxy.size.width - 32, 0), 296)
             ZStack {
-                IumrahHemisphereMap(projection: route?.projection ?? .arabia, palette: .dark, isAnimating: scenePhase == .active, mapOpacity: 0.87)
-                if let route { routeOverlay(route) }
-            }.frame(height: 218)
-            if route != nil { Text(t("Маршрут по большой окружности", "Great-circle route", "Katta aylana bo‘yicha yo‘nalish", "Катта айлана бўйича йўналиш")).font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.white.opacity(0.52)) }
-        }.accessibilityHidden(true)
+                IumrahHemisphereMap(projection: route?.projection ?? .arabia, palette: .dark, isAnimating: scenePhase == .active, mapOpacity: globeExpanded ? 0.95 : 0.44)
+                if let route { routeOverlay(route).opacity(globeExpanded ? 1 : 0) }
+            }
+            .frame(width: diameter, height: diameter)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+        }
+        .frame(height: globeExpanded ? 296 : 148)
+        .clipped()
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
     private func routeOverlay(_ route: IumrahFlightGlobeRoute) -> some View {
         Canvas { context, size in
@@ -146,7 +187,7 @@ struct IumrahPremiumFlightDetail: View {
             for (p, label) in [(route.points.first, leg.origin), (route.points.last, leg.destination)] {
                 guard let p else { continue }; let q = point(p)
                 context.fill(Path(ellipseIn: CGRect(x: q.x-3.5, y: q.y-3.5, width: 7, height: 7)), with: .color(.white))
-                context.draw(Text(label).font(.system(size: 10, weight: .semibold)).foregroundColor(.white), at: CGPoint(x: q.x, y: q.y + 15))
+                context.draw(Text(label).font(.system(size: 10, weight: .semibold)).foregroundColor(.white), at: CGPoint(x: q.x, y: q.y + (label == leg.origin ? -14 : 14)))
             }
             if let p = route.livePoint {
                 let q = point(p)
@@ -161,23 +202,29 @@ struct IumrahPremiumFlightDetail: View {
                 if let speed = p.speedKmh, speed.isFinite, speed >= 0, speed < 3000 { metric(t("Скорость", "Ground speed", "Tezlik", "Тезлик"), "\(Int(speed.rounded())) km/h") }
                 if let arrival = IumrahPremiumFlightLeg.instant(details?.arrivalEstimatedUTC), arrival > Date() { metric(t("До прилёта", "Until arrival", "Yetib kelishgacha", "Етиб келишгача"), durationText(Int(arrival.timeIntervalSinceNow / 60))) }
             }
-            if let date = IumrahPremiumFlightLeg.instant(p.reportedAt) { Text(t("Позиция на ", "Position at ", "Joylashuv vaqti ", "Жойлашув вақти ") + date.formatted(.dateTime.hour().minute()) + " · " + t("Прогресс ориентировочный", "Approximate progress", "Taxminiy jarayon", "Тахминий жараён")).font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.white.opacity(0.65)) }
+            if let date = IumrahPremiumFlightLeg.instant(p.reportedAt) { Text(t("Позиция на ", "Position at ", "Joylashuv vaqti ", "Жойлашув вақти ") + date.formatted(.dateTime.hour().minute()) + " · " + t("Прогресс ориентировочный", "Approximate progress", "Taxminiy jarayon", "Тахминий жараён")).font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.secondary) }
         }
     }
-    private func metric(_ title: String, _ value: String) -> some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(IumrahType.regular(11)).foregroundStyle(.white.opacity(0.65)); Text(value).font(IumrahType.bold(17)).foregroundStyle(.white).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, alignment: .leading) }
+    private func metric(_ title: String, _ value: String) -> some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(IumrahType.regular(11)).foregroundStyle(.secondary); Text(value).font(IumrahType.bold(17)).foregroundStyle(.primary).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, alignment: .leading) }
     private var airportSection: some View {
         VStack(alignment: .leading, spacing: 15) {
+            HStack(spacing: 10) {
+                if !leg.airlineCode.isEmpty { AirlineLogoView(airlineCode: leg.airlineCode, size: 34) }
+                Text(leg.title).font(IumrahType.bold(16))
+            }
             Text(t("Детали перелёта", "Flight itinerary", "Parvoz tafsilotlari", "Парвоз тафсилотлари")).font(IumrahType.bold(19))
-            airportRow(code: leg.origin, airport: from ?? bundled(leg.origin), title: t("Вылет", "Departure", "Jo‘nash", "Жўнаш"), terminal: details?.departureTerminal ?? leg.departureTerminal, gate: details?.departureGate, revised: details?.departureRevised, actual: details?.departureActual)
+            airportRow(code: leg.origin, raw: leg.departure, airport: from ?? bundled(leg.origin), title: t("Вылет", "Departure", "Jo‘nash", "Жўнаш"), terminal: details?.departureTerminal ?? leg.departureTerminal, gate: details?.departureGate, revised: details?.departureRevised, actual: details?.departureActual)
             Divider()
-            airportRow(code: leg.destination, airport: to ?? bundled(leg.destination), title: t("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш"), terminal: details?.arrivalTerminal ?? leg.arrivalTerminal, gate: details?.arrivalGate, revised: details?.arrivalRevised, actual: details?.arrivalActual)
+            airportRow(code: leg.destination, raw: arrivalDisplay, airport: to ?? bundled(leg.destination), title: t("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш"), terminal: details?.arrivalTerminal ?? leg.arrivalTerminal, gate: details?.arrivalGate, revised: details?.arrivalRevised, actual: details?.arrivalActual)
             if let belt = clean(details?.baggageBelt) { fact(t("Лента багажа", "Baggage belt", "Bagaj lentasi", "Багаж лентаси"), belt) }
-        }.iumrahCard()
+        }.iumrahFlightCard()
     }
-    private func airportRow(code: String, airport: Airport?, title: String, terminal: String?, gate: String?, revised: String?, actual: String?) -> some View {
+    private func airportRow(code: String, raw: String?, airport: Airport?, title: String, terminal: String?, gate: String?, revised: String?, actual: String?) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(title).font(IumrahType.regular(12)).foregroundStyle(.secondary)
             Text("\(city(code, airport: airport)) · \(code)").font(IumrahType.bold(17))
+            if let local = IumrahPremiumFlightLeg.localParts(raw, code: code) { Text(dateLabel(local.day) + " · " + local.time).font(IumrahType.regular(13)).foregroundStyle(.secondary) }
+            else if let raw, raw.count == 10 { Text(dateLabel(raw)).font(IumrahType.regular(13)).foregroundStyle(.secondary) }
             if let name = airport?.name ?? FlightReferenceCatalog.airport(code)?.name { Text(name).font(IumrahType.regular(13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
             if let terminal = clean(terminal) { fact(t("Терминал", "Terminal", "Terminal", "Терминал"), terminal) }
             if let gate = clean(gate) { fact(t("Выход", "Gate", "Chiqish", "Чиқиш"), gate) }
@@ -192,7 +239,7 @@ struct IumrahPremiumFlightDetail: View {
             if let reg = clean(details?.registration) { fact(t("Бортовой номер", "Registration", "Bort raqami", "Борт рақами"), reg) }
             if let cabin = clean(leg.cabin) { fact(t("Класс", "Cabin", "Klass", "Класс"), cabin.capitalized) }
             if let carrier = clean(leg.operatingCarrier) { fact(t("Выполняет рейс", "Operated by", "Parvoz operatori", "Парвоз оператори"), carrier) }
-        }.iumrahCard()
+        }.iumrahFlightCard()
     }
     private func fact(_ title: String, _ value: String) -> some View { HStack(alignment: .firstTextBaseline) { Text(title).font(IumrahType.regular(13)).foregroundStyle(.secondary); Spacer(minLength: 10); Text(value).font(IumrahType.bold(13)).multilineTextAlignment(.trailing) } }
     @MainActor private func load() async {
@@ -236,10 +283,45 @@ struct IumrahPremiumFlightConnection: View {
                 Text(title + " · " + next.origin).font(IumrahType.bold(14))
                 Spacer()
                 Text("\(minutes / 60)h \(minutes % 60)m").font(IumrahType.regular(13)).foregroundStyle(.secondary)
-            }.iumrahCard()
+            }.iumrahFlightCard()
         }
     }
     private var title: String {
         switch language { case .russian: return "Пересадка"; case .uzbek: return "Ulanish"; case .uzbekCyrillic: return "Уланиш"; default: return "Connection" }
+    }
+}
+
+
+/// Flight-only palette: explicit neutral RGB values, not iOS grouped (blue-gray) surfaces.
+enum IumrahFlightPalette {
+    static let hero = Color(white: 0.065)
+    static let page = adaptive(light: 0.95, dark: 0.045)
+    static let card = adaptive(light: 1, dark: 0.105)
+    static let raised = adaptive(light: 0.90, dark: 0.17)
+    static let bar = adaptive(light: 0.75, dark: 0.36)
+    private static func adaptive(light: CGFloat, dark: CGFloat) -> Color {
+        Color(uiColor: UIColor { traits in UIColor(white: traits.userInterfaceStyle == .dark ? dark : light, alpha: 1) })
+    }
+}
+
+extension View {
+    func iumrahFlightCard() -> some View {
+        self.frame(maxWidth: .infinity, alignment: .leading)
+            .padding(17)
+            .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.75) }
+    }
+
+    /// Keep the native back gesture and toolbar. Its opaque graphite background
+    /// continues through the status bar into the full-bleed first flight hero.
+    func iumrahFlightDetailChrome() -> some View {
+        self
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(false)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(IumrahFlightPalette.hero, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .tint(Color.primary)
     }
 }

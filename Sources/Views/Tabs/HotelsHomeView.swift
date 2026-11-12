@@ -150,12 +150,13 @@ struct HotelsHomeView: View {
                         search()
                     }
                     .padding(.horizontal, IumrahDesign.pagePadding)
+                    .tint(Color.primary)
                 }
 
             }
             .padding(.bottom, 115)
         })
-        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
+        .background((mode == .hotels ? Color.iumrahPageBackground : IumrahFlightPalette.page).ignoresSafeArea(edges: .bottom))
 
         .safeAreaInset(edge: .bottom, spacing: 0) {
             discoverySwitcher.padding(.horizontal, 18).padding(.vertical, 8)

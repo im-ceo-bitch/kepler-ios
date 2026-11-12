@@ -47,10 +47,11 @@ struct IumrahFlightBrowseCatalog: View {
                     flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination,
                     departureAt: flight.departureAt, arrivalAt: flight.arrivalAt,
                     duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice,
-                    isAviasales: flight.id.hasPrefix("feed:")) { onChoose(flight) }
+                    isAviasales: flight.id.hasPrefix("feed:"), selectedSearchDay: filters.day) { onChoose(flight) }
                 .onAppear { if flight.id == filtered.prefix(visibleCount).last?.id { visibleCount += 30 } }
             }
         }
+        .tint(Color.primary)
         .task(id: identity) { await model.load(trip: journey.trip, language: settings.language) }
         .onChange(of: direction) { _, _ in visibleCount = 30; filters = IumrahFlightFilterState() }
     }

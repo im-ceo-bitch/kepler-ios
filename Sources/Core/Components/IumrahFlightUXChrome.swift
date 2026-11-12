@@ -100,9 +100,8 @@ struct IumrahJourneySheetStyle: ViewModifier {
     }
 }
 
-/// The header is exactly the same height for Flights, Nuitee, Transfer and
-/// Review, even when the search/route details are expanded.
-/// Only the WHITE card grows: it never stretches the black world-map surface.
+/// Shared header: flight selection optionally adds its route and step title.
+/// The search summary expands independently of the black surface.
 struct IumrahJourneyHeader<Summary: View>: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var chrome: AppChromeStore
@@ -113,15 +112,26 @@ struct IumrahJourneyHeader<Summary: View>: View {
     @Environment(\.iumrahPullHandler) private var pullHandler
     @Environment(\.journeyTopInset) private var topInset
     var showsNotifications: Bool = false
+    let pageBackground: Color
     let summary: Summary
+    struct FlightHeading {
+        let origin: String
+        let destination: String
+        let title: String
+    }
+    let flightHeading: FlightHeading?
 
-    init(showsNotifications: Bool = false, @ViewBuilder summary: () -> Summary) {
+    init(showsNotifications: Bool = false, pageBackground: Color = .iumrahPageBackground,
+         flightHeading: FlightHeading? = nil, @ViewBuilder summary: () -> Summary) {
         self.showsNotifications = showsNotifications
+        self.pageBackground = pageBackground
         self.summary = summary()
+        self.flightHeading = flightHeading
     }
 
     var body: some View {
         VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
@@ -144,8 +154,28 @@ struct IumrahJourneyHeader<Summary: View>: View {
             .foregroundStyle(.white)
             .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
             .padding(.horizontal, 20)
+            if let heading = flightHeading {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text(heading.origin).font(IumrahType.bold(36, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.7)
+                        VStack(spacing: 4) {
+                            Image(systemName: "airplane").font(.system(size: 19, weight: .medium))
+                            HStack(spacing: 0) {
+                                Circle().frame(width: 5, height: 5)
+                                Rectangle().frame(height: 1)
+                                Circle().frame(width: 5, height: 5)
+                            }.foregroundStyle(.white.opacity(0.65))
+                        }.frame(maxWidth: .infinity)
+                        Text(heading.destination).font(IumrahType.bold(36, relativeTo: .largeTitle)).lineLimit(1).minimumScaleFactor(0.7)
+                    }.accessibilityElement(children: .combine)
+                    Text(heading.title).font(IumrahType.bold(23, relativeTo: .title2))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                }.foregroundStyle(.white).padding(.horizontal, 20)
+            }
+            }
             .padding(.top, IumrahSignatureHeaderGeometry.topInset + topInset)
-            .padding(.bottom, IumrahSignatureHeaderGeometry.lowerInset)
+            .padding(.bottom, flightHeading == nil ? IumrahSignatureHeaderGeometry.lowerInset : 62)
             .frame(maxWidth: .infinity)
             .background {
                 IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
@@ -163,7 +193,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
 
 
         }
-        .background(Color.iumrahPageBackground)
+        .background(pageBackground)
         .background(IumrahNoVerticalBounce())
     }
 }

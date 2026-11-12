@@ -10,7 +10,7 @@ struct FlightDetailsView: View {
             VStack(alignment: .leading, spacing: 22) {
 
                 ForEach(Array(offer.displaySegments.enumerated()), id: \.element.id) { index, segment in
-                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(segment, stops: offer.segments?.isEmpty == false ? 0 : offer.stops, cabin: offer.cabinClass), language: settings.language)
+                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(segment, stops: offer.segments?.isEmpty == false ? 0 : offer.stops, cabin: offer.cabinClass), language: settings.language, pageHeroInset: index == 0 ? IumrahDesign.pagePadding : nil)
                     if index < offer.layovers.count {
                         layoverSection(offer.layovers[index])
                     }
@@ -27,13 +27,13 @@ struct FlightDetailsView: View {
                 IumrahRefundPolicyCard(component: .flight, compact: false)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
             .padding(.bottom, 42)
         }
-        .background(Color.iumrahPageBackground)
+        .background(IumrahFlightPalette.page)
         .iumrahInternalNavigation(progress: .flight)
         .navigationTitle(offer.airline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: "iumrah · \(offer.airline) · \(offer.origin) → \(offer.destination)") { Image(systemName: "square.and.arrow.up") } } }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: "iumrah · \(offer.airline) · \(offer.origin) → \(offer.destination)") { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+        .iumrahFlightDetailChrome()
         .task { await enrichAirports() }
     }
 
@@ -125,7 +125,7 @@ struct FlightDetailsView: View {
                     }
                 }
             }
-            .iumrahCard()
+            .iumrahFlightCard()
         }
     }
 
@@ -293,7 +293,7 @@ struct FlightDetailsView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .iumrahCard()
+        .iumrahFlightCard()
     }
 
     private var ticketInfoTitle: String {

@@ -80,6 +80,7 @@ struct IumrahFlightDiscoveryView: View {
             }
             }
         }
+        .tint(Color.primary)
         .task {
             seedFromJourneyIfNeeded()
             // The home form is authoritative in guided mode. Do not write stale
@@ -211,7 +212,7 @@ struct IumrahFlightDiscoveryView: View {
                         .font(.subheadline.weight(.semibold))
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(Color.iumrahRoyalViolet)
+                .foregroundStyle(Color.primary)
             }
             Text(tr("Выберите прямой рейс туда и обратно. Продолжение появится внизу экрана.",
                     "Select a published outbound and return flight. Continue below.",
@@ -221,7 +222,7 @@ struct IumrahFlightDiscoveryView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 18))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var searchModePicker: some View {
@@ -300,7 +301,7 @@ struct IumrahFlightDiscoveryView: View {
             }
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
@@ -387,7 +388,7 @@ struct IumrahFlightDiscoveryView: View {
 
             if recommendedLoading && items.isEmpty {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.iumrahCardBackground)
+                    .fill(IumrahFlightPalette.card)
                     .frame(height: 176)
                     .overlay { ProgressView() }
             } else if items.isEmpty {
@@ -396,7 +397,7 @@ struct IumrahFlightDiscoveryView: View {
                     .foregroundStyle(.secondary)
                     .padding(18)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
@@ -502,7 +503,7 @@ struct IumrahFlightDiscoveryView: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 8)
         }
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
@@ -513,9 +514,9 @@ struct IumrahFlightDiscoveryView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.primary)
                 .frame(width: 34, height: 34)
-                .background(Color.blue.opacity(0.1), in: Circle())
+                .background(Color.primary.opacity(0.1), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(eyebrow.uppercased())
                     .font(.caption2.weight(.bold))
@@ -563,7 +564,7 @@ struct IumrahFlightDiscoveryView: View {
             }
             .buttonStyle(.plain)
         }
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
@@ -678,7 +679,7 @@ struct IumrahFlightDiscoveryView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.primary)
                     Text(tr(
                         "Опубликованные прямые",
                         "Published non-stop",
@@ -690,9 +691,9 @@ struct IumrahFlightDiscoveryView: View {
                 }
                 .padding(.horizontal, 15)
                 .frame(height: 46)
-                .background(Color.green.opacity(0.09), in: Capsule())
+                .background(Color.primary.opacity(0.09), in: Capsule())
                 .overlay {
-                    Capsule().strokeBorder(Color.green.opacity(0.18), lineWidth: 0.8)
+                    Capsule().strokeBorder(Color.primary.opacity(0.18), lineWidth: 0.8)
                 }
             }
         }
@@ -714,7 +715,7 @@ struct IumrahFlightDiscoveryView: View {
             .padding(.horizontal, 15)
             .frame(height: 46)
             .background(
-                active ? Color.iumrahPrimaryButtonBackground : Color.iumrahCardBackground,
+                active ? Color.iumrahPrimaryButtonBackground : IumrahFlightPalette.card,
                 in: Capsule()
             )
             .overlay {
@@ -732,7 +733,7 @@ struct IumrahFlightDiscoveryView: View {
             discoveryAction(
                 icon: "chart.bar.xaxis",
                 title: tr("График цен", "Price chart", "Narx grafigi", "Нарх графиги"),
-                tint: .blue,
+                tint: .primary,
                 active: false
             ) {
                 graphPresented = true
@@ -741,7 +742,7 @@ struct IumrahFlightDiscoveryView: View {
             discoveryAction(
                 icon: "airplane",
                 title: tr("Прямые", "Non-stop", "To‘g‘ri", "Тўғри"),
-                tint: .green,
+                tint: .primary,
                 active: directOnly
             ) {
                 directOnly.toggle()
@@ -782,7 +783,7 @@ struct IumrahFlightDiscoveryView: View {
             .padding(.horizontal, 14)
             .frame(width: 174)
             .frame(minHeight: 68)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.7)
@@ -808,7 +809,7 @@ struct IumrahFlightDiscoveryView: View {
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 9)
                         .frame(height: 28)
-                        .background(Color.iumrahRaisedBackground, in: Capsule())
+                        .background(IumrahFlightPalette.raised, in: Capsule())
                 }
 
                 if !favorites.records.isEmpty {
@@ -820,7 +821,7 @@ struct IumrahFlightDiscoveryView: View {
                             .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.red)
                             .frame(width: 36, height: 36)
-                            .background(Color.iumrahCardBackground, in: Circle())
+                            .background(IumrahFlightPalette.card, in: Circle())
                             .overlay { Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8) }
                     }
                     .buttonStyle(.plain)
@@ -905,7 +906,7 @@ struct IumrahFlightDiscoveryView: View {
                                 .padding(14)
                                 .frame(width: 142, alignment: .leading)
                                 .frame(minHeight: 112, alignment: .leading)
-                                .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                                         .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.7)
@@ -949,7 +950,7 @@ struct IumrahFlightDiscoveryView: View {
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
@@ -974,7 +975,7 @@ struct IumrahFlightDiscoveryView: View {
             }
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private var emptyOffersCard: some View {
@@ -1034,7 +1035,7 @@ struct IumrahFlightDiscoveryView: View {
             }
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private var selectedDateUnfilteredOffers: [FlightDiscoveryOffer] {
@@ -1084,7 +1085,7 @@ struct IumrahFlightDiscoveryView: View {
         if offer.isDirect {
             values.append(.init(
                 title: tr("Рекомендует iumrah", "iumrah recommends", "iumrah tavsiya qiladi", "iumrah тавсия қилади"),
-                tint: .green
+                tint: .primary
             ))
         }
 
@@ -1757,10 +1758,10 @@ private struct IumrahRecommendedFlightCard: View {
 
                     Text(tr("Прямой", "Non-stop", "To‘g‘ri", "Тўғри"))
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.primary)
                         .padding(.horizontal, 9)
                         .frame(height: 25)
-                        .background(Color.green.opacity(0.11), in: Capsule())
+                        .background(Color.primary.opacity(0.11), in: Capsule())
                 }
             }
 
@@ -1788,21 +1789,21 @@ private struct IumrahRecommendedFlightCard: View {
                     Spacer()
                 }
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(selected ? Color.green : Color.iumrahPrimaryButtonText)
+                .foregroundStyle(selected ? Color.primary : Color.iumrahPrimaryButtonText)
                 .padding(.horizontal, 15)
                 .frame(height: 48)
                 .background(
-                    selected ? Color.green.opacity(0.1) : Color.iumrahPrimaryButtonBackground,
+                    selected ? Color.primary.opacity(0.1) : Color.iumrahPrimaryButtonBackground,
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
             }
             .buttonStyle(.plain)
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(selected ? Color.green.opacity(0.4) : Color.primary.opacity(0.06), lineWidth: selected ? 1.2 : 0.8)
+                .strokeBorder(selected ? Color.primary.opacity(0.4) : Color.primary.opacity(0.06), lineWidth: selected ? 1.2 : 0.8)
         }
     }
 
@@ -1825,7 +1826,7 @@ private struct IumrahRecommendedFlightCard: View {
                 Spacer()
                 Image(systemName: "airplane")
                     .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.primary)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(timeText(leg.arrivalAt)).font(.title3.bold())
@@ -1944,7 +1945,7 @@ private struct FlightDiscoveryTicketCard: View {
                         AirlineLogoView(airlineCode: offer.airlineCode, size: 42)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(money(offer.price))
-                                .font(.system(size: 25, weight: .bold, design: .rounded))
+                                .font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit()
                                 .foregroundStyle(.primary)
                             Text(offer.airlineName)
                                 .font(.subheadline.weight(.semibold))
@@ -1967,9 +1968,9 @@ private struct FlightDiscoveryTicketCard: View {
                     } label: {
                         Image(systemName: isFavorite ? "heart.fill" : "heart")
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(isFavorite ? Color.red : Color.primary)
+                            .foregroundStyle(Color.primary)
                             .frame(width: 38, height: 38)
-                            .background(Color.iumrahRaisedBackground, in: Circle())
+                            .background(IumrahFlightPalette.raised, in: Circle())
                     }
                     .buttonStyle(.plain)
 
@@ -1985,9 +1986,9 @@ private struct FlightDiscoveryTicketCard: View {
             } label: {
                 VStack(spacing: 11) {
                     legRow(
-                        departureTime: localTime(offer.departureAt),
+                        departureTime: IumrahFlightClock.time(IumrahFlightClock.local(offer.departureAt, airport: offer.origin)),
                         departureDate: compactDate(offer.departureAt),
-                        arrivalTime: arrivalTime(for: offer.departureAt, duration: offer.durationMinutes, destination: offer.destination),
+                        arrivalTime: IumrahFlightClock.arrival(actual: offer.arrivalAt, departure: offer.departureAt, duration: offer.durationMinutes, origin: offer.origin, destination: offer.destination)?.time ?? "—",
                         origin: offer.originAirport.isEmpty ? offer.origin : offer.originAirport,
                         destination: offer.destinationAirport.isEmpty ? offer.destination : offer.destinationAirport,
                         duration: durationText(offer.durationMinutes),
@@ -1997,9 +1998,9 @@ private struct FlightDiscoveryTicketCard: View {
                     if let returnAt = offer.returnAt, !returnAt.isEmpty {
                         Divider()
                         legRow(
-                            departureTime: localTime(returnAt),
+                            departureTime: IumrahFlightClock.time(IumrahFlightClock.local(returnAt, airport: offer.destination)),
                             departureDate: compactDate(returnAt),
-                            arrivalTime: arrivalTime(for: returnAt, duration: offer.returnDurationMinutes ?? 0, destination: offer.origin),
+                            arrivalTime: IumrahFlightClock.arrival(actual: nil, departure: returnAt, duration: offer.returnDurationMinutes ?? 0, origin: offer.destination, destination: offer.origin)?.time ?? "—",
                             origin: offer.destinationAirport.isEmpty ? offer.destination : offer.destinationAirport,
                             destination: offer.originAirport.isEmpty ? offer.origin : offer.originAirport,
                             duration: durationText(offer.returnDurationMinutes ?? 0),
@@ -2031,7 +2032,7 @@ private struct FlightDiscoveryTicketCard: View {
             .buttonStyle(.plain)
         }
         .padding(15)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 23, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 23, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 23, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.065), lineWidth: 0.8)
@@ -2050,7 +2051,7 @@ private struct FlightDiscoveryTicketCard: View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(departureTime)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(IumrahType.bold(27, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
                 Text(origin)
                     .font(.caption.monospaced().weight(.bold))
                     .foregroundStyle(.secondary)
@@ -2068,19 +2069,19 @@ private struct FlightDiscoveryTicketCard: View {
                     Rectangle().fill(Color.secondary.opacity(0.2)).frame(height: 1)
                     Image(systemName: "airplane")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(transfers == 0 ? Color.green : Color.secondary)
+                        .foregroundStyle(Color.secondary)
                     Rectangle().fill(Color.secondary.opacity(0.2)).frame(height: 1)
                     Circle().fill(Color.secondary.opacity(0.45)).frame(width: 5, height: 5)
                 }
                 Text(stopsText(transfers))
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(transfers == 0 ? Color.green : Color.secondary)
+                    .foregroundStyle(Color.secondary)
             }
             .frame(maxWidth: .infinity)
 
             VStack(alignment: .trailing, spacing: 2) {
                 Text(arrivalTime)
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(IumrahType.bold(27, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
                 Text(destination)
                     .font(.caption.monospaced().weight(.bold))
                     .foregroundStyle(.secondary)
@@ -2100,7 +2101,7 @@ private struct FlightDiscoveryTicketCard: View {
                 } else {
                     Image(systemName: "airplane.arrival")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Color.primary)
                         .frame(width: 24, height: 24)
                 }
                 Text(
@@ -2265,7 +2266,7 @@ private struct FlightDiscoveryPassengersSheet: View {
                         Spacer()
                         Text(tr("Эконом", "Economy", "Ekonom", "Эконом"))
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Color.primary)
                     }
                     Text(tr(
                         "Data API используется для ориентировочной цены. Другие классы и точный тариф выбираются при финальной проверке.",
@@ -2293,7 +2294,7 @@ private struct FlightDiscoveryPassengersSheet: View {
                 .buttonStyle(.plain)
             }
             .padding(20)
-            .background(Color.iumrahPageBackground)
+            .background(IumrahFlightPalette.page)
             .navigationTitle(tr("Пассажиры", "Passengers", "Yo‘lovchilar", "Йўловчилар"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2323,7 +2324,7 @@ private struct FlightDiscoveryPassengersSheet: View {
                 Image(systemName: "minus")
                     .font(.system(size: 15, weight: .bold))
                     .frame(width: 38, height: 38)
-                    .background(Color.iumrahRaisedBackground, in: Circle())
+                    .background(IumrahFlightPalette.raised, in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(!canDecrement)
@@ -2336,9 +2337,9 @@ private struct FlightDiscoveryPassengersSheet: View {
             Button(action: increment) {
                 Image(systemName: "plus")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.iumrahPrimaryButtonText)
                     .frame(width: 38, height: 38)
-                    .background(Color.blue, in: Circle())
+                    .background(Color.iumrahPrimaryButtonBackground, in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(total >= 9)
@@ -2376,9 +2377,9 @@ private struct FlightDiscoveryFiltersSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .tint(.blue)
+                .tint(Color.primary)
                 .padding(18)
-                .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
 
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "suitcase.rolling.fill")
@@ -2407,7 +2408,7 @@ private struct FlightDiscoveryFiltersSheet: View {
                 .buttonStyle(.plain)
             }
             .padding(20)
-            .background(Color.iumrahPageBackground)
+            .background(IumrahFlightPalette.page)
             .navigationTitle(tr("Фильтры", "Filters", "Filtrlar", "Фильтрлар"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2472,7 +2473,7 @@ private struct FlightDiscoveryAirlinesSheet: View {
                                 }
                                 Spacer()
                                 Image(systemName: selectedCodes.contains(airline.code) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selectedCodes.contains(airline.code) ? Color.blue : Color.secondary)
+                                    .foregroundStyle(selectedCodes.contains(airline.code) ? Color.primary : Color.secondary)
                             }
                         }
                         .buttonStyle(.plain)
@@ -2542,7 +2543,7 @@ private struct FlightDiscoveryFavoritesSheet: View {
                                                 .foregroundStyle(.secondary)
                                             Text(tr("Цена отслеживается", "Price tracking is on", "Narx kuzatilmoqda", "Нарх кузатилмоқда"))
                                                 .font(.caption.weight(.semibold))
-                                                .foregroundStyle(.green)
+                                                .foregroundStyle(Color.primary)
                                         }
                                         Spacer()
                                         Image(systemName: "chevron.right")
@@ -2632,7 +2633,7 @@ private struct FlightDiscoveryCalendarSheet: View {
                 }
                 .padding(20)
             }
-            .background(Color.iumrahPageBackground)
+            .background(IumrahFlightPalette.page)
             .navigationTitle(
                 selectingReturn && tripType == .roundTrip
                     ? tr("Обратная дата", "Return date", "Qaytish sanasi", "Қайтиш санаси")
@@ -2668,7 +2669,7 @@ private struct FlightDiscoveryCalendarSheet: View {
             }
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var months: [Date] {
@@ -2790,14 +2791,14 @@ private struct FlightDiscoveryMonthGrid: View {
                 if let price {
                     Text("$\(Int(price.rounded()))")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(isSelected ? Color.blue : (isLowPrice(price) ? Color.green : Color.secondary))
+                        .foregroundStyle(isSelected ? Color.primary : (isLowPrice(price) ? Color.primary : Color.secondary))
                 } else {
                     Text(" ")
                         .font(.caption2)
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 52)
-            .background(isSelected ? Color.blue.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .background(isSelected ? Color.primary.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isPast)
@@ -2929,7 +2930,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                             .font(.headline)
                     }
                     .padding(16)
-                    .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .onChange(of: directOnly) { _, _ in
                         Task { await load() }
                     }
@@ -2941,8 +2942,8 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .frame(height: 55)
-                            .foregroundStyle(.white)
-                            .background(Color.blue, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+                            .foregroundStyle(Color.iumrahPrimaryButtonText)
+                            .background(Color.iumrahPrimaryButtonBackground, in: RoundedRectangle(cornerRadius: 17, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -2954,7 +2955,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                         .allowsHitTesting(false)
                 }
             }
-            .background(Color.iumrahPageBackground)
+            .background(IumrahFlightPalette.page)
             .navigationTitle(tr("График цен", "Price chart", "Narx grafigi", "Нарх графиги"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2984,12 +2985,12 @@ private struct FlightDiscoveryPriceGraphSheet: View {
             if let selectedDay = days.first(where: { $0.date == IumrahFlightDiscoveryStore.dayFormatter.string(from: selectedDate) }) {
                 Text("\(tr("Выбранная дата", "Selected date", "Tanlangan sana", "Танланган сана")): $\(Int(selectedDay.price.rounded()))")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.blue)
+                    .foregroundStyle(Color.primary)
             }
 
             if days.isEmpty {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Color.iumrahCardBackground)
+                    .fill(IumrahFlightPalette.card)
                     .frame(height: 148)
                     .overlay {
                         VStack(spacing: 8) {
@@ -3029,7 +3030,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
         let height = CGFloat(40 + max(0, min(1, normalized)) * 70)
         let selected = IumrahFlightDiscoveryStore.dayFormatter.string(from: selectedDate) == day.date
         let cheapest = abs(day.price - minPrice) < 0.5
-        let tint: Color = selected ? .blue : (cheapest ? .green : Color.secondary.opacity(0.24))
+        let tint: Color = selected ? .primary : (cheapest ? Color.primary.opacity(0.55) : IumrahFlightPalette.bar)
 
         return Button {
             if let date = IumrahFlightDiscoveryStore.dayFormatter.date(from: day.date) {
@@ -3041,7 +3042,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
                 if selected || cheapest {
                     Text("$\(Int(day.price.rounded()))")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(selected ? Color.blue : Color.green)
+                        .foregroundStyle(selected ? Color.primary : Color.secondary)
                         .lineLimit(1)
                 } else {
                     Text(" ")
@@ -3054,7 +3055,7 @@ private struct FlightDiscoveryPriceGraphSheet: View {
 
                 Text(dayNumber(day.date))
                     .font(.caption2.weight(selected ? .bold : .medium))
-                    .foregroundStyle(selected ? Color.blue : Color.secondary)
+                    .foregroundStyle(selected ? Color.primary : Color.secondary)
             }
             .frame(width: 52)
         }
@@ -3148,15 +3149,17 @@ private struct FlightDiscoveryOfferDetailView: View {
                 monitoringCard
                 warningCard
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
-        .background(Color.iumrahPageBackground)
+        .background(IumrahFlightPalette.page)
         
         .navigationTitle(activeOffer.airlineName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
         .navigationBarBackButtonHidden(false)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: shareText) { Image(systemName: "square.and.arrow.up") } } }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: shareText) { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+        .iumrahFlightDetailChrome()
         .safeAreaInset(edge: .bottom, spacing: 0) { purchaseBar }
         .task {
             await refreshCurrentFare()
@@ -3230,10 +3233,10 @@ private struct FlightDiscoveryOfferDetailView: View {
         VStack(spacing: 13) {
             Text(tripTypeTitle)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(hasReturn ? Color.blue : Color.secondary)
+                .foregroundStyle(hasReturn ? Color.primary : Color.secondary)
                 .padding(.horizontal, 11)
                 .frame(height: 27)
-                .background((hasReturn ? Color.blue : Color.secondary).opacity(0.11), in: Capsule())
+                .background((hasReturn ? Color.primary : Color.secondary).opacity(0.11), in: Capsule())
 
             Text(tr("Тариф и наличие", "Fare & availability", "Tarif va mavjudlik", "Тариф ва мавжудлик"))
                 .font(IumrahType.bold(19)).frame(maxWidth: .infinity, alignment: .leading)
@@ -3291,7 +3294,7 @@ private struct FlightDiscoveryOfferDetailView: View {
 
         }
         .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.8)
@@ -3321,16 +3324,16 @@ private struct FlightDiscoveryOfferDetailView: View {
             }
         }
         .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func summaryLeg(icon: String, route: String, date: String, flight: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.primary)
                 .frame(width: 36, height: 36)
-                .background(Color.blue.opacity(0.1), in: Circle())
+                .background(Color.primary.opacity(0.1), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(route)
                     .font(.headline.monospaced())
@@ -3353,11 +3356,11 @@ private struct FlightDiscoveryOfferDetailView: View {
             conditionRow(icon: "arrow.uturn.backward.circle", tint: .secondary, title: tr("Обмен и возврат", "Changes & refunds", "Almashtirish va qaytarish", "Алмаштириш ва қайтариш"), value: tr("По правилам тарифа продавца", "According to seller fare rules", "Sotuvchi tarifi qoidalariga ko‘ra", "Сотувчи тарифи қоидаларига кўра"))
 
             if hasReturn {
-                conditionRow(icon: "arrow.left.arrow.right", tint: .blue, title: tr("Тип билета", "Ticket type", "Chipta turi", "Чипта тури"), value: tripTypeTitle)
+                conditionRow(icon: "arrow.left.arrow.right", tint: .primary, title: tr("Тип билета", "Ticket type", "Chipta turi", "Чипта тури"), value: tripTypeTitle)
             }
         }
         .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private var purchaseBar: some View {
@@ -3387,10 +3390,10 @@ private struct FlightDiscoveryOfferDetailView: View {
             if let legs = FlightDiscoveryItineraryValidator.verified(activeOffer.outboundSegments, origin: outboundOrigin, destination: outboundDestination, transfers: activeOffer.transfers) {
                 ForEach(Array(legs.enumerated()), id: \.offset) { index, leg in
                     if index > 0 { IumrahPremiumFlightConnection(previous: IumrahPremiumFlightLeg(legs[index - 1]), next: IumrahPremiumFlightLeg(leg), language: language) }
-                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language)
+                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language, pageHeroInset: index == 0 ? 20 : nil)
                 }
             } else {
-                IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(airline: activeOffer.airlineName, airlineCode: activeOffer.airlineCode, number: activeOffer.flightNumber, origin: outboundOrigin, destination: outboundDestination, departure: activeOffer.departureAt, arrival: activeOffer.arrivalAt, duration: activeOffer.durationMinutes, stops: activeOffer.transfers), language: language)
+                IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(airline: activeOffer.airlineName, airlineCode: activeOffer.airlineCode, number: activeOffer.flightNumber, origin: outboundOrigin, destination: outboundDestination, departure: activeOffer.departureAt, arrival: activeOffer.arrivalAt, duration: activeOffer.durationMinutes, stops: activeOffer.transfers), language: language, pageHeroInset: 20)
             }
         }
     }
@@ -3438,9 +3441,9 @@ private struct FlightDiscoveryOfferDetailView: View {
                 } else {
                     Image(systemName: "airplane")
                         .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Color.primary)
                         .frame(width: 44, height: 44)
-                        .background(Color.blue.opacity(0.1), in: Circle())
+                        .background(Color.primary.opacity(0.1), in: Circle())
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(airlineName)
@@ -3477,7 +3480,7 @@ private struct FlightDiscoveryOfferDetailView: View {
             )
         }
         .padding(18)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func flightTimeline(departureAt: String, duration: Int, origin: String, destination: String) -> some View {
@@ -3547,7 +3550,7 @@ private struct FlightDiscoveryOfferDetailView: View {
                     Image(systemName: "arrow.up.right")
                 }
                 .font(.subheadline.weight(.bold))
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.primary)
                 .padding(.vertical, 9)
                 .contentShape(Rectangle())
             }
@@ -3575,9 +3578,9 @@ private struct FlightDiscoveryOfferDetailView: View {
             HStack(spacing: 12) {
                 Image(systemName: favorites.isFavorite(activeOffer) ? "bell.badge.fill" : "heart")
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(favorites.isFavorite(activeOffer) ? Color.green : Color.red)
+                    .foregroundStyle(Color.primary)
                     .frame(width: 42, height: 42)
-                    .background((favorites.isFavorite(activeOffer) ? Color.green : Color.red).opacity(0.11), in: Circle())
+                    .background((Color.primary).opacity(0.11), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(favorites.isFavorite(activeOffer)
@@ -3597,10 +3600,10 @@ private struct FlightDiscoveryOfferDetailView: View {
                 }
                 Spacer()
                 Image(systemName: favorites.isFavorite(activeOffer) ? "checkmark.circle.fill" : "chevron.right")
-                    .foregroundStyle(favorites.isFavorite(activeOffer) ? Color.green : Color.secondary)
+                    .foregroundStyle(favorites.isFavorite(activeOffer) ? Color.primary : Color.secondary)
             }
             .padding(16)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         }
         .buttonStyle(.plain)
     }

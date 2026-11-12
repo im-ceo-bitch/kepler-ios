@@ -200,7 +200,7 @@ struct IumrahOTAFlightCard: View {
                 AirlineLogoView(airlineCode: flight.airlineCode, size: 40)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(flight.airline.isEmpty ? flight.airlineCode : flight.airline)
-                        .font(IumrahType.bold(15))
+                        .font(IumrahType.bold(17))
                         .lineLimit(1)
                     HStack(spacing: 5) {
                         let number = flight.flightNumber.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -220,7 +220,7 @@ struct IumrahOTAFlightCard: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(Color.iumrahRoyalViolet)
+                        .foregroundStyle(Color.primary)
                         .accessibilityLabel(t("Выбран", "Selected", "Tanlangan", "Танланган"))
                 } else {
                     Image(systemName: "chevron.right")
@@ -271,26 +271,19 @@ struct IumrahOTAFlightCard: View {
                          : t("Опубликованный рейс", "Published flight", "E’lon qilingan reys", "Эълон қилинган рейс"))
                         .font(IumrahType.regular(11, relativeTo: .caption2))
                         .foregroundStyle(.secondary)
-                    HStack(spacing: 5) {
-                        Image(systemName: "suitcase")
-                            .font(.system(size: 12))
-                        Text(t("Багаж уточняется", "Baggage pending", "Bagaj aniqlanmoqda", "Багаж аниқланмоқда"))
-                            .lineLimit(1)
-                    }
-                    .font(IumrahType.regular(12, relativeTo: .caption))
-                    .foregroundStyle(.secondary)
+
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
                     if flight.hasUsablePrice, let price = flight.priceUSD {
                         Text(IumrahOTAText.price(price))
-                            .font(IumrahType.bold(21, relativeTo: .title3))
+                            .font(IumrahType.bold(25, relativeTo: .title3))
                             .monospacedDigit()
                         Text(t("за пассажира · ориентир", "per traveler · indicative", "yo‘lovchiga · taxminiy", "йўловчига · тахминий"))
                             .font(IumrahType.regular(10, relativeTo: .caption2))
                             .foregroundStyle(.secondary)
                     } else {
-                        Text(t("Цена по запросу", "Fare on request", "Narx so‘rov bilan", "Нарх сўров билан"))
+                        Text(t("Посмотреть тариф", "View fare", "Tarifni ko‘rish", "Тарифни кўриш"))
                             .font(IumrahType.bold(13, relativeTo: .subheadline))
                             .multilineTextAlignment(.trailing)
                     }
@@ -298,10 +291,10 @@ struct IumrahOTAFlightCard: View {
             }
         }
         .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(isSelected ? Color.iumrahRoyalViolet.opacity(0.72) : Color.primary.opacity(0.075),
+                .strokeBorder(isSelected ? Color.primary.opacity(0.72) : Color.primary.opacity(0.075),
                               lineWidth: isSelected ? 1.5 : 0.75)
         }
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -314,7 +307,7 @@ struct IumrahOTAFlightCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 if isArrival { Spacer(minLength: 0) }
                 Text(time)
-                    .font(IumrahType.bold(25, relativeTo: .title2))
+                    .font(IumrahType.bold(28, relativeTo: .title2))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
@@ -371,15 +364,16 @@ struct IumrahOTAFlightDetailPage: View {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(Array(legs.enumerated()), id: \.offset) { index, leg in
                     if index > 0, flight.segments.indices.contains(index) { connectionRow(previous: flight.segments[index - 1], current: flight.segments[index]) }
-                    IumrahPremiumFlightDetail(leg: leg, language: language)
+                    IumrahPremiumFlightDetail(leg: leg, language: language, pageHeroInset: index == 0 ? IumrahDesign.pagePadding : nil)
                 }
                 if flight.hasUsablePrice, let price = flight.priceUSD {
                     Text(t("Ориентировочный тариф · ", "Indicative fare · ", "Taxminiy tarif · ", "Тахминий тариф · ") + IumrahOTAText.price(price)).font(IumrahType.bold(18))
                 }
                 Text(t("Перед оплатой подтверждаются цена, багаж и наличие мест.", "Final fare, baggage and availability are confirmed before payment.", "Narx, bagaj va joylar to‘lovdan oldin tasdiqlanadi.", "Нарх, багаж ва жойлар тўловдан олдин тасдиқланади.")).font(IumrahType.regular(13)).foregroundStyle(.secondary)
-            }.padding(IumrahDesign.pagePadding)
+            }.padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.bottom, IumrahDesign.pagePadding)
         }
-        .background(Color.iumrahPageBackground)
+        .background(IumrahFlightPalette.page)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if onChoose != nil || externalURL != nil {
                 VStack(spacing: 10) {
@@ -399,7 +393,8 @@ struct IumrahOTAFlightDetailPage: View {
         .navigationTitle(flight.airline)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: legs.first?.share ?? "iumrah") { Image(systemName: "square.and.arrow.up") } } }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: legs.first?.share ?? "iumrah") { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+        .iumrahFlightDetailChrome()
     }
 
     private func detailGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -409,7 +404,7 @@ struct IumrahOTAFlightDetailPage: View {
             VStack(alignment: .leading, spacing: 13, content: content)
                 .padding(17)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.065), lineWidth: 0.75)
@@ -421,7 +416,7 @@ struct IumrahOTAFlightDetailPage: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "circle.inset.filled")
                 .font(.system(size: 13))
-                .foregroundStyle(Color.iumrahRoyalViolet)
+                .foregroundStyle(Color.primary)
                 .frame(width: 18)
                 .padding(.top, 5)
             VStack(alignment: .leading, spacing: 4) {
@@ -437,7 +432,7 @@ struct IumrahOTAFlightDetailPage: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
                 Text(estimatedArrival?.time ?? IumrahOTAText.clock(date, airportCode: code))
-                    .font(IumrahType.bold(21, relativeTo: .title3))
+                    .font(IumrahType.bold(25, relativeTo: .title3))
                     .monospacedDigit()
                 if let date {
                     Text(IumrahOTAText.date(date, language: language, airportCode: code))
@@ -483,7 +478,7 @@ struct IumrahOTAFlightDetailPage: View {
     private func connectionRow(previous: IumrahOTAFlightLeg, current: IumrahOTAFlightLeg) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "arrow.triangle.branch")
-                .foregroundStyle(Color.iumrahRoyalViolet)
+                .foregroundStyle(Color.primary)
             VStack(alignment: .leading, spacing: 4) {
                 Text(t("Пересадка", "Connection", "Ulanish", "Уланиш") + " · " +
                      IumrahOTAText.city(previous.destination))
@@ -504,7 +499,7 @@ struct IumrahOTAFlightDetailPage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(Color.iumrahRoyalViolet.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private func factRow(_ title: String, _ value: String) -> some View {

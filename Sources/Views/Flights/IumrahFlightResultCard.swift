@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Shared presentation for the catalogue and both configurator legs.
 struct IumrahFlightResultCard: View {
@@ -15,6 +16,7 @@ struct IumrahFlightResultCard: View {
     let price: Double?
     let isAviasales: Bool
     var selected = false
+    var selectedSearchDay: String? = nil
     var onSelect: (() -> Void)? = nil
     let action: () -> Void
 
@@ -25,94 +27,97 @@ struct IumrahFlightResultCard: View {
         IumrahFlightClock.arrival(actual: arrivalAt, departure: departureAt, duration: duration, origin: origin, destination: destination)
     }
     private var localDeparture: String { IumrahFlightClock.local(departureAt, airport: origin) }
-    private var number: String {
-        let trimmed = flightNumber.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.uppercased().hasPrefix(airlineCode.uppercased()) ? trimmed : "\(airlineCode) \(trimmed)"
+    private var number: String? {
+        IumrahPremiumFlightLeg(airline: airline, airlineCode: airlineCode, number: flightNumber, origin: origin, destination: destination, departure: departureAt, arrival: arrivalAt, duration: duration, stops: stops).verifiedNumber
+    }
+    private var usablePrice: Double? { guard let price, price.isFinite, price > 0 else { return nil }; return price }
+    private var locale: Locale { Locale(identifier: settings.language.localeIdentifier) }
+    private var durationTitle: String {
+        tr("\(duration / 60) ч \(duration % 60) мин", "\(duration / 60)h \(duration % 60)m", "\(duration / 60) soat \(duration % 60) daq", "\(duration / 60) соат \(duration % 60) дақ")
     }
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 13) {
                 HStack(spacing: 10) {
-                    AirlineLogoView(airlineCode: airlineCode, size: 32)
+                    AirlineLogoView(airlineCode: airlineCode, size: 36)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(airline).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(2)
-                        Text(number).font(.caption).foregroundStyle(.secondary)
+                        Text(airline).font(IumrahType.bold(17)).lineLimit(2)
                     }
                     Spacer(minLength: 6)
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Text(isAviasales ? "Aviasales" : "iumrah Direct")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(isAviasales ? Color.blue : Color.iumrahInk)
-                            .padding(.horizontal, 8).padding(.vertical, 5)
-                            .background((isAviasales ? Color.blue : Color.primary).opacity(0.08), in: Capsule())
-                        if selected && onSelect == nil { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green) }
-                    }
+                    if let number { Text(number).font(IumrahType.bold(16)).lineLimit(1) }
+                    if selected && onSelect == nil { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.primary) }
                 }
                 .padding(.trailing, onSelect == nil ? 0 : 44)
                 HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(IumrahFlightClock.time(localDeparture)).font(.title2.weight(.bold)).monospacedDigit()
-                        Text(origin).font(.subheadline.weight(.semibold))
-                        Text(IumrahFlightClock.day(localDeparture, locale: Locale(identifier: settings.language.localeIdentifier))).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                    VStack(spacing: 7) {
-                        Text(duration > 0 ? "\(duration / 60)h \(duration % 60)m" : "—").font(.caption).foregroundStyle(.secondary)
-                        HStack(spacing: 4) {
-                            Capsule().fill(Color.secondary.opacity(0.25)).frame(height: 1)
-                            Image(systemName: stops == 0 ? "airplane" : "circle.fill").font(.system(size: stops == 0 ? 12 : 5))
-                            Capsule().fill(Color.secondary.opacity(0.25)).frame(height: 1)
-                        }.frame(width: 70).foregroundStyle(stops == 0 ? Color.green : Color.secondary)
-                        Text(stops == 0 ? tr("Без пересадок", "Non-stop", "Transfersiz", "Трансферсиз") : tr("Пересадок: \(stops)", "Stops: \(stops)", "Transfer: \(stops)", "Трансфер: \(stops)"))
-                            .font(.caption2).foregroundStyle(stops == 0 ? Color.green : Color.secondary)
-                    }.padding(.top, 4)
-                    Spacer(minLength: 0)
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(arrival?.time ?? "—").font(.title2.weight(.bold)).monospacedDigit()
-                        Text(destination).font(.subheadline.weight(.semibold))
-                        if let arrival {
-                            Text(IumrahFlightClock.day(arrival.day, locale: Locale(identifier: settings.language.localeIdentifier))).font(.caption).foregroundStyle(.secondary)
-                            if arrival.estimated {
-                                Text(tr("Расчётное", "Estimated", "Hisoblangan", "Ҳисобланган")).font(.caption2).foregroundStyle(.secondary)
+                    endpoint(origin, time: IumrahFlightClock.time(localDeparture), day: localDeparture, trailing: false)
+                    VStack(spacing: 5) {
+                        if duration > 0 { Text(durationTitle).font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center) }
+                        ZStack(alignment: .top) {
+                            GeometryReader { geo in
+                                Path { path in
+                                    path.move(to: CGPoint(x: 2, y: 24))
+                                    path.addQuadCurve(to: CGPoint(x: geo.size.width - 2, y: 24), control: CGPoint(x: geo.size.width / 2, y: -5))
+                                }.stroke(Color.primary.opacity(0.38), lineWidth: 1)
                             }
+                            Image(systemName: stops == 0 ? "airplane" : "arrow.triangle.branch")
+                                .font(.system(size: 16, weight: .medium)).foregroundStyle(.primary)
+                        }.frame(height: 26).accessibilityHidden(true)
+                        if stops >= 0 {
+                            Text(stops == 0 ? tr("Без пересадок", "Non-stop", "Transfersiz", "Трансферсиз") : tr("Пересадок: \(stops)", "Stops: \(stops)", "Transfer: \(stops)", "Трансфер: \(stops)"))
+                                .font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center)
                         }
-                    }
+                    }.frame(maxWidth: .infinity).padding(.top, 2)
+                    endpoint(destination, time: arrival?.time, day: arrival?.day, trailing: true, estimated: arrival?.estimated == true)
                 }
-                Divider().opacity(0.55)
-                HStack(alignment: .firstTextBaseline) {
-                    Text(tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун"))
-                        .font(.caption).foregroundStyle(.secondary)
-                    Spacer(minLength: 8)
-                    if let price, price > 0 {
-                        Text(price.formatted(.currency(code: "USD").precision(.fractionLength(0))))
-                            .font(IumrahType.bold(23, relativeTo: .title2))
-                    } else {
-                        Text(tr("Цена при расчёте", "Price on quote", "Narx hisobda", "Нарх ҳисобда"))
-                            .font(.subheadline.weight(.semibold))
+                Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1)
+                HStack(alignment: .center, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(isAviasales ? "Aviasales" : "iumrah Direct")
+                            .font(IumrahType.bold(11)).foregroundStyle(.secondary)
+                        if usablePrice != nil { Text(tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун")).font(IumrahType.regular(11)).foregroundStyle(.secondary) }
                     }
+                    Spacer(minLength: 6)
+                    if let price = usablePrice {
+                        Text(price.formatted(.currency(code: "USD").precision(.fractionLength(0)))).font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit()
+                    } else {
+                        Text(tr("Подробнее", "Details", "Batafsil", "Батафсил")).font(IumrahType.bold(15))
+                    }
+                    if onSelect == nil { Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).accessibilityHidden(true) }
                 }
             }
-            .foregroundStyle(Color.iumrahInk).padding(18)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 28).strokeBorder(selected ? Color.green : Color.primary.opacity(0.04), lineWidth: selected ? 1.5 : 1))
-            .contentShape(RoundedRectangle(cornerRadius: 28))
+            .foregroundStyle(Color.primary).padding(16)
+            .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(selected ? Color.primary : Color.primary.opacity(0.07), lineWidth: selected ? 1.5 : 0.75))
+            .contentShape(RoundedRectangle(cornerRadius: 22))
         }.buttonStyle(.plain)
+        .accessibilityHint(tr("Открыть рейс", "Open flight", "Reysni ochish", "Рейсни очиш"))
         .overlay(alignment: .topTrailing) {
             if let onSelect {
                 Button(action: onSelect) {
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 27, weight: .medium))
-                        .foregroundStyle(selected ? Color.green : Color.secondary)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(selected ? Color.primary : Color.secondary)
                         .frame(width: 44, height: 44)
-                        .contentShape(Circle())
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Выбрать рейс", "Select flight", "Reysni tanlash", "Рейсни танлаш"))
                 .accessibilityAddTraits(selected ? .isSelected : [])
-                .padding(12)
+                .padding(9)
             }
         }
     }
+    private func endpoint(_ code: String, time: String?, day: String?, trailing: Bool, estimated: Bool = false) -> some View {
+        VStack(alignment: trailing ? .trailing : .leading, spacing: 3) {
+            Text(code.uppercased()).font(IumrahType.bold(30, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.75)
+            if let time, time != "—" { Text(time).font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7) }
+            if let day, (String(day.prefix(10)) != selectedSearchDay || (trailing && String(day.prefix(10)) != String(localDeparture.prefix(10)))) {
+                Text(IumrahFlightClock.day(day, locale: locale)).font(IumrahType.regular(12)).foregroundStyle(.secondary).lineLimit(1)
+            }
+            if estimated { Text(tr("Расчётное", "Estimated", "Hisoblangan", "Ҳисобланган")).font(IumrahType.regular(10)).foregroundStyle(.secondary) }
+        }.frame(maxWidth: .infinity, alignment: trailing ? .trailing : .leading)
+    }
+
 }
 
 enum IumrahFlightCopy {
@@ -181,7 +186,7 @@ struct IumrahFlightFilterState {
         (!directOnly || stops == 0) && (self.airline.isEmpty || self.airline == airline) && (!includeDay || day == nil || day == String(departure.prefix(10)))
     }
 }
-struct IumrahFlightPriceDay: Identifiable {
+struct IumrahFlightPriceDay: Identifiable, Equatable {
     let id: String
     let price: Double
 }
@@ -203,9 +208,9 @@ struct IumrahFlightSearchControls: View {
                 HStack(spacing: 8) {
                     Button { filters.directOnly.toggle() } label: {
                         Text(tr("Без пересадок", "Non-stop", "Transfersiz", "Трансферсиз"))
-                            .foregroundStyle(filters.directOnly ? Color.white : Color.iumrahInk)
+                            .foregroundStyle(filters.directOnly ? Color.iumrahPrimaryButtonText : Color.primary)
                             .padding(.horizontal, 14).padding(.vertical, 10)
-                            .background(filters.directOnly ? Color.iumrahSignatureBlack : Color.iumrahCardBackground, in: Capsule())
+                            .background(filters.directOnly ? Color.iumrahPrimaryButtonBackground : IumrahFlightPalette.card, in: Capsule())
                     }.buttonStyle(.plain)
                     Menu {
                         Picker(tr("Авиакомпания", "Airline", "Aviakompaniya", "Авиакомпания"), selection: $filters.airline) {
@@ -225,31 +230,20 @@ struct IumrahFlightSearchControls: View {
             }
             if !days.isEmpty {
                 HStack {
-                    Text(tr("Цены по датам · USD", "Fares by date · USD", "Sanalar bo‘yicha narx · USD", "Саналар бўйича нарх · USD")).font(.caption).foregroundStyle(.secondary)
+                    Text(tr("Цены по датам", "Fares by date", "Sanalar bo‘yicha narx", "Саналар бўйича нарх")).font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     if filters.day != nil {
                         Button(tr("Все даты", "All dates", "Barcha sanalar", "Барча саналар")) { filters.day = nil }.font(.caption)
                     }
                 }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .bottom, spacing: 8) {
-                        ForEach(days) { day in
-                            Button { select(day.id) } label: {
-                                VStack(spacing: 6) {
-                                    Text(day.price.formatted(.number.precision(.fractionLength(0)))).font(.caption2.weight(.semibold))
-                                    RoundedRectangle(cornerRadius: 5)
-                                        .fill((selectedDay ?? filters.day) == day.id ? Color.iumrahInk : Color.blue.opacity(0.24))
-                                        .frame(width: 42, height: max(12, 52 * day.price / max(days.map(\.price).max() ?? 1, 1)))
-                                    Text(IumrahFlightClock.day(day.id, locale: Locale(identifier: settings.language.localeIdentifier))).font(.caption2)
-                                }.frame(width: 56).foregroundStyle(Color.iumrahInk)
-                            }.buttonStyle(.plain)
-                             .accessibilityLabel("\(day.id), \(day.price.formatted(.currency(code: "USD")))")
-                             .accessibilityAddTraits((selectedDay ?? filters.day) == day.id ? .isSelected : [])
-                        }
-                    }.padding(.vertical, 4)
-                }
+                IumrahCenteredFareChart(days: days, selectedDay: selectedDay ?? filters.day,
+                    locale: Locale(identifier: settings.language.localeIdentifier),
+                    onSelect: { select($0, feedback: false) })
+                    .frame(height: 112)
+
             }
         }
+        .tint(Color.primary)
         .sheet(isPresented: $showCalendar) {
             NavigationStack {
                 VStack(spacing: 20) {
@@ -263,15 +257,16 @@ struct IumrahFlightSearchControls: View {
                 }.padding(20)
                 .navigationTitle(tr("Календарь цен", "Fare calendar", "Narxlar taqvimi", "Нархлар тақвими"))
                 .toolbar { ToolbarItem(placement: .topBarTrailing) { Button(tr("Закрыть", "Close", "Yopish", "Ёпиш")) { showCalendar = false } } }
-            }.presentationDetents([.large])
+            }.tint(Color.primary).presentationDetents([.large])
         }
     }
-    private func select(_ day: String) {
+    private func select(_ day: String, feedback: Bool = true) {
+        guard day != (selectedDay ?? filters.day) else { return }
+        if feedback { IumrahHaptics.selection() }
         if let onSelectDay { onSelectDay(day) } else { filters.day = day }
-        IumrahHaptics.selection()
     }
     private func pill(_ title: String) -> some View {
-        Text(title).padding(.horizontal, 14).padding(.vertical, 10).background(Color.iumrahCardBackground, in: Capsule())
+        Text(title).foregroundStyle(Color.primary).padding(.horizontal, 14).padding(.vertical, 10).background(IumrahFlightPalette.card, in: Capsule())
     }
     static func priceDays(_ fares: [(String, Double?)]) -> [IumrahFlightPriceDay] {
         var lowest: [String: Double] = [:]
@@ -281,5 +276,201 @@ struct IumrahFlightSearchControls: View {
             lowest[key] = min(lowest[key] ?? price, price)
         }
         return lowest.keys.sorted().map { IumrahFlightPriceDay(id: $0, price: lowest[$0]!) }
+    }
+}
+
+/// Native horizontal scrolling, center snapping and a single commit after scrolling stops.
+/// The selected day remains represented even when no fare has been received for it.
+private struct IumrahCenteredFareChart: UIViewRepresentable {
+    let days: [IumrahFlightPriceDay]
+    let selectedDay: String?
+    let locale: Locale
+    let onSelect: (String) -> Void
+
+    struct Item: Equatable {
+        let day: String
+        let price: Double?
+    }
+    final class Rail: UICollectionView {
+        var onResize: (() -> Void)?
+        private var previousWidth: CGFloat = 0
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            guard bounds.width > 0, abs(previousWidth - bounds.width) > 0.5 else { return }
+            previousWidth = bounds.width
+            let inset = max(0, (bounds.width - 64) / 2)
+            contentInset = UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
+            onResize?()
+        }
+    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeUIView(context: Context) -> Rail {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.itemSize = CGSize(width: 64, height: 110)
+        layout.minimumLineSpacing = 8
+        let view = Rail(frame: .zero, collectionViewLayout: layout)
+        view.backgroundColor = .clear
+        view.contentInsetAdjustmentBehavior = .never
+        view.showsHorizontalScrollIndicator = false
+        view.decelerationRate = .fast
+        view.alwaysBounceHorizontal = false
+        view.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "fare")
+        view.dataSource = context.coordinator
+        view.delegate = context.coordinator
+        view.onResize = { [weak coordinator = context.coordinator, weak view] in
+            guard let view else { return }; coordinator?.align(view)
+        }
+        return view
+    }
+    func updateUIView(_ view: Rail, context: Context) { context.coordinator.update(self, view) }
+    static func dismantleUIView(_ view: Rail, coordinator: Coordinator) {
+        view.onResize = nil; view.delegate = nil; view.dataSource = nil
+    }
+
+    final class Coordinator: NSObject, UICollectionViewDataSource, UICollectionViewDelegate {
+        private var parent: IumrahCenteredFareChart
+        private var deferredParent: IumrahCenteredFareChart?
+        private var items: [Item] = []
+        private var focus = 0
+        private var committedDay: String?
+        private var userScrolling = false
+        private var pendingTap = false
+        private var isAligning = false
+        private let feedback = UISelectionFeedbackGenerator()
+        private let stride: CGFloat = 72
+        init(_ parent: IumrahCenteredFareChart) { self.parent = parent }
+
+        func update(_ next: IumrahCenteredFareChart, _ view: Rail) {
+            if userScrolling || pendingTap { deferredParent = next; return }
+            deferredParent = nil
+            let selectionChanged = parent.selectedDay != next.selectedDay
+            let localeChanged = parent.locale != next.locale
+            parent = next
+            var newItems = next.days.map { Item(day: $0.id, price: $0.price) }
+            if let selected = next.selectedDay, !newItems.contains(where: { $0.day == selected }) {
+                newItems.append(Item(day: selected, price: nil))
+            }
+            newItems.sort { $0.day < $1.day }
+            let changed = newItems != items || localeChanged
+            if changed || selectionChanged {
+                let oldFocus = items.indices.contains(focus) ? items[focus].day : nil
+                items = newItems
+                committedDay = next.selectedDay
+                focus = items.firstIndex(where: { $0.day == (next.selectedDay ?? oldFocus) }) ?? 0
+                if changed { view.reloadData() }
+                align(view)
+                refresh(view)
+            }
+        }
+        func align(_ view: UICollectionView) {
+            guard !items.isEmpty, view.bounds.width > 0, !userScrolling else { return }
+            isAligning = true
+            view.layoutIfNeeded()
+            view.setContentOffset(CGPoint(x: CGFloat(focus) * stride - view.contentInset.left, y: 0), animated: false)
+            isAligning = false
+        }
+        func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int { items.count }
+        func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "fare", for: indexPath)
+            configure(cell, at: indexPath.item)
+            return cell
+        }
+        private func configure(_ cell: UICollectionViewCell, at index: Int) {
+            guard items.indices.contains(index) else { return }
+            let item = items[index]
+            let selected = focus == index
+            let maximum = max(items.compactMap(\.price).max() ?? 1, 1)
+            let barHeight = item.price.map { max(10, 55 * $0 / maximum) } ?? 2
+            let date = IumrahFlightClock.day(item.day, locale: parent.locale)
+            let price = item.price.map { "$" + $0.formatted(.number.precision(.fractionLength(0))) } ?? "—"
+            cell.contentConfiguration = UIHostingConfiguration {
+                VStack(spacing: 5) {
+                    Spacer(minLength: 0)
+                    Text(price).font(IumrahType.bold(12)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
+                    RoundedRectangle(cornerRadius: 5).fill(selected ? Color.primary : IumrahFlightPalette.bar)
+                        .frame(width: 40, height: CGFloat(barHeight))
+                    Text(date).font(selected ? IumrahType.bold(11) : IumrahType.regular(11)).lineLimit(1).minimumScaleFactor(0.75)
+                    Capsule().fill(selected ? Color.primary : Color.clear).frame(width: 14, height: 2)
+                }
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .frame(width: 64, height: 106)
+                .accessibilityHidden(true)
+            }.margins(.all, 0)
+            cell.isAccessibilityElement = true
+            cell.accessibilityLabel = "\(date), \(price)"
+            cell.accessibilityTraits = selected ? [.button, .selected] : [.button]
+        }
+        private func refresh(_ view: UICollectionView) {
+            for cell in view.visibleCells {
+                if let index = view.indexPath(for: cell)?.item { configure(cell, at: index) }
+            }
+        }
+        private func index(at offset: CGFloat, in view: UIScrollView) -> Int {
+            min(max(Int(((offset + view.contentInset.left) / stride).rounded()), 0), max(items.count - 1, 0))
+        }
+        private func moveFocus(_ index: Int, in view: UICollectionView, haptic: Bool) {
+            guard items.indices.contains(index), focus != index else { return }
+            let previous = focus
+            focus = index
+            if haptic { feedback.selectionChanged(); feedback.prepare() }
+            for changed in [previous, index] {
+                if let cell = view.cellForItem(at: IndexPath(item: changed, section: 0)) { configure(cell, at: changed) }
+            }
+        }
+        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+            pendingTap = false; userScrolling = true; feedback.prepare()
+        }
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            guard userScrolling, !isAligning, let view = scrollView as? UICollectionView else { return }
+            moveFocus(index(at: view.contentOffset.x, in: view), in: view, haptic: true)
+        }
+        func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+            let target = index(at: targetContentOffset.pointee.x, in: scrollView)
+            targetContentOffset.pointee.x = CGFloat(target) * stride - scrollView.contentInset.left
+        }
+        func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+            if !decelerate { finish(scrollView) }
+        }
+        func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) { finish(scrollView) }
+        func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+            if pendingTap {
+                pendingTap = false
+                if let view = scrollView as? Rail { commit(in: view) }
+            } else { finish(scrollView) }
+        }
+        func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+            collectionView.deselectItem(at: indexPath, animated: false)
+            guard items.indices.contains(indexPath.item) else { return }
+            userScrolling = false
+            feedback.prepare()
+            if focus == indexPath.item { feedback.selectionChanged() }
+            moveFocus(indexPath.item, in: collectionView, haptic: true)
+            let x = CGFloat(focus) * stride - collectionView.contentInset.left
+            if abs(collectionView.contentOffset.x - x) > 0.5 {
+                pendingTap = true
+                collectionView.setContentOffset(CGPoint(x: x, y: 0), animated: true)
+            } else if let view = collectionView as? Rail { commit(in: view) }
+        }
+        private func finish(_ scrollView: UIScrollView) {
+            guard userScrolling, let view = scrollView as? UICollectionView else { return }
+            moveFocus(index(at: view.contentOffset.x, in: view), in: view, haptic: true)
+            userScrolling = false
+            align(view)
+            if let rail = view as? Rail { commit(in: rail) }
+        }
+        private func commit(in view: Rail) {
+            guard items.indices.contains(focus) else { return }
+            let day = items[focus].day
+            let deferred = deferredParent
+            deferredParent = nil
+            if day != committedDay {
+                committedDay = day
+                // The next SwiftUI update supplies the newly committed date.
+                (deferred ?? parent).onSelect(day)
+            } else if let deferred {
+                update(deferred, view)
+            }
+        }
     }
 }

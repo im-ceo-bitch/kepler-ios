@@ -8,7 +8,16 @@ test('booking tab root isolates complicated SwiftUI view types before navigation
   assert.match(source, /private var bookingScrollRoot: AnyView\s*\{\s*AnyView\(\s*IumrahRootScrollingPage/);
   assert.match(source, /header:\s*\{\s*AnyView\(bookingHeader\(hasActiveBooking: activeSession != nil\)\)/);
   assert.match(source, /content:\s*\{\s*AnyView\(bookingTabContent\)/);
-  assert.match(source, /var body: some View\s*\{\s*bookingScrollRoot\s*\.modifier\(IumrahPrimaryTabScrollChrome\(\)\)\s*\.task/);
+  // Chrome may wrap the erased root in body, or live inside the erased root.
+  // Both preserve the scroll behavior and keep the heavy view tree isolated.
+  const root = source.match(/private var bookingScrollRoot: AnyView\s*\{([\s\S]*?)\n    \}/)?.[1];
+  const bodyPrefix = source.match(/\bvar body: some View\s*\{\s*(bookingScrollRoot[\s\S]*?)\.task\s*\{/)?.[1];
+  assert.ok(root, 'bookingScrollRoot must remain an independently erased view');
+  assert.ok(bodyPrefix, 'body must use bookingScrollRoot before starting its refresh task');
+  const chrome = /\.modifier\(IumrahPrimaryTabScrollChrome\(\)\)/g;
+  const chromeCount = [...root.matchAll(chrome), ...bodyPrefix.matchAll(chrome)].length;
+  assert.equal(chromeCount, 1, 'booking scroll root must apply its chrome exactly once');
+  assert.match(bodyPrefix, /^bookingScrollRoot\s*(?:\.modifier\(IumrahPrimaryTabScrollChrome\(\)\)\s*)?$/);
 });
 
 test('booking tab erases active and empty branches before inserting them into main VStack', () => {

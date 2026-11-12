@@ -20,11 +20,14 @@ test('native hotel storefront admits ready priced server snapshots without the o
   assert.match(storefront, /standardQuotes\[hotel\.id\] \?\? comfortQuotes\[hotel\.id\] \?\? luxuryQuotes\[hotel\.id\]/);
 });
 
-test('home configurator keeps the white card geometry and displays Orbit', () => {
+test('home configurator keeps its white card, CTA and the actual search navigation', () => {
   assert.match(home, /let cardHeight: CGFloat = 540/);
-  assert.match(home, /IumrahOrbitIconRing\(/);
-  assert.match(home, /accessibilityIdentifier\("iumrah\.orbit\.home\.configurator"\)/);
-  assert.match(home, /private var hero: some View[\s\S]*?Color\.white/);
+  const hero = home.slice(home.indexOf('private var hero: some View'), home.indexOf('private var configuratorTimeBadge: String'));
+  assert.match(hero, /focusJourneySearchRevision \+= 1/);
+  assert.match(hero, /Image\("StoreConfiguratorPhones"\)/);
+  assert.match(hero, /Text\(configuratorHeroCTA\)/);
+  assert.match(hero, /\.background\(Color\.white\)/);
+  assert.match(hero, /\.accessibilityLabel\(configuratorHeroTitle\)/);
 });
 
 test('transfer car order is Malibu then Carnival then Yukon everywhere', () => {

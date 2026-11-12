@@ -79,6 +79,8 @@ assert.match(flightCard, /deltaDisplay/);
 assert.ok(!flightCard.includes('Тариф Ignav'));
 assert.ok(!finalPackage.includes('Ignav'));
 assert.ok(!primaryHotel.includes('providerDisplayName'));
-assert.match(finalPackage, /Цена вашего Umrah-пакета/);
+// The new final review labels the server-confirmed total for all travelers.
+assert.match(finalPackage, /Text\(tr\("Итого за всех"/);
+assert.match(finalPackage, /quote\.totalPackagePrice/);
 
 console.log('secure server generator + post-booking Business report contract OK');

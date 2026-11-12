@@ -219,7 +219,7 @@ struct BookingDetailView: View {
                     .font(.headline)
                 if let session {
                     HStack(spacing: 7) {
-                        Text("Бронь \(session.displayBookingNumber)")
+                        Text(L10n.format("booking_number_short", settings.language, session.displayBookingNumber))
                         if let pilgrimID = session.displayPilgrimID {
                             Text("·")
                             Text("iumrah ID \(pilgrimID)")

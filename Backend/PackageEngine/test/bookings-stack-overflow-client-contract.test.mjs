@@ -8,7 +8,7 @@ test('booking tab root isolates complicated SwiftUI view types before navigation
   assert.match(source, /private var bookingScrollRoot: AnyView\s*\{\s*AnyView\(\s*IumrahRootScrollingPage/);
   assert.match(source, /header:\s*\{\s*AnyView\(bookingHeader\(hasActiveBooking: activeSession != nil\)\)/);
   assert.match(source, /content:\s*\{\s*AnyView\(bookingTabContent\)/);
-  assert.match(source, /var body: some View\s*\{\s*bookingScrollRoot\s*\.task/);
+  assert.match(source, /var body: some View\s*\{\s*bookingScrollRoot\s*\.modifier\(IumrahPrimaryTabScrollChrome\(\)\)\s*\.task/);
 });
 
 test('booking tab erases active and empty branches before inserting them into main VStack', () => {

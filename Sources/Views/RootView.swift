@@ -84,6 +84,7 @@ struct RootView: View {
                 }
             }
             .onChange(of: settings.language.rawValue) { _, _ in
+                syncWidgets()
                 guard hasCompletedOnboarding else { return }
                 Task {
                     await syncPushSubscriptions()

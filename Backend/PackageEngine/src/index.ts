@@ -22,6 +22,7 @@ import { createCarePackageRequest, listCarePackageRequests, updateCarePackageReq
 import { createTelegramBookingLink, getTelegramBookingStatus } from "./telegram-bridge";
 import { getBookingItineraryPlan } from "./itinerary-planner";
 import { handleNuiteeHotelRequest, refreshNuiteeHotelCatalog } from "./nuitee-hotels";
+import { flightDetailResponse } from "./flight-detail";
 import { runPackageSchedule } from "./package-schedule";
 
 function json(value: unknown, status = 200) {
@@ -276,6 +277,10 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/api/package/flights/search") {
       return searchIgnavFlights(request, env);
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/package/flights/detail") {
+      return flightDetailResponse(url, env);
     }
 
     if (request.method === "GET" && url.pathname === "/api/package/flights/data") {

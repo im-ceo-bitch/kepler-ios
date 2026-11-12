@@ -20,11 +20,11 @@ test("generated package detail keeps the existing visual hierarchy but upgrades 
   assert.match(detail, /tabViewStyle\(\.page\(indexDisplayMode: \.never\)\)/);
   assert.match(detail, /ForEach\(heroImages\.indices/);
   assert.match(detail, /PackageFlightLegDetailCard/);
-  assert.match(detail, /expanded\.toggle\(\)/);
-  assert.match(detail, /departureAirportTitle/);
-  assert.match(detail, /arrivalAirportTitle/);
-  assert.match(detail, /durationTitle/);
-  assert.match(detail, /flightNumberTitle/);
+  const flightCard = home.slice(home.indexOf("struct PackageFlightLegDetailCard:"), home.indexOf("struct PackageHotelDetailCard:"));
+  assert.match(flightCard, /NavigationLink\s*\{/);
+  assert.match(flightCard, /IumrahPremiumFlightDetail\(leg: IumrahPremiumFlightLeg\(leg\)/);
+  assert.match(flightCard, /onChange\(\)/);
+  assert.match(flightCard, /ShareLink/);
   assert.match(detail, /HotelDetailView\(/);
   assert.match(detail, /selectionFlow: true/);
   assert.match(detail, /selectionRole: target\.role/);

@@ -8,11 +8,9 @@ struct FlightDetailsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                header
-                IumrahRefundPolicyCard(component: .flight, compact: false)
 
                 ForEach(Array(offer.displaySegments.enumerated()), id: \.element.id) { index, segment in
-                    segmentSection(segment, index: index)
+                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(segment, stops: offer.segments?.isEmpty == false ? 0 : offer.stops, cabin: offer.cabinClass), language: settings.language)
                     if index < offer.layovers.count {
                         layoverSection(offer.layovers[index])
                     }
@@ -26,6 +24,7 @@ struct FlightDetailsView: View {
 
 
                 ticketInfoSection
+                IumrahRefundPolicyCard(component: .flight, compact: false)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 10)
@@ -33,6 +32,8 @@ struct FlightDetailsView: View {
         }
         .background(Color.iumrahPageBackground)
         .iumrahInternalNavigation(progress: .flight)
+        .navigationTitle(offer.airline)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: "iumrah · \(offer.airline) · \(offer.origin) → \(offer.destination)") { Image(systemName: "square.and.arrow.up") } } }
         .task { await enrichAirports() }
     }
 

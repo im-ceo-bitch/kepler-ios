@@ -3140,101 +3140,27 @@ private struct FlightDiscoveryOfferDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
-                priceHero
-                tripSummaryCard
-                fareConditionsCard
                 outboundCard
-
-                if hasReturn {
-                    returnCard
-                    if activeOffer.returnAirlineCode?.isEmpty != false || activeOffer.returnFlightNumber?.isEmpty != false {
-                        Label(tr(
-                            "Data API не подтверждает перевозчика и номер обратного рейса. Уточните их у продавца перед оплатой.",
-                            "Data API does not confirm the return carrier or flight number. Check with the seller before payment.",
-                            "Data API qaytish aviakompaniyasi va reys raqamini tasdiqlamaydi. To‘lovdan oldin sotuvchidan tekshiring.",
-                            "Data API қайтиш авиакомпанияси ва рейс рақамини тасдиқламайди. Тўловдан олдин сотувчидан текширинг."
-                        ), systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-
-                if activeOffer.transfers > 0 || (hasReturn && (activeOffer.returnTransfers ?? 0) > 0) {
-                    connectingFlightsNote
-                }
-
+                if hasReturn { returnCard }
+                priceHero
+                fareConditionsCard
+                if activeOffer.transfers > 0 || (hasReturn && (activeOffer.returnTransfers ?? 0) > 0) { connectingFlightsNote }
                 monitoringCard
                 warningCard
-
-                Button {
-                    onCheckPrice(activeOffer)
-                } label: {
-                    HStack {
-                        if isRefreshingPrice {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "airplane.circle.fill")
-                        }
-                        Text(tr("Проверить и купить", "Check fare & buy", "Narxni tekshirish va sotib olish", "Нархни текшириш ва сотиб олиш"))
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
-                    }
-                    .font(.headline)
-                    .foregroundStyle(Color.iumrahPrimaryButtonText)
-                    .padding(.horizontal, 18)
-                    .frame(height: 60)
-                    .background(Color.iumrahPrimaryButtonBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
-                .buttonStyle(.plain)
-
-                if canBuildUmrah {
-                    Button {
-                        animateCartDrop()
-                        onBuildUmrah(activeOffer)
-                    } label: {
-                        HStack {
-                            Image(systemName: "cart.badge.plus")
-                            Text(tr("Добавить рейс в сборку Umrah", "Add flight to Umrah package", "Reysni Umra paketiga qo‘shish", "Рейсни Умра пакетига қўшиш"))
-                            Spacer()
-                            Image(systemName: "arrow.down.to.line")
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 18)
-                        .frame(height: 58)
-                        .iumrahGlass(in: RoundedRectangle(cornerRadius: 20, style: .continuous), interactive: true)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(cartAnimationVisible)
-                }
             }
             .padding(20)
         }
         .background(Color.iumrahPageBackground)
         
-        .navigationTitle(tr("Авиабилет", "Flight", "Aviachipta", "Авиачипта"))
+        .navigationTitle(activeOffer.airlineName)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    favorites.toggle(activeOffer, currency: currency, language: language)
-                    IumrahHaptics.soft()
-                } label: {
-                    Image(systemName: favorites.isFavorite(activeOffer) ? "heart.fill" : "heart")
-                        .foregroundStyle(favorites.isFavorite(activeOffer) ? Color.red : Color.primary)
-                }
-
-                ShareLink(item: shareText) {
-                    Image(systemName: "square.and.arrow.up")
-                }
-            }
-        }
+        .toolbar(.visible, for: .navigationBar)
+        .navigationBarBackButtonHidden(false)
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: shareText) { Image(systemName: "square.and.arrow.up") } } }
+        .safeAreaInset(edge: .bottom, spacing: 0) { purchaseBar }
         .task {
             await refreshCurrentFare()
         }
-        .safeAreaPadding(.bottom, 110)
         .overlay {
             GeometryReader { proxy in
                 if cartAnimationVisible {
@@ -3309,11 +3235,8 @@ private struct FlightDiscoveryOfferDetailView: View {
                 .frame(height: 27)
                 .background((hasReturn ? Color.blue : Color.secondary).opacity(0.11), in: Capsule())
 
-            Text(money(livePrice ?? activeOffer.price))
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .tracking(-1)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+            Text(tr("Тариф и наличие", "Fare & availability", "Tarif va mavjudlik", "Тариф ва мавжудлик"))
+                .font(IumrahType.bold(19)).frame(maxWidth: .infinity, alignment: .leading)
 
             if let livePrice, abs(livePrice - offer.price) >= 0.5 {
                 Text(tr(
@@ -3338,9 +3261,6 @@ private struct FlightDiscoveryOfferDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Text(passengerPriceCaption)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
 
             HStack(spacing: 10) {
                 Label(priceRefreshStatusText, systemImage: lastPriceRefreshAt == nil ? "clock" : "checkmark.circle.fill")
@@ -3368,20 +3288,7 @@ private struct FlightDiscoveryOfferDetailView: View {
                 .accessibilityLabel(tr("Повторно проверить цену", "Recheck cached fare", "Narxni qayta tekshirish", "Нархни қайта текшириш"))
             }
 
-            HStack(spacing: 10) {
-                AirlineLogoView(airlineCode: activeOffer.airlineCode, size: 42)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(activeOffer.airlineName)
-                        .font(.headline)
-                    Text(flightNumberText)
-                        .font(.caption.monospaced().weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Text(activeOffer.routeTitle)
-                    .font(.subheadline.monospaced().weight(.bold))
-                    .foregroundStyle(.secondary)
-            }
+
         }
         .padding(18)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
@@ -3443,8 +3350,6 @@ private struct FlightDiscoveryOfferDetailView: View {
             Text(tr("Условия тарифа", "Fare conditions", "Tarif shartlari", "Тариф шартлари"))
                 .font(.title3.bold())
 
-            conditionRow(icon: "bag.fill", tint: .green, title: tr("Ручная кладь и багаж", "Cabin & checked baggage", "Qo‘l yuki va bagaj", "Қўл юки ва багаж"), value: tr("Уточняются при проверке тарифа", "Confirmed during live fare check", "Tarif tekshirilganda aniqlanadi", "Тариф текширилганда аниқланади"))
-            conditionRow(icon: activeOffer.isDirect ? "checkmark.circle.fill" : "arrow.triangle.branch", tint: activeOffer.isDirect ? .green : .orange, title: tr("Маршрут", "Route", "Yo‘nalish", "Йўналиш"), value: directText(transfers: activeOffer.transfers))
             conditionRow(icon: "arrow.uturn.backward.circle", tint: .secondary, title: tr("Обмен и возврат", "Changes & refunds", "Almashtirish va qaytarish", "Алмаштириш ва қайтариш"), value: tr("По правилам тарифа продавца", "According to seller fare rules", "Sotuvchi tarifi qoidalariga ko‘ra", "Сотувчи тарифи қоидаларига кўра"))
 
             if hasReturn {
@@ -3455,40 +3360,54 @@ private struct FlightDiscoveryOfferDetailView: View {
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
-    private var outboundCard: some View {
-        flightLegCard(
-            title: "\(airportCity(outboundOrigin)) — \(airportCity(outboundDestination))",
-            subtitle: tr("Перелёт туда", "Outbound flight", "Borish reysi", "Бориш рейси"),
-            departureAt: activeOffer.departureAt,
-            origin: outboundOrigin,
-            destination: outboundDestination,
-            duration: activeOffer.durationMinutes,
-            transfers: activeOffer.transfers,
-            flightNumber: flightNumberText,
-            airlineCode: activeOffer.airlineCode,
-            airlineName: activeOffer.transfers > 0
-                ? tr("Перевозчик первого сегмента: ", "First leg airline: ", "Birinchi qism aviakompaniyasi: ", "Биринчи қисм авиакомпанияси: ") + activeOffer.airlineName
-                : activeOffer.airlineName
-        )
+    private var purchaseBar: some View {
+        VStack(spacing: 9) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(passengerPriceCaption).font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2)
+                    Text(money(livePrice ?? activeOffer.price)).font(IumrahType.bold(27, relativeTo: .title)).lineLimit(1).minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 0)
+                Button { onCheckPrice(activeOffer) } label: {
+                    Text(tr("Проверить и купить", "Check fare & buy", "Narxni tekshirish", "Нархни текшириш"))
+                        .font(IumrahType.bold(15)).multilineTextAlignment(.center).frame(maxWidth: .infinity).frame(height: 52)
+                }.buttonStyle(IumrahPrimaryButtonStyle())
+            }
+            if canBuildUmrah {
+                Button { animateCartDrop(); onBuildUmrah(activeOffer) } label: {
+                    Text(tr("Добавить в сборку Umrah", "Add to Umrah package", "Umra paketiga qo‘shish", "Умра пакетига қўшиш"))
+                        .font(IumrahType.bold(14)).frame(maxWidth: .infinity).frame(height: 44)
+                }.buttonStyle(IumrahSecondaryButtonStyle()).disabled(cartAnimationVisible)
+            }
+        }.padding(.horizontal, IumrahDesign.pagePadding).padding(.vertical, 10).background(.regularMaterial)
     }
 
-    @ViewBuilder
-    private var returnCard: some View {
+    private var outboundCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let legs = FlightDiscoveryItineraryValidator.verified(activeOffer.outboundSegments, origin: outboundOrigin, destination: outboundDestination, transfers: activeOffer.transfers) {
+                ForEach(Array(legs.enumerated()), id: \.offset) { index, leg in
+                    if index > 0 { IumrahPremiumFlightConnection(previous: IumrahPremiumFlightLeg(legs[index - 1]), next: IumrahPremiumFlightLeg(leg), language: language) }
+                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language)
+                }
+            } else {
+                IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(airline: activeOffer.airlineName, airlineCode: activeOffer.airlineCode, number: activeOffer.flightNumber, origin: outboundOrigin, destination: outboundDestination, departure: activeOffer.departureAt, arrival: activeOffer.arrivalAt, duration: activeOffer.durationMinutes, stops: activeOffer.transfers), language: language)
+            }
+        }
+    }
+
+    @ViewBuilder private var returnCard: some View {
         if let returnAt = effectiveReturnAt {
-            flightLegCard(
-                title: "\(airportCity(outboundDestination)) — \(airportCity(outboundOrigin))",
-                subtitle: tr("Обратный перелёт", "Return flight", "Qaytish reysi", "Қайтиш рейси"),
-                departureAt: returnAt,
-                origin: outboundDestination,
-                destination: outboundOrigin,
-                duration: activeOffer.returnDurationMinutes ?? 0,
-                transfers: activeOffer.returnTransfers ?? -1,
-                flightNumber: returnFlightNumberText,
-                airlineCode: activeOffer.returnAirlineCode ?? "",
-                airlineName: returnAirlineName
-            )
-        } else {
-            EmptyView()
+            VStack(alignment: .leading, spacing: 14) {
+                Text(tr("Обратный перелёт", "Return flight", "Qaytish reysi", "Қайтиш рейси")).font(IumrahType.bold(21))
+                if let legs = FlightDiscoveryItineraryValidator.verified(activeOffer.inboundSegments, origin: outboundDestination, destination: outboundOrigin, transfers: activeOffer.returnTransfers ?? -1) {
+                    ForEach(Array(legs.enumerated()), id: \.offset) { index, leg in
+                        if index > 0 { IumrahPremiumFlightConnection(previous: IumrahPremiumFlightLeg(legs[index - 1]), next: IumrahPremiumFlightLeg(leg), language: language) }
+                        IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language)
+                    }
+                } else {
+                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(airline: activeOffer.returnAirlineCode.map { FlightReferenceCatalog.airlineName(code: $0, fallback: $0) } ?? "", airlineCode: activeOffer.returnAirlineCode ?? "", number: activeOffer.returnFlightNumber ?? "", origin: outboundDestination, destination: outboundOrigin, departure: returnAt, arrival: nil, duration: activeOffer.returnDurationMinutes ?? 0, stops: activeOffer.returnTransfers ?? -1), language: language)
+                }
+            }
         }
     }
 

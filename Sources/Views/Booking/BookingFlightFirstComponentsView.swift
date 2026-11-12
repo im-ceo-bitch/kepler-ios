@@ -511,6 +511,15 @@ private struct BookingFlightFirstLegCard: View {
 
             if expanded {
                 Divider().padding(.vertical, 14)
+                NavigationLink {
+                    FlightDetailsView(offer: flight)
+                } label: {
+                    HStack {
+                        Text(localized("Детали рейса", "Flight details", "Reys tafsilotlari", "Рейс тафсилотлари")).font(IumrahType.bold(14))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    }.foregroundStyle(.primary)
+                }.buttonStyle(.plain)
                 VStack(spacing: 11) {
                     fact(localized("Аэропорт вылета", "Departure airport", "Jo‘nash aeroporti", "Жўнаш аэропорти"), airportText(flight.origin))
                     fact(localized("Аэропорт прилёта", "Arrival airport", "Yetib borish aeroporti", "Етиб бориш аэропорти"), airportText(flight.destination))

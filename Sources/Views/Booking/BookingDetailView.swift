@@ -1644,6 +1644,18 @@ private struct BookingFlightDisclosureCard: View {
                     .foregroundStyle(.secondary)
             }
 
+            if let offer {
+                NavigationLink {
+                    FlightDetailsView(offer: offer)
+                } label: {
+                    HStack {
+                        Text(L10n.text("flight_details_cta", settings.language)).font(IumrahType.bold(14))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    }.foregroundStyle(.primary)
+                }.buttonStyle(.plain)
+            }
+
             if isExpanded {
                 Divider()
                 if let offer {

@@ -3406,7 +3406,6 @@ struct PackageFlightLegDetailCard: View {
     let language: AppSettingsStore.Language
     let actionTitle: String?
     let onChange: (() -> Void)?
-    @State private var expanded = false
 
     init(
         leg: StorefrontFlightLeg,
@@ -3425,11 +3424,15 @@ struct PackageFlightLegDetailCard: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Button {
-                    withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
-                        expanded.toggle()
+                NavigationLink {
+                    ScrollView(showsIndicators: false) {
+                        IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language)
+                            .padding(IumrahDesign.pagePadding)
                     }
-                    IumrahHaptics.selection()
+                    .background(Color.iumrahPageBackground)
+                    .iumrahInternalNavigation()
+                    .navigationTitle(leg.airline)
+                    .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: IumrahPremiumFlightLeg(leg).share) { Image(systemName: "square.and.arrow.up") } } }
                 } label: {
                     HStack(spacing: 14) {
                         AirlineLogoView(airlineCode: leg.airlineCode, size: 50)
@@ -3459,10 +3462,9 @@ struct PackageFlightLegDetailCard: View {
                             Text(directText)
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.secondary)
-                            Image(systemName: "chevron.down")
+                            Image(systemName: "chevron.right")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(.tertiary)
-                                .rotationEffect(.degrees(expanded ? 180 : 0))
                         }
                     }
                     .contentShape(Rectangle())
@@ -3484,55 +3486,8 @@ struct PackageFlightLegDetailCard: View {
                 }
             }
 
-            if expanded {
-                Divider().padding(.vertical, 14)
-                VStack(spacing: 11) {
-                    flightFact(title: departureAirportTitle, value: airportText(leg.origin))
-                    flightFact(title: arrivalAirportTitle, value: airportText(leg.destination))
-                    flightFact(title: departureTimeTitle, value: fullDateTime(leg.departureAt))
-                    flightFact(title: arrivalTimeTitle, value: fullDateTime(leg.arrivalAt))
-                    flightFact(title: durationTitle, value: durationText(leg.durationMinutes))
-                    flightFact(title: cabinTitle, value: leg.cabinClass.isEmpty ? "—" : leg.cabinClass.capitalized)
-                    flightFact(title: flightNumberTitle, value: leg.flightNumber)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
         .iumrahCard()
-    }
-
-    private func flightFact(title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 12)
-            Text(value)
-                .font(.caption.weight(.semibold))
-                .multilineTextAlignment(.trailing)
-        }
-    }
-
-    private func airportText(_ code: String) -> String {
-        if let airport = FlightReferenceCatalog.airport(code) {
-            return "\(airport.city) · \(airport.name) · \(code.uppercased())"
-        }
-        return code.uppercased()
-    }
-
-    private func fullDateTime(_ value: String) -> String {
-        guard let date = parseStorefrontISO(value) else { return value }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: language.localeIdentifier)
-        formatter.setLocalizedDateFormatFromTemplate("d MMM yyyy HH:mm")
-        return formatter.string(from: date)
-    }
-
-    private func durationText(_ minutes: Int) -> String {
-        let h = max(0, minutes) / 60
-        let m = max(0, minutes) % 60
-        if m == 0 { return "\(h)h" }
-        return "\(h)h \(m)m"
     }
 
     private var directText: String {
@@ -3544,22 +3499,6 @@ struct PackageFlightLegDetailCard: View {
         }
     }
 
-    private var departureAirportTitle: String { tr("Аэропорт вылета", "Departure airport", "Jo‘nash aeroporti", "Жўнаш аэропорти") }
-    private var arrivalAirportTitle: String { tr("Аэропорт прилёта", "Arrival airport", "Yetib borish aeroporti", "Етиб бориш аэропорти") }
-    private var departureTimeTitle: String { tr("Вылет", "Departure", "Jo‘nash", "Жўнаш") }
-    private var arrivalTimeTitle: String { tr("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш") }
-    private var durationTitle: String { tr("В пути", "Duration", "Yo‘lda", "Йўлда") }
-    private var cabinTitle: String { tr("Класс", "Cabin", "Klass", "Класс") }
-    private var flightNumberTitle: String { tr("Рейс", "Flight", "Reys", "Рейс") }
-
-    private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCy: String) -> String {
-        switch language {
-        case .russian: return ru
-        case .english, .turkish, .indonesian, .malay, .arabic: return en
-        case .uzbek: return uz
-        case .uzbekCyrillic: return uzCy
-        }
-    }
 }
 
 struct PackageHotelDetailCard: View {

@@ -1,0 +1,2 @@
+# Superseded by Unified Core V8
+All first-party iOS API calls use https://iumrah-backend.helloiumrah.workers.dev. Public links remain on iumrah.app. No legacy API fallback. Do not install this build before Business backend V8 is deployed, D1/R2 parity is confirmed and IUMRAH_CORE_CUTOVER_READY is enabled. See Business IUMRAH_UNIFIED_CORE_V8.md. Existing backend source/workflows remain for rollback; do not deploy the old Package Engine. No full Xcode build in this environment.

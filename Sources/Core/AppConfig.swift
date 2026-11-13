@@ -9,7 +9,7 @@ enum AppConfig {
     // separate Worker. The unified backend must implement these contracts.
     static let apiBaseURL = URL(string: "https://iumrah-backend.helloiumrah.workers.dev")!
     static let publicWebBaseURL = URL(string: "https://iumrah.app")!
-
+    // All first-party API requests use the unified Worker.
     private static let legacyAPIHosts: Set<String> = [
         "iumrah.app", "www.iumrah.app", "iumrah.uz", "www.iumrah.uz",
         "iumrahproject.com", "www.iumrahproject.com",
@@ -56,6 +56,10 @@ enum AppConfig {
         (url.port == nil || url.port == 443) && url.user == nil && url.password == nil
     }
 
+    static func isAllowedAPIOrigin(_ url: URL) -> Bool {
+        return isUnifiedAPIOrigin(url)
+    }
+
     /// Public external image/map links remain public. First-party API media and
     /// relative API resources follow the same Worker as the rest of the app.
     static func absoluteURL(_ rawValue: String?) -> URL? {
@@ -73,7 +77,8 @@ final class IumrahAPIOriginDelegate: NSObject, URLSessionTaskDelegate {
                     willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
-        guard let url = request.url, AppConfig.isUnifiedAPIOrigin(url) else {
+        guard let url = request.url, let original = response.url,
+              AppConfig.isAllowedAPIOrigin(url), url.host?.lowercased() == original.host?.lowercased() else {
             completionHandler(nil)
             return
         }

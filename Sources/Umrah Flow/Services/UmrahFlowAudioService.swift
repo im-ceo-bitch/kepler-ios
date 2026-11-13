@@ -23,6 +23,8 @@ final class UmrahFlowAudioService: ObservableObject {
     private let speechDelegate = UmrahFlowSpeechDelegate()
     private var interruptionObserver: NSObjectProtocol?
 
+    private let audioSession = URLSession(configuration: .default, delegate: IumrahAPIOriginDelegate(), delegateQueue: nil)
+
     private let audioCache: NSCache<NSURL, NSData> = {
         let cache = NSCache<NSURL, NSData>()
         cache.totalCostLimit = 48 * 1024 * 1024
@@ -116,12 +118,13 @@ final class UmrahFlowAudioService: ObservableObject {
 
     /// An invalid/HTML error response must never be cached as an MP3.
     private func audioData(for url: URL) async throws -> Data {
+        guard UmrahFlowAudioURLPolicy.isAllowed(url) else { throw URLError(.badURL) }
         let cacheKey = url as NSURL
         if let cached = audioCache.object(forKey: cacheKey) { return cached as Data }
         var request = URLRequest(url: url)
         request.cachePolicy = .returnCacheDataElseLoad
-        request.timeoutInterval = 15
-        let (data, response) = try await URLSession.shared.data(for: request)
+        request.timeoutInterval = 25
+        let (data, response) = try await audioSession.data(for: request)
         if let http = response as? HTTPURLResponse,
            !(200...299).contains(http.statusCode) {
             throw URLError(.badServerResponse)
@@ -129,7 +132,7 @@ final class UmrahFlowAudioService: ObservableObject {
         guard !data.isEmpty, data.count < 30 * 1024 * 1024 else {
             throw URLError(.dataLengthExceedsMaximum)
         }
-        // Supabase Storage may return an HTML/JSON error page with HTTP 200.
+        // An upstream audio service may return an HTML/JSON error page with HTTP 200.
         let prefix = data.prefix(64)
         if prefix.first == 0x3C || prefix.first == 0x7B {
             throw URLError(.cannotDecodeContentData)

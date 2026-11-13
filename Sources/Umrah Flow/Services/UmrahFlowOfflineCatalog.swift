@@ -30,7 +30,7 @@ struct UmrahFlowOfflineCatalog {
 
     func audioURLs(for language: String) -> [String: URL] {
         (payload?.audio[language] ?? [:]).reduce(into: [String: URL]()) { result, row in
-            guard let url = URL(string: row.value),
+            guard let url = AppConfig.apiURL(row.value),
                   UmrahFlowAudioURLPolicy.isAllowed(url) else { return }
             result[row.key] = url
         }
@@ -38,15 +38,9 @@ struct UmrahFlowOfflineCatalog {
 }
 
 
-/// Only download recordings from this project's public audio storage bucket.
-/// Supabase rows are still externally controlled data, not trusted code.
+/// Reject legacy cached URLs and all arbitrary recording origins.
 enum UmrahFlowAudioURLPolicy {
     static func isAllowed(_ url: URL) -> Bool {
-        guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
-        return parts.scheme?.lowercased() == "https" &&
-            parts.host?.lowercased() == "coaqrsapnpyutsxflsru.supabase.co" &&
-            parts.port == nil &&
-            parts.user == nil && parts.password == nil &&
-            parts.path.hasPrefix("/storage/v1/object/public/")
+        AppConfig.isUnifiedAPIOrigin(url) && url.path.hasPrefix("/api/services/advisor/audio/") && url.query == nil && url.fragment == nil
     }
 }

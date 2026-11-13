@@ -4,7 +4,7 @@ import Foundation
 struct UnifiedBackendRoutingSmoke {
     static func main() {
         let host = "iumrah-backend.helloiumrah.workers.dev"
-        let paths = ["/api/package/health", "/api/package/flights/detail", "/api/package/flights/search", "/api/package/quote", "/api/catalog/hotels", "/api/catalog/ziyarats", "/api/bookings/1234", "/api/package/client/account/login/email/start", "/api/catalog/hotels/client/trips/1234", "/api/catalog/hotels/client/chats/1234/messages", "/api/storefront/packages", "/api/airports", "/api/catalog/hotels/intelligence/events"]
+        let paths = ["/api/services/prayer", "/api/services/weather", "/api/services/fx", "/api/services/advisor/audio/en/tawaf_1", "/api/package/health", "/api/package/flights/detail", "/api/package/flights/search", "/api/package/quote", "/api/catalog/hotels", "/api/catalog/ziyarats", "/api/bookings/1234", "/api/package/client/account/login/email/start", "/api/catalog/hotels/client/trips/1234", "/api/catalog/hotels/client/chats/1234/messages", "/api/storefront/packages", "/api/airports", "/api/catalog/hotels/intelligence/events"]
         for path in paths {
             let url = AppConfig.apiURL(path)!
             precondition(url.host == host && url.path == path && AppConfig.isUnifiedAPIOrigin(url))

@@ -1,0 +1,58 @@
+{
+  "release": "V21 RC",
+  "cumulative": true,
+  "production_verified": false,
+  "workflows_modified": false,
+  "files": [
+    {
+      "path": "IUMRAH_V21_CLIENT_RELEASE_RC_RU.md",
+      "sha256": "282b022fd6638c5c90ace1e71bc0c892acbf4051abb3f629b8a81df83bfbaea1",
+      "bytes": 429
+    },
+    {
+      "path": "Resources/UmrahFlow/umrah_flow_catalog.json",
+      "sha256": "c38cb7aa9dd361f8cf1d5b8e55e501347821894d411bf06fe81ca0365353d281",
+      "bytes": 186181
+    },
+    {
+      "path": "Sources/Core/AppConfig.swift",
+      "sha256": "1a5e13b2ce65a520a4fc6040bb6c2b5ba8f63534a6df1ed400f7da2090b78e04",
+      "bytes": 4350
+    },
+    {
+      "path": "Sources/Services/LocalFXRateService.swift",
+      "sha256": "a2e88a22ef55097c637251f8c1c988a6dfe5a77fbe24ad556e022584a0e202fd",
+      "bytes": 2616
+    },
+    {
+      "path": "Sources/Umrah Flow/Services/UmrahFlowAudioService.swift",
+      "sha256": "b04694e6c393209c1bad2293d2a13f1b29f00c8d40f317c58e521058dc626772",
+      "bytes": 10325
+    },
+    {
+      "path": "Sources/Umrah Flow/Services/UmrahFlowOfflineCatalog.swift",
+      "sha256": "ce628b1c319cc767af125d8e505c7f93a3ccd91f253fe4c24aaa4e1640099877",
+      "bytes": 1729
+    },
+    {
+      "path": "Sources/Umrah Flow/Services/UmrahFlowStore.swift",
+      "sha256": "6cd0e5740f0ffbc187616ed6a1de034ca5a39f7411967638d7c13bf5900658dd",
+      "bytes": 5178
+    },
+    {
+      "path": "Sources/Umrah Flow/Services/UmrahFlowSupabaseClient.swift",
+      "sha256": "2c49d64a9235f84fe7d496a34bbdabb3ac2c633f81322be0107a294c8023209c",
+      "bytes": 1847
+    },
+    {
+      "path": "Sources/Views/Booking/JourneyTravelInfoView.swift",
+      "sha256": "6e78c30f2dba979f06f490a416c485d7ec5866af488b17260061540c84493de9",
+      "bytes": 64195
+    },
+    {
+      "path": "Tests/UnifiedBackendRoutingSmoke.swift",
+      "sha256": "00305927fc04dd778236f62f55e53f84b4f63d40b53dddbc994e60ebbe19e3a0",
+      "bytes": 2567
+    }
+  ]
+}

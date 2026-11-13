@@ -10,7 +10,7 @@ final class UmrahFlowStore: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var guideLanguage: UmrahGuideLanguage
 
-    private let client = UmrahFlowSupabaseClient()
+    private let client = UmrahFlowBackendClient()
     private let defaults = UserDefaults.standard
 
     init(language: UmrahGuideLanguage = .english) {
@@ -92,7 +92,7 @@ final class UmrahFlowStore: ObservableObject {
         if let data = defaults.data(forKey: translationsCacheKey(language)),
            let map = try? JSONDecoder().decode([String: String].self, from: data) {
             // Reviewed app-bundled content wins over an older on-device cache.
-            // The latest Supabase response (when reachable) is applied later.
+            // The latest backend response (when reachable) is applied later.
             translations.merge(map) { bundled, _ in bundled }
         }
 

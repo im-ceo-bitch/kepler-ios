@@ -28,7 +28,7 @@ final class LocalFXRateService {
 
     private func refreshIfNeeded() async throws {
         if let cachedAt, Date().timeIntervalSince(cachedAt) < cacheLifetime, cached.count > 1 { return }
-        guard let url = URL(string: "https://cbu.uz/en/arkhiv-kursov-valyut/json/") else { throw LocalFXError.unavailable }
+        guard let url = AppConfig.apiURL("/api/services/fx") else { throw LocalFXError.unavailable }
         var request = URLRequest(url: url)
         request.timeoutInterval = 8
         request.setValue("application/json", forHTTPHeaderField: "Accept")

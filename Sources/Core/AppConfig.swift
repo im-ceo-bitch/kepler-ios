@@ -12,7 +12,7 @@ enum AppConfig {
     // All first-party API requests use the unified Worker.
     private static let legacyAPIHosts: Set<String> = [
         "iumrah.app", "www.iumrah.app", "iumrah.uz", "www.iumrah.uz",
-        "iumrahproject.com", "www.iumrahproject.com",
+        "iumrahproject.com", "www.iumrahproject.com", "iumrah.us", "www.iumrah.us",
         "iumrah-package-api.helloiumrah.workers.dev", "iumrah-flight-hub.helloiumrah.workers.dev"
     ]
 

@@ -1,191 +1,247 @@
-name: Deploy iumrah Package Engine
+name: Sync iumrah Backend integrations
 
 on:
   workflow_dispatch:
+    inputs:
+      sync_missing_secrets:
+        description: 'Add missing integration secrets to existing iumrah-backend (never replace existing secrets)'
+        type: boolean
+        default: true
+        required: true
 
 permissions:
   contents: read
 
+concurrency:
+  group: iumrah-backend-integrations
+  cancel-in-progress: false
+
 jobs:
-  deploy:
+  integrations:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: Backend/PackageEngine
+    timeout-minutes: 10
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      SYNC_MISSING_SECRETS: ${{ inputs.sync_missing_secrets }}
+      NEW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.NEW_CLOUDFLARE_ACCOUNT_ID }}
+      NEW_CLOUDFLARE_API_TOKEN: ${{ secrets.NEW_CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-      D1_NAME: iumrah-hotels
-
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      IGNAV_API_KEY: ${{ secrets.IGNAV_API_KEY }}
+      TRAVELPAYOUTS_API_TOKEN: ${{ secrets.TRAVELPAYOUTS_API_TOKEN }}
+      DEVSMS_API_TOKEN: ${{ secrets.DEVSMS_API_TOKEN }}
+      AERODATABOX_RAPIDAPI_KEY: ${{ secrets.AERODATABOX_RAPIDAPI_KEY }}
+      AERODATABOX_RAPIDAPI_KEY_BACKUP: ${{ secrets.AERODATABOX_RAPIDAPI_KEY_BACKUP }}
+      WALLET_CERT_PEM: ${{ secrets.WALLET_CERT_PEM }}
+      WALLET_KEY_PEM: ${{ secrets.WALLET_KEY_PEM }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Verify deploy secrets
-        env:
-          IGNAV_API_KEY: ${{ secrets.IGNAV_API_KEY }}
-          TRAVELPAYOUTS_API_TOKEN: ${{ secrets.TRAVELPAYOUTS_API_TOKEN }}
-          DEVSMS_API_TOKEN: ${{ secrets.DEVSMS_API_TOKEN }}
-          WALLET_CERT_PEM: ${{ secrets.WALLET_CERT_PEM }}
-          WALLET_KEY_PEM: ${{ secrets.WALLET_KEY_PEM }}
+      - name: Sync and verify existing unified backend
+        shell: bash
         run: |
           set -euo pipefail
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_ZONE_ID IGNAV_API_KEY TRAVELPAYOUTS_API_TOKEN DEVSMS_API_TOKEN WALLET_CERT_PEM WALLET_KEY_PEM; do
-            if [ -z "${!name:-}" ]; then
-              echo "Missing GitHub secret: $name"
-              exit 1
-            fi
-          done
-          echo "Required deployment secrets are present."
+          python3 - <<'PYTHON'
+          import json
+          import os
+          import re
+          import subprocess
+          import tempfile
+          import time
+          from pathlib import Path
+          from urllib.request import Request, build_opener, HTTPRedirectHandler
+          from urllib.error import HTTPError, URLError
 
-      - name: Verify DevSMS API token
-        env:
-          DEVSMS_API_TOKEN: ${{ secrets.DEVSMS_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          RESPONSE=$(curl -fsS "https://devsms.uz/api/get_balance.php" \
-            -H "Authorization: Bearer ${DEVSMS_API_TOKEN}" \
-            -H "Accept: application/json")
-          echo "$RESPONSE" | jq -e '.success == true' >/dev/null
-          echo "DevSMS API token is valid."
+          ORIGIN = 'https://iumrah-backend.helloiumrah.workers.dev'
+          API = 'https://api.cloudflare.com/client/v4'
+          WORKER = 'iumrah-backend'
+          REQUIRED = ('IGNAV_API_KEY', 'TRAVELPAYOUTS_API_TOKEN', 'DEVSMS_API_TOKEN')
+          AERO = ('AERODATABOX_RAPIDAPI_KEY', 'AERODATABOX_RAPIDAPI_KEY_BACKUP')
+          WALLET = ('WALLET_CERT_PEM', 'WALLET_KEY_PEM', 'WALLET_WWDR_CERT_PEM')
 
-      - name: Install dependencies
-        run: npm install
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
 
-      - name: Typecheck and tests
-        run: |
-          npm run typecheck
-          npm test
+          opener = build_opener(NoRedirect())
 
-      - name: Resolve EXISTING iumrah-hotels D1
-        id: d1
-        run: |
-          set -euo pipefail
-          LIST=$(curl -fsS \
-            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json")
+          def fetch_bytes(url, *, token=None, method='GET', payload=None):
+              headers = {'Accept': 'application/json', 'User-Agent': 'iumrah-integrations-ci/1.0'}
+              if token: headers['Authorization'] = 'Bearer ' + token
+              data = None
+              if payload is not None:
+                  headers['Content-Type'] = 'application/json'
+                  data = json.dumps(payload).encode()
+              try:
+                  with opener.open(Request(url, data=data, headers=headers, method=method), timeout=30) as r:
+                      return r.read(2_000_000)
+              except HTTPError as e:
+                  # Do not print provider bodies, headers, tokens or request payloads.
+                  raise RuntimeError(f'HTTP {e.code}: {url.split("?")[0]}') from None
+              except (URLError, TimeoutError):
+                  raise RuntimeError(f'Network error: {url.split("?")[0]}') from None
 
-          DB_ID=$(printf '%s' "$LIST" | jq -r --arg NAME "$D1_NAME" \
-            '.result[]? | select(.name == $NAME) | (.uuid // .id)' | head -n 1)
+          def get_json(url, **kwargs):
+              try: return json.loads(fetch_bytes(url, **kwargs))
+              except (ValueError, UnicodeError): raise RuntimeError('Invalid JSON: ' + url.split('?')[0]) from None
 
-          if [ -z "$DB_ID" ] || [ "$DB_ID" = "null" ]; then
-            echo "Existing D1 database '$D1_NAME' was not found. Refusing to create a second hotel database."
-            exit 1
-          fi
+          def cloudflare(url, token, **kwargs):
+              data = get_json(url, token=token, **kwargs)
+              if not isinstance(data, dict) or data.get('success') is not True:
+                  raise RuntimeError('Cloudflare rejected request: ' + url.split('?')[0])
+              return data.get('result')
 
-          echo "Using existing D1: $D1_NAME ($DB_ID)"
-          echo "database_id=$DB_ID" >> "$GITHUB_OUTPUT"
+          def select_credentials(env):
+              new_id, new_token = (env.get(x, '').strip() for x in ('NEW_CLOUDFLARE_ACCOUNT_ID','NEW_CLOUDFLARE_API_TOKEN'))
+              if new_id or new_token:
+                  if not (new_id and new_token): raise RuntimeError('Set BOTH NEW_CLOUDFLARE_ACCOUNT_ID and NEW_CLOUDFLARE_API_TOKEN in kepler-ios.')
+                  account, token = new_id, new_token
+              else:
+                  account, token = (env.get(x, '').strip() for x in ('CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_API_TOKEN'))
+              if not re.fullmatch(r'[a-fA-F0-9]{32}', account) or not token:
+                  raise RuntimeError('Missing Cloudflare credentials for helloiumrah account.')
+              return account, token
 
-      - name: Generate production Wrangler config
-        run: |
-          node scripts/render-config.mjs "${{ steps.d1.outputs.database_id }}" "$CLOUDFLARE_ZONE_ID"
-          node -e "JSON.parse(require('fs').readFileSync('wrangler.generated.jsonc','utf8')); console.log('Wrangler config JSON OK')"
+          def retry_health(path, predicate, get=get_json, sleep=time.sleep):
+              last = 'not ready'
+              for i in range(6):
+                  try:
+                      data = get(ORIGIN + path)
+                      if isinstance(data, dict) and predicate(data): return data
+                      last = 'unexpected health response or required flags missing'
+                  except RuntimeError as e: last = str(e)
+                  if i < 5: sleep(5)
+              raise RuntimeError(path + ': ' + last)
 
-      - name: Apply Package Engine schema to existing D1
-        run: npx wrangler d1 execute HOTELS_DB --remote --file migrations/0006_package_primary_hotels.sql --config wrangler.generated.jsonc
+          def unified_health(h):
+              return (h.get('ok') is True and h.get('service') == WORKER
+                      and all(h.get('bindings', {}).get(k) is True for k in ('HOTELS_DB','BOOKINGS_DB','FLIGHTS_DB'))
+                      and all(h.get('modules', {}).get(k) is True for k in ('packages','core','hotels','flights')))
 
-      - name: Apply DevSMS phone verification schema
-        run: npx wrangler d1 execute HOTELS_DB --remote --file migrations/0008_devsms_phone_verification.sql --config wrangler.generated.jsonc
+          def package_health(h):
+              return (h.get('ok') is True and h.get('service') == 'iumrah-package-engine'
+                      and h.get('hotelsDbConfigured') is True and h.get('bookingsDbConfigured') is True)
 
-      - name: Verify Package Engine table
-        run: npx wrangler d1 execute HOTELS_DB --remote --command "SELECT COUNT(*) AS configured FROM package_primary_hotels;" --config wrangler.generated.jsonc
+          def openssl(*args):
+              try:
+                  return subprocess.run(['openssl', *args], check=True, capture_output=True, timeout=20).stdout
+              except (subprocess.SubprocessError, OSError):
+                  raise RuntimeError('Apple Wallet certificate/key validation failed: ' + args[0]) from None
 
-      - name: Deploy Package Engine routes
-        run: npx wrangler deploy --config wrangler.generated.jsonc
+          def prepare_wallet(cert, key, download=fetch_bytes):
+              with tempfile.TemporaryDirectory() as folder:
+                  p = Path(folder)
+                  der = p/'wwdr.der'; pem = p/'wwdr.pem'
+                  der.write_bytes(download('https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer'))
+                  pem.write_bytes(openssl('x509','-inform','DER','-in',str(der),'-outform','PEM'))
+                  subject = openssl('x509','-in',str(pem),'-noout','-subject','-nameopt','RFC2253').decode()
+                  if 'OU=G4' not in subject: raise RuntimeError('Apple WWDR G4 certificate mismatch')
+                  openssl('x509','-in',str(pem),'-checkend','0','-noout')
+                  if cert is not None and key is not None:
+                      c = p/'cert.pem'; k = p/'key.pem'
+                      c.write_text(cert); k.write_text(key)
+                      k.chmod(0o600)
+                      subject = openssl('x509','-in',str(c),'-noout','-subject','-nameopt','RFC2253').decode()
+                      issuer = openssl('x509','-in',str(c),'-noout','-issuer','-nameopt','RFC2253').decode()
+                      if not all(x in subject for x in ('UID=pass.com.iumrah.id','OU=2DQ678JTNG')) or 'OU=G4' not in issuer:
+                          raise RuntimeError('Apple Wallet certificate identity mismatch')
+                      openssl('x509','-in',str(c),'-checkend','0','-noout')
+                      openssl('pkey','-in',str(k),'-passin','pass:','-check','-noout')
+                      pub1 = openssl('x509','-in',str(c),'-pubkey','-noout')
+                      pub2 = openssl('pkey','-in',str(k),'-passin','pass:','-pubout')
+                      if pub1.strip() != pub2.strip(): raise RuntimeError('Apple Wallet certificate and key do not match')
+                      openssl('verify','-partial_chain','-trusted',str(pem),str(c))
+                  return pem.read_text()
 
-      - name: Install Ignav Worker secret
-        env:
-          IGNAV_API_KEY: ${{ secrets.IGNAV_API_KEY }}
-        run: |
-          set -euo pipefail
-          printf '%s' "$IGNAV_API_KEY" | npx wrangler secret put IGNAV_API_KEY --config wrangler.generated.jsonc
+          def plan_missing(existing, env, wallet=prepare_wallet, get=get_json):
+              # Never rotate an existing secret or overwrite an existing non-secret binding.
+              pending = {}
+              for name in REQUIRED + AERO:
+                  value = env.get(name, '').strip()
+                  if name not in existing and value: pending[name] = value
+              missing = [n for n in REQUIRED if n not in existing and n not in pending]
+              if missing: raise RuntimeError('Missing in both Worker and GitHub Secrets: ' + ', '.join(missing))
+              if not any(n in existing or n in pending for n in AERO):
+                  raise RuntimeError('No AeroDataBox key configured in Worker or GitHub Secrets.')
+              if 'DEVSMS_API_TOKEN' in pending:
+                  data = get('https://devsms.uz/api/get_balance.php', token=pending['DEVSMS_API_TOKEN'])
+                  if data.get('success') is not True: raise RuntimeError('DevSMS token from GitHub did not pass balance check.')
+                  print('DevSMS: supplied token validated (balance not logged).')
+              cert, key, wwdr = WALLET
+              if (cert in existing) != (key in existing):
+                  raise RuntimeError('Apple Wallet pair partially installed; refusing to mix old and new keys. Restore the matching pair in Cloudflare first.')
+              if cert not in existing:
+                  c, k = (env.get(n, '').strip() for n in (cert,key))
+                  if not c or not k: raise RuntimeError('Missing Apple Wallet certificate/key in Worker and GitHub Secrets.')
+                  chain = wallet(c,k)
+                  pending.update({cert:c,key:k})
+                  if wwdr not in existing: pending[wwdr] = chain
+                  print('Apple Wallet: new certificate and key validated as a pair.')
+              elif wwdr not in existing:
+                  pending[wwdr] = wallet(None,None)
+                  print('Apple Wallet: adding missing WWDR G4 certificate; existing pair preserved.')
+              return pending
 
-      - name: Install DevSMS Worker secret
-        env:
-          DEVSMS_API_TOKEN: ${{ secrets.DEVSMS_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          printf '%s' "$DEVSMS_API_TOKEN" | npx wrangler secret put DEVSMS_API_TOKEN --config wrangler.generated.jsonc
+          def run(env=os.environ, cf=cloudflare, get=get_json, wallet=prepare_wallet, sleep=time.sleep):
+              account, token = select_credentials(env)
+              root = f'{API}/accounts/{account}/workers'
+              script = root + '/scripts/' + WORKER
+              subdomain = cf(root+'/subdomain', token)
+              if not isinstance(subdomain, dict) or subdomain.get('subdomain') != 'helloiumrah':
+                  raise RuntimeError('WRONG_CLOUDFLARE_ACCOUNT: use NEW_CLOUDFLARE_ACCOUNT_ID and NEW_CLOUDFLARE_API_TOKEN for helloiumrah. Nothing changed.')
+              health = retry_health('/__iumrah/health', unified_health, get, sleep)
+              retry_health('/api/package/health', package_health, get, sleep)
+              # Read-only identity checks are complete before any possible secret write.
+              listed = cf(script+'/secrets', token)
+              settings = cf(script+'/settings', token)
+              if not isinstance(listed, list) or not isinstance(settings, dict) or not isinstance(settings.get('bindings'), list):
+                  raise RuntimeError('Unable to inspect existing Worker bindings safely.')
+              existing = {r['name'] for r in listed + settings['bindings'] if isinstance(r,dict) and isinstance(r.get('name'),str)}
+              if env.get('SYNC_MISSING_SECRETS','true').lower() == 'true':
+                  pending = plan_missing(existing, env, wallet, get)
+                  if pending:
+                      # Re-read immediately before writing; refuse if another deployment added a planned name.
+                      latest = cf(script+'/secrets', token)
+                      latest_settings = cf(script+'/settings', token)
+                      if not isinstance(latest,list) or not isinstance(latest_settings,dict) or not isinstance(latest_settings.get('bindings'),list):
+                          raise RuntimeError('Cannot recheck bindings before update.')
+                      latest_names = {r['name'] for r in latest + latest_settings['bindings'] if isinstance(r,dict) and isinstance(r.get('name'),str)}
+                      if set(pending)&latest_names: raise RuntimeError('Bindings changed during preflight. Rerun after other deploys finish.')
+                      # Merge patch, missing names only. No null/deletions, no source upload, no route or schedule changes.
+                      payload = {'secrets': {n: {'name':n,'type':'secret_text','text':v} for n,v in pending.items()}}
+                      cf(script+'/secrets-bulk', token, method='PATCH', payload=payload)
+                      print('Added missing secrets: ' + ', '.join(sorted(pending)))
+                  else: print('All configured integration secrets preserved; no changes necessary.')
+              else: print('Verification-only mode. No Cloudflare writes.')
+              # Verify real, directly addressed unified module; do not trust the old public domain.
+              def providers_ready(h):
+                  return (package_health(h) and h.get('flightProvider')=='ignav' and h.get('flightProviderConfigured') is True
+                          and h.get('flightDiscoveryProvider')=='aviasales-data' and h.get('flightDiscoveryConfigured') is True
+                          and h.get('smsProvider')=='devsms' and h.get('smsProviderConfigured') is True
+                          and h.get('aerodataBoxConfigured') is True)
+              try:
+                  h = retry_health('/api/package/health', providers_ready, get, sleep)
+              except RuntimeError:
+                  h = retry_health('/api/package/health', package_health, get, sleep)
+                  missing = [n for n,k in [('Ignav','flightProviderConfigured'),('Aviasales','flightDiscoveryConfigured'),('DevSMS','smsProviderConfigured'),('AeroDataBox','aerodataBoxConfigured')] if h.get(k) is not True]
+                  raise RuntimeError('Unified integration health check failed: ' + (', '.join(missing) or 'provider contract mismatch')) from None
+              current = cf(script+'/secrets', token)
+              if not isinstance(current, list): raise RuntimeError('Cannot verify installed secret bindings.')
+              current_names = {r.get('name') for r in current if isinstance(r,dict)}
+              if not set(WALLET).issubset(current_names): raise RuntimeError('Apple Wallet secret bindings incomplete.')
+              health = retry_health('/__iumrah/health', unified_health, get, sleep)
+              retry_health('/health', lambda x:x.get('ok') is True and x.get('database_connected') is True, get, sleep)
+              retry_health('/v1/public/status', lambda x:x.get('ok') is True and x.get('ready') is True and isinstance(x.get('counts',{}).get('flights'),int), get, sleep)
+              print('Unified Worker: ' + ORIGIN)
+              print('Ignav, Aviasales, DevSMS, AeroDataBox: configured. Wallet: secret bindings present.')
+              print('AeroDataBox primary=' + str(h.get('aerodataBoxPrimaryConfigured') is True) + ', backup=' + str(h.get('aerodataBoxBackupConfigured') is True))
+              if not health.get('modules',{}).get('coreCutoverEnabled'):
+                  print('::warning::Core cutover pending. Existing accounts/bookings migration is not proven. Do not retire old data.')
+              if not health.get('fullyConfigured'):
+                  print('::warning::Some non-core bindings are missing; check R2 and unified backend health.')
+              print('Health flags verify configuration, not live supplier responses or Wallet signing. No source deployment was performed.')
 
-      - name: Install Travelpayouts Worker secret
-        env:
-          TRAVELPAYOUTS_API_TOKEN: ${{ secrets.TRAVELPAYOUTS_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          printf '%s' "$TRAVELPAYOUTS_API_TOKEN" | npx wrangler secret put TRAVELPAYOUTS_API_TOKEN --config wrangler.generated.jsonc
-
-      - name: Validate and install Apple Wallet Worker secrets
-        env:
-          WALLET_CERT_PEM: ${{ secrets.WALLET_CERT_PEM }}
-          WALLET_KEY_PEM: ${{ secrets.WALLET_KEY_PEM }}
-        run: |
-          set -euo pipefail
-
-          CERT_FILE="$(mktemp)"
-          KEY_FILE="$(mktemp)"
-          WWDR_DER="$(mktemp)"
-          WWDR_PEM="$(mktemp)"
-          trap 'rm -f "$CERT_FILE" "$KEY_FILE" "$WWDR_DER" "$WWDR_PEM"' EXIT
-
-          printf '%s\n' "$WALLET_CERT_PEM" > "$CERT_FILE"
-          printf '%s\n' "$WALLET_KEY_PEM" > "$KEY_FILE"
-
-          openssl x509 -in "$CERT_FILE" -noout -subject -issuer -dates -nameopt RFC2253
-          openssl pkey -in "$KEY_FILE" -check -noout
-
-          SUBJECT="$(openssl x509 -in "$CERT_FILE" -noout -subject -nameopt RFC2253)"
-          ISSUER="$(openssl x509 -in "$CERT_FILE" -noout -issuer -nameopt RFC2253)"
-          printf '%s' "$SUBJECT" | grep -F 'UID=pass.com.iumrah.id' >/dev/null
-          printf '%s' "$SUBJECT" | grep -F 'OU=2DQ678JTNG' >/dev/null
-          printf '%s' "$ISSUER" | grep -F 'OU=G4' >/dev/null
-
-          CERT_PUB_SHA="$(openssl x509 -in "$CERT_FILE" -pubkey -noout | openssl pkey -pubin -outform DER 2>/dev/null | openssl dgst -sha256 | awk '{print $2}')"
-          KEY_PUB_SHA="$(openssl pkey -in "$KEY_FILE" -pubout -outform DER 2>/dev/null | openssl dgst -sha256 | awk '{print $2}')"
-          if [ "$CERT_PUB_SHA" != "$KEY_PUB_SHA" ]; then
-            echo 'Apple Wallet certificate does not match WALLET_KEY_PEM.'
-            exit 1
-          fi
-
-          curl -fsSL 'https://www.apple.com/certificateauthority/AppleWWDRCAG4.cer' -o "$WWDR_DER"
-          openssl x509 -inform DER -in "$WWDR_DER" -out "$WWDR_PEM"
-          openssl x509 -in "$WWDR_PEM" -noout -subject -dates -nameopt RFC2253
-          openssl x509 -in "$WWDR_PEM" -noout -subject -nameopt RFC2253 | grep -F 'OU=G4' >/dev/null
-
-          printf '%s' "$WALLET_CERT_PEM" | npx wrangler secret put WALLET_CERT_PEM --config wrangler.generated.jsonc
-          printf '%s' "$WALLET_KEY_PEM" | npx wrangler secret put WALLET_KEY_PEM --config wrangler.generated.jsonc
-          cat "$WWDR_PEM" | npx wrangler secret put WALLET_WWDR_CERT_PEM --config wrangler.generated.jsonc
-
-          echo 'Apple Wallet signing certificate, matching private key, and WWDR G4 were installed.'
-
-      - name: Verify Package Engine and Ignav
-        working-directory: ${{ github.workspace }}
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4 5 6; do
-            if RESPONSE=$(curl -fsS "https://iumrah.app/api/package/health"); then
-              echo "$RESPONSE" | jq .
-              if echo "$RESPONSE" | jq -e '
-                .ok == true and
-                .hotelsDbConfigured == true and
-                .flightProvider == "ignav" and
-                .flightProviderConfigured == true and
-                .flightDiscoveryProvider == "aviasales-data" and
-                .flightDiscoveryConfigured == true and
-                .smsProvider == "devsms" and
-                .smsProviderConfigured == true
-              ' >/dev/null; then
-                echo "iumrah Package Engine is online; Ignav, Aviasales Data API and DevSMS are configured."
-                exit 0
-              fi
-            fi
-            sleep 5
-          done
-          echo "Package Engine health check failed: Ignav, Aviasales Data API or DevSMS is not configured."
-          exit 1
+          if __name__ == '__main__':
+              try: run()
+              except Exception as exc:
+                  # Only our controlled errors are shown, never API responses or tracebacks with secret values.
+                  print('::error::' + (str(exc) if isinstance(exc,RuntimeError) else type(exc).__name__))
+                  raise SystemExit(1)
+          PYTHON

@@ -2,30 +2,27 @@ name: Deploy iumrah backend (full)
 
 on:
   workflow_dispatch:
-    inputs:
-      sync_missing_secrets:
-        description: 'Add missing integration secrets to existing iumrah-backend (never replace existing secrets)'
-        type: boolean
-        default: true
-        required: true
 
 permissions:
   contents: read
 
 concurrency:
-  group: iumrah-backend-full-dispatch
+  group: iumrah-backend-direct-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 35
     env:
-      SYNC_MISSING_SECRETS: ${{ inputs.sync_missing_secrets }}
-      NEW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.NEW_CLOUDFLARE_ACCOUNT_ID }}
-      NEW_CLOUDFLARE_API_TOKEN: ${{ secrets.NEW_CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      HOTELS_DB_NAME: iumrah-hotels
+      BOOKINGS_DB_NAME: iumrah-core
+      FLIGHTS_DB_NAME: iumrah-flights
+      IUMRAH_ENABLE_ROUTE_CUTOVER: '0'
+      IUMRAH_ENABLE_SCHEDULED_JOBS: '1'
+      SYNC_MISSING_SECRETS: 'true'
       IGNAV_API_KEY: ${{ secrets.IGNAV_API_KEY }}
       TRAVELPAYOUTS_API_TOKEN: ${{ secrets.TRAVELPAYOUTS_API_TOKEN }}
       DEVSMS_API_TOKEN: ${{ secrets.DEVSMS_API_TOKEN }}
@@ -34,109 +31,57 @@ jobs:
       WALLET_CERT_PEM: ${{ secrets.WALLET_CERT_PEM }}
       WALLET_KEY_PEM: ${{ secrets.WALLET_KEY_PEM }}
     steps:
-      - name: Run and wait for canonical Business backend deployment
-        env:
-          IUMRAH_BACKEND_DEPLOY_TOKEN: ${{ secrets.IUMRAH_BACKEND_DEPLOY_TOKEN }}
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Extract complete unified backend source (Business V10)
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PYTHON'
-          import json
-          import os
-          import re
-          import time
-          from urllib.request import Request, build_opener, HTTPRedirectHandler
-          from urllib.error import HTTPError, URLError
-
-          REPO = 'im-ceo-bitch/lattice-mobile'
-          BRANCH = 'main'
-          WORKFLOW = 'deploy-iumrah-backend.yml'
-          API = 'https://api.github.com/repos/' + REPO
-
-          class NoRedirect(HTTPRedirectHandler):
-              def redirect_request(self, req, fp, code, msg, headers, newurl):
-                  return None
-
-          opener = build_opener(NoRedirect())
-
-          class APIError(RuntimeError):
-              def __init__(self, status, operation):
-                  super().__init__(f'GitHub API {operation}: HTTP {status}')
-                  self.status = status
-
-
-          def call(path, token, method='GET', payload=None):
-              headers = {'Accept':'application/vnd.github+json', 'Authorization':'Bearer '+token,
-                         'X-GitHub-Api-Version':'2026-03-10', 'User-Agent':'iumrah-unified-deploy-ci'}
-              data = None
-              if payload is not None:
-                  headers['Content-Type'] = 'application/json'
-                  data = json.dumps(payload).encode()
-              try:
-                  with opener.open(Request(API + path, data=data, headers=headers, method=method), timeout=30) as r:
-                      result = json.loads(r.read(2_000_000))
-                      if not isinstance(result, dict): raise RuntimeError('Unexpected GitHub response')
-                      return result
-              except HTTPError as exc:
-                  raise APIError(exc.code, method) from None
-              except (URLError, TimeoutError):
-                  raise RuntimeError('GitHub network error; check the Business Actions page before retrying.') from None
-              except (ValueError, UnicodeError):
-                  raise RuntimeError('Unexpected GitHub response; check the Business Actions page before retrying.') from None
-
-
-          def run(token, request=call, sleep=time.sleep, monotonic=time.monotonic, timeout=2700):
-              if not token.strip():
-                  raise RuntimeError('Add IUMRAH_BACKEND_DEPLOY_TOKEN in kepler-ios GitHub Actions Secrets (lattice-mobile: Actions read/write).')
-              token = token.strip()
-              path = '/actions/workflows/' + WORKFLOW
-              workflow = request(path, token)
-              workflow_id = workflow.get('id')
-              if (type(workflow_id) is not int or workflow_id <= 0 or workflow.get('state') != 'active'
-                      or workflow.get('path') != '.github/workflows/' + WORKFLOW):
-                  raise RuntimeError('Canonical Business deployment workflow missing, disabled, or unexpected.')
-              # No retry on POST: an ambiguous response may already have launched the deployment.
-              result = request(path + '/dispatches', token, 'POST', {'ref':BRANCH})
-              run_id = result.get('workflow_run_id')
-              if type(run_id) is not int or run_id <= 0:
-                  raise RuntimeError('Dispatch response has no run ID. Check Business Actions before retrying.')
-              url = f'https://github.com/{REPO}/actions/runs/{run_id}'
-              print('Full backend deploy started: ' + url, flush=True)
-              summary = os.environ.get('GITHUB_STEP_SUMMARY')
-              if summary:
-                  with open(summary,'a',encoding='utf-8') as f: f.write(f'### Canonical deployment\n[{run_id}]({url})\n')
-              deadline = monotonic() + timeout
-              last = None
-              while monotonic() < deadline:
-                  try:
-                      state = request('/actions/runs/' + str(run_id), token)
-                  except APIError as exc:
-                      if exc.status not in (404, 429, 500, 502, 503, 504): raise
-                      sleep(15)
-                      continue
-                  if (state.get('id') != run_id or state.get('workflow_id') != workflow_id
-                          or state.get('event') != 'workflow_dispatch' or state.get('head_branch') != BRANCH):
-                      raise RuntimeError('Run identity mismatch; refusing to report deployment success.')
-                  status = state.get('status')
-                  if status != last:
-                      print('Business deploy status: ' + str(status), flush=True)
-                      last = status
-                  if status == 'completed':
-                      if state.get('conclusion') != 'success':
-                          raise RuntimeError(f'Business full deployment did not succeed: {state.get("conclusion")}. See {url}')
-                      print('Canonical backend deploy succeeded: ' + url, flush=True)
-                      return run_id
-                  sleep(15)
-              raise RuntimeError('Timed out waiting for Business deployment. It may still be running. Check ' + url + ' before restarting.')
-
-          if __name__ == '__main__':
-              try:
-                  run(os.environ.get('IUMRAH_BACKEND_DEPLOY_TOKEN',''))
-              except Exception as exc:
-                  print('::error::' + (str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__))
-                  raise SystemExit(1)
-          PYTHON
-      - name: Sync missing integration secrets and verify deployed backend
+          cd Backend/UnifiedDeploySnapshot
+          sha256sum -c SHA256SUMS
+          mkdir -p "$RUNNER_TEMP/iumrah-unified-v10"
+          tar -xzf business-v10.tar.gz -C "$RUNNER_TEMP/iumrah-unified-v10"
+          echo "BACKEND_DIR=$RUNNER_TEMP/iumrah-unified-v10/Backend/IumrahBackend" >> "$GITHUB_ENV"
+          test -f "$RUNNER_TEMP/iumrah-unified-v10/Backend/IumrahBackend/src/index.js"
+      - name: Install dependencies and test complete unified backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$BACKEND_DIR"
+          npm install --no-audit --no-fund
+          npm install --prefix ../HotelsWorker --no-audit --no-fund
+          npm run check
+      - name: Discover existing D1 and verify configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$BACKEND_DIR"
+          node scripts/discover-bindings.mjs >> "$GITHUB_ENV"
+      - name: Render and validate production config without resource changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$BACKEND_DIR"
+          npm run preflight
+          npm run render
+          python3 "$GITHUB_WORKSPACE/Backend/UnifiedDeploySnapshot/prepare-existing-config.py" wrangler.generated.jsonc
+          npm run dry-run
+      - name: Apply additive D1 schema and deploy unified iumrah-backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$BACKEND_DIR"
+          npx --no-install wrangler d1 execute HOTELS_DB --remote --file=../HotelsWorker/migrations/0044_business_intelligence.sql --config wrangler.generated.jsonc
+          npm run deploy
+      - name: Verify deployed backend and flight catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$BACKEND_DIR"
+          node scripts/check-deployed.mjs
+      - name: Verify and sync missing integration secrets on iumrah-backend
         shell: bash
         run: |
           set -euo pipefail
@@ -191,14 +136,9 @@ jobs:
               return data.get('result')
 
           def select_credentials(env):
-              new_id, new_token = (env.get(x, '').strip() for x in ('NEW_CLOUDFLARE_ACCOUNT_ID','NEW_CLOUDFLARE_API_TOKEN'))
-              if new_id or new_token:
-                  if not (new_id and new_token): raise RuntimeError('Set BOTH NEW_CLOUDFLARE_ACCOUNT_ID and NEW_CLOUDFLARE_API_TOKEN in kepler-ios.')
-                  account, token = new_id, new_token
-              else:
-                  account, token = (env.get(x, '').strip() for x in ('CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_API_TOKEN'))
+              account, token = (env.get(x, '').strip() for x in ('CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_API_TOKEN'))
               if not re.fullmatch(r'[a-fA-F0-9]{32}', account) or not token:
-                  raise RuntimeError('Missing Cloudflare credentials for helloiumrah account.')
+                  raise RuntimeError('Existing Cloudflare credentials missing.')
               return account, token
 
           def retry_health(path, predicate, get=get_json, sleep=time.sleep):
@@ -287,7 +227,7 @@ jobs:
               script = root + '/scripts/' + WORKER
               subdomain = cf(root+'/subdomain', token)
               if not isinstance(subdomain, dict) or subdomain.get('subdomain') != 'helloiumrah':
-                  raise RuntimeError('WRONG_CLOUDFLARE_ACCOUNT: use NEW_CLOUDFLARE_ACCOUNT_ID and NEW_CLOUDFLARE_API_TOKEN for helloiumrah. Nothing changed.')
+                  raise RuntimeError('WRONG_CLOUDFLARE_ACCOUNT: use the existing updated CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN for helloiumrah. Nothing changed.')
               health = retry_health('/__iumrah/health', unified_health, get, sleep)
               retry_health('/api/package/health', package_health, get, sleep)
               # Read-only identity checks are complete before any possible secret write.
@@ -338,9 +278,7 @@ jobs:
                   print('::warning::Core cutover pending. Existing accounts/bookings migration is not proven. Do not retire old data.')
               if not health.get('fullyConfigured'):
                   print('::warning::Some non-core bindings are missing; check R2 and unified backend health.')
-              if h.get('aerodataBoxBackupConfigured') is not True:
-                  print('::warning::AeroDataBox backup is not active in runtime. Check the distinct backup key and its limit; existing bindings are preserved.')
-              print('Full source deployment completed in lattice-mobile. Health flags verify configuration, not live supplier responses or Wallet signing.')
+              print('Health flags verify configuration, not live supplier responses or Wallet signing. Full deployment and configuration checks completed.')
 
           if __name__ == '__main__':
               try: run()

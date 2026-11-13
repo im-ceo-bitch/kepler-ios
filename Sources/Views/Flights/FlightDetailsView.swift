@@ -29,10 +29,7 @@ struct FlightDetailsView: View {
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.bottom, 42)
         }
-        .background(IumrahFlightPalette.page)
-        .iumrahInternalNavigation(progress: .flight)
-        .navigationTitle(offer.airline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: "iumrah · \(offer.airline) · \(offer.origin) → \(offer.destination)") { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+        .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
         .iumrahFlightDetailChrome()
         .task { await enrichAirports() }
     }

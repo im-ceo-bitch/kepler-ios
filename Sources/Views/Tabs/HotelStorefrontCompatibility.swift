@@ -3430,10 +3430,7 @@ struct PackageFlightLegDetailCard: View {
                             .padding(.horizontal, IumrahDesign.pagePadding)
                             .padding(.bottom, IumrahDesign.pagePadding)
                     }
-                    .background(IumrahFlightPalette.page)
-                    .iumrahInternalNavigation()
-                    .navigationTitle(leg.airline)
-                    .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: IumrahPremiumFlightLeg(leg).share) { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+                    .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
                     .iumrahFlightDetailChrome()
                 } label: {
                     HStack(spacing: 14) {

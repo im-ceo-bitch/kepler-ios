@@ -13,6 +13,10 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var published: [CuratedFlightRecommendation] = []
     @State private var dataOutbound: [FlightDiscoveryOffer] = []
     @State private var dataReturn: [FlightDiscoveryOffer] = []
+    @State private var outboundCalendar: [FlightDiscoveryCalendarDay] = []
+    @State private var returnCalendar: [FlightDiscoveryCalendarDay] = []
+    @State private var calendarCache: [String: CalendarCacheEntry] = [:]
+    private struct CalendarCacheEntry { let days: [FlightDiscoveryCalendarDay]; let expires: Date }
     @State private var outbound: FlightChoice?
     @State private var inbound: FlightChoice?
     @State private var isLoading = false
@@ -104,7 +108,7 @@ struct IumrahGuidedFlightSelectionView: View {
             // Same operating flight can be represented in local time or UTC by
             // the two providers. Compare its flight number and local travel day.
             let flight = flightNumber.trimmingCharacters(in: .whitespacesAndNewlines)
-            let date = String(departureAt.prefix(10))
+            let date = String(IumrahFlightClock.local(departureAt, airport: origin).prefix(10))
             return [origin.uppercased(), destination.uppercased(), airlineCode.uppercased(),
                     flight.uppercased(), date, flight.isEmpty ? String(departureAt.prefix(16)) : ""].joined(separator: "|")
         }
@@ -146,7 +150,6 @@ struct IumrahGuidedFlightSelectionView: View {
                             }
                         }
                     VStack(alignment: .leading, spacing: 16) {
-                        IumrahPageHelpCard(isLoading ? "flights.loading" : loadError != nil && availableCandidates.isEmpty ? "flights.error" : availableCandidates.isEmpty ? (step == .inbound ? "flights.inbound_empty" : "flights.empty") : step == .outbound ? "flights.outbound" : "flights.inbound")
                         stepSelector.id("flight-step-selector")
                         searchControls
                         resultsSection
@@ -284,7 +287,8 @@ struct IumrahGuidedFlightSelectionView: View {
             }
         }
         .padding(16)
-        .modifier(IumrahAnimatedSearchBorder())
+        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22))
+        .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(Color.primary.opacity(0.09), lineWidth: 1) }
         .modifier(IumrahCollapseSearchOnPull { editingSearch = false })
     }
 
@@ -383,11 +387,21 @@ struct IumrahGuidedFlightSelectionView: View {
             }
     }
 
+    private var minimumSearchDay: String {
+        let today = Calendar.current.startOfDay(for: Date())
+        let afterOutbound = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: journey.trip.departureDate)) ?? today
+        return IumrahFlightDiscoveryStore.dayFormatter.string(from: step == .outbound ? today : max(today, afterOutbound))
+    }
+    private var observedFareDays: [IumrahFlightPriceDay] {
+        let prices = calendarOffers.map { (IumrahFlightClock.local($0.departureAt, airport: $0.origin), Optional($0.price)) }
+        return IumrahFlightSearchControls.priceDays(prices + calendarPrices)
+    }
     private var searchControls: some View {
         IumrahFlightSearchControls(filters: $filters,
             airlines: Array(Set(availableCandidates.map(\.airlineCode))).sorted(),
-            days: IumrahFlightSearchControls.priceDays(calendarOffers.map { ($0.departureAt, Optional($0.price)) }),
+            days: observedFareDays,
             selectedDay: dayKey(IumrahFlightDiscoveryStore.dayFormatter.string(from: currentTarget)),
+            minimumDay: minimumSearchDay,
             onSelectDay: { key in
                 guard let date = dateFromISODay(key), date >= Calendar.current.startOfDay(for: Date()),
                       !Calendar.current.isDate(date, inSameDayAs: currentTarget) else { return }
@@ -405,12 +419,19 @@ struct IumrahGuidedFlightSelectionView: View {
             })
             .id(step)
     }
+    private var calendarPrices: [(String, Double?)] {
+        guard selectedCabin == .economy, filters.airline.isEmpty else { return [] }
+        return (step == .outbound ? outboundCalendar : returnCalendar).filter { day in
+            day.origin.uppercased() == currentOrigin && day.destination.uppercased() == currentDestination &&
+            (day.returnAt ?? "").isEmpty && filters.accepts(stops: day.transfers, airline: day.airlineCode, departure: day.date, includeDay: false)
+        }.map { ($0.date, Optional($0.price)) }
+    }
     private var calendarOffers: [FlightDiscoveryOffer] {
         guard selectedCabin == .economy else { return [] }
         return (step == .outbound ? dataOutbound : dataReturn).filter {
             !$0.isRoundTrip && $0.origin == currentOrigin && $0.destination == currentDestination &&
-            dayKey($0.departureAt) >= IumrahFlightDiscoveryStore.dayFormatter.string(from: Calendar.current.startOfDay(for: Date())) &&
-            (step == .outbound || dayKey($0.departureAt) > IumrahFlightDiscoveryStore.dayFormatter.string(from: journey.trip.departureDate)) &&
+            dayKey(IumrahFlightClock.local($0.departureAt, airport: $0.origin)) >= IumrahFlightDiscoveryStore.dayFormatter.string(from: Calendar.current.startOfDay(for: Date())) &&
+            (step == .outbound || dayKey(IumrahFlightClock.local($0.departureAt, airport: $0.origin)) > IumrahFlightDiscoveryStore.dayFormatter.string(from: journey.trip.departureDate)) &&
             filters.accepts(stops: $0.transfers, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false)
         }
     }
@@ -510,10 +531,10 @@ struct IumrahGuidedFlightSelectionView: View {
         var seen = Set<String>()
         return candidates.filter { choice in
             guard choice.stops >= 0,
-                  let flightDay = dateFromISODay(dayKey(choice.departureAt)),
+                  let flightDay = dateFromISODay(dayKey(IumrahFlightClock.local(choice.departureAt, airport: choice.origin))),
                   flightDay >= Calendar.current.startOfDay(for: Date()),
                   abs(dayOffset(for: choice)) <= flexDays,
-                  !(step == .inbound && dayKey(choice.departureAt) <= dayKey(outbound?.departureAt ?? "")) else { return false }
+                  !(step == .inbound && dayKey(IumrahFlightClock.local(choice.departureAt, airport: choice.origin)) <= dayKey(outbound.map { IumrahFlightClock.local($0.departureAt, airport: $0.origin) } ?? "")) else { return false }
             return seen.insert(choice.dedupeKey).inserted
         }.sorted { a, b in
             let aRank = rank(a), bRank = rank(b)
@@ -543,7 +564,7 @@ struct IumrahGuidedFlightSelectionView: View {
         dayOffset(for: choice, from: currentTarget)
     }
     private func dayOffset(for choice: FlightChoice, from target: Date) -> Int {
-        guard let date = dateFromISODay(dayKey(choice.departureAt)) else { return 9999 }
+        guard let date = dateFromISODay(dayKey(IumrahFlightClock.local(choice.departureAt, airport: choice.origin))) else { return 9999 }
         return Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: target),
                                                to: Calendar.current.startOfDay(for: date)).day ?? 9999
     }
@@ -570,7 +591,7 @@ struct IumrahGuidedFlightSelectionView: View {
         editingSearch = false
         let requestID = UUID()
         loadingRequestID = requestID
-        if !preserveCalendar { dataOutbound = []; dataReturn = [] }
+        if !preserveCalendar { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = [] }
         isLoading = true
         loadError = nil
         defer { if loadingRequestID == requestID { isLoading = false } }
@@ -586,29 +607,47 @@ struct IumrahGuidedFlightSelectionView: View {
             published = []
             loadError = error.localizedDescription
         }
-        if selectedCabin != .economy { dataOutbound = []; dataReturn = []; return }
+        if selectedCabin != .economy { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = []; return }
         let legs: [(String, String, Date)] = [(outboundCode, destinationCode, trip.departureDate),
                                               (returnCode, outboundCode, trip.returnDate)]
-        for (index, route) in legs.enumerated() {
+        let orderedLegs = step == .outbound ? [0, 1] : [1, 0]
+        for index in orderedLegs {
             if Task.isCancelled || loadingRequestID != requestID { return }
-            let (origin, destination, target) = route
-            let range = (-flexDays...flexDays).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: target) }
-            let months = Array(Set(range.map { IumrahFlightDiscoveryStore.monthFormatter.string(from: $0) })).sorted()
+            let (origin, destination, target) = legs[index]
+            let selected = IumrahFlightDiscoveryStore.dayFormatter.string(from: target)
+            let calendarMonths = Set((-14...14).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: target) }.map { IumrahFlightDiscoveryStore.monthFormatter.string(from: $0) })
+            let offerMonths = Set((-flexDays...flexDays).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: target) }.map { IumrahFlightDiscoveryStore.monthFormatter.string(from: $0) })
             var collected: [FlightDiscoveryOffer] = []
-            for month in months {
-                if let value = try? await service.offers(origin: origin, destination: destination,
-                                                          departure: month, direct: false, limit: 100) {
-                    collected += value.offers
+            // Show the actual selected-date results first; calendar observations never become flight offers.
+            if let value = try? await service.offers(origin: origin, destination: destination, departure: selected, direct: false, limit: 100) {
+                collected += value.offers.filter { $0.origin.uppercased() == origin && $0.destination.uppercased() == destination }
+                guard !Task.isCancelled, loadingRequestID == requestID else { return }
+                if index == 0 { dataOutbound = collected } else { dataReturn = collected }
+            }
+            guard !Task.isCancelled, loadingRequestID == requestID else { return }
+            var calendar: [FlightDiscoveryCalendarDay] = []
+            for month in calendarMonths.sorted() {
+                if Task.isCancelled || loadingRequestID != requestID { return }
+                let cacheKey = "\(origin)|\(destination)|\(month)"
+                if let cached = calendarCache[cacheKey], cached.expires > Date() {
+                    calendar += cached.days
+                } else if let value = try? await service.calendar(origin: origin, destination: destination, month: month) {
+                    guard !Task.isCancelled, loadingRequestID == requestID else { return }
+                    calendar += value.days
+                    calendarCache = calendarCache.filter { $0.value.expires > Date() }
+                    calendarCache[cacheKey] = CalendarCacheEntry(days: value.days, expires: Date().addingTimeInterval(300))
+                }
+                guard !Task.isCancelled, loadingRequestID == requestID else { return }
+                if index == 0 { outboundCalendar = calendar } else { returnCalendar = calendar }
+                if offerMonths.contains(month), let value = try? await service.offers(origin: origin, destination: destination, departure: month, direct: false, limit: 100) {
+                    collected += value.offers.filter { $0.origin.uppercased() == origin && $0.destination.uppercased() == destination }
+                    guard !Task.isCancelled, loadingRequestID == requestID else { return }
+                    // Keep the exact date version if both endpoints returned the same offer ID.
+                    var seen = Set<String>()
+                    let unique = collected.filter { seen.insert($0.id).inserted }
+                    if index == 0 { dataOutbound = unique } else { dataReturn = unique }
                 }
             }
-            if let value = try? await service.offers(origin: origin, destination: destination,
-                                                      departure: IumrahFlightDiscoveryStore.dayFormatter.string(from: target),
-                                                      direct: false, limit: 100) {
-                collected += value.offers
-            }
-            if Task.isCancelled || loadingRequestID != requestID { return }
-            let filtered = collected.filter { $0.origin.uppercased() == origin && $0.destination.uppercased() == destination }
-            if index == 0 { dataOutbound = filtered } else { dataReturn = filtered }
         }
     }
 
@@ -617,8 +656,8 @@ struct IumrahGuidedFlightSelectionView: View {
             isShowingSourceHelp = true
             return
         }
-        guard let outboundDate = dateFromISODay(dayKey(outbound.departureAt)),
-              let inboundDate = dateFromISODay(dayKey(inbound.departureAt)),
+        guard let outboundDate = dateFromISODay(dayKey(IumrahFlightClock.local(outbound.departureAt, airport: outbound.origin))),
+              let inboundDate = dateFromISODay(dayKey(IumrahFlightClock.local(inbound.departureAt, airport: inbound.origin))),
               inboundDate > outboundDate else { return }
 
         journey.clearStagedUmrahFlights()
@@ -761,18 +800,16 @@ private struct IumrahGuidedFlightDetailView: View {
                     if index > 0 { IumrahPremiumFlightConnection(previous: legs[index - 1], next: leg, language: language) }
                     IumrahPremiumFlightDetail(leg: leg, language: language, pageHeroInset: index == 0 ? IumrahDesign.pagePadding : nil)
                 }
-                Text(tr("Окончательный тариф, багаж и наличие мест подтверждаются перед оплатой.", "Final fare, baggage and availability are confirmed before payment.", "Yakuniy tarif, bagaj va joylar to‘lovdan oldin tasdiqlanadi.", "Якуний тариф, багаж ва жойлар тўловдан олдин тасдиқланади."))
-                    .font(IumrahType.regular(13)).foregroundStyle(.secondary)
-            VStack(spacing: 10) {
-                if let price = choice.price {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(tr("Ориентир за пассажира", "Indicative fare per traveler", "Bir yo‘lovchi uchun taxminiy narx", "Бир йўловчи учун тахминий нарх")).font(IumrahType.regular(12)).foregroundStyle(.secondary)
-                            Text("$" + price.formatted(.number.precision(.fractionLength(0...2)))).font(IumrahType.bold(28, relativeTo: .title))
-                        }
-                        Spacer()
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(tr("Тариф", "Fare", "Tarif", "Тариф")).font(IumrahType.bold(20, relativeTo: .title2))
+                    if let price = choice.price, price.isFinite, price > 0 {
+                        Text("$" + price.formatted(.number.precision(.fractionLength(0...2))))
+                            .font(IumrahType.bold(30, relativeTo: .title)).monospacedDigit()
+                        Text(tr("За пассажира · ориентир", "Per traveler · indicative", "Yo‘lovchiga · taxminiy", "Йўловчига · тахминий")).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary)
                     }
-                }
+                    Text(tr("Цена, багаж и наличие мест подтверждаются перед оплатой.", "Fare, baggage and availability are confirmed before payment.", "Narx, bagaj va joylar to‘lovdan oldin tasdiqlanadi.", "Нарх, багаж ва жойлар тўловдан олдин тасдиқланади.")).font(IumrahType.regular(13, relativeTo: .subheadline)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }.iumrahFlightCard()
+            VStack(spacing: 10) {
                 Button { onChoose(); dismiss() } label: {
                     Text(tr("Выбрать авиабилет", "Select flight", "Reysni tanlash", "Рейсни танлаш"))
                         .font(IumrahType.bold(16)).frame(maxWidth: .infinity).frame(height: 52)
@@ -788,12 +825,7 @@ private struct IumrahGuidedFlightDetailView: View {
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.bottom, IumrahDesign.pagePadding)
         }
-        .background(IumrahFlightPalette.page)
-        .toolbar(.visible, for: .navigationBar)
-        .navigationBarBackButtonHidden(false)
-        .navigationTitle(choice.airlineName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: legs.first?.share ?? "iumrah") { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+        .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
         .iumrahFlightDetailChrome()
     }
 

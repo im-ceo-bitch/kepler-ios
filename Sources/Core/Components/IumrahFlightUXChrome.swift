@@ -172,7 +172,15 @@ struct IumrahJourneyHeader<Summary: View>: View {
             .padding(.bottom, flightHeading == nil ? IumrahSignatureHeaderGeometry.lowerInset : 62)
             .frame(maxWidth: .infinity)
             .background {
-                IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
+                if flightHeading != nil {
+                    ZStack(alignment: .bottom) {
+                        IumrahFlightPalette.hero
+                        IumrahHemisphereMap(presentation: .horizon, palette: .dark, lightIntensity: 0.85, mapOpacity: 0.42)
+                            .frame(height: 148)
+                    }
+                } else {
+                    IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
+                }
             }
             .offset(y: 0)
             .transaction { $0.animation = nil }

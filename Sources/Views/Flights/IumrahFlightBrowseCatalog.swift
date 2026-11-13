@@ -16,7 +16,7 @@ struct IumrahFlightBrowseCatalog: View {
         model.flights.filter { direction == 0 ? $0.origin == journey.trip.originCode : $0.destination == journey.trip.originCode }
     }
     private var filtered: [LocalJourneyFlight] {
-        directionFlights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: $0.departureAt) }.sorted { a, b in
+        directionFlights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: IumrahFlightClock.local($0.departureAt, airport: $0.origin)) }.sorted { a, b in
             if filters.sort == 1, a.displayedPrice != b.displayedPrice { return (a.displayedPrice ?? .infinity) < (b.displayedPrice ?? .infinity) }
             if filters.sort == 2, a.durationMinutes != b.durationMinutes { return (a.durationMinutes > 0 ? a.durationMinutes : Int.max) < (b.durationMinutes > 0 ? b.durationMinutes : Int.max) }
             return a.departureAt == b.departureAt ? a.id < b.id : a.departureAt < b.departureAt
@@ -29,7 +29,7 @@ struct IumrahFlightBrowseCatalog: View {
         LazyVStack(spacing: 14) {
             IumrahFlightSearchControls(filters: $filters,
                 airlines: Array(Set(directionFlights.map(\.airlineCode))).sorted(),
-                days: IumrahFlightSearchControls.priceDays(calendarFlights.map { ($0.departureAt, $0.displayedPrice) }),
+                days: IumrahFlightSearchControls.priceDays(calendarFlights.map { (IumrahFlightClock.local($0.departureAt, airport: $0.origin), $0.displayedPrice) }),
                 onSelectDay: { day in
                     filters.day = day
                     Task { await model.loadDay(day, trip: journey.trip, direction: direction, language: settings.language) }

@@ -3,6 +3,8 @@ import UIKit
 import UserNotifications
 
 final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    private let quickActions = IumrahQuickActionCenter.shared
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -14,9 +16,37 @@ final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
             // Restore local prayer reminders after normal launches, without
             // requesting permissions or touching flight/booking notifications.
             _ = await IumrahPrayerNotifications.synchronize(state: IumrahPrayerState())
+            quickActions.refreshShortcutItems(language: AppSettingsStore.Language(rawValue: UserDefaults.standard.string(forKey: "iumrah.language") ?? AppSettingsStore.Language.uzbek.rawValue) ?? .uzbek, activeBooking: BookingSessionVault.load().first)
+        }
+
+        if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
+            Task { @MainActor in
+                _ = quickActions.queue(shortcutItem: shortcutItem)
+            }
         }
 
         return true
+    }
+
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        Task { @MainActor in
+            quickActions.refreshShortcutItems(
+                language: AppSettingsStore.Language(rawValue: UserDefaults.standard.string(forKey: "iumrah.language") ?? AppSettingsStore.Language.uzbek.rawValue) ?? .uzbek,
+                activeBooking: BookingSessionVault.load().first
+            )
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        Task { @MainActor in
+            let handled = quickActions.queue(shortcutItem: shortcutItem)
+            completionHandler(handled)
+        }
     }
 
     func application(

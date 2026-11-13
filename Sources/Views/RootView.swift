@@ -12,7 +12,9 @@ struct RootView: View {
     @StateObject private var hotelStorefront = HotelStorefrontStore()
     @ObservedObject private var push = PushNotificationManager.shared
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
+    @ObservedObject private var quickActions = IumrahQuickActionCenter.shared
     @State private var hasBootstrappedAfterOnboarding = false
+    @State private var isSupportQuickActionDialogPresented = false
 
     var body: some View {
         IumrahAdaptiveLayoutHost {
@@ -28,6 +30,9 @@ struct RootView: View {
             .environmentObject(hotelStorefront)
             .task {
                 await IumrahIntelligence.shared.start(initialScreen: telemetryScreen)
+            }
+            .task { @MainActor in
+                quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
             }
             .onChange(of: chrome.currentTab) { _, next in
                 let screen = telemetryName(for: next)
@@ -62,6 +67,7 @@ struct RootView: View {
             }
             .onChange(of: bookings.sessions) { _, _ in
                 syncWidgets()
+                quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
                 Task {
                     await linkLocalBookingsToAccount()
                     guard hasCompletedOnboarding else { return }
@@ -85,6 +91,7 @@ struct RootView: View {
             }
             .onChange(of: settings.language.rawValue) { _, _ in
                 syncWidgets()
+                quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
                 guard hasCompletedOnboarding else { return }
                 Task {
                     await syncPushSubscriptions()
@@ -121,6 +128,23 @@ struct RootView: View {
                 guard hasCompletedOnboarding else { return }
                 handleOpenedPushIfNeeded()
             }
+            .onChange(of: quickActions.pendingRequest) { _, request in
+                guard let request else { return }
+                handleQuickAction(request.action)
+                quickActions.consume()
+            }
+            .confirmationDialog(
+                quickActionSupportTitle,
+                isPresented: $isSupportQuickActionDialogPresented,
+                titleVisibility: .visible
+            ) {
+                Button(quickActionCallButtonTitle) {
+                    callQuickActionSupport()
+                }
+                Button(L10n.text("cancel", settings.language), role: .cancel) {}
+            } message: {
+                Text(quickActionSupportMessage)
+            }
             .onOpenURL { url in
                 handleDeepLink(url)
             }
@@ -148,6 +172,60 @@ struct RootView: View {
                     await syncClientNotifications()
                 }
             }
+    }
+
+    @MainActor
+    private func handleQuickAction(_ action: IumrahQuickActionCenter.Action) {
+        switch action {
+        case .newTrip:
+            chrome.startNewTrip()
+        case .bookings:
+            if let session = bookings.sessions.first {
+                chrome.openBooking(id: session.id)
+            } else {
+                chrome.navigate(to: .booking)
+            }
+        case .flights:
+            chrome.openHotels(board: .flights)
+        case .supportBeforeDelete:
+            isSupportQuickActionDialogPresented = true
+        }
+    }
+
+    private var quickActionSupportTitle: String {
+        switch settings.language {
+        case .russian: return "Хотите удалить приложение?"
+        case .english: return "Thinking of deleting the app?"
+        case .uzbek: return "Ilovani o‘chirib tashlamoqchimisiz?"
+        case .uzbekCyrillic: return "Иловани ўчириб ташламоқчимисиз?"
+        default: return "Thinking of deleting the app?"
+        }
+    }
+
+    private var quickActionSupportMessage: String {
+        switch settings.language {
+        case .russian: return "Мы точно можем помочь. Позвоните нам, и мы поможем с вашей поездкой, бронированием или входом в аккаунт."
+        case .english: return "We can help. Call us and we will help with your trip, booking or sign-in."
+        case .uzbek: return "Yordam bera olamiz. Safar, bron yoki akkauntga kirish bo‘yicha bizga qo‘ng‘iroq qiling."
+        case .uzbekCyrillic: return "Ёрдам бера оламиз. Сафар, брон ёки аккаунтга кириш бўйича бизга қўнғироқ қилинг."
+        default: return "We can help. Call us and we will help with your trip, booking or sign-in."
+        }
+    }
+
+    private var quickActionCallButtonTitle: String {
+        switch settings.language {
+        case .russian: return "Позвонить"
+        case .english: return "Call"
+        case .uzbek: return "Qo‘ng‘iroq qilish"
+        case .uzbekCyrillic: return "Қўнғироқ қилиш"
+        default: return "Call"
+        }
+    }
+
+    private func callQuickActionSupport() {
+        let digits = IumrahQuickActionCenter.shared.supportPhoneNumber.filter { !$0.isWhitespace }
+        guard let url = URL(string: "tel://\(digits)") else { return }
+        UIApplication.shared.open(url)
     }
 
     @MainActor

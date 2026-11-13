@@ -86,10 +86,10 @@ private struct IumrahHemisphereSurface: View {
             let lightY = 0.29 + 0.08 * cos(phase)
             let breath = (1 + cos(phase - .pi / 3)) * 0.5
             let center = UnitPoint(x: lightX, y: lightY)
-            let oceanBright = dark ? 0.075 + 0.025 * intensity * breath : 0.97 - 0.02 * intensity * breath
-            let landBright = dark ? 0.72 + 0.18 * intensity * breath : 0.48 - 0.16 * intensity * breath
-            let oceanDim = dark ? 0.045 : 0.98
-            let landDim = dark ? 0.25 : 0.70
+            let oceanBright = dark ? 0.071 + 0.012 * intensity * breath : 0.99
+            let landBright = dark ? 0.68 + 0.23 * intensity * breath : 0.48 - 0.16 * intensity * breath
+            let oceanDim = dark ? 0.065 : 0.98
+            let landDim = dark ? 0.22 : 0.70
             let oceanLight = RadialGradient(colors: [gray(oceanBright), gray(oceanDim)],
                                             center: center, startRadius: 0, endRadius: diameter * 0.84)
             let landLight = RadialGradient(colors: [gray(landBright), gray((landBright + landDim) / 2), gray(landDim)],
@@ -104,7 +104,7 @@ private struct IumrahHemisphereSurface: View {
                         .init(color: .clear, location: 0.55),
                         .init(color: .black.opacity(dark ? 0.24 : 0.035), location: 1)
                     ], center: .center, startRadius: 0, endRadius: diameter / 2))
-                Circle().strokeBorder(gray(dark ? 0.65 : 0.3).opacity(0.13), lineWidth: 0.7)
+                Circle().strokeBorder(gray(dark ? 0.65 : 0.3).opacity(0.06), lineWidth: 0.5)
             }
             .clipShape(Circle())
             // Render as a single native composited layer to avoid triangle seams.
@@ -117,7 +117,7 @@ private struct IumrahHemisphereSurface: View {
 private struct IumrahHemisphereDotShape: Shape {
     private static let unit: Path = {
         var path = Path()
-        let count = 144
+        let count = 112
         let step = 1.0 / Double(count)
         for row in 0..<count {
             for col in 0..<count {
@@ -125,7 +125,7 @@ private struct IumrahHemisphereDotShape: Shape {
                 let y = (Double(row) + 0.5) * step
                 let radiusSquared = (x - 0.5) * (x - 0.5) + (y - 0.5) * (y - 0.5)
                 guard radiusSquared < 0.248 else { continue }
-                let radius = step * (0.22 + 0.14 * sqrt(max(0, 1 - radiusSquared * 4)))
+                let radius = step * (0.15 + 0.15 * sqrt(max(0, 1 - radiusSquared * 4)))
                 path.addEllipse(in: CGRect(x: x-radius, y: y-radius, width: radius*2, height: radius*2))
             }
         }

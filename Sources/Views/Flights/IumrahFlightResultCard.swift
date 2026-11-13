@@ -33,18 +33,24 @@ struct IumrahFlightResultCard: View {
     private var usablePrice: Double? { guard let price, price.isFinite, price > 0 else { return nil }; return price }
     private var locale: Locale { Locale(identifier: settings.language.localeIdentifier) }
     private var durationTitle: String {
-        tr("\(duration / 60) ч \(duration % 60) мин", "\(duration / 60)h \(duration % 60)m", "\(duration / 60) soat \(duration % 60) daq", "\(duration / 60) соат \(duration % 60) дақ")
+        if duration % 60 == 0 { return tr("\(duration / 60) ч", "\(duration / 60)h", "\(duration / 60) soat", "\(duration / 60) соат") }
+        if duration < 60 { return tr("\(duration) мин", "\(duration)m", "\(duration) daq", "\(duration) дақ") }
+        return tr("\(duration / 60) ч \(duration % 60) мин", "\(duration / 60)h \(duration % 60)m", "\(duration / 60) soat \(duration % 60) daq", "\(duration / 60) соат \(duration % 60) дақ")
     }
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 13) {
                 HStack(spacing: 10) {
-                    AirlineLogoView(airlineCode: airlineCode, size: 36)
+                    AirlineLogoView(airlineCode: airlineCode, size: 34)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(airline).font(IumrahType.bold(17)).lineLimit(2)
+                        Text(airline).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(2)
+                        HStack(spacing: 6) {
+                            if let number { Text(number).font(IumrahType.bold(12, relativeTo: .caption)).monospacedDigit().lineLimit(1) }
+                            Text(isAviasales ? "Aviasales" : "iumrah Direct")
+                                .font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1)
+                        }
                     }
                     Spacer(minLength: 6)
-                    if let number { Text(number).font(IumrahType.bold(16)).lineLimit(1) }
                     if selected && onSelect == nil { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.primary) }
                 }
                 .padding(.trailing, onSelect == nil ? 0 : 44)
@@ -52,29 +58,21 @@ struct IumrahFlightResultCard: View {
                     endpoint(origin, time: IumrahFlightClock.time(localDeparture), day: localDeparture, trailing: false)
                     VStack(spacing: 5) {
                         if duration > 0 { Text(durationTitle).font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center) }
-                        ZStack(alignment: .top) {
-                            GeometryReader { geo in
-                                Path { path in
-                                    path.move(to: CGPoint(x: 2, y: 24))
-                                    path.addQuadCurve(to: CGPoint(x: geo.size.width - 2, y: 24), control: CGPoint(x: geo.size.width / 2, y: -5))
-                                }.stroke(Color.primary.opacity(0.38), lineWidth: 1)
-                            }
-                            Image(systemName: stops == 0 ? "airplane" : "arrow.triangle.branch")
-                                .font(.system(size: 16, weight: .medium)).foregroundStyle(.primary)
-                        }.frame(height: 26).accessibilityHidden(true)
+                        Image(systemName: stops == 0 ? "airplane" : "arrow.triangle.branch")
+                            .font(.system(size: 18, weight: .medium)).foregroundStyle(.primary)
+                            .frame(height: 22).accessibilityHidden(true)
                         if stops >= 0 {
                             Text(stops == 0 ? tr("Прямой", "Direct", "To‘g‘ri", "Тўғри") : tr("Пересадок: \(stops)", "Stops: \(stops)", "Transfer: \(stops)", "Трансфер: \(stops)"))
-                                .font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center)
+                                .font(IumrahType.regular(11, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7).multilineTextAlignment(.center)
                         }
                     }.frame(maxWidth: .infinity).padding(.top, 2)
                     endpoint(destination, time: arrival?.time, day: arrival?.day, trailing: true, estimated: arrival?.estimated == true)
                 }
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1)
                 HStack(alignment: .center, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(isAviasales ? "Aviasales" : "iumrah Direct")
-                            .font(IumrahType.regular(9, relativeTo: .caption2)).foregroundStyle(.secondary)
-                        if usablePrice != nil { Text(tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун")).font(IumrahType.regular(11)).foregroundStyle(.secondary) }
+                    if usablePrice != nil {
+                        Text(tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун"))
+                            .font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 6)
                     if let price = usablePrice {
@@ -109,8 +107,8 @@ struct IumrahFlightResultCard: View {
     }
     private func endpoint(_ code: String, time: String?, day: String?, trailing: Bool, estimated: Bool = false) -> some View {
         VStack(alignment: trailing ? .trailing : .leading, spacing: 3) {
-            Text(code.uppercased()).font(IumrahType.bold(30, relativeTo: .title2)).lineLimit(1).minimumScaleFactor(0.75)
-            if let time, time != "—" { Text(time).font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7) }
+            if let time, time != "—" { Text(time).font(IumrahType.bold(28, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7) }
+            Text(code.uppercased()).font(IumrahType.bold(19, relativeTo: .headline)).lineLimit(1).minimumScaleFactor(0.75)
             if let day, (String(day.prefix(10)) != selectedSearchDay || (trailing && String(day.prefix(10)) != String(localDeparture.prefix(10)))) {
                 Text(IumrahFlightClock.day(day, locale: locale)).font(IumrahType.regular(12)).foregroundStyle(.secondary).lineLimit(1)
             }
@@ -198,6 +196,7 @@ struct IumrahFlightSearchControls: View {
     let airlines: [String]
     let days: [IumrahFlightPriceDay]
     var selectedDay: String? = nil
+    var minimumDay: String? = nil
     var onSelectDay: ((String) -> Void)? = nil
     @State private var showCalendar = false
     @State private var calendarDate = Date()
@@ -225,10 +224,13 @@ struct IumrahFlightSearchControls: View {
                             Text(tr("Быстрее", "Fastest", "Tezroq", "Тезроқ")).tag(2)
                         }
                     } label: { pill(filters.sort == 1 ? tr("Дешевле", "Cheapest", "Arzonroq", "Арзонроқ") : filters.sort == 2 ? tr("Быстрее", "Fastest", "Tezroq", "Тезроқ") : tr("По дате", "Date", "Sana", "Сана")) }
-                    Button { showCalendar = true } label: { pill(tr("Календарь", "Calendar", "Taqvim", "Тақвим")) }.buttonStyle(.plain)
+                    Button {
+                        calendarDate = max(earliestDate, Self.localDate(selectedDay ?? filters.day) ?? earliestDate)
+                        showCalendar = true
+                    } label: { pill(tr("Календарь", "Calendar", "Taqvim", "Тақвим")) }.buttonStyle(.plain)
                 }.font(.subheadline.weight(.medium))
             }
-            if !days.isEmpty {
+            if !days.isEmpty || selectedDay != nil || filters.day != nil {
                 HStack {
                     Text(tr("Цены по датам", "Fares by date", "Sanalar bo‘yicha narx", "Саналар бўйича нарх")).font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -237,9 +239,14 @@ struct IumrahFlightSearchControls: View {
                     }
                 }
                 IumrahCenteredFareChart(days: days, selectedDay: selectedDay ?? filters.day,
-                    locale: Locale(identifier: settings.language.localeIdentifier),
+                    minimumDay: minimumDay, locale: Locale(identifier: settings.language.localeIdentifier),
+                    noPriceLabel: tr("Нет опубликованной цены", "No published fare", "E’lon qilingan narx yo‘q", "Эълон қилинган нарх йўқ"),
                     onSelect: { select($0, feedback: false) })
                     .frame(height: 112)
+                if days.isEmpty {
+                    Text(tr("Цены появятся после поиска", "Fares appear after search", "Narxlar qidiruvdan keyin chiqadi", "Нархлар қидирувдан кейин чиқади"))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
 
             }
         }
@@ -247,7 +254,7 @@ struct IumrahFlightSearchControls: View {
         .sheet(isPresented: $showCalendar) {
             NavigationStack {
                 VStack(spacing: 20) {
-                    DatePicker(tr("Дата вылета", "Departure date", "Uchish sanasi", "Учиш санаси"), selection: $calendarDate, in: Calendar.current.startOfDay(for: Date())..., displayedComponents: .date)
+                    DatePicker(tr("Дата вылета", "Departure date", "Uchish sanasi", "Учиш санаси"), selection: $calendarDate, in: earliestDate..., displayedComponents: .date)
                         .datePickerStyle(.graphical)
                     Button(tr("Выбрать дату", "Select date", "Sanani tanlash", "Санани танлаш")) {
                         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.dateFormat = "yyyy-MM-dd"
@@ -260,8 +267,15 @@ struct IumrahFlightSearchControls: View {
             }.tint(Color.primary).presentationDetents([.large])
         }
     }
+    private var earliestDate: Date { max(Calendar.current.startOfDay(for: Date()), Self.localDate(minimumDay) ?? .distantPast) }
+    private static func localDate(_ day: String?) -> Date? {
+        guard let day else { return nil }
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        return Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+    }
     private func select(_ day: String, feedback: Bool = true) {
-        guard day != (selectedDay ?? filters.day) else { return }
+        guard day != (selectedDay ?? filters.day), let date = Self.localDate(day), date >= earliestDate else { return }
         if feedback { IumrahHaptics.selection() }
         if let onSelectDay { onSelectDay(day) } else { filters.day = day }
     }
@@ -279,12 +293,47 @@ struct IumrahFlightSearchControls: View {
     }
 }
 
+/// Continuous calendar rail. Unknown fares remain nil, never zero or interpolated.
+enum IumrahFareDateWindow {
+    struct Day: Equatable { let day: String; let price: Double? }
+    static func items(prices: [IumrahFlightPriceDay], selected: String?, minimum: String?, now: Date = Date()) -> [Day] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let formatter = DateFormatter(); formatter.calendar = calendar; formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = calendar.timeZone; formatter.dateFormat = "yyyy-MM-dd"; formatter.isLenient = false
+        func date(_ key: String?) -> Date? {
+            guard let key, key.count == 10, let parsed = formatter.date(from: key), formatter.string(from: parsed) == key else { return nil }
+            return parsed
+        }
+        // Use the user's calendar date, not UTC midnight, for the default lower bound.
+        let local = DateFormatter(); local.calendar = Calendar(identifier: .gregorian); local.locale = Locale(identifier: "en_US_POSIX"); local.dateFormat = "yyyy-MM-dd"
+        let today = date(local.string(from: now)) ?? calendar.startOfDay(for: now)
+        let floor = max(today, date(minimum) ?? today)
+        var observed: [String: Double] = [:]
+        for value in prices where value.price.isFinite && value.price > 0 {
+            guard let day = date(value.id), day >= floor else { continue }
+            observed[value.id] = min(observed[value.id] ?? value.price, value.price)
+        }
+        let firstObserved = observed.keys.sorted().first.flatMap { date($0) }
+        let anchor = max(floor, date(selected) ?? firstObserved ?? floor)
+        let start = max(floor, calendar.date(byAdding: .day, value: -14, to: anchor) ?? anchor)
+        let end = calendar.date(byAdding: .day, value: 14, to: anchor) ?? anchor
+        let count = max(0, calendar.dateComponents([.day], from: start, to: end).day ?? 0)
+        return (0...count).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: offset, to: start) else { return nil }
+            let key = formatter.string(from: day)
+            return Day(day: key, price: observed[key])
+        }
+    }
+}
+
 /// Native horizontal scrolling, center snapping and a single commit after scrolling stops.
 /// The selected day remains represented even when no fare has been received for it.
 private struct IumrahCenteredFareChart: UIViewRepresentable {
     let days: [IumrahFlightPriceDay]
     let selectedDay: String?
+    let minimumDay: String?
     let locale: Locale
+    let noPriceLabel: String
     let onSelect: (String) -> Void
 
     struct Item: Equatable {
@@ -345,19 +394,17 @@ private struct IumrahCenteredFareChart: UIViewRepresentable {
             if userScrolling || pendingTap { deferredParent = next; return }
             deferredParent = nil
             let selectionChanged = parent.selectedDay != next.selectedDay
-            let localeChanged = parent.locale != next.locale
+            let localeChanged = parent.locale != next.locale || parent.noPriceLabel != next.noPriceLabel
+            let oldDay = items.indices.contains(focus) ? items[focus].day : nil
             parent = next
-            var newItems = next.days.map { Item(day: $0.id, price: $0.price) }
-            if let selected = next.selectedDay, !newItems.contains(where: { $0.day == selected }) {
-                newItems.append(Item(day: selected, price: nil))
-            }
-            newItems.sort { $0.day < $1.day }
+            let newItems = IumrahFareDateWindow.items(prices: next.days, selected: next.selectedDay ?? oldDay, minimum: next.minimumDay)
+                .map { Item(day: $0.day, price: $0.price) }
             let changed = newItems != items || localeChanged
             if changed || selectionChanged {
                 let oldFocus = items.indices.contains(focus) ? items[focus].day : nil
                 items = newItems
                 committedDay = next.selectedDay
-                focus = items.firstIndex(where: { $0.day == (next.selectedDay ?? oldFocus) }) ?? 0
+                focus = items.firstIndex(where: { $0.day == (next.selectedDay ?? oldFocus) }) ?? items.firstIndex(where: { $0.price != nil }) ?? 0
                 if changed { view.reloadData() }
                 align(view)
                 refresh(view)
@@ -381,14 +428,14 @@ private struct IumrahCenteredFareChart: UIViewRepresentable {
             let item = items[index]
             let selected = focus == index
             let maximum = max(items.compactMap(\.price).max() ?? 1, 1)
-            let barHeight = item.price.map { max(10, 55 * $0 / maximum) } ?? 2
+            let barHeight = item.price.map { max(10, 55 * $0 / maximum) } ?? 3
             let date = IumrahFlightClock.day(item.day, locale: parent.locale)
             let price = item.price.map { "$" + $0.formatted(.number.precision(.fractionLength(0))) } ?? "—"
             cell.contentConfiguration = UIHostingConfiguration {
                 VStack(spacing: 5) {
                     Spacer(minLength: 0)
                     Text(price).font(IumrahType.bold(12)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
-                    RoundedRectangle(cornerRadius: 5).fill(selected ? Color.primary : IumrahFlightPalette.bar)
+                    RoundedRectangle(cornerRadius: 5).fill(item.price == nil ? Color.primary.opacity(selected ? 0.55 : 0.12) : (selected ? Color.primary : IumrahFlightPalette.bar))
                         .frame(width: 40, height: CGFloat(barHeight))
                     Text(date).font(selected ? IumrahType.bold(11) : IumrahType.regular(11)).lineLimit(1).minimumScaleFactor(0.75)
                     Capsule().fill(selected ? Color.primary : Color.clear).frame(width: 14, height: 2)
@@ -398,7 +445,7 @@ private struct IumrahCenteredFareChart: UIViewRepresentable {
                 .accessibilityHidden(true)
             }.margins(.all, 0)
             cell.isAccessibilityElement = true
-            cell.accessibilityLabel = "\(date), \(price)"
+            cell.accessibilityLabel = "\(date), \(item.price == nil ? parent.noPriceLabel : price)"
             cell.accessibilityTraits = selected ? [.button, .selected] : [.button]
         }
         private func refresh(_ view: UICollectionView) {

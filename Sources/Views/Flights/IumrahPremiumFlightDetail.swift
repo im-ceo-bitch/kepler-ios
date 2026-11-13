@@ -8,13 +8,13 @@ struct IumrahPremiumFlightDetail: View {
     let language: AppSettingsStore.Language
     /// Outer page gutter to cancel for the first segment only; embedded legs stay cards.
     var pageHeroInset: CGFloat? = nil
+    var headerShareText: String? = nil
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.flightDetailTopInset) private var topInset
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var details: IumrahFlightOperationalDetail?
     @State private var from: Airport?
     @State private var to: Airport?
     @State private var refreshing = false
+    @State private var hasLoadedDetail = false
     @State private var enrichmentReason: String?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -61,7 +61,9 @@ struct IumrahPremiumFlightDetail: View {
         f.locale = Locale(identifier: language.localeIdentifier); f.setLocalizedDateFormatFromTemplate("d MMM EEE"); return f.string(from: date)
     }
     private func durationText(_ minutes: Int) -> String {
-        t("\(minutes / 60) ч \(minutes % 60) мин", "\(minutes / 60)h \(minutes % 60)m", "\(minutes / 60) soat \(minutes % 60) daq", "\(minutes / 60) соат \(minutes % 60) дақ")
+        if minutes % 60 == 0 { return t("\(minutes / 60) ч", "\(minutes / 60)h", "\(minutes / 60) soat", "\(minutes / 60) соат") }
+        if minutes < 60 { return t("\(minutes) мин", "\(minutes)m", "\(minutes) daq", "\(minutes) дақ") }
+        return t("\(minutes / 60) ч \(minutes % 60) мин", "\(minutes / 60)h \(minutes % 60)m", "\(minutes / 60) soat \(minutes % 60) daq", "\(minutes / 60) соат \(minutes % 60) дақ")
     }
     private func clean(_ value: String?) -> String? { guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }; return value }
     var body: some View {
@@ -69,7 +71,7 @@ struct IumrahPremiumFlightDetail: View {
             if live { TimelineView(.periodic(from: .now, by: 60)) { _ in hero } } else { hero }
             if live { TimelineView(.periodic(from: .now, by: 60)) { _ in if let p = livePosition { liveMetrics(p).iumrahFlightCard() } } }
             airportSection
-            if clean(details?.aircraft ?? leg.aircraft) != nil || clean(details?.registration) != nil || clean(leg.cabin) != nil || clean(leg.operatingCarrier) != nil { aircraftSection }
+            if clean(details?.aircraft) != nil || clean(leg.aircraft) != nil || clean(details?.registration) != nil || clean(leg.cabin) != nil || otherCarrier != nil { aircraftSection }
             if leg.verifiedNumber != nil && leg.stops == 0 { enrichmentFooter }
 
         }
@@ -78,35 +80,43 @@ struct IumrahPremiumFlightDetail: View {
     private var hero: some View {
         VStack(alignment: .leading, spacing: 0) {
             if pageHeroInset != nil {
-                HStack(spacing: 12) {
-                    Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 20, weight: .semibold)).frame(width: 44, height: 44).contentShape(Rectangle()) }
-                        .buttonStyle(.plain).accessibilityLabel(t("Назад", "Back", "Orqaga", "Орқага"))
+                HStack(spacing: 8) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left").font(.system(size: 19, weight: .semibold))
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel(t("Назад", "Back", "Orqaga", "Орқага"))
                     Spacer(minLength: 0)
-                    Text(leg.title).font(IumrahType.bold(16)).lineLimit(1).minimumScaleFactor(0.75)
+                    Text(leg.title).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(1).minimumScaleFactor(0.7)
                     Spacer(minLength: 0)
-                    ShareLink(item: leg.share) { Image(systemName: "square.and.arrow.up").font(.system(size: 19, weight: .medium)).frame(width: 44, height: 44).contentShape(Rectangle()) }
-                        .buttonStyle(.plain).accessibilityLabel(t("Поделиться", "Share", "Ulashish", "Улашиш"))
-                }.foregroundStyle(.white).padding(.horizontal, 12).padding(.top, topInset)
+                    ShareLink(item: headerShareText ?? leg.share) {
+                        Image(systemName: "square.and.arrow.up").font(.system(size: 19, weight: .medium))
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel(t("Поделиться", "Share", "Ulashish", "Улашиш"))
+                }
+                .foregroundStyle(.white).padding(.horizontal, 12).padding(.top, 4)
             }
-            VStack(alignment: .leading, spacing: 15) {
-                HStack(alignment: .center, spacing: 8) {
+            VStack(alignment: .leading, spacing: 13) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let number = leg.verifiedNumber, leg.stops == 0 {
                         Text(number).font(IumrahType.bold(29, relativeTo: .title)).lineLimit(1).minimumScaleFactor(0.75)
-                    } else { Text(leg.title).font(IumrahType.bold(20)).lineLimit(2) }
-                    Spacer(minLength: 8)
+                    } else {
+                        Text(leg.title).font(IumrahType.bold(20, relativeTo: .title2)).lineLimit(2)
+                    }
+                    Spacer(minLength: 4)
                     if let status { Text(status).font(IumrahType.bold(12, relativeTo: .caption)).foregroundStyle(statusColor).multilineTextAlignment(.trailing) }
                 }.foregroundStyle(.white)
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: 6) {
                     endpoint(leg.origin, raw: departureDisplay, trailing: false)
-                    VStack(spacing: 6) {
+                    VStack(spacing: 5) {
                         Image(systemName: leg.stops == 0 ? "airplane" : "arrow.triangle.branch")
-                            .font(.system(size: 23, weight: .medium)).foregroundStyle(livePosition == nil ? Color.white : Color.green)
-                        if displayDuration > 0 { Text(durationText(displayDuration)).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.white.opacity(0.78)).lineLimit(1).minimumScaleFactor(0.7) }
-                        if leg.stops >= 0 { Text(leg.stops == 0 ? t("Прямой", "Direct", "To‘g‘ri", "Тўғри") : t("Пересадок: \(leg.stops)", "Stops: \(leg.stops)", "Ulanish: \(leg.stops)", "Уланиш: \(leg.stops)")).font(IumrahType.regular(11)).foregroundStyle(.white.opacity(0.7)).lineLimit(2).multilineTextAlignment(.center) }
-                    }.frame(maxWidth: .infinity).padding(.top, 8)
+                            .font(.system(size: 24, weight: .medium)).foregroundStyle(livePosition == nil ? Color.white : Color.green)
+                            .accessibilityHidden(true)
+                        if displayDuration > 0 { Text(durationText(displayDuration)).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.white.opacity(0.82)).lineLimit(1).minimumScaleFactor(0.7) }
+                        if leg.stops >= 0 { Text(leg.stops == 0 ? t("Прямой", "Direct", "To‘g‘ri", "Тўғри") : t("Пересадок: \(leg.stops)", "Stops: \(leg.stops)", "Ulanish: \(leg.stops)", "Уланиш: \(leg.stops)")).font(IumrahType.regular(11, relativeTo: .caption2)).foregroundStyle(.white.opacity(0.76)).lineLimit(2).multilineTextAlignment(.center) }
+                    }.frame(maxWidth: .infinity).padding(.top, 6)
                     endpoint(leg.destination, raw: arrivalDisplay, trailing: true, estimated: arrivalEstimated)
                 }
-            }.padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 8)
+            }.padding(.horizontal, 20).padding(.top, pageHeroInset == nil ? 18 : 12).padding(.bottom, 10)
             globe
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -120,19 +130,31 @@ struct IumrahPremiumFlightDetail: View {
         if let a = IumrahPremiumFlightLeg.instant(details?.departureScheduled), let b = IumrahPremiumFlightLeg.instant(details?.arrivalScheduled), b > a { return Int(b.timeIntervalSince(a) / 60) }
         return leg.effectiveDuration
     }
+    private var enrichmentMessage: String {
+        if details != nil { return "AeroDataBox" + (IumrahPremiumFlightLeg.instant(details?.updatedAt).map { " · " + $0.formatted(.dateTime.day().month().hour().minute()) } ?? "") }
+        switch enrichmentReason {
+        case "no_match": return t("Дополнительное расписание ещё не опубликовано", "Additional schedule not published yet", "Qo‘shimcha jadval hali e’lon qilinmagan", "Қўшимча жадвал ҳали эълон қилинмаган")
+        case "quota_exhausted", "provider_quota": return t("Лимит обновлений исчерпан", "Flight update limit reached", "Yangilash limiti tugadi", "Янгилаш лимити тугади")
+        case "not_configured", "http_404", "http_503": return t("Сервис данных рейса недоступен", "Flight data service unavailable", "Reys ma’lumotlari xizmati mavjud emas", "Рейс маълумотлари хизмати мавжуд эмас")
+        default: return t("Не удалось обновить данные рейса", "Could not update flight data", "Reys ma’lumotlarini yangilab bo‘lmadi", "Рейс маълумотларини янгилаб бўлмади")
+        }
+    }
     private var enrichmentFooter: some View {
-        HStack(alignment: .center, spacing: 8) {
-            if refreshing {
+        HStack(alignment: .center, spacing: 10) {
+            if refreshing || !hasLoadedDetail {
                 ProgressView().controlSize(.small)
-                Text(t("Обновляем данные рейса", "Updating flight data", "Reys ma’lumotlari yangilanmoqda", "Рейс маълумотлари янгиланмоқда"))
-            } else if details != nil {
-                Text("AeroDataBox" + (IumrahPremiumFlightLeg.instant(details?.updatedAt).map { " · " + $0.formatted(.dateTime.day().month().hour().minute()) } ?? ""))
+                Text(t("Обновляем расписание", "Updating schedule", "Jadval yangilanmoqda", "Жадвал янгиланмоқда"))
             } else {
-                Text(enrichmentReason == "no_match" ? t("Дополнительное расписание пока не опубликовано", "Additional schedule not published", "Qo‘shimcha jadval hali e’lon qilinmagan", "Қўшимча жадвал ҳали эълон қилинмаган") : t("Дополнительные данные недоступны", "Additional flight data unavailable", "Qo‘shimcha ma’lumot mavjud emas", "Қўшимча маълумот мавжуд эмас"))
+                Image(systemName: details != nil ? "checkmark.circle" : "info.circle").accessibilityHidden(true)
+                Text(enrichmentMessage).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)
-            if !refreshing { Button { Task { await refreshOperational() } } label: { Image(systemName: "arrow.clockwise").font(.system(size: 14, weight: .medium)).frame(width: 44, height: 44) }.buttonStyle(.plain).accessibilityLabel(t("Обновить", "Refresh", "Yangilash", "Янгилаш")) }
-        }.font(IumrahType.regular(11, relativeTo: .caption2)).foregroundStyle(.secondary)
+            if hasLoadedDetail && !refreshing && enrichmentReason != "quota_exhausted" && enrichmentReason != "provider_quota" {
+                Button { Task { await refreshOperational() } } label: {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 15, weight: .medium)).frame(width: 44, height: 44)
+                }.buttonStyle(.plain).accessibilityLabel(t("Обновить", "Refresh", "Yangilash", "Янгилаш"))
+            }
+        }.font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary)
     }
     private var arrivalEstimate: IumrahFlightClock.Arrival? {
         guard clean(leg.arrival) == nil, details?.arrivalScheduled == nil, IumrahPremiumFlightLeg.localParts(leg.departure, code: leg.origin) != nil, leg.stops == 0 else { return nil }
@@ -155,15 +177,25 @@ struct IumrahPremiumFlightDetail: View {
     }
     private var globe: some View {
         GeometryReader { proxy in
-            let diameter = min(proxy.size.width - 32, 330)
-            ZStack {
-                IumrahHemisphereMap(projection: route?.projection ?? .arabia, palette: .dark, isAnimating: scenePhase == .active, mapOpacity: 0.95)
-                if let route, livePosition != nil { routeOverlay(route) }
+            let diameter = min(max(1, proxy.size.width - 32), 324)
+            let visibleHeight = proxy.size.height
+            let cropOffset = livePosition == nil ? 0 : diameter * 0.22
+            ZStack(alignment: .top) {
+                IumrahHemisphereMap(projection: route?.projection ?? .arabia,
+                    presentation: .globe, palette: .dark, isAnimating: scenePhase == .active,
+                    lightIntensity: 0.88, mapOpacity: 1)
+                    .frame(width: diameter, height: diameter)
+                    .offset(y: -cropOffset)
+                if let route, livePosition != nil {
+                    // Place the live overlay on the same projected sphere, not on the clipped viewport.
+                    routeOverlay(route)
+                        .frame(width: diameter, height: diameter)
+                        .offset(y: -cropOffset)
+                }
             }
-            .frame(width: max(0, diameter), height: max(0, diameter))
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+            .frame(width: proxy.size.width, height: visibleHeight, alignment: .top)
         }
-        .frame(height: 154)
+        .frame(height: 142)
         .clipped()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -200,45 +232,58 @@ struct IumrahPremiumFlightDetail: View {
     }
     private func metric(_ title: String, _ value: String) -> some View { VStack(alignment: .leading, spacing: 3) { Text(title).font(IumrahType.regular(11)).foregroundStyle(.secondary); Text(value).font(IumrahType.bold(17)).foregroundStyle(.primary).minimumScaleFactor(0.7) }.frame(maxWidth: .infinity, alignment: .leading) }
     private var airportSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            Text(t("Детали перелёта", "Flight itinerary", "Parvoz tafsilotlari", "Парвоз тафсилотлари")).font(IumrahType.bold(19))
-            airportRow(code: leg.origin, raw: departureDisplay, airport: from ?? bundled(leg.origin), title: t("Вылет", "Departure", "Jo‘nash", "Жўнаш"), terminal: details?.departureTerminal ?? leg.departureTerminal, gate: details?.departureGate, revised: details?.departureRevised, actual: details?.departureActual)
-            Divider()
-            airportRow(code: leg.destination, raw: arrivalDisplay, airport: to ?? bundled(leg.destination), title: t("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш"), terminal: details?.arrivalTerminal ?? leg.arrivalTerminal, gate: details?.arrivalGate, revised: details?.arrivalRevised, actual: details?.arrivalActual)
-            if let belt = clean(details?.baggageBelt) { fact(t("Лента багажа", "Baggage belt", "Bagaj lentasi", "Багаж лентаси"), belt) }
+        VStack(alignment: .leading, spacing: 16) {
+            Text(t("Маршрут перелёта", "Flight itinerary", "Parvoz yo‘nalishi", "Парвоз йўналиши")).font(IumrahType.bold(20, relativeTo: .title2))
+            airportRow(code: leg.origin, raw: departureDisplay, airport: from ?? bundled(leg.origin), title: t("Вылет", "Departure", "Jo‘nash", "Жўнаш"), icon: "airplane.departure", terminal: details?.departureTerminal ?? leg.departureTerminal, gate: details?.departureGate, revised: details?.departureRevised, actual: details?.departureActual)
+            Divider().padding(.leading, 38)
+            airportRow(code: leg.destination, raw: arrivalDisplay, airport: to ?? bundled(leg.destination), title: t("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш"), icon: "airplane.arrival", terminal: details?.arrivalTerminal ?? leg.arrivalTerminal, gate: details?.arrivalGate, revised: details?.arrivalRevised, actual: details?.arrivalActual)
+            if let belt = clean(details?.baggageBelt) { Divider(); fact(t("Лента багажа", "Baggage belt", "Bagaj lentasi", "Багаж лентаси"), belt) }
         }.iumrahFlightCard()
     }
-    private func airportRow(code: String, raw: String?, airport: Airport?, title: String, terminal: String?, gate: String?, revised: String?, actual: String?) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(title).font(IumrahType.regular(12)).foregroundStyle(.secondary)
-            Text("\(city(code, airport: airport)) · \(code)").font(IumrahType.bold(17))
-            if let local = IumrahPremiumFlightLeg.localParts(raw, code: code) { Text(dateLabel(local.day) + " · " + local.time).font(IumrahType.regular(13)).foregroundStyle(.secondary) }
-            else if let raw, raw.count == 10 { Text(dateLabel(raw)).font(IumrahType.regular(13)).foregroundStyle(.secondary) }
-            if let name = airport?.name ?? FlightReferenceCatalog.airport(code)?.name { Text(name).font(IumrahType.regular(13)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
-            if let terminal = clean(terminal) { fact(t("Терминал", "Terminal", "Terminal", "Терминал"), terminal) }
-            if let gate = clean(gate) { fact(t("Выход", "Gate", "Chiqish", "Чиқиш"), gate) }
-            if let actual = clean(actual) { fact(t("Фактическое время ВПП", "Actual runway time", "Haqiqiy uchish vaqti", "Ҳақиқий учиш вақти"), actual) }
-            else if let revised = clean(revised) { fact(t("Обновлённое время", "Revised time", "Yangilangan vaqt", "Янгиланган вақт"), revised) }
-        }.frame(maxWidth: .infinity, alignment: .leading)
+    private func airportRow(code: String, raw: String?, airport: Airport?, title: String, icon: String, terminal: String?, gate: String?, revised: String?, actual: String?) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon).font(.system(size: 16, weight: .medium))
+                .frame(width: 30, height: 30).background(IumrahFlightPalette.raised, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary)
+                    Spacer(minLength: 4)
+                    if let local = IumrahPremiumFlightLeg.localParts(raw, code: code) {
+                        Text(dateLabel(local.day)).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary)
+                    } else if let raw, raw.count == 10 { Text(dateLabel(raw)).font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary) }
+                }
+                Text(city(code, airport: airport)).font(IumrahType.bold(18, relativeTo: .headline))
+                if let name = airport?.name ?? FlightReferenceCatalog.airport(code)?.name { Text(name).font(IumrahType.regular(13, relativeTo: .subheadline)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                if let terminal = clean(terminal) { fact(t("Терминал", "Terminal", "Terminal", "Терминал"), terminal) }
+                if let gate = clean(gate) { fact(t("Выход", "Gate", "Chiqish", "Чиқиш"), gate) }
+                if let actual = clean(actual), let time = IumrahPremiumFlightLeg.localParts(actual, code: code) { fact(t("Фактическое время ВПП", "Actual runway time", "Haqiqiy uchish vaqti", "Ҳақиқий учиш вақти"), dateLabel(time.day) + " · " + time.time) }
+                else if let revised = clean(revised), let time = IumrahPremiumFlightLeg.localParts(revised, code: code) { fact(t("Обновлённое время", "Revised time", "Yangilangan vaqt", "Янгиланган вақт"), dateLabel(time.day) + " · " + time.time) }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    private var otherCarrier: String? {
+        guard let carrier = clean(leg.operatingCarrier), carrier.caseInsensitiveCompare(leg.title) != .orderedSame else { return nil }
+        return carrier
     }
     private var aircraftSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(t("Самолёт и класс", "Aircraft & cabin", "Samolyot va klass", "Самолёт ва класс")).font(IumrahType.bold(19))
-            if let model = clean(details?.aircraft ?? leg.aircraft) { fact(t("Самолёт", "Aircraft", "Samolyot", "Самолёт"), model) }
+            if let model = clean(details?.aircraft) ?? clean(leg.aircraft) { fact(t("Самолёт", "Aircraft", "Samolyot", "Самолёт"), model) }
             if let reg = clean(details?.registration) { fact(t("Бортовой номер", "Registration", "Bort raqami", "Борт рақами"), reg) }
             if let cabin = clean(leg.cabin) { fact(t("Класс", "Cabin", "Klass", "Класс"), cabin.capitalized) }
-            if let carrier = clean(leg.operatingCarrier) { fact(t("Выполняет рейс", "Operated by", "Parvoz operatori", "Парвоз оператори"), carrier) }
+            if let carrier = otherCarrier { fact(t("Выполняет рейс", "Operated by", "Parvoz operatori", "Парвоз оператори"), carrier) }
         }.iumrahFlightCard()
     }
     private func fact(_ title: String, _ value: String) -> some View { HStack(alignment: .firstTextBaseline) { Text(title).font(IumrahType.regular(13)).foregroundStyle(.secondary); Spacer(minLength: 10); Text(value).font(IumrahType.bold(13)).multilineTextAlignment(.trailing) } }
     @MainActor private func load() async {
-        details = nil; enrichmentReason = nil; from = bundled(leg.origin); to = bundled(leg.destination)
+        details = nil; enrichmentReason = nil; hasLoadedDetail = false; from = bundled(leg.origin); to = bundled(leg.destination)
         async let origin = resolve(leg.origin, existing: from)
         async let destination = resolve(leg.destination, existing: to)
         refreshing = true
         let result = await fetchDetail()
         guard !Task.isCancelled else { refreshing = false; return }
-        details = result.detail; enrichmentReason = result.reason; refreshing = false
+        details = result.detail; enrichmentReason = result.reason; refreshing = false; hasLoadedDetail = true
         let (a, b) = await (origin, destination)
         guard !Task.isCancelled else { return }
         from = a; to = b
@@ -250,7 +295,7 @@ struct IumrahPremiumFlightDetail: View {
         let result = await fetchDetail(force: true)
         guard !Task.isCancelled else { return }
         if let new = result.detail { details = new }
-        enrichmentReason = result.reason
+        enrichmentReason = result.reason; hasLoadedDetail = true
     }
     private func resolve(_ code: String, existing: Airport?) async -> Airport? {
         if let existing { return existing }
@@ -307,26 +352,28 @@ extension View {
             .overlay { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.75) }
     }
 
-    /// One in-content header. The first hero paints the status-bar inset itself.
+    /// One in-content header; only the background extends into the status-bar safe area.
     func iumrahFlightDetailChrome() -> some View { modifier(IumrahFlightDetailChromeModifier()) }
 }
 
-private struct IumrahFlightDetailTopInsetKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
-private extension EnvironmentValues {
-    var flightDetailTopInset: CGFloat {
-        get { self[IumrahFlightDetailTopInsetKey.self] }
-        set { self[IumrahFlightDetailTopInsetKey.self] = newValue }
-    }
-}
 private struct IumrahFlightDetailChromeModifier: ViewModifier {
-    @Environment(\.journeyTopInset) private var inheritedInset
+    @EnvironmentObject private var chrome: AppChromeStore
+    @State private var registered = false
     func body(content: Content) -> some View {
-        GeometryReader { viewport in
-            content.environment(\.flightDetailTopInset, max(viewport.safeAreaInsets.top, inheritedInset))
-                .ignoresSafeArea(.container, edges: .top)
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .navigationBarBackButtonHidden(true)
-        .background(GeneratorInteractivePopRestorer().frame(width: 0, height: 0))
+        content
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationBarBackButtonHidden(true)
+            .tint(Color.primary)
+            .background(IumrahFlightPalette.hero, ignoresSafeAreaEdges: .top)
+            .background(GeneratorInteractivePopRestorer().frame(width: 0, height: 0))
+            .onAppear {
+                guard !registered else { return }
+                registered = true; chrome.beginInternalNavigation()
+            }
+            .onDisappear {
+                guard registered else { return }
+                registered = false; chrome.endInternalNavigation()
+            }
     }
 }

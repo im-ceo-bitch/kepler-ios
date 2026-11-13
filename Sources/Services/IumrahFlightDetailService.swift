@@ -49,6 +49,12 @@ actor IumrahFlightDetailService {
             do {
                 let envelope: Envelope = try await APIClient.shared.get("/api/package/flights/detail", query: query, timeoutInterval: 15)
                 return .init(detail: envelope.detail, reason: envelope.reason ?? (envelope.detail == nil ? "no_match" : nil))
+            } catch let error as APIError {
+                switch error {
+                case .status(let code), .server(let code, _): return .init(detail: nil, reason: "http_\(code)")
+                case .decoding: return .init(detail: nil, reason: "invalid_response")
+                default: return .init(detail: nil, reason: "request_failed")
+                }
             } catch { return .init(detail: nil, reason: "network_error") }
         }
         inFlight[key] = request

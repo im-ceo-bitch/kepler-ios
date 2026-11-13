@@ -165,7 +165,7 @@ private enum IumrahOTAText {
     }
 
     static func price(_ amount: Double) -> String {
-        amount.formatted(.currency(code: "USD").precision(.fractionLength(0)))
+        "$" + amount.formatted(.number.precision(.fractionLength(0)))
     }
 
     static func connectionMinutes(_ lhs: IumrahOTAFlightLeg, _ rhs: IumrahOTAFlightLeg) -> Int? {
@@ -387,11 +387,7 @@ struct IumrahOTAFlightDetailPage: View {
             }.padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.bottom, IumrahDesign.pagePadding)
         }
-        .background(IumrahFlightPalette.page)
-        .navigationTitle(flight.airline)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: legs.first?.share ?? "iumrah") { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+        .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
         .iumrahFlightDetailChrome()
     }
 

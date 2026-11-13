@@ -24,7 +24,9 @@ test("generated package detail keeps the existing visual hierarchy but upgrades 
   assert.match(flightCard, /NavigationLink\s*\{/);
   assert.match(flightCard, /IumrahPremiumFlightDetail\(leg: IumrahPremiumFlightLeg\(leg\)/);
   assert.match(flightCard, /onChange\(\)/);
-  assert.match(flightCard, /ShareLink/);
+  assert.match(flightCard, /iumrahFlightDetailChrome\(\)/);
+  const premium = fs.readFileSync(new URL("Sources/Views/Flights/IumrahPremiumFlightDetail.swift", root), "utf8");
+  assert.match(premium, /ShareLink\(item: headerShareText \?\? leg.share\)/);
   assert.match(detail, /HotelDetailView\(/);
   assert.match(detail, /selectionFlow: true/);
   assert.match(detail, /selectionRole: target\.role/);

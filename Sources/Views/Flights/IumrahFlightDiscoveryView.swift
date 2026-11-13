@@ -647,7 +647,7 @@ struct IumrahFlightDiscoveryView: View {
                 chipButton(
                     icon: "slider.horizontal.3",
                     title: directOnly
-                        ? tr("Без пересадок", "Non-stop", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри")
+                        ? tr("Прямой", "Direct", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри")
                         : tr("Фильтры", "Filters", "Filtrlar", "Фильтрлар"),
                     active: directOnly
                 ) {
@@ -1927,10 +1927,10 @@ private struct FlightDiscoveryTicketCard: View {
                         ForEach(badges) { badge in
                             Text(badge.title)
                                 .font(.caption2.weight(.bold))
-                                .foregroundStyle(badge.tint)
+                                .foregroundStyle(Color.secondary)
                                 .padding(.horizontal, 9)
                                 .frame(height: 25)
-                                .background(badge.tint.opacity(0.12), in: Capsule())
+                                .background(IumrahFlightPalette.raised, in: Capsule())
                         }
                     }
                 }
@@ -2017,7 +2017,6 @@ private struct FlightDiscoveryTicketCard: View {
                 onTap()
             } label: {
                 HStack(spacing: 8) {
-                    Label(dateText, systemImage: "calendar")
                     Spacer()
                     Text(tr("Подробнее", "Details", "Batafsil", "Батафсил"))
                         .font(.caption.weight(.bold))
@@ -2073,9 +2072,11 @@ private struct FlightDiscoveryTicketCard: View {
                     Rectangle().fill(Color.secondary.opacity(0.2)).frame(height: 1)
                     Circle().fill(Color.secondary.opacity(0.45)).frame(width: 5, height: 5)
                 }
-                Text(stopsText(transfers))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color.secondary)
+                if transfers >= 0 {
+                    Text(stopsText(transfers))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.secondary)
+                }
             }
             .frame(maxWidth: .infinity)
 
@@ -2370,7 +2371,7 @@ private struct FlightDiscoveryFiltersSheet: View {
             VStack(alignment: .leading, spacing: 20) {
                 Toggle(isOn: $directOnly) {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(tr("Без пересадок", "Non-stop only", "Faqat to‘g‘ridan-to‘g‘ri", "Фақат тўғридан-тўғри"))
+                        Text(tr("Прямые рейсы", "Direct flights only", "Faqat to‘g‘ridan-to‘g‘ri", "Фақат тўғридан-тўғри"))
                             .font(.headline)
                         Text(tr("Показывать только прямые варианты", "Show only direct options", "Faqat to‘g‘ridan-to‘g‘ri variantlar", "Фақат тўғридан-тўғри вариантлар"))
                             .font(.caption)
@@ -3153,13 +3154,7 @@ private struct FlightDiscoveryOfferDetailView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 20)
         }
-        .background(IumrahFlightPalette.page)
-        
-        .navigationTitle(activeOffer.airlineName)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
-        .navigationBarBackButtonHidden(false)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { ShareLink(item: shareText) { Image(systemName: "square.and.arrow.up").foregroundStyle(.white) } } }
+        .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
         .iumrahFlightDetailChrome()
         .task {
             await refreshCurrentFare()
@@ -3249,7 +3244,7 @@ private struct FlightDiscoveryOfferDetailView: View {
                     "Саҳифа очилганда нарх янгиланди · олдин \(money(offer.price))"
                 ))
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.primary)
             } else if isRefreshingPrice {
                 Text(tr("Проверяем последние данные Data API…", "Checking recent Data API fares…", "Data API ma’lumotlari tekshirilmoqda…", "Data API маълумотлари текширилмоқда…"))
                     .font(.caption)
@@ -3259,7 +3254,7 @@ private struct FlightDiscoveryOfferDetailView: View {
             if let refreshFeedback {
                 Label(refreshFeedback, systemImage: refreshFailed ? "exclamationmark.circle" : "checkmark.circle")
                     .font(.caption)
-                    .foregroundStyle(refreshFailed ? Color.orange : Color.green)
+                    .foregroundStyle(refreshFailed ? Color.orange : Color.primary)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -3268,7 +3263,7 @@ private struct FlightDiscoveryOfferDetailView: View {
             HStack(spacing: 10) {
                 Label(priceRefreshStatusText, systemImage: lastPriceRefreshAt == nil ? "clock" : "checkmark.circle.fill")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(lastPriceRefreshAt == nil ? Color.secondary : Color.green)
+                    .foregroundStyle(lastPriceRefreshAt == nil ? Color.secondary : Color.primary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Button {
@@ -3390,10 +3385,10 @@ private struct FlightDiscoveryOfferDetailView: View {
             if let legs = FlightDiscoveryItineraryValidator.verified(activeOffer.outboundSegments, origin: outboundOrigin, destination: outboundDestination, transfers: activeOffer.transfers) {
                 ForEach(Array(legs.enumerated()), id: \.offset) { index, leg in
                     if index > 0 { IumrahPremiumFlightConnection(previous: IumrahPremiumFlightLeg(legs[index - 1]), next: IumrahPremiumFlightLeg(leg), language: language) }
-                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language, pageHeroInset: index == 0 ? 20 : nil)
+                    IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(leg), language: language, pageHeroInset: index == 0 ? 20 : nil, headerShareText: shareText)
                 }
             } else {
-                IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(airline: activeOffer.airlineName, airlineCode: activeOffer.airlineCode, number: activeOffer.flightNumber, origin: outboundOrigin, destination: outboundDestination, departure: activeOffer.departureAt, arrival: activeOffer.arrivalAt, duration: activeOffer.durationMinutes, stops: activeOffer.transfers), language: language, pageHeroInset: 20)
+                IumrahPremiumFlightDetail(leg: IumrahPremiumFlightLeg(airline: activeOffer.airlineName, airlineCode: activeOffer.airlineCode, number: activeOffer.flightNumber, origin: outboundOrigin, destination: outboundDestination, departure: activeOffer.departureAt, arrival: activeOffer.arrivalAt, duration: activeOffer.durationMinutes, stops: activeOffer.transfers), language: language, pageHeroInset: 20, headerShareText: shareText)
             }
         }
     }

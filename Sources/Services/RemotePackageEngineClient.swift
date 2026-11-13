@@ -1,8 +1,7 @@
 import Foundation
 
-/// The Package Engine is intentionally hotel/booking-support only.
-/// Flight inventory will be connected through the separate unified
-/// FlightInventoryProviding boundary in the next Ignav integration update.
+/// Thin client for the authoritative configurator inside iumrah-backend.
+/// Never calculate selling prices or expose internal supplier cost here.
 struct RemotePackageEngineClient {
     private let api = APIClient.shared
 

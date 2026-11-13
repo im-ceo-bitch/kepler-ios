@@ -3,6 +3,7 @@ import Foundation
 struct BookingCreateEnvelope: Encodable {
     let lang: String
     let booking: BookingDraftRequest
+    let quoteProof: String?
 }
 
 struct BookingDraftRequest: Encodable {

@@ -128,7 +128,7 @@ enum BookingDraftBuilder {
                 madinahHotel: madinahHotel.map { generatorHotel($0, room: madinahRoom, roomCategory: madinahRoomCategory, authoritativeRoomId: authoritativeMadinahRoomId) }
             )
         )
-        return BookingCreateEnvelope(lang: language.rawValue, booking: draft)
+        return BookingCreateEnvelope(lang: language.rawValue, booking: draft, quoteProof: quote.quoteProof)
     }
 
     private static func generatorFlight(_ offer: FlightOffer) -> BookingGeneratorFlightSnapshot {

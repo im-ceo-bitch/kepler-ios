@@ -880,6 +880,7 @@ final class JourneyStore: ObservableObject {
 
     func chooseTransferVehicle(_ vehicle: TransferVehicleKind) {
         guard selectedTransferVehicle != vehicle else { return }
+        packageQuoteRevision &+= 1
         selectedTransferVehicle = vehicle
         transferSelectionConfirmed = false
         // Rebuild the final generator snapshot so iumrah Business receives the
@@ -892,6 +893,7 @@ final class JourneyStore: ObservableObject {
         let resolved = allowed && selected
         if resolved { ensureHaramainTicketDefaults() }
         guard haramainTrainSelected != resolved else { return }
+        packageQuoteRevision &+= 1
         haramainTrainSelected = resolved
         transferSelectionConfirmed = false
         quote = nil
@@ -910,6 +912,7 @@ final class JourneyStore: ObservableObject {
         guard haramainFareClass != fareClass else { return }
         haramainFareClass = fareClass
         if haramainTrainSelected {
+            packageQuoteRevision &+= 1
             transferSelectionConfirmed = false
             quote = nil
         }
@@ -920,6 +923,7 @@ final class JourneyStore: ObservableObject {
         guard haramainAdultTickets != resolved else { return }
         haramainAdultTickets = resolved
         if haramainTrainSelected {
+            packageQuoteRevision &+= 1
             transferSelectionConfirmed = false
             quote = nil
         }
@@ -930,6 +934,7 @@ final class JourneyStore: ObservableObject {
         guard haramainChildTickets != resolved else { return }
         haramainChildTickets = resolved
         if haramainTrainSelected {
+            packageQuoteRevision &+= 1
             transferSelectionConfirmed = false
             quote = nil
         }

@@ -10,7 +10,6 @@ struct TransferSelectionView: View {
 
     @State private var selectedIndex = 1
     @State private var dragOffset: CGFloat = 0
-    @State private var basePackagePriceUsd: Decimal?
     @State private var showFinalPackage = false
     @State private var isConfirming = false
     @State private var confirmationError: String?
@@ -28,13 +27,17 @@ struct TransferSelectionView: View {
         selectedVehicle.publicUpgradeUsd(for: journey.trip.scope)
     }
 
-    private var selectedTrainAddOnUsd: Decimal {
-        journey.haramainTrainSelected ? journey.haramainTrainAddOnUsd : 0
+    private var currentPackageTotalUsd: Decimal? {
+        guard journey.hasFinalGeneratorQuote else { return nil }
+        return journey.quote?.totalPackagePrice
     }
 
-    private var currentPackageTotalUsd: Decimal? {
-        guard let basePackagePriceUsd else { return journey.quote?.totalPackagePrice }
-        return basePackagePriceUsd + selectedVehicleAddOnUsd + selectedTrainAddOnUsd
+    // Changes to the visible configuration invalidate the current quote. A
+    // cancellable task requests a new server total, instead of synthesizing it.
+    private var pricingSelectionKey: String {
+        [selectedVehicle.rawValue, String(journey.haramainTrainSelected),
+         journey.haramainFareClass.rawValue, String(journey.haramainTicketCount),
+         String(journey.trip.hashValue)].joined(separator: "|")
     }
 
     var familyFlow = false
@@ -63,6 +66,12 @@ struct TransferSelectionView: View {
             Text(confirmationError ?? "")
         }
         .task { await prepareTransferSelection() }
+        .task(id: pricingSelectionKey) {
+            // Wait for a swipe/counter gesture to settle, never a request per frame.
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            guard !Task.isCancelled, !isConfirming else { return }
+            await refreshBasePackagePrice()
+        }
     }
 
     private var transferPageBackground: some View {
@@ -518,7 +527,6 @@ struct TransferSelectionView: View {
             let choice = journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle()
             selectedIndex = vehicles.firstIndex(of: choice) ?? 0
             journey.chooseTransferVehicle(choice)
-            await refreshBasePackagePrice()
             return
         }
 
@@ -528,20 +536,12 @@ struct TransferSelectionView: View {
             journey.chooseTransferVehicle(selected)
         }
 
-        // Vehicle classes are package options, not GPS-matched nearby drivers.
-        // Show them immediately and update the server quote asynchronously.
-        await refreshBasePackagePrice()
+        // The pricingSelectionKey task refreshes the authoritative price.
     }
 
     @MainActor
     private func refreshBasePackagePrice() async {
         await journey.buildQuote(forceHotelRefresh: false)
-        guard let quote = journey.quote else { basePackagePriceUsd = nil; return }
-        let activeVehicleAddOn = (journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle())
-            .publicUpgradeUsd(for: journey.trip.scope)
-        let activeTrainAddOn = journey.haramainTrainSelected ? journey.haramainTrainAddOnUsd : 0
-        let resolved = quote.totalPackagePrice - activeVehicleAddOn - activeTrainAddOn
-        if resolved > 0 { basePackagePriceUsd = resolved }
     }
 
     private func resistedTranslation(_ raw: CGFloat) -> CGFloat {
@@ -596,11 +596,6 @@ struct TransferSelectionView: View {
             return
         }
 
-        if let quote = journey.quote {
-            let addOns = selectedVehicleAddOnUsd + selectedTrainAddOnUsd
-            let resolved = quote.totalPackagePrice - addOns
-            if resolved > 0 { basePackagePriceUsd = resolved }
-        }
 
         IumrahHaptics.success()
         isConfirming = false

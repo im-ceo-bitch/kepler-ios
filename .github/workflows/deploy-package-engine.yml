@@ -1,4 +1,4 @@
-name: Sync iumrah Backend integrations
+name: Deploy iumrah backend (full)
 
 on:
   workflow_dispatch:
@@ -13,13 +13,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: iumrah-backend-integrations
+  group: iumrah-backend-full-dispatch
   cancel-in-progress: false
 
 jobs:
-  integrations:
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 65
     env:
       SYNC_MISSING_SECRETS: ${{ inputs.sync_missing_secrets }}
       NEW_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.NEW_CLOUDFLARE_ACCOUNT_ID }}
@@ -34,7 +34,109 @@ jobs:
       WALLET_CERT_PEM: ${{ secrets.WALLET_CERT_PEM }}
       WALLET_KEY_PEM: ${{ secrets.WALLET_KEY_PEM }}
     steps:
-      - name: Sync and verify existing unified backend
+      - name: Run and wait for canonical Business backend deployment
+        env:
+          IUMRAH_BACKEND_DEPLOY_TOKEN: ${{ secrets.IUMRAH_BACKEND_DEPLOY_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          import json
+          import os
+          import re
+          import time
+          from urllib.request import Request, build_opener, HTTPRedirectHandler
+          from urllib.error import HTTPError, URLError
+
+          REPO = 'im-ceo-bitch/lattice-mobile'
+          BRANCH = 'main'
+          WORKFLOW = 'deploy-iumrah-backend.yml'
+          API = 'https://api.github.com/repos/' + REPO
+
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          opener = build_opener(NoRedirect())
+
+          class APIError(RuntimeError):
+              def __init__(self, status, operation):
+                  super().__init__(f'GitHub API {operation}: HTTP {status}')
+                  self.status = status
+
+
+          def call(path, token, method='GET', payload=None):
+              headers = {'Accept':'application/vnd.github+json', 'Authorization':'Bearer '+token,
+                         'X-GitHub-Api-Version':'2026-03-10', 'User-Agent':'iumrah-unified-deploy-ci'}
+              data = None
+              if payload is not None:
+                  headers['Content-Type'] = 'application/json'
+                  data = json.dumps(payload).encode()
+              try:
+                  with opener.open(Request(API + path, data=data, headers=headers, method=method), timeout=30) as r:
+                      result = json.loads(r.read(2_000_000))
+                      if not isinstance(result, dict): raise RuntimeError('Unexpected GitHub response')
+                      return result
+              except HTTPError as exc:
+                  raise APIError(exc.code, method) from None
+              except (URLError, TimeoutError):
+                  raise RuntimeError('GitHub network error; check the Business Actions page before retrying.') from None
+              except (ValueError, UnicodeError):
+                  raise RuntimeError('Unexpected GitHub response; check the Business Actions page before retrying.') from None
+
+
+          def run(token, request=call, sleep=time.sleep, monotonic=time.monotonic, timeout=2700):
+              if not token.strip():
+                  raise RuntimeError('Add IUMRAH_BACKEND_DEPLOY_TOKEN in kepler-ios GitHub Actions Secrets (lattice-mobile: Actions read/write).')
+              token = token.strip()
+              path = '/actions/workflows/' + WORKFLOW
+              workflow = request(path, token)
+              workflow_id = workflow.get('id')
+              if (type(workflow_id) is not int or workflow_id <= 0 or workflow.get('state') != 'active'
+                      or workflow.get('path') != '.github/workflows/' + WORKFLOW):
+                  raise RuntimeError('Canonical Business deployment workflow missing, disabled, or unexpected.')
+              # No retry on POST: an ambiguous response may already have launched the deployment.
+              result = request(path + '/dispatches', token, 'POST', {'ref':BRANCH})
+              run_id = result.get('workflow_run_id')
+              if type(run_id) is not int or run_id <= 0:
+                  raise RuntimeError('Dispatch response has no run ID. Check Business Actions before retrying.')
+              url = f'https://github.com/{REPO}/actions/runs/{run_id}'
+              print('Full backend deploy started: ' + url, flush=True)
+              summary = os.environ.get('GITHUB_STEP_SUMMARY')
+              if summary:
+                  with open(summary,'a',encoding='utf-8') as f: f.write(f'### Canonical deployment\n[{run_id}]({url})\n')
+              deadline = monotonic() + timeout
+              last = None
+              while monotonic() < deadline:
+                  try:
+                      state = request('/actions/runs/' + str(run_id), token)
+                  except APIError as exc:
+                      if exc.status not in (404, 429, 500, 502, 503, 504): raise
+                      sleep(15)
+                      continue
+                  if (state.get('id') != run_id or state.get('workflow_id') != workflow_id
+                          or state.get('event') != 'workflow_dispatch' or state.get('head_branch') != BRANCH):
+                      raise RuntimeError('Run identity mismatch; refusing to report deployment success.')
+                  status = state.get('status')
+                  if status != last:
+                      print('Business deploy status: ' + str(status), flush=True)
+                      last = status
+                  if status == 'completed':
+                      if state.get('conclusion') != 'success':
+                          raise RuntimeError(f'Business full deployment did not succeed: {state.get("conclusion")}. See {url}')
+                      print('Canonical backend deploy succeeded: ' + url, flush=True)
+                      return run_id
+                  sleep(15)
+              raise RuntimeError('Timed out waiting for Business deployment. It may still be running. Check ' + url + ' before restarting.')
+
+          if __name__ == '__main__':
+              try:
+                  run(os.environ.get('IUMRAH_BACKEND_DEPLOY_TOKEN',''))
+              except Exception as exc:
+                  print('::error::' + (str(exc) if isinstance(exc, RuntimeError) else type(exc).__name__))
+                  raise SystemExit(1)
+          PYTHON
+      - name: Sync missing integration secrets and verify deployed backend
         shell: bash
         run: |
           set -euo pipefail
@@ -236,7 +338,9 @@ jobs:
                   print('::warning::Core cutover pending. Existing accounts/bookings migration is not proven. Do not retire old data.')
               if not health.get('fullyConfigured'):
                   print('::warning::Some non-core bindings are missing; check R2 and unified backend health.')
-              print('Health flags verify configuration, not live supplier responses or Wallet signing. No source deployment was performed.')
+              if h.get('aerodataBoxBackupConfigured') is not True:
+                  print('::warning::AeroDataBox backup is not active in runtime. Check the distinct backup key and its limit; existing bindings are preserved.')
+              print('Full source deployment completed in lattice-mobile. Health flags verify configuration, not live supplier responses or Wallet signing.')
 
           if __name__ == '__main__':
               try: run()

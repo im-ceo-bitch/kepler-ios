@@ -7,6 +7,7 @@ struct RootView: View {
     @StateObject private var settings = AppSettingsStore()
     @ObservedObject var chrome: AppChromeStore
     @StateObject private var journey = JourneyStore()
+    @StateObject private var manualJourney = IumrahManualJourneyStore()
     @StateObject private var bookings = BookingStore()
     @StateObject private var account = IumrahAccountStore()
     @StateObject private var hotelStorefront = HotelStorefrontStore()
@@ -25,6 +26,7 @@ struct RootView: View {
             .environmentObject(settings)
             .environmentObject(chrome)
             .environmentObject(journey)
+            .environmentObject(manualJourney)
             .environmentObject(bookings)
             .environmentObject(account)
             .environmentObject(hotelStorefront)

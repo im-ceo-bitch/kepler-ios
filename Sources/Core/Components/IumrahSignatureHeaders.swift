@@ -71,37 +71,62 @@ struct IumrahPrimaryHeaderBrandRow: View {
     }
 }
 
-/// The segmented navigation inside a black hero is intentionally a solid
-/// capsule, NOT a mocked Liquid Glass navigation control.
+/// Shared Booking-style independent pills. Horizontal scrolling avoids truncated
+/// labels on iPhone mini; selected pills remain visible after a board switch.
+struct IumrahHeaderPills: View {
+    let labels: [String]
+    let symbols: [String]
+    var selection: Int? = nil
+    var enabled: [Bool] = []
+    let onSelect: (Int) -> Void
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(labels.indices, id: \.self) { index in
+                        let selected = selection == index
+                        let allowed = !enabled.indices.contains(index) || enabled[index]
+                        Button {
+                            IumrahHaptics.selection()
+                            onSelect(index)
+                        } label: {
+                            HStack(spacing: 7) {
+                                if symbols.indices.contains(index) {
+                                    Image(systemName: symbols[index]).font(.system(size: 15, weight: .medium))
+                                }
+                                Text(labels[index]).font(.system(size: 13, weight: .semibold)).fixedSize()
+                            }
+                            .padding(.horizontal, 15)
+                            .frame(height: 44)
+                            .foregroundStyle(selected ? Color.black : Color.white.opacity(allowed ? 1 : 0.5))
+                            .background(selected ? Color.white : Color.white.opacity(0.07), in: Capsule())
+                            .overlay(Capsule().strokeBorder(Color.white.opacity(selected ? 1 : 0.65), lineWidth: 1))
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!allowed)
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                        .id(index)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .onAppear { if let selection { proxy.scrollTo(selection, anchor: .center) } }
+            .onChange(of: selection) { _, value in
+                if let value { withAnimation(.easeInOut(duration: 0.22)) { proxy.scrollTo(value, anchor: .center) } }
+            }
+        }
+        .frame(height: 46)
+    }
+}
+
 struct IumrahHeaderTripleTabs: View {
     let labels: [String]
     let selection: Int
     let onSelect: (Int) -> Void
-
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(labels.indices, id: \.self) { index in
-                Button {
-                    IumrahHaptics.selection()
-                    onSelect(index)
-                } label: {
-                    Text(labels[index])
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.74)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 34)
-                        .foregroundStyle(index == selection ? Color.black : Color.white)
-                        .background(index == selection ? Color.white : Color.clear, in: Capsule())
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(index == selection ? .isSelected : [])
-            }
-        }
-        .padding(3)
-        .background(Color.white.opacity(0.12), in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.white.opacity(0.18), lineWidth: 0.6))
+        IumrahHeaderPills(labels: labels, symbols: ["suitcase", "doc.text", "calendar"], selection: selection, onSelect: onSelect)
     }
 }
 
@@ -110,72 +135,75 @@ struct IumrahHeaderCapsuleActions: View {
     let symbols: [String]
     let enabled: [Bool]
     let onSelect: (Int) -> Void
-
     var body: some View {
-        HStack(spacing: 7) {
-            ForEach(labels.indices, id: \.self) { index in
-                let allowed = enabled.indices.contains(index) ? enabled[index] : true
-                Button { onSelect(index) } label: {
-                    Label(labels[index], systemImage: symbols.indices.contains(index) ? symbols[index] : "circle")
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .lineLimit(1).minimumScaleFactor(0.7)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 35)
-                        .foregroundStyle(.white)
-                        .background(Color.white.opacity(allowed ? 0.15 : 0.06), in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.white.opacity(allowed ? 0.32 : 0.13), lineWidth: 0.7))
-                }
-                .buttonStyle(.plain)
-                .disabled(!allowed)
-                .accessibilityLabel(labels[index])
-            }
-        }
+        IumrahHeaderPills(labels: labels, symbols: symbols, enabled: enabled, onSelect: onSelect)
     }
 }
 
-/// Shared root-tab masthead. Height is constant, but the whole masthead is a
-/// normal scroll item: swiping UP moves it offscreen. During top overscroll,
-/// IumrahRootScrollingPage compensates its position so it does not stretch.
+/// Home, Hotels, Flights, Transfer and Package use exactly the same masthead.
+struct IumrahDiscoveryMasthead: View {
+    @EnvironmentObject private var chrome: AppChromeStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var manual: IumrahManualJourneyStore
+    let selection: Int
+    private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
+        IumrahFlightCopy.text(settings.language, ru, en, uz, cy)
+    }
+    var body: some View {
+        IumrahPrimaryTabHeader(footer: AnyView(IumrahHeaderPills(
+            labels: [tr("Собрать умру", "Build Umrah", "Umra tuzish", "Умра тузиш"),
+                     tr("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"),
+                     tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"),
+                     tr("Трансфер", "Transfer", "Transfer", "Трансфер"),
+                     tr("Мой пакет", "My package", "Mening paketim", "Менинг пакетим") + (manual.componentCount > 0 ? " · \(manual.componentCount)" : "")],
+            symbols: ["sparkles", "bed.double", "airplane", "car.side", "suitcase"], selection: selection,
+            onSelect: { index in
+                switch index {
+                case 0: chrome.openUmrahPlan()
+                case 1: chrome.openHotels(board: .hotels)
+                case 2: chrome.openHotels(board: .flights)
+                case 3: chrome.openHotels(board: .transfer)
+                case 4: chrome.openHotels(board: .summary)
+                default: break
+                }
+            })), discovery: true)
+    }
+}
+
+/// One curved black masthead for all root surfaces, with room for the pills.
 struct IumrahPrimaryTabHeader: View {
     var title: String? = nil
     var subtitle: String? = nil
     var footer: AnyView? = nil
+    var discovery = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             IumrahPrimaryHeaderBrandRow()
-
             if let title {
                 Text(title)
                     .font(IumrahType.bold(28, relativeTo: .largeTitle))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                    .foregroundStyle(.white)
-                    .padding(.top, footer == nil ? 7 : 2)
+                    .lineLimit(1).minimumScaleFactor(0.78)
+                    .foregroundStyle(.white).padding(.top, 7)
                     .accessibilityAddTraits(.isHeader)
             }
             if let subtitle {
-                Text(subtitle)
-                    .font(IumrahType.regular(14, relativeTo: .subheadline))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .foregroundStyle(.white.opacity(0.76))
-                    .padding(.top, 3)
+                Text(subtitle).font(IumrahType.regular(14, relativeTo: .subheadline))
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                    .foregroundStyle(.white.opacity(0.76)).padding(.top, 3)
             }
-            if let footer {
-                footer
-                    .padding(.top, title == nil ? 7 : 4)
-            }
+            if let footer { footer.padding(.top, 12) }
             Spacer(minLength: 0)
         }
         .foregroundStyle(.white)
         .padding(.horizontal, IumrahDesign.pagePadding)
         .padding(.top, IumrahSignatureHeaderGeometry.topInset)
         .frame(maxWidth: .infinity)
-        .frame(height: IumrahSignatureHeaderGeometry.contentHeight, alignment: .top)
-        // Hotels, Bookings, Support and Account have a STRAIGHT bottom edge.
-        // Only Home retains the brand's curved lower corners.
-        .background(IumrahWorldDotsHeaderBackground(mapOpacity: 0.33))
+        .frame(height: discovery ? IumrahSignatureHeaderGeometry.contentHeight + 52 : IumrahSignatureHeaderGeometry.contentHeight + (footer == nil ? 0 : 34), alignment: .top)
+        .background {
+            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: IumrahSignatureHeaderGeometry.bottomRadius, bottomTrailingRadius: IumrahSignatureHeaderGeometry.bottomRadius))
+        }
         .accessibilityElement(children: .contain)
     }
 }

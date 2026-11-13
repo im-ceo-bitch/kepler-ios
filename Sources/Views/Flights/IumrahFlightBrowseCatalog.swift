@@ -8,12 +8,38 @@ struct IumrahFlightBrowseCatalog: View {
     let direction: Int
     let refreshSignal: Int
     @ObservedObject var model: IumrahFlightBrowseModel
+    var tripOverride: TripDraft? = nil
+    var requestedDay: String? = nil
+    var requestedSaudiAirport: String? = nil
+    var selectedID: String? = nil
+    var pairedContextID: String? = nil
+    var onAdd: ((LocalJourneyFlight) -> Void)? = nil
     let onChoose: (LocalJourneyFlight) -> Void
+    private var trip: TripDraft { tripOverride ?? journey.trip }
     @State private var filters = IumrahFlightFilterState()
     @State private var visibleCount = 20
-    private var identity: String { "\(journey.trip.originCode):\(refreshSignal)" }
+    private var identity: String { "\(trip.originCode):\(trip.effectiveFlightFilters.cabinClass.rawValue):\(refreshSignal)" }
     private var directionFlights: [LocalJourneyFlight] {
-        model.flights.filter { direction == 0 ? $0.origin == journey.trip.originCode : $0.destination == journey.trip.originCode }
+        let candidates = model.flights.filter { flight in
+            let route = direction == 0 ? flight.origin == trip.originCode : flight.destination == trip.originCode
+            let saudi = direction == 0 ? flight.destination : flight.origin
+            return route && (requestedSaudiAirport == nil || requestedSaudiAirport == saudi)
+        }
+        // Keep the chosen exact provider identity and the matching paired itinerary
+        // visible, without showing duplicate physical flights in the catalogue.
+        func priority(_ flight: LocalJourneyFlight) -> Int {
+            if flight.id == selectedID { return 0 }
+            if let pairedContextID, flight.publishedID == pairedContextID { return 1 }
+            return flight.publishedIsPair == true ? 3 : 2
+        }
+        var unique: [String: LocalJourneyFlight] = [:]
+        for flight in candidates {
+            let key = "\(flight.origin):\(flight.destination):\(flight.airlineCode):\(flight.flightNumber):\(String(IumrahFlightClock.local(flight.departureAt, airport: flight.origin).prefix(10)))"
+            if let old = unique[key] {
+                if priority(flight) < priority(old) { unique[key] = flight }
+            } else { unique[key] = flight }
+        }
+        return Array(unique.values)
     }
     private var filtered: [LocalJourneyFlight] {
         directionFlights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: IumrahFlightClock.local($0.departureAt, airport: $0.origin)) }.sorted { a, b in
@@ -25,6 +51,10 @@ struct IumrahFlightBrowseCatalog: View {
     private var calendarFlights: [LocalJourneyFlight] {
         directionFlights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false) }
     }
+    private func addAction(_ flight: LocalJourneyFlight) -> (() -> Void)? {
+        guard let onAdd else { return nil }
+        return { onAdd(flight) }
+    }
     var body: some View {
         LazyVStack(spacing: 14) {
             IumrahFlightSearchControls(filters: $filters,
@@ -32,12 +62,12 @@ struct IumrahFlightBrowseCatalog: View {
                 days: IumrahFlightSearchControls.priceDays(calendarFlights.map { (IumrahFlightClock.local($0.departureAt, airport: $0.origin), $0.displayedPrice) }),
                 onSelectDay: { day in
                     filters.day = day
-                    Task { await model.loadDay(day, trip: journey.trip, direction: direction, language: settings.language) }
+                    Task { await model.loadDay(day, trip: trip, direction: direction, language: settings.language) }
                 })
             if model.loading { ProgressView().frame(maxWidth: .infinity).padding(18) }
             if let error = model.error {
                 Text(error).font(.footnote).foregroundStyle(.secondary)
-                Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await model.load(trip: journey.trip, language: settings.language) } }
+                Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await model.load(trip: trip, language: settings.language) } }
             } else if !model.loading && filtered.isEmpty {
                 Text(NuiteeCopy.text("Пока нет рейсов на выбранном направлении", "Bu yo‘nalishda reyslar hali yo‘q", "No flights available for this direction", settings.language))
                     .foregroundStyle(.secondary).padding(.vertical, 24)
@@ -47,14 +77,21 @@ struct IumrahFlightBrowseCatalog: View {
                     flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination,
                     departureAt: flight.departureAt, arrivalAt: flight.arrivalAt,
                     duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice,
-                    isAviasales: flight.id.hasPrefix("feed:"), selectedSearchDay: filters.day) { onChoose(flight) }
+                    isAviasales: flight.id.hasPrefix("feed:"), selected: selectedID == flight.id, selectedSearchDay: filters.day,
+                    onSelect: addAction(flight)) { onChoose(flight) }
 
             }
             IumrahLoadMoreButton(remaining: filtered.count - visibleCount) { visibleCount += 20 }
         }
         .tint(Color.primary)
-        .task(id: identity) { await model.load(trip: journey.trip, language: settings.language) }
-        .onChange(of: direction) { _, _ in visibleCount = 20; filters = IumrahFlightFilterState() }
+        .task(id: identity) {
+            filters.day = requestedDay
+            await model.load(trip: trip, language: settings.language)
+            if let day = requestedDay, !Task.isCancelled { await model.loadDay(day, trip: trip, direction: direction, language: settings.language) }
+        }
+        .onChange(of: direction) { _, _ in
+            visibleCount = 20; filters = IumrahFlightFilterState(); filters.day = requestedDay
+        }
         .onChange(of: filters) { _, _ in visibleCount = 20 }
         .onChange(of: identity) { _, _ in visibleCount = 20 }
     }
@@ -82,13 +119,13 @@ final class IumrahFlightBrowseModel: ObservableObject {
         var failures = 0
         do {
             let items = try await CuratedFlightRecommendationService.shared.load(trip: trip, from: tomorrow, days: 365)
-            for item in items {
+            for item in items where item.cabinClass.lowercased().replacingOccurrences(of: " ", with: "_") == trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() {
                 for leg in [item.outbound, item.inbound].compactMap({ $0 }) where String(leg.departureAt.prefix(10)) >= day {
                     result.append(LocalJourneyFlight(id: "published:\(item.id):\(leg.origin):\(leg.departureAt)",
                         origin: leg.origin, destination: leg.destination, airline: leg.airline,
                         flightNumber: leg.flightNumber, airlineCode: leg.airlineCode,
                         durationMinutes: leg.durationMinutes, stops: leg.stops, departureAt: leg.departureAt,
-                        arrivalAt: leg.arrivalAt, displayedPrice: nil))
+                        arrivalAt: leg.arrivalAt, displayedPrice: nil, publishedID: item.id, publishedIsPair: item.inbound != nil, publishedCabin: leg.cabinClass))
                 }
             }
         } catch { failures += 1 }
@@ -96,6 +133,7 @@ final class IumrahFlightBrowseModel: ObservableObject {
         flights = sortedUnique(result)
         // Both Saudi airports, both directions. Cached monthly feeds include
         // tomorrow onward; published rows above cover the full available year.
+        guard trip.effectiveFlightFilters.cabinClass == .economy else { loading = false; return }
         let months = Set([tomorrow, Calendar.current.date(byAdding: .month, value: 1, to: tomorrow) ?? tomorrow]
             .map { IumrahFlightDiscoveryStore.monthFormatter.string(from: $0) })
         for airport in ["JED", "MED"] {
@@ -105,12 +143,12 @@ final class IumrahFlightBrowseModel: ObservableObject {
                     do {
                         let response = try await AviasalesFlightDiscoveryService().offers(origin: route.0, destination: route.1,
                             departure: month, direct: false, limit: 200)
-                        for offer in response.offers where offer.origin == route.0 && offer.destination == route.1
+                        for offer in response.offers where !offer.isRoundTrip && offer.origin == route.0 && offer.destination == route.1
                             && String(offer.departureAt.prefix(10)) >= day {
                             result.append(LocalJourneyFlight(id: "feed:\(offer.id)", origin: offer.origin,
                                 destination: offer.destination, airline: offer.airlineName, flightNumber: offer.flightNumber,
                                 airlineCode: offer.airlineCode, durationMinutes: offer.durationMinutes, stops: offer.transfers,
-                                departureAt: offer.departureAt, arrivalAt: offer.arrivalAt ?? FlightDiscoveryItineraryValidator.verified(offer.outboundSegments, origin: offer.origin, destination: offer.destination, transfers: offer.transfers)?.last?.arrivalAt, displayedPrice: offer.price > 0 ? offer.price : nil))
+                                departureAt: offer.departureAt, arrivalAt: offer.arrivalAt ?? FlightDiscoveryItineraryValidator.verified(offer.outboundSegments, origin: offer.origin, destination: offer.destination, transfers: offer.transfers)?.last?.arrivalAt, displayedPrice: offer.price > 0 ? offer.price : nil, discoveryOffer: offer))
                         }
                     } catch { failures += 1 }
                     guard requestID == token, !Task.isCancelled else { return }
@@ -124,6 +162,7 @@ final class IumrahFlightBrowseModel: ObservableObject {
         if requestID == token { loading = false }
     }
     func loadDay(_ day: String, trip: TripDraft, direction: Int, language: AppSettingsStore.Language) async {
+        guard trip.effectiveFlightFilters.cabinClass == .economy else { return }
         let token = UUID(); requestID = token
         loading = true; error = nil
         defer { if requestID == token { loading = false } }
@@ -141,7 +180,7 @@ final class IumrahFlightBrowseModel: ObservableObject {
                         airline: offer.airlineName, flightNumber: offer.flightNumber, airlineCode: offer.airlineCode,
                         durationMinutes: offer.durationMinutes, stops: offer.transfers, departureAt: offer.departureAt,
                         arrivalAt: offer.arrivalAt ?? FlightDiscoveryItineraryValidator.verified(offer.outboundSegments, origin: offer.origin, destination: offer.destination, transfers: offer.transfers)?.last?.arrivalAt,
-                        displayedPrice: offer.price > 0 ? offer.price : nil))
+                        displayedPrice: offer.price > 0 ? offer.price : nil, discoveryOffer: offer))
                 }
             } catch { failures += 1 }
         }
@@ -154,7 +193,8 @@ final class IumrahFlightBrowseModel: ObservableObject {
     private func sortedUnique(_ values: [LocalJourneyFlight]) -> [LocalJourneyFlight] {
         var unique: [String: LocalJourneyFlight] = [:]
         for flight in values {
-            let key = "\(flight.origin):\(flight.destination):\(flight.flightNumber):\(flight.departureAt.prefix(10))"
+            let source = flight.publishedIsPair == true ? "pair:" + (flight.publishedID ?? flight.id) : "independent"
+            let key = "\(flight.origin):\(flight.destination):\(flight.airlineCode):\(flight.flightNumber):\(flight.departureAt.prefix(10)):\(source)"
             if unique[key] == nil || (unique[key]?.displayedPrice == nil && flight.displayedPrice != nil) { unique[key] = flight }
         }
         return unique.values.sorted { $0.departureAt < $1.departureAt }

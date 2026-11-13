@@ -108,6 +108,8 @@ struct NuiteeHotelsCatalogView: View {
     var initialHotelQuery: String = ""
     var searchOverride: IumrahHotelTabSearch? = nil
     var showsSearchControls = true
+    var onManualRoom: ((LocalJourneyRoom) -> Void)? = nil
+    @State private var manualMeals = HotelMealChoices()
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
     @StateObject private var model: NuiteeCatalogModel
@@ -132,12 +134,13 @@ struct NuiteeHotelsCatalogView: View {
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
 
     init(refreshSignal: Int, initialHotelQuery: String = "", searchOverride: IumrahHotelTabSearch? = nil,
-         showsSearchControls: Bool = true, model: NuiteeCatalogModel? = nil) {
+         showsSearchControls: Bool = true, model: NuiteeCatalogModel? = nil, onManualRoom: ((LocalJourneyRoom) -> Void)? = nil) {
         _model = StateObject(wrappedValue: model ?? NuiteeCatalogModel())
         self.refreshSignal = refreshSignal
         self.initialHotelQuery = initialHotelQuery
         self.searchOverride = searchOverride
         self.showsSearchControls = showsSearchControls
+        self.onManualRoom = onManualRoom
         _hotelQuery = State(initialValue: initialHotelQuery)
         if let request = searchOverride {
             _city = State(initialValue: request.city == "madinah" ? .madinah : .makkah)
@@ -358,7 +361,15 @@ struct NuiteeHotelsCatalogView: View {
             NuiteeStayCalendarSheet(checkin: $draftCheckin, nights: $draftNights)
         }
         .navigationDestination(item: $opened) { hotel in
-            NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox)
+            if let onManualRoom {
+                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox,
+                    onSelectRate: { rate in
+                        guard rate.currency == "USD", rate.price.isFinite, rate.price > 0 else { return }
+                        onManualRoom(LocalJourneyRoom(id: "\(city.rawValue):0", city: city.rawValue, hotel: hotel, rate: rate, checkin: checkin, checkout: checkout, adults: adults, childrenAges: [], meals: manualMeals))
+                    }, onSelectMeals: { manualMeals = $0 })
+            } else {
+                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox)
+            }
         }
     }
 

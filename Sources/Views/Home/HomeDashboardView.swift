@@ -118,6 +118,8 @@ struct HomeDashboardView: View {
             .background(IumrahNoVerticalBounce())
             })
             .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
+            .onAppear { consumeHeaderBuildRequest() }
+            .onChange(of: chrome.shouldOpenUmrahPlan) { _, _ in consumeHeaderBuildRequest() }
             .onChange(of: focusJourneySearchRevision) { _, _ in
                 withAnimation(.easeInOut(duration: 0.28)) {
                     scrollProxy.scrollTo("journey-search", anchor: .top)
@@ -127,6 +129,13 @@ struct HomeDashboardView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea())
     }
 
+
+    private func consumeHeaderBuildRequest() {
+        guard chrome.shouldOpenUmrahPlan, chrome.currentTab == .home else { return }
+        chrome.shouldOpenUmrahPlan = false
+        withAnimation(.easeInOut(duration: 0.28)) { journeySearchExpanded = true }
+        focusJourneySearchRevision += 1
+    }
 
     private func dismissSystemNotification(_ notification: ClientSystemNotification) {
         IumrahHaptics.selection()
@@ -2057,17 +2066,7 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var blackTop: some View {
-        IumrahPrimaryHeaderBrandRow()
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, IumrahSignatureHeaderGeometry.topInset)
-            .padding(.bottom, IumrahSignatureHeaderGeometry.lowerInset)
-            .frame(maxWidth: .infinity)
-            .background {
-                IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
-                    .clipShape(UnevenRoundedRectangle(
-                        bottomLeadingRadius: IumrahSignatureHeaderGeometry.bottomRadius,
-                        bottomTrailingRadius: IumrahSignatureHeaderGeometry.bottomRadius))
-            }
+        IumrahDiscoveryMasthead(selection: 0)
     }
 
     private var searchCard: some View {

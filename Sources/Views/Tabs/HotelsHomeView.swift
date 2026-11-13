@@ -4,11 +4,17 @@ import SwiftUI
 /// components remain available below for existing deep links, never displayed
 /// as an alternative supplier catalogue on this root tab.
 struct HotelsHomeView: View {
-    private enum Discovery: Int { case hotels, flights, weekends }
+    private enum Discovery: Int { case hotels, flights, weekends, transfer, summary }
 
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
-    @EnvironmentObject private var journey: JourneyStore
+    @EnvironmentObject private var manual: IumrahManualJourneyStore
+    @State private var browseTrip = TripDraft()
+    @State private var requestedFlightDay: String?
+    @State private var requestedSaudiAirport: String?
+    @State private var openedManualFlight: LocalJourneyFlight?
+    @State private var selectionMessage: String?
+    @State private var flightSearchRevision = 0
     @EnvironmentObject private var storefront: HotelStorefrontStore
 
     @State private var mode: Discovery = .hotels
@@ -41,29 +47,38 @@ struct HotelsHomeView: View {
     @State private var flightDeparture = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date()
     @State private var flightReturn = Calendar.current.date(byAdding: .day, value: 21, to: Date()) ?? Date()
     @State private var flightAdults = 2
-    @State private var flightChildren = 0
-    @State private var flightInfants = 0
     @State private var flightCabin: FlightCabinClass = .economy
     @State private var weekendDate = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date()
     @State private var weekendNights = 3
-    @State private var flightResultsPresented = false
     @State private var selectedLegacyPackage: StorefrontFlightPackagePreview?
 
     private var modes: [String] {
         [copy("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"),
          copy("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"),
-         copy("Выходные", "Weekends", "Dam olish", "Дам олиш")]
+         copy("Выходные", "Weekends", "Dam olish", "Дам олиш"),
+         copy("Трансфер", "Transfer", "Transfer", "Трансфер"),
+         copy("Мой пакет", "My package", "Mening paketim", "Менинг пакетим")]
+    }
+
+    private var matchingPairID: String? {
+        let other = flightDirection == 0 ? manual.inbound : manual.outbound
+        return other?.publishedIsPair == true ? other?.publishedID : nil
     }
 
     private var fixedHeader: some View {
-        IumrahPrimaryTabHeader(title: modes[mode.rawValue])
+        IumrahDiscoveryMasthead(selection: mode == .hotels ? 1 : mode == .transfer ? 3 : mode == .summary ? 4 : 2)
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, headerHelp: mode != .hotels, header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, headerHelp: false, header: {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
+                if mode == .transfer {
+                    IumrahManualTransferCatalog()
+                } else if mode == .summary {
+                    IumrahManualPackageView()
+                } else {
                 IumrahGraphiteSearchSurface(
                     isExpanded: $searchExpanded,
                     summary: mode == .hotels
@@ -77,6 +92,7 @@ struct HotelsHomeView: View {
                         case .hotels: hotelFields
                         case .flights: flightFields
                         case .weekends: weekendFields
+                        case .transfer, .summary: EmptyView()
                         }
                         searchAction
                     }
@@ -85,6 +101,22 @@ struct HotelsHomeView: View {
                 .padding(.top, -40)
                 .padding(.bottom, 20)
 
+                if let selectionMessage {
+                    Label(selectionMessage, systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold)).padding(15)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+                        .padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 12)
+                }
+                if manual.componentCount > 0 {
+                    Button { chrome.openHotels(board: .summary) } label: {
+                        HStack {
+                            Label(copy("Мой пакет", "My package", "Mening paketim", "Менинг пакетим"), systemImage: "suitcase")
+                            Spacer(); Text("\(manual.componentCount)"); Image(systemName: "chevron.right")
+                        }.font(.subheadline.weight(.semibold)).padding(15)
+                            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+                    }.buttonStyle(.plain).padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 12)
+                }
                 IumrahPageHelpCard(mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights")
                     .padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 16)
                 if mode == .hotels {
@@ -117,7 +149,11 @@ struct HotelsHomeView: View {
                                 refreshSignal: hotelSearchRevision,
                                 initialHotelQuery: appliedHotelName,
                                 searchOverride: hotelRequest,
-                                showsSearchControls: false, model: hotelCatalog
+                                showsSearchControls: false, model: hotelCatalog, onManualRoom: { room in
+                                    manual.select(room)
+                                    selectionMessage = copy("Отель добавлен в ваш пакет", "Hotel added to your package", "Mehmonxona paketingizga qo‘shildi", "Меҳмонхона пакетингизга қўшилди")
+                                    IumrahHaptics.success()
+                                }
                             )
                         }
                         .padding(.horizontal, IumrahDesign.pagePadding)
@@ -132,39 +168,24 @@ struct HotelsHomeView: View {
                                      "Шаҳар, сана ва меҳмонларни танланг. Натижалар Nuitee’дан келади.")
                     )
                 } else {
-                    IumrahFlightBrowseCatalog(direction: flightDirection, refreshSignal: hotelSearchRevision, model: flightCatalog) { flight in
-                        let formatter = DateFormatter()
-                        formatter.locale = Locale(identifier: "en_US_POSIX")
-                        formatter.dateFormat = "yyyy-MM-dd"
-                        if let day = formatter.date(from: String(flight.departureAt.prefix(10))) {
-                            if flightDirection == 0 {
-                                flightDeparture = day
-                                flightDestination = flight.destination == "MED" ? .madinah : .jeddah
-                                if flightReturn <= day { flightReturn = Calendar.current.date(byAdding: .day, value: 7, to: day) ?? day }
-                            } else {
-                                flightReturn = day
-                                flightDestination = flight.origin == "MED" ? .madinah : .jeddah
-                                if flightDeparture >= day { flightDeparture = Calendar.current.date(byAdding: .day, value: -1, to: day) ?? day }
-                            }
-                        }
-                        if mode == .weekends { weekendDate = flightDeparture }
-                        search()
+                    IumrahFlightBrowseCatalog(direction: flightDirection, refreshSignal: flightSearchRevision, model: flightCatalog,
+                        tripOverride: browseTrip, requestedDay: requestedFlightDay, requestedSaudiAirport: requestedSaudiAirport,
+                        selectedID: flightDirection == 0 ? manual.outbound?.id : manual.inbound?.id,
+                        pairedContextID: matchingPairID,
+                        onAdd: { flight in addManualFlight(flight) }) { flight in
+                        openedManualFlight = flight
                     }
                     .padding(.horizontal, IumrahDesign.pagePadding)
                     .tint(Color.primary)
                 }
-
+                }
             }
             .padding(.bottom, 115)
         })
-        .background((mode == .hotels ? Color.iumrahPageBackground : IumrahFlightPalette.page).ignoresSafeArea(edges: .bottom))
+        .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
 
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            discoverySwitcher.padding(.horizontal, 18).padding(.vertical, 8)
-        }
-        .navigationDestination(isPresented: $flightResultsPresented) {
-            IumrahGuidedFlightSelectionView()
-                .toolbar(.hidden, for: .tabBar)
+        .navigationDestination(item: $openedManualFlight) { flight in
+            IumrahManualFlightDetail(flight: flight)
         }
         .navigationDestination(item: $selectedLegacyPackage) { package in
             StorefrontUmrahPackageDetailView(preview: package)
@@ -175,14 +196,23 @@ struct HotelsHomeView: View {
             openRequestedPackage(chrome.requestedPackageID)
         }
         .onChange(of: chrome.requestedHotelsBoard) { _, _ in applyRequestedBoard() }
+        .onChange(of: chrome.manualBoardRevision) { _, _ in applyRequestedBoard() }
+        .onChange(of: manual.outbound?.id) { _, value in if value != nil { showFlightAddedMessage() } }
+        .onChange(of: manual.inbound?.id) { _, value in if value != nil { showFlightAddedMessage() } }
         .onChange(of: chrome.requestedHotelTabSearch) { _, value in applyRequestedHotelSearch(value) }
         .onChange(of: chrome.requestedPackageID) { _, value in openRequestedPackage(value) }
         .onChange(of: hotelCity) { _, city in
             guard hotelRequest?.city != city else { return }
             let applied = hotelRequest
-            hotelRequest = IumrahHotelTabSearch(city: city,
-                checkin: applied?.checkin ?? hotelCheckin,
-                nights: applied?.nights ?? hotelNights, adults: applied?.adults ?? hotelAdults)
+            if let window = manual.expectedWindow(city) {
+                hotelCheckin = window.checkIn; hotelNights = window.nights
+                hotelAdults = manual.adults
+                hotelRequest = IumrahHotelTabSearch(city: city, checkin: window.checkIn, nights: window.nights, adults: manual.adults)
+            } else {
+                hotelRequest = IumrahHotelTabSearch(city: city,
+                    checkin: applied?.checkin ?? hotelCheckin,
+                    nights: applied?.nights ?? hotelNights, adults: applied?.adults ?? hotelAdults)
+            }
             if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
         }
         .onChange(of: hotelName) { _, _ in manualHotelLimit = 20 }
@@ -190,28 +220,14 @@ struct HotelsHomeView: View {
             if count > childAges.count { childAges += Array(repeating: 6, count: count - childAges.count) }
             if count < childAges.count { childAges = Array(childAges.prefix(count)) }
         }
+        .onChange(of: flightDirection) { _, _ in
+            if requestedFlightDay != nil { requestedSaudiAirport = nil; updateRequestedFlightDay(); flightSearchRevision += 1 }
+        }
         .onChange(of: flightDeparture) { _, date in
             if flightReturn <= date {
                 flightReturn = Calendar.current.date(byAdding: .day, value: 7, to: date) ?? date
             }
         }
-    }
-
-    @ViewBuilder private var discoverySwitcher: some View {
-        if #available(iOS 26.0, *) {
-            discoveryPicker.padding(8).glassEffect(.regular, in: .capsule)
-        } else {
-            discoveryPicker.padding(8)
-        }
-    }
-    private var discoveryPicker: some View {
-        Picker("", selection: $mode) {
-            Text(modes[0]).tag(Discovery.hotels)
-            Text(modes[1]).tag(Discovery.flights)
-            Text(modes[2]).tag(Discovery.weekends)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
     }
 
     private var hotelFields: some View {
@@ -258,9 +274,9 @@ struct HotelsHomeView: View {
     private var flightFields: some View {
         VStack(alignment: .leading, spacing: 16) {
             fieldTitle(copy("Поиск авиабилетов", "Find flights", "Aviachipta qidirish", "Авиачипта қидириш"))
-            AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
+            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin)
             VStack(alignment: .leading, spacing: 6) {
-                fieldLabel(copy("Аэропорт прилёта", "Arrival airport", "Kelish aeroporti", "Келиш аэропорти"))
+                fieldLabel(flightDirection == 0 ? copy("Аэропорт прилёта", "Arrival airport", "Kelish aeroporti", "Келиш аэропорти") : copy("Аэропорт вылета из Саудии", "Saudi departure airport", "Saudiya jo‘nash aeroporti", "Саудия жўнаш аэропорти"))
                 Picker("Arrival", selection: $flightDestination) {
                     Text(copy("Джидда", "Jeddah", "Jidda", "Жидда")).tag(SaudiArrivalAirport.jeddah)
                     Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag(SaudiArrivalAirport.madinah)
@@ -285,7 +301,7 @@ struct HotelsHomeView: View {
     private var weekendFields: some View {
         VStack(alignment: .leading, spacing: 16) {
             fieldTitle(copy("Короткая умра", "Short Umrah", "Qisqa Umra", "Қисқа Умра"))
-            AirportSelectorButton(airport: $journey.trip.originAirport, fallbackCode: $journey.trip.origin)
+            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin)
             DatePicker(copy("Дата начала", "Start date", "Boshlanish", "Бошланиш"), selection: $weekendDate, in: Date()..., displayedComponents: .date)
             Stepper(value: $weekendNights, in: 2...4) {
                 Label("\(weekendNights) " + copy("ночей", "nights", "tun", "тун"), systemImage: "moon.stars")
@@ -302,15 +318,10 @@ struct HotelsHomeView: View {
 
     private var travelerControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Stepper(value: $flightAdults, in: 1...9) {
+            Stepper(value: $flightAdults, in: 1...6) {
                 Label("\(flightAdults) " + copy("взрослых", "adults", "kattalar", "катталар"), systemImage: "person.2")
             }
-            Stepper(value: $flightChildren, in: 0...8) {
-                Label("\(flightChildren) " + copy("детей", "children", "bola", "бола"), systemImage: "figure.child")
-            }
-            Stepper(value: $flightInfants, in: 0...flightAdults) {
-                Label("\(flightInfants) " + copy("младенцев", "infants", "chaqaloq", "чақалоқ"), systemImage: "figure.and.child.holdinghands")
-            }
+            Text(copy("Для детей или нескольких номеров используйте пошаговый конфигуратор на главной.", "For children or multiple rooms use the guided builder on Home.", "Bolalar yoki bir nechta xona uchun bosh sahifadagi konfiguratorni ishlating.", "Болалар ёки бир нечта хона учун бош саҳифадаги конфигураторни ишлатинг.")).font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -415,37 +426,45 @@ struct HotelsHomeView: View {
         appliedHotelName = hotelName
         if mode == .hotels {
             manualQuoteRequired = hotelRooms != 1 || hotelChildren > 0 || hotelAdults > 6
+            if !manualQuoteRequired { manual.adults = hotelAdults }
             hotelRequest = IumrahHotelTabSearch(city: hotelCity, checkin: hotelCheckin,
                 nights: hotelNights, adults: hotelAdults)
             showHotelResults = true
             if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
             return
         }
-        journey.resetAfterTripChange()
-        journey.clearStagedUmrahFlights()
-        journey.trip.adults = flightAdults
-        journey.trip.children = flightChildren
-        journey.trip.infants = min(flightInfants, flightAdults)
-        journey.trip.rooms = 1
-        journey.trip.scope = .makkahAndMadinah
-        journey.trip.arrivalAirport = mode == .weekends ? .jeddah : flightDestination
-        journey.trip.selectedReturnAirport = nil
-        journey.trip.departureDate = mode == .weekends ? weekendDate : flightDeparture
-        journey.trip.returnDate = mode == .weekends
-            ? Calendar.current.date(byAdding: .day, value: weekendNights, to: weekendDate) ?? weekendDate
-            : flightReturn
-        journey.trip.flightTripType = .roundTrip
-        journey.trip.flexibility = mode == .weekends ? .weekend : .exact
-        var filters = journey.trip.effectiveFlightFilters
-        filters.cabinClass = mode == .weekends ? .economy : flightCabin
-        journey.trip.flightFilters = filters
-        journey.packageFlightPath = mode == .weekends ? .weekend : .flexibleDates
-        flightResultsPresented = true
+        guard mode == .flights || mode == .weekends else { return }
+        manual.adults = flightAdults
+        manual.cabin = mode == .weekends ? .economy : flightCabin
+        browseTrip.adults = manual.adults
+        browseTrip.children = 0; browseTrip.infants = 0
+        browseTrip.departureDate = mode == .weekends ? weekendDate : flightDeparture
+        browseTrip.returnDate = mode == .weekends ? (Calendar.current.date(byAdding: .day, value: weekendNights, to: weekendDate) ?? weekendDate) : flightReturn
+        var filters = browseTrip.effectiveFlightFilters; filters.cabinClass = manual.cabin; browseTrip.flightFilters = filters
+        requestedSaudiAirport = flightDestination.rawValue
+        updateRequestedFlightDay()
+        flightSearchRevision += 1
+    }
+
+    private func updateRequestedFlightDay() {
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+        requestedFlightDay = f.string(from: flightDirection == 0 ? browseTrip.departureDate : browseTrip.returnDate)
+    }
+
+    private func addManualFlight(_ flight: LocalJourneyFlight) {
+        manual.select(flight)
+        showFlightAddedMessage()
+        IumrahHaptics.success()
+    }
+
+    private func showFlightAddedMessage() {
+        selectionMessage = copy("Авиабилет добавлен в ваш пакет", "Flight added to your package", "Aviachipta paketingizga qo‘shildi", "Авиачипта пакетингизга қўшилди")
     }
 
     private func refreshSearch() async {
         searchExpanded = false
-        if mode != .hotels { await flightCatalog.load(trip: journey.trip, language: settings.language); return }
+        if mode == .flights || mode == .weekends { flightSearchRevision += 1; return }
+        guard mode == .hotels else { return }
         if mode == .hotels && showHotelResults {
             if manualQuoteRequired { await loadManualHotelCatalog() }
             else if let request = hotelRequest {
@@ -483,10 +502,28 @@ struct HotelsHomeView: View {
 
     private func applyRequestedBoard() {
         guard let requested = chrome.requestedHotelsBoard else { return }
+        selectionMessage = nil
         switch requested {
-        case .flights: mode = .flights
+        case .flights:
+            mode = .flights
+            if let direction = chrome.requestedManualFlightDirection {
+                flightDirection = direction; chrome.requestedManualFlightDirection = nil
+                requestedFlightDay = nil; requestedSaudiAirport = nil; flightSearchRevision += 1
+            }
+            flightAdults = manual.adults; flightCabin = manual.cabin
         case .sundayClub: mode = .weekends
-        default: mode = .hotels
+        case .transfer: mode = .transfer
+        case .summary: mode = .summary
+        default:
+            let switchingFromOtherBoard = mode != .hotels
+            mode = .hotels
+            if let city = chrome.requestedManualHotelCity ?? (switchingFromOtherBoard && manual.trip != nil ? hotelCity : nil) {
+                chrome.requestedManualHotelCity = nil
+                hotelCity = city; hotelAdults = manual.adults; hotelRooms = 1; hotelChildren = 0; manualQuoteRequired = false
+                if let window = manual.expectedWindow(city) { hotelCheckin = window.checkIn; hotelNights = window.nights }
+                hotelRequest = IumrahHotelTabSearch(city: city, checkin: hotelCheckin, nights: hotelNights, adults: hotelAdults)
+                showHotelResults = true
+            }
         }
         chrome.requestedHotelsBoard = nil
     }

@@ -1,6 +1,6 @@
 import Foundation
 
-struct LocalJourneyFlight: Codable, Identifiable {
+struct LocalJourneyFlight: Codable, Identifiable, Hashable {
     let id: String
     let origin: String
     let destination: String
@@ -13,6 +13,11 @@ struct LocalJourneyFlight: Codable, Identifiable {
     let arrivalAt: String?
     /// USD per traveler, exactly as shown in discovery; nil is never zero.
     let displayedPrice: Double?
+    // Exact discovery identities are retained for manual server revalidation.
+    var publishedID: String? = nil
+    var publishedIsPair: Bool? = nil
+    var discoveryOffer: FlightDiscoveryOffer? = nil
+    var publishedCabin: String? = nil
 }
 
 struct LocalJourneyRoom: Codable, Identifiable {

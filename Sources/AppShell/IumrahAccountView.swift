@@ -151,6 +151,15 @@ struct IumrahAccountView: View {
                 .padding(.bottom, 46)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             })
+            .onChange(of: guestAccountMode) { _, _ in
+                loginError = nil
+                loginEmailServerIssue = nil
+                resetPhoneLoginState()
+                resetPhoneRegistrationState()
+                registrationEmailChallengeID = ""
+                registrationEmailCode = ""
+                registrationEmailIssue = nil
+            }
             .onChange(of: loginScrollNonce) { _, _ in
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.90)) {
                     proxy.scrollTo("account-login", anchor: .top)
@@ -230,7 +239,11 @@ struct IumrahAccountView: View {
     private var accountHeader: some View {
         IumrahPrimaryTabHeader(
             title: tr("Account", "Аккаунт", "Akkaunt", "Аккаунт"),
-            subtitle: tr("Your profile, iumrah ID and journeys", "Ваш профиль, iumrah ID и поездки", "Profilingiz, iumrah ID va safarlar", "Профилингиз, iumrah ID ва сафарлар")
+            subtitle: account.account == nil ? nil : tr("Your profile, iumrah ID and journeys", "Ваш профиль, iumrah ID и поездки", "Profilingiz, iumrah ID va safarlar", "Профилингиз, iumrah ID ва сафарлар"),
+            footer: account.account == nil ? AnyView(IumrahHeaderPills(
+                labels: [tr("Register", "Зарегистрироваться", "Ro‘yxatdan o‘tish", "Рўйхатдан ўтиш"), tr("Sign in", "Войти", "Kirish", "Кириш")],
+                symbols: ["person.badge.plus", "key"], selection: guestAccountMode == .register ? 0 : 1,
+                onSelect: { index in guestAccountMode = index == 0 ? .register : .signIn; loginScrollNonce += 1 })) : nil
         )
     }
 
@@ -1279,21 +1292,6 @@ struct IumrahAccountView: View {
                     ? tr("Use the method linked to your permanent iumrah account", "Используйте способ, привязанный к Вашему постоянному аккаунту iumrah", "Doimiy iumrah akkauntingizga ulangan usuldan foydalaning", "Доимий iumrah аккаунтингизга уланган усулдан фойдаланинг")
                     : tr("Create one permanent account for all future trips", "Создайте один постоянный аккаунт для всех будущих поездок", "Barcha keyingi safarlar uchun bitta doimiy akkaunt yarating", "Барча кейинги сафарлар учун битта доимий аккаунт яратинг")
             )
-
-            Picker("", selection: $guestAccountMode) {
-                Text(tr("Register", "Регистрация", "Ro‘yxatdan o‘tish", "Рўйхатдан ўтиш")).tag(IumrahGuestAccountMode.register)
-                Text(tr("Sign in", "Вход", "Kirish", "Кириш")).tag(IumrahGuestAccountMode.signIn)
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: guestAccountMode) { _, _ in
-                loginError = nil
-                loginEmailServerIssue = nil
-                resetPhoneLoginState()
-                resetPhoneRegistrationState()
-                registrationEmailChallengeID = ""
-                registrationEmailCode = ""
-                registrationEmailIssue = nil
-            }
 
             Picker("", selection: $guestAuthMethod) {
                 Text("SMS").tag(IumrahGuestAuthMethod.sms)

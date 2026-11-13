@@ -41,6 +41,9 @@ final class AppChromeStore: ObservableObject {
     @Published var requestedHotelConfiguratorID: String?
     @Published var requestedHotelConfiguratorDeepLink: HotelConfiguratorDeepLink?
     @Published var requestedHotelsBoard: HotelsShowcaseBoard?
+    @Published var requestedManualFlightDirection: Int?
+    @Published var requestedManualHotelCity: String?
+    @Published var manualBoardRevision = 0
     /// A new guided journey is distinct from ordinary browsing of the Flights board.
     @Published private(set) var guidedUmrahSearchRevision = 0
     @Published private(set) var isGuidedUmrahSearch = false
@@ -91,6 +94,7 @@ final class AppChromeStore: ObservableObject {
     func openHotels(board: HotelsShowcaseBoard) {
         isGuidedUmrahSearch = false
         requestedHotelsBoard = board
+        manualBoardRevision &+= 1
         currentTab = .hotels
         requestedTab = .hotels
         IumrahHaptics.selection()

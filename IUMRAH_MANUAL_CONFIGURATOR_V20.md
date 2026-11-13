@@ -1,0 +1,8 @@
+# iumrah V20 — unified discovery masthead & manual package
+
+- Home/Hotels/Flights/Transfer/My package share the same black rounded masthead and outlined independent pills. The lower legacy discovery picker is gone. Booking/Support/Guest Account use the same capsule component.
+- Home's search continues into the existing guided flow. Manual discovery never calls that flow on a flight tap; the concrete premium detail opens instead. A separate ManualJourneyStore retains the component choices across root tabs during the app session.
+- Manual package shows empty component slots, supports edit/remove, and delegates complete-package pricing to the existing server quote and checkout. It validates dates, route, exact hotel stay/occupancy, vehicle capacity and compatible published/Aviasales identities. No pricing formula is added to the client.
+- Existing server has no partial-package pricing contract. Incomplete packages show available indicative component prices, with the total pending. The manual path supports 1–6 adults in one room per city; children/multi-room cases still use the existing guided flow. Booking is enabled only when the server returns a verified, booking-allowed quote.
+- V12 Quick Actions, V18 client security and V19 home/catalog changes are included cumulatively; no workflow, backend or database changes. V18 cleanup script is retained, not run by ZIP extraction.
+- Linux preflight: 317 Swift files parsed, 435 language switches checked, 95 assets/plists validated. Existing two unused asset warnings. 12 cache checks pass. Manual store logic smoke test with mocked dependencies passes. Full Xcode compilation, live quote and device rendering remain unverified.

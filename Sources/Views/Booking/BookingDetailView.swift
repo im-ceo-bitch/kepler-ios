@@ -188,31 +188,8 @@ struct BookingDetailView: View {
 
     private var topBar: some View {
         HStack(spacing: 12) {
-            Group {
-                if #available(iOS 26.0, *) {
-                    Button {
-                        IumrahHaptics.soft()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 40, height: 40)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(.glass)
-                } else {
-                    Button {
-                        IumrahHaptics.soft()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 17, weight: .bold))
-                            .frame(width: 44, height: 44)
-                            .iumrahGlass(in: Circle(), interactive: true)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+            IumrahGlassIconButton(systemName: "chevron.backward", size: 44,
+                accessibilityLabel: localizedDetail("Назад", "Back", "Orqaga", "Орқага")) { dismiss() }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(L10n.text("booking_detail_title", settings.language))

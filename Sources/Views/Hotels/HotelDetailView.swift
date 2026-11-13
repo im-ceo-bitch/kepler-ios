@@ -1772,15 +1772,9 @@ private struct HotelImageViewer: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 46, height: 46)
-                    .contentShape(Circle())
-                    .iumrahGlass(in: Circle(), interactive: true, tint: .black.opacity(0.22), chrome: true)
-            }
-            .buttonStyle(.plain)
+            IumrahGlassIconButton(systemName: "xmark", size: 46, foreground: .white,
+                tint: .black.opacity(0.22), accessibilityLabel: "Close") { dismiss() }
+                .environment(\.colorScheme, .dark)
             .padding(18)
         }
         .overlay(alignment: .topTrailing) {

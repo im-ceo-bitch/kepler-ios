@@ -327,11 +327,7 @@ struct IumrahIdentityUnlockSheet: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .frame(width: 34, height: 34)
-                            .contentShape(Circle())
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

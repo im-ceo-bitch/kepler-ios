@@ -684,7 +684,6 @@ struct NuiteeHotelDetailView: View {
             .padding(.bottom, 70)
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea())
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { IumrahPageHelpButton() } }
         .modifier(IumrahHelpOverlayHost(enabled: true))
         .navigationTitle(hotel.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -692,11 +691,14 @@ struct NuiteeHotelDetailView: View {
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) {
-            ShareLink(item: hotel.name + " — " + (hotel.address ?? hotel.city)) {
-                Image(systemName: "square.and.arrow.up")
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                ShareLink(item: hotel.name + " — " + (hotel.address ?? hotel.city)) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                IumrahPageHelpButton(inSystemToolbar: true)
             }
-        } }
+        }
         .task(id: settings.language.rawValue) { await refreshDetail() }
         .task(id: reloadID) { await refreshRates() }
         .fullScreenCover(isPresented: $isGalleryPresented) {

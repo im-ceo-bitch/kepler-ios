@@ -119,7 +119,7 @@ struct HotelsHomeView: View {
                 }
                 IumrahPageHelpCard(mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights")
                     .padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 16)
-                if mode == .hotels {
+                if mode == .hotels && (!manual.routeConfigured || manual.scope == .makkahAndMadinah) {
                     Picker("City", selection: $hotelCity) {
                         Text(copy("Мекка", "Makkah", "Makka", "Макка")).tag("makkah")
                         Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag("madinah")
@@ -150,7 +150,7 @@ struct HotelsHomeView: View {
                                 initialHotelQuery: appliedHotelName,
                                 searchOverride: hotelRequest,
                                 showsSearchControls: false, model: hotelCatalog, onManualRoom: { room in
-                                    manual.select(room)
+                                    guard manual.select(room) else { return }
                                     selectionMessage = copy("Отель добавлен в ваш пакет", "Hotel added to your package", "Mehmonxona paketingizga qo‘shildi", "Меҳмонхона пакетингизга қўшилди")
                                     IumrahHaptics.success()
                                 }
@@ -197,6 +197,15 @@ struct HotelsHomeView: View {
         }
         .onChange(of: chrome.requestedHotelsBoard) { _, _ in applyRequestedBoard() }
         .onChange(of: chrome.manualBoardRevision) { _, _ in applyRequestedBoard() }
+        .onChange(of: manual.scope) { _, scope in
+            if scope == .makkahOnly {
+                flightDestination = .jeddah
+                requestedSaudiAirport = "JED"
+                if mode == .hotels && hotelCity != "makkah" { hotelCity = "makkah" }
+            }
+            if scope == .makkahAndMadinah { requestedSaudiAirport = nil }
+            browseTrip.scope = scope
+        }
         .onChange(of: manual.outbound?.id) { _, value in if value != nil { showFlightAddedMessage() } }
         .onChange(of: manual.inbound?.id) { _, value in if value != nil { showFlightAddedMessage() } }
         .onChange(of: chrome.requestedHotelTabSearch) { _, value in applyRequestedHotelSearch(value) }
@@ -221,7 +230,8 @@ struct HotelsHomeView: View {
             if count < childAges.count { childAges = Array(childAges.prefix(count)) }
         }
         .onChange(of: flightDirection) { _, _ in
-            if requestedFlightDay != nil { requestedSaudiAirport = nil; updateRequestedFlightDay(); flightSearchRevision += 1 }
+            flightDestination = SaudiArrivalAirport(rawValue: flightDirection == 0 ? manual.plannedTrip.outboundDestinationCode : manual.plannedTrip.returnOriginCode) ?? .jeddah
+            if requestedFlightDay != nil { requestedSaudiAirport = flightDestination.rawValue; updateRequestedFlightDay(); flightSearchRevision += 1 }
         }
         .onChange(of: flightDeparture) { _, date in
             if flightReturn <= date {
@@ -274,12 +284,14 @@ struct HotelsHomeView: View {
     private var flightFields: some View {
         VStack(alignment: .leading, spacing: 16) {
             fieldTitle(copy("Поиск авиабилетов", "Find flights", "Aviachipta qidirish", "Авиачипта қидириш"))
-            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin)
+            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin, monochrome: true)
+                .tint(.primary)
+            IumrahManualScopePicker()
             VStack(alignment: .leading, spacing: 6) {
                 fieldLabel(flightDirection == 0 ? copy("Аэропорт прилёта", "Arrival airport", "Kelish aeroporti", "Келиш аэропорти") : copy("Аэропорт вылета из Саудии", "Saudi departure airport", "Saudiya jo‘nash aeroporti", "Саудия жўнаш аэропорти"))
                 Picker("Arrival", selection: $flightDestination) {
                     Text(copy("Джидда", "Jeddah", "Jidda", "Жидда")).tag(SaudiArrivalAirport.jeddah)
-                    Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag(SaudiArrivalAirport.madinah)
+                    if manual.scope == .makkahAndMadinah { Text(copy("Медина", "Madinah", "Madina", "Мадина")).tag(SaudiArrivalAirport.madinah) }
                 }
                 .pickerStyle(.segmented)
             }
@@ -294,7 +306,7 @@ struct HotelsHomeView: View {
                 Text(copy("Бизнес", "Business", "Biznes", "Бизнес")).tag(FlightCabinClass.business)
                 Text(copy("Первый", "First", "Birinchi", "Биринчи")).tag(FlightCabinClass.first)
             }
-            .pickerStyle(.menu)
+            .pickerStyle(.menu).tint(.primary)
         }
     }
 
@@ -435,6 +447,13 @@ struct HotelsHomeView: View {
         }
         guard mode == .flights || mode == .weekends else { return }
         manual.adults = flightAdults
+        manual.routeConfigured = true
+        manual.plannedOrigin = browseTrip.originCode
+        manual.plannedDeparture = mode == .weekends ? weekendDate : flightDeparture
+        manual.plannedReturn = mode == .weekends ? (Calendar.current.date(byAdding: .day, value: weekendNights, to: weekendDate) ?? weekendDate) : flightReturn
+        if manual.scope == .makkahOnly { flightDestination = .jeddah }
+        if flightDirection == 0 { manual.plannedArrival = flightDestination }
+        browseTrip.scope = manual.scope; browseTrip.arrivalAirport = manual.plannedArrival
         manual.cabin = mode == .weekends ? .economy : flightCabin
         browseTrip.adults = manual.adults
         browseTrip.children = 0; browseTrip.infants = 0
@@ -452,7 +471,7 @@ struct HotelsHomeView: View {
     }
 
     private func addManualFlight(_ flight: LocalJourneyFlight) {
-        manual.select(flight)
+        guard manual.select(flight) else { return }
         showFlightAddedMessage()
         IumrahHaptics.success()
     }
@@ -511,13 +530,16 @@ struct HotelsHomeView: View {
                 requestedFlightDay = nil; requestedSaudiAirport = nil; flightSearchRevision += 1
             }
             flightAdults = manual.adults; flightCabin = manual.cabin
+            flightDeparture = manual.plannedTrip.departureDate; flightReturn = manual.plannedTrip.returnDate
+            flightDestination = SaudiArrivalAirport(rawValue: flightDirection == 0 ? manual.plannedTrip.outboundDestinationCode : manual.plannedTrip.returnOriginCode) ?? .jeddah
+            browseTrip = manual.plannedTrip
         case .sundayClub: mode = .weekends
         case .transfer: mode = .transfer
         case .summary: mode = .summary
         default:
             let switchingFromOtherBoard = mode != .hotels
             mode = .hotels
-            if let city = chrome.requestedManualHotelCity ?? (switchingFromOtherBoard && manual.trip != nil ? hotelCity : nil) {
+            if let city = (manual.routeConfigured && manual.scope == .makkahOnly ? "makkah" : chrome.requestedManualHotelCity) ?? (switchingFromOtherBoard && (manual.trip != nil || manual.routeConfigured) ? hotelCity : nil) {
                 chrome.requestedManualHotelCity = nil
                 hotelCity = city; hotelAdults = manual.adults; hotelRooms = 1; hotelChildren = 0; manualQuoteRequired = false
                 if let window = manual.expectedWindow(city) { hotelCheckin = window.checkIn; hotelNights = window.nights }
@@ -531,14 +553,14 @@ struct HotelsHomeView: View {
     private func applyRequestedHotelSearch(_ request: IumrahHotelTabSearch?) {
         guard let request else { return }
         mode = .hotels
-        hotelCity = request.city == "madinah" ? "madinah" : "makkah"
+        hotelCity = request.city == "madinah" && (!manual.routeConfigured || manual.scope == .makkahAndMadinah) ? "madinah" : "makkah"
         hotelCheckin = request.checkin
         hotelNights = request.nights
         hotelAdults = request.adults
         hotelRooms = 1
         hotelChildren = 0
         manualQuoteRequired = request.adults > 6
-        hotelRequest = request
+        hotelRequest = IumrahHotelTabSearch(city: hotelCity, checkin: request.checkin, nights: request.nights, adults: request.adults)
         hotelSearchRevision += 1
         showHotelResults = true
         if manualQuoteRequired { Task { await loadManualHotelCatalog() } }

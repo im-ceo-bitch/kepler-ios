@@ -68,6 +68,7 @@ struct IumrahPrimaryHeaderBrandRow: View {
         }
         .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
         .foregroundStyle(.white)
+        .environment(\.colorScheme, .dark)
     }
 }
 
@@ -110,6 +111,7 @@ struct IumrahHeaderPills: View {
                         .id(index)
                     }
                 }
+                .padding(.horizontal, IumrahDesign.pagePadding)
                 .padding(.vertical, 1)
             }
             .onAppear { if let selection { proxy.scrollTo(selection, anchor: .center) } }
@@ -179,30 +181,34 @@ struct IumrahPrimaryTabHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            IumrahPrimaryHeaderBrandRow()
+            IumrahPrimaryHeaderBrandRow().padding(.horizontal, IumrahDesign.pagePadding)
             if let title {
                 Text(title)
                     .font(IumrahType.bold(28, relativeTo: .largeTitle))
                     .lineLimit(1).minimumScaleFactor(0.78)
-                    .foregroundStyle(.white).padding(.top, 7)
+                    .foregroundStyle(.white).padding(.top, 7).padding(.horizontal, IumrahDesign.pagePadding)
                     .accessibilityAddTraits(.isHeader)
             }
             if let subtitle {
                 Text(subtitle).font(IumrahType.regular(14, relativeTo: .subheadline))
                     .lineLimit(1).minimumScaleFactor(0.8)
-                    .foregroundStyle(.white.opacity(0.76)).padding(.top, 3)
+                    .foregroundStyle(.white.opacity(0.76)).padding(.top, 3).padding(.horizontal, IumrahDesign.pagePadding)
             }
-            if let footer { footer.padding(.top, 12) }
+            if let footer {
+                if discovery {
+                    // Center the 46pt carousel in the visible gap above the 40pt overlap.
+                    footer.padding(.top, max(0, (IumrahSignatureHeaderGeometry.contentHeight + 52 - IumrahSignatureHeaderGeometry.topInset - IumrahSignatureHeaderGeometry.logoHeight - 40 - 46) / 2))
+                } else { footer.padding(.top, 12) }
+            }
             Spacer(minLength: 0)
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, IumrahDesign.pagePadding)
         .padding(.top, IumrahSignatureHeaderGeometry.topInset)
         .frame(maxWidth: .infinity)
         .frame(height: discovery ? IumrahSignatureHeaderGeometry.contentHeight + 52 : IumrahSignatureHeaderGeometry.contentHeight + (footer == nil ? 0 : 34), alignment: .top)
         .background {
             IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
-                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: IumrahSignatureHeaderGeometry.bottomRadius, bottomTrailingRadius: IumrahSignatureHeaderGeometry.bottomRadius))
+                .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: discovery ? IumrahSignatureHeaderGeometry.bottomRadius : 0, bottomTrailingRadius: discovery ? IumrahSignatureHeaderGeometry.bottomRadius : 0))
         }
         .accessibilityElement(children: .contain)
     }

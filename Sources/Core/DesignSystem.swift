@@ -489,11 +489,10 @@ struct IumrahGlassIconButton: View {
                 .font(.system(size: fontSize, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(foreground ?? Color.primary)
-                .frame(width: size, height: size)
-                .contentShape(Circle())
-                .iumrahGlass(in: Circle(), interactive: true, tint: tint, chrome: true)
+                .frame(width: max(20, size - 20), height: max(20, size - 20))
         }
-        .buttonStyle(.plain)
+        .modifier(IumrahNativeChromeButton(tint: tint))
+        .frame(minWidth: size, minHeight: size)
         .accessibilityLabel(accessibilityLabel ?? systemName)
     }
 }

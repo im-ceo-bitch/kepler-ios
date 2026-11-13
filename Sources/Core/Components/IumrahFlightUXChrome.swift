@@ -81,11 +81,20 @@ struct IumrahGlassPillSelector<Value: Hashable>: View {
 
 /// Uses the system button renderer, including its interaction on iOS 26.
 struct IumrahNativeChromeButton: ViewModifier {
+    var tint: Color? = nil
+
     @ViewBuilder func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.regular)
+            if let tint {
+                content.buttonStyle(.glass(.regular.tint(tint)))
+                    .buttonBorderShape(.circle).controlSize(.regular)
+            } else {
+                content.buttonStyle(.glass)
+                    .buttonBorderShape(.circle).controlSize(.regular)
+            }
         } else {
-            content.buttonStyle(.bordered).buttonBorderShape(.circle).controlSize(.regular)
+            content.buttonStyle(.bordered).buttonBorderShape(.circle)
+                .controlSize(.regular).tint(tint ?? .primary)
         }
     }
 }
@@ -133,13 +142,10 @@ struct IumrahJourneyHeader<Summary: View>: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 10) {
-                Button(action: { dismiss() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 23, height: 23)
-                }
-                .modifier(IumrahNativeChromeButton())
-                .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language, ru: "Назад", en: "Back", uz: "Orqaga", cy: "Орқага", tr: "Geri", id: "Kembali"))
+                IumrahGlassIconButton(systemName: "chevron.backward", size: 48,
+                    foreground: .white,
+                    accessibilityLabel: IumrahAccessibilityCopy.text(settings.language, ru: "Назад", en: "Back", uz: "Orqaga", cy: "Орқага", tr: "Geri", id: "Kembali")) { dismiss() }
+                    .environment(\.colorScheme, .dark)
                 Spacer(minLength: 0)
                 Image("HeaderWordmarkLight")
                     .resizable()
@@ -152,6 +158,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
                 IumrahPageHelpButton()
             }
             .foregroundStyle(.white)
+            .environment(\.colorScheme, .dark)
             .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
             .padding(.horizontal, 20)
             if let heading = flightHeading {

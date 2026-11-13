@@ -9,7 +9,15 @@ final class IumrahManualJourneyStore: ObservableObject {
     @Published var inbound: LocalJourneyFlight?
     @Published var rooms: [String: LocalJourneyRoom] = [:]
     @Published var transfer: TransferVehicleKind?
+    @Published var haramainSelected = false
+    @Published var haramainFareClass: HaramainFareClass = .economy
+    @Published var haramainAdultTickets = 1
     @Published var scope: JourneyScope = .makkahAndMadinah
+    @Published var routeConfigured = false
+    @Published var plannedOrigin = "TAS"
+    @Published var plannedArrival: SaudiArrivalAirport = .jeddah
+    @Published var plannedDeparture = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date()
+    @Published var plannedReturn = Calendar.current.date(byAdding: .day, value: 21, to: Date()) ?? Date()
     @Published var adults = 2
     @Published var cabin: FlightCabinClass = .economy
 
@@ -19,19 +27,51 @@ final class IumrahManualJourneyStore: ObservableObject {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let values = (try? encoder.encode(rooms))?.base64EncodedString() ?? ""
         let flights = (try? encoder.encode([outbound, inbound]))?.base64EncodedString() ?? ""
-        return [flights, values, transfer?.rawValue ?? "", scope.rawValue, String(adults), cabin.rawValue].joined(separator: "|")
+        let components = [flights, values, transfer?.rawValue ?? "", scope.rawValue, String(adults), cabin.rawValue]
+        let route = [plannedOrigin, plannedArrival.rawValue, String(plannedDeparture.timeIntervalSince1970), String(plannedReturn.timeIntervalSince1970), String(routeConfigured)]
+        let train = [String(haramainSelected), haramainFareClass.rawValue, String(haramainAdultTickets)]
+        return (components + route + train).joined(separator: "|")
     }
-    func select(_ flight: LocalJourneyFlight) {
-        if ["JED", "MED"].contains(flight.destination) { outbound = flight }
-        else if ["JED", "MED"].contains(flight.origin) { inbound = flight }
+    @discardableResult func select(_ flight: LocalJourneyFlight) -> Bool {
+        if ["JED", "MED"].contains(flight.destination) {
+            guard !routeConfigured || scope != .makkahOnly || flight.destination == "JED" else { return false }
+            outbound = flight
+            plannedOrigin = flight.origin
+            plannedArrival = SaudiArrivalAirport(rawValue: flight.destination) ?? .jeddah
+            if let value = day(flight.departureAt, airport: flight.origin) { plannedDeparture = value }
+            if plannedReturn <= plannedDeparture { plannedReturn = Calendar.current.date(byAdding: .day, value: 7, to: plannedDeparture) ?? plannedDeparture }
+        } else if ["JED", "MED"].contains(flight.origin) {
+            guard !routeConfigured || scope != .makkahOnly || flight.origin == "JED" else { return false }
+            inbound = flight
+            if outbound == nil { plannedOrigin = flight.destination }
+            if let value = day(flight.departureAt, airport: flight.origin) { plannedReturn = value }
+            if plannedDeparture >= plannedReturn && outbound == nil { plannedDeparture = max(Calendar.current.startOfDay(for: Date()), Calendar.current.date(byAdding: .day, value: -7, to: plannedReturn) ?? plannedReturn) }
+        } else { return false }
+        return true
     }
-    func select(_ room: LocalJourneyRoom) {
+    @discardableResult func select(_ room: LocalJourneyRoom) -> Bool {
+        guard cities.contains(room.city) else { return false }
         rooms[room.city] = room
         if room.city == "madinah" { scope = .makkahAndMadinah }
+        if outbound == nil && inbound == nil {
+            if !routeConfigured {
+                plannedDeparture = rooms.values.map(\.checkin).min() ?? room.checkin
+                plannedReturn = rooms.values.map(\.checkout).max() ?? room.checkout
+            }
+            else { plannedDeparture = min(plannedDeparture, room.checkin); plannedReturn = max(plannedReturn, room.checkout) }
+            if scope == .makkahAndMadinah && (Calendar.current.dateComponents([.day], from: plannedDeparture, to: plannedReturn).day ?? 0) < 2 {
+                plannedReturn = Calendar.current.date(byAdding: .day, value: 2, to: plannedDeparture) ?? plannedReturn
+            }
+        }
+        return true
     }
     func changeScope(_ value: JourneyScope) {
-        scope = value
-        if value == .makkahOnly { rooms.removeValue(forKey: "madinah") }
+        scope = value; routeConfigured = true
+        if value == .makkahOnly {
+            rooms.removeValue(forKey: "madinah"); plannedArrival = .jeddah; haramainSelected = false
+            if outbound?.destination == "MED" { outbound = nil }
+            if inbound?.origin == "MED" { inbound = nil }
+        }
     }
     private func day(_ raw: String?, airport: String) -> Date? {
         guard let parts = IumrahPremiumFlightLeg.localParts(raw, code: airport) else { return nil }
@@ -59,8 +99,23 @@ final class IumrahManualJourneyStore: ObservableObject {
         var filters = draft.effectiveFlightFilters; filters.cabinClass = cabin; draft.flightFilters = filters
         return draft
     }
+    var plannedTrip: TripDraft {
+        if let trip { return trip }
+        var draft = TripDraft()
+        draft.origin = plannedOrigin; draft.originAirport = nil
+        draft.scope = scope; draft.arrivalAirport = scope == .makkahOnly ? .jeddah : plannedArrival
+        draft.departureDate = outbound.flatMap { day($0.departureAt, airport: $0.origin) } ?? plannedDeparture
+        draft.saudiArrivalDate = outbound.flatMap { day($0.arrivalAt, airport: $0.destination) }
+        draft.returnDate = inbound.flatMap { day($0.departureAt, airport: $0.origin) } ?? plannedReturn
+        draft.selectedReturnAirport = inbound.flatMap { SaudiArrivalAirport(rawValue: $0.origin) }
+        draft.adults = adults; draft.rooms = 1; draft.children = 0; draft.infants = 0
+        var filters = draft.effectiveFlightFilters; filters.cabinClass = cabin; draft.flightFilters = filters
+        return draft
+    }
+    var hasPriceComponent: Bool { outbound != nil || inbound != nil || !rooms.isEmpty }
     func expectedWindow(_ city: String) -> TripStayWindow? {
-        guard let trip else { return nil }
+        guard trip != nil || routeConfigured else { return nil }
+        let trip = plannedTrip
         let windows = TripStayPlanner.windows(for: trip)
         return city == "madinah" ? windows.madinah : windows.makkah
     }
@@ -88,6 +143,10 @@ final class IumrahManualJourneyStore: ObservableObject {
         guard trip != nil, sourceCompatible, let transfer, transfer.passengerCapacity >= adults,
               (1...6).contains(adults) else { return false }
         return cities.allSatisfy { validRoom($0) }
+    }
+    func estimateIdentity(_ flight: LocalJourneyFlight) -> String? {
+        if let id = flight.publishedID { return "curated:" + id }
+        return identity(flight)
     }
     private func identity(_ flight: LocalJourneyFlight) -> String? {
         if let id = flight.publishedID, flight.publishedIsPair != true { return "curated:" + id }
@@ -119,7 +178,11 @@ final class IumrahManualJourneyStore: ObservableObject {
         result.usesLocalJourney = true
         result.localJourneyFlights = [a, b]
         result.localJourneyRooms = Dictionary(uniqueKeysWithValues: cities.compactMap { city in rooms[city].map { ($0.id, $0) } })
-        result.chooseTransferVehicle(transfer); result.confirmTransferSelection()
+        result.chooseTransferVehicle(transfer)
+        result.setHaramainFareClass(haramainFareClass)
+        result.setHaramainAdultTickets(haramainAdultTickets)
+        result.setHaramainTrainSelected(haramainSelected)
+        result.confirmTransferSelection()
         return result
     }
 }

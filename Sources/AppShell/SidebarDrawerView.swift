@@ -47,13 +47,8 @@ struct SidebarDrawerView: View {
                     .frame(width: 160, height: 42, alignment: .leading)
                     .accessibilityLabel("iumrah")
                 Spacer()
-                Button { chrome.closeSidebar() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .frame(width: 38, height: 38)
-                        .iumrahGlass(in: Circle(), interactive: true, chrome: true)
-                }
-                .buttonStyle(.plain)
+                IumrahGlassIconButton(systemName: "xmark", size: 44,
+                    accessibilityLabel: L10n.text("cancel", settings.language)) { chrome.closeSidebar() }
             }
             .padding(.top, 16)
 

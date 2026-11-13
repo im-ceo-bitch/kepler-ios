@@ -81,17 +81,17 @@ struct IumrahPremiumFlightDetail: View {
         VStack(alignment: .leading, spacing: 0) {
             if pageHeroInset != nil {
                 HStack(spacing: 8) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 19, weight: .semibold))
-                            .frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityLabel(t("Назад", "Back", "Orqaga", "Орқага"))
+                    IumrahGlassIconButton(systemName: "chevron.backward", size: 44,
+                        foreground: .white, accessibilityLabel: t("Назад", "Back", "Orqaga", "Орқага")) { dismiss() }
                     Spacer(minLength: 0)
                     Text(leg.title).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(1).minimumScaleFactor(0.7)
                     Spacer(minLength: 0)
                     ShareLink(item: headerShareText ?? leg.share) {
                         Image(systemName: "square.and.arrow.up").font(.system(size: 19, weight: .medium))
-                            .frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityLabel(t("Поделиться", "Share", "Ulashish", "Улашиш"))
+                            .frame(width: 24, height: 24)
+                    }.modifier(IumrahNativeChromeButton())
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel(t("Поделиться", "Share", "Ulashish", "Улашиш"))
                 }
                 .foregroundStyle(.white).padding(.horizontal, 12).padding(.top, 4)
             }

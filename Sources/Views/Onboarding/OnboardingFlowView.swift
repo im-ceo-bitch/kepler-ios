@@ -263,11 +263,11 @@ struct OnboardingFlowView: View {
                     Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
-                        .iumrahGlass(in: Circle(), interactive: true, chrome: true)
+                        .frame(width: 24, height: 24)
                 }
-                .buttonStyle(.plain)
+                .modifier(IumrahNativeChromeButton())
+                .environment(\.colorScheme, .dark)
+                .frame(minWidth: 44, minHeight: 44)
                 .accessibilityLabel(isMuted ? IumrahAccessibilityCopy.text(settings.language, ru: "Звук выключен", en: "Sound off", uz: "Ovoz o‘chiq", cy: "Овоз ўчиқ", tr: "Ses kapalı", id: "Suara nonaktif") : IumrahAccessibilityCopy.text(settings.language, ru: "Звук включён", en: "Sound on", uz: "Ovoz yoqilgan", cy: "Овоз ёқилган", tr: "Ses açık", id: "Suara aktif"))
             }
             .padding(.horizontal, 24)

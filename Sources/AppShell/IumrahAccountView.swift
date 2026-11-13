@@ -451,18 +451,10 @@ struct IumrahAccountView: View {
                             .buttonStyle(.plain)
                         }
                         Spacer()
-                        Button {
-                            IumrahHaptics.soft()
+                        IumrahGlassIconButton(systemName: "xmark", size: 46,
+                            accessibilityLabel: tr("Close", "Закрыть", "Yopish", "Ёпиш")) {
                             showIdentityFullscreen = false
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 17, weight: .bold))
-                                .foregroundStyle(.primary)
-                                .frame(width: 46, height: 46)
-                                .contentShape(Circle())
-                                .iumrahGlass(in: Circle(), interactive: true, tint: colorScheme == .dark ? .white.opacity(0.12) : .white.opacity(0.58), chrome: true)
                         }
-                        .buttonStyle(.plain)
                     }
 
                     Spacer()

@@ -17,15 +17,9 @@ struct UmrahFlowHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                Button(action: onClose) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(primary)
-                        .frame(width: 44, height: 44)
-                        .background(primary.opacity(0.055), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(UmrahFlowCopy.closeFlowLabel)
+                IumrahGlassIconButton(systemName: "chevron.backward", size: 44,
+                    foreground: primary, accessibilityLabel: UmrahFlowCopy.closeFlowLabel, action: onClose)
+                    .environment(\.colorScheme, .dark)
 
                 Spacer(minLength: 4)
                 HStack(spacing: 7) {
@@ -40,15 +34,9 @@ struct UmrahFlowHeader: View {
                         .foregroundStyle(secondary)
                 }
                 Spacer(minLength: 4)
-                Button(action: onOpenNavigator) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(primary)
-                        .frame(width: 44, height: 44)
-                        .background(primary.opacity(0.055), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(UmrahFlowCopy.chooseStageLabel)
+                IumrahGlassIconButton(systemName: "list.bullet", size: 44,
+                    foreground: primary, accessibilityLabel: UmrahFlowCopy.chooseStageLabel, action: onOpenNavigator)
+                    .environment(\.colorScheme, .dark)
             }
 
             HStack(alignment: .bottom, spacing: 12) {

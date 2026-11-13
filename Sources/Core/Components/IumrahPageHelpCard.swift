@@ -103,14 +103,18 @@ enum IumrahHelpLabel {
 struct IumrahPageHelpButton: View {
     @Environment(\.iumrahShowPageHelp) private var show
     @EnvironmentObject private var settings: AppSettingsStore
-    var body: some View {
-        Button(action: show) {
-            Image(systemName: "questionmark").font(.system(size: 19, weight: .semibold))
-                .frame(width: 24, height: 24)
+    var inSystemToolbar = false
+
+    init(inSystemToolbar: Bool = false) { self.inSystemToolbar = inSystemToolbar }
+
+    @ViewBuilder var body: some View {
+        if inSystemToolbar {
+            Button(action: show) { Image(systemName: "questionmark") }
+                .accessibilityLabel(IumrahHelpLabel.title(settings.language))
+        } else {
+            IumrahGlassIconButton(systemName: "questionmark", size: 48, fontSize: 19,
+                accessibilityLabel: IumrahHelpLabel.title(settings.language), action: show)
         }
-        .modifier(IumrahNativeChromeButton())
-        .frame(width: 48, height: 48)
-        .accessibilityLabel(IumrahHelpLabel.title(settings.language))
     }
 }
 struct IumrahTypedHelpText: View {

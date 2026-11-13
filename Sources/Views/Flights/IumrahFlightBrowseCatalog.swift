@@ -23,7 +23,7 @@ struct IumrahFlightBrowseCatalog: View {
         let candidates = model.flights.filter { flight in
             let route = direction == 0 ? flight.origin == trip.originCode : flight.destination == trip.originCode
             let saudi = direction == 0 ? flight.destination : flight.origin
-            return route && (requestedSaudiAirport == nil || requestedSaudiAirport == saudi)
+            return route && (trip.scope != .makkahOnly || saudi == "JED") && (requestedSaudiAirport == nil || requestedSaudiAirport == saudi)
         }
         // Keep the chosen exact provider identity and the matching paired itinerary
         // visible, without showing duplicate physical flights in the catalogue.

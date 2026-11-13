@@ -391,36 +391,9 @@ struct IumrahGeneratorHeader: View {
         .accessibilityElement(children: .contain)
     }
 
-    @ViewBuilder
     private var nativeBackButton: some View {
-        if #available(iOS 26.0, *) {
-            Button {
-                IumrahHaptics.selection()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .frame(width: 40, height: 40)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.glass)
-            .accessibilityLabel(backAccessibilityLabel)
-        } else {
-            Button {
-                IumrahHaptics.selection()
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color.primary)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .background(Color.iumrahRaisedBackground, in: Circle())
-            .overlay(Circle().stroke(Color.primary.opacity(0.07), lineWidth: 0.7))
-            .accessibilityLabel(backAccessibilityLabel)
-        }
+        IumrahGlassIconButton(systemName: "chevron.backward", size: 44,
+                              accessibilityLabel: backAccessibilityLabel) { dismiss() }
     }
 
     private var backAccessibilityLabel: String {

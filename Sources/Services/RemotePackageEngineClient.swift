@@ -5,6 +5,12 @@ import Foundation
 struct RemotePackageEngineClient {
     private let api = APIClient.shared
 
+    func manualEstimate(_ body: IumrahManualEstimateRequest) async throws -> IumrahManualEstimate {
+        let response: IumrahManualEstimateEnvelope = try await APIClient.hotelPrices.post("/api/package/estimate", body: body, timeoutInterval: 120)
+        guard response.ok, response.estimate.bookingAllowed == false else { throw APIError.invalidResponse }
+        return response.estimate
+    }
+
     func health() async throws -> PackageEngineHealthResponse {
         try await api.get(AppConfig.packageHealthPath, timeoutInterval: 8)
     }

@@ -355,7 +355,7 @@ struct IumrahAnimatedSearchBorder: ViewModifier {
                                          paused: reduceMotion || scenePhase != .active)) { timeline in
                     let rotation = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * 72
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(AngularGradient(colors: guidance ? [.black, .gray.opacity(0.7), .black, Color(white: 0.35), .black] : [.black, .black, .white, .gray, .black, .white, .black],
+                        .strokeBorder(AngularGradient(colors: guidance ? [Color(red: 0.96, green: 0.66, blue: 0.08), Color(red: 1, green: 0.83, blue: 0.33), .white, Color(red: 1, green: 0.92, blue: 0.65), Color(red: 0.96, green: 0.66, blue: 0.08)] : [.black, .black, .white, .gray, .black, .white, .black],
                             center: .center, startAngle: .degrees(rotation), endAngle: .degrees(rotation + 360)), lineWidth: 3)
                         .allowsHitTesting(false)
                 }

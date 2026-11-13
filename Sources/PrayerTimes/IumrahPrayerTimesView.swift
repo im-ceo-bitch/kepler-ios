@@ -407,15 +407,9 @@ struct IumrahPrayerTimesView: View {
     }
 
     private func roundAction(_ symbol: String, label: String, perform: @escaping () -> Void) -> some View {
-        Button(action: perform) {
-            Image(systemName: symbol)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 43, height: 43)
-                .iumrahGlass(in: Circle(), interactive: true, tint: Color.black.opacity(0.20), chrome: true)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        IumrahGlassIconButton(systemName: symbol, size: 44, fontSize: 16,
+            foreground: .white, tint: .black.opacity(0.20), accessibilityLabel: label, action: perform)
+            .environment(\.colorScheme, .dark)
     }
 
     private var scheduleSheet: some View {

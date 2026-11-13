@@ -2975,7 +2975,8 @@ private struct FlightDiscoveryPriceGraphSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: { Image(systemName: "chevron.left") }
+                    Button { dismiss() } label: { Image(systemName: "chevron.backward") }
+                        .accessibilityLabel(tr("Назад", "Back", "Orqaga", "Орқага"))
                 }
             }
             .task {

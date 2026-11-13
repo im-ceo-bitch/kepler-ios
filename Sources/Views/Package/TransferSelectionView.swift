@@ -41,19 +41,32 @@ struct TransferSelectionView: View {
     }
 
     var familyFlow = false
+    var manualConfirm: ((TransferVehicleKind) -> Void)? = nil
     @State private var reviewing = false
 
     var body: some View {
         Group {
-            if familyFlow && reviewing { familyReview } else {
+            if manualConfirm != nil {
+                VStack(spacing: 20) {
+                    vehicleStage
+                    vehicleInformation
+                    IumrahRefundPolicyCard(component: .transfer, compact: false)
+                    if includesMadinah { haramainExpandedCard }
+                    Button(localized("Добавить трансфер в пакет", "Add transfer to package", "Transferni paketga qo‘shish", "Трансферни пакетга қўшиш")) {
+                        manualConfirm?(selectedVehicle)
+                        IumrahHaptics.success()
+                    }.buttonStyle(IumrahPrimaryButtonStyle())
+                        .disabled(selectedVehicle.passengerCapacity < journey.trip.travelerCount)
+                        .opacity(selectedVehicle.passengerCapacity < journey.trip.travelerCount ? 0.45 : 1)
+                }.environment(\.colorScheme, isVIP ? .dark : .light)
+            } else if familyFlow && reviewing { familyReview } else {
             matchedExperience
                 .environment(\.colorScheme, isVIP ? .dark : .light)
         }
         }
         .animation(.easeInOut(duration: 0.58), value: isVIP)
-        .toolbar(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
-        .background(transferPageBackground)
+        .modifier(IumrahTransferNavigationChrome(embedded: manualConfirm != nil))
+        .background { if manualConfirm == nil { transferPageBackground } }
         .navigationDestination(isPresented: $showFinalPackage) {
             FinalPackageView(familyFlow: familyFlow)
         }
@@ -69,7 +82,7 @@ struct TransferSelectionView: View {
         .task(id: pricingSelectionKey) {
             // Wait for a swipe/counter gesture to settle, never a request per frame.
             do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
-            guard !Task.isCancelled, !isConfirming else { return }
+            guard !Task.isCancelled, !isConfirming, manualConfirm == nil else { return }
             await refreshBasePackagePrice()
         }
     }
@@ -307,8 +320,8 @@ struct TransferSelectionView: View {
 
             transferCoverageCard
 
+            if manualConfirm == nil {
             Divider()
-
             HStack(alignment: .lastTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(localized("Изменение пакета", "Package change", "Paket o‘zgarishi", "Пакет ўзгариши"))
@@ -327,6 +340,7 @@ struct TransferSelectionView: View {
                         .font(.title3.monospacedDigit().weight(.bold))
                         .contentTransition(.numericText())
                 }
+            }
             }
         }
         .padding(19)
@@ -863,5 +877,12 @@ private func transferLocalized(
     case .english, .malay: return english
     case .uzbek: return uzbek
     case .uzbekCyrillic: return uzbekCyrillic
+    }
+}
+
+private struct IumrahTransferNavigationChrome: ViewModifier {
+    let embedded: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if embedded { content } else { content.toolbar(.hidden, for: .navigationBar).toolbar(.hidden, for: .tabBar) }
     }
 }

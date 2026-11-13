@@ -338,21 +338,9 @@ struct UmrahSideStepButton: View {
     }
 
     var body: some View {
-        Button {
-            IumrahHaptics.selection()
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(emphasized ? (colorScheme == .dark ? Color.black : Color.white) : palette.textPrimary)
-                .frame(width: 54, height: 54)
-                .iumrahGlass(
-                    in: Circle(),
-                    interactive: true,
-                    tint: emphasized ? palette.accent.opacity(colorScheme == .dark ? 0.48 : 0.56) : nil
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
+        IumrahGlassIconButton(systemName: systemName, size: 54, fontSize: 18,
+            foreground: emphasized ? (colorScheme == .dark ? Color.black : Color.white) : palette.textPrimary,
+            tint: emphasized ? palette.accent.opacity(colorScheme == .dark ? 0.48 : 0.56) : nil,
+            accessibilityLabel: accessibilityLabel, action: action)
     }
 }

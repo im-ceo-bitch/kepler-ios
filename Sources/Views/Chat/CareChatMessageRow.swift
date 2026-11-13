@@ -353,10 +353,11 @@ private struct CareChatImageViewer: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
+                    .frame(width: 24, height: 24)
             }
-            .careNativeGlassButton()
+            .modifier(IumrahNativeChromeButton())
+            .environment(\.colorScheme, .dark)
+            .frame(minWidth: 44, minHeight: 44)
             .padding(.top, 12)
             .padding(.trailing, 16)
         }

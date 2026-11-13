@@ -93,7 +93,7 @@ struct FlightDateCalendarView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle(copy(.title))
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { IumrahPageHelpButton() }
+                ToolbarItem(placement: .topBarLeading) { IumrahPageHelpButton(inSystemToolbar: true) }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(closeLabel) { dismiss() }
                 }

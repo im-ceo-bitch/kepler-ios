@@ -14,6 +14,9 @@ struct HotelsHomeView: View {
     @State private var requestedSaudiAirport: String?
     @State private var openedManualFlight: LocalJourneyFlight?
     @State private var selectionMessage: String?
+    @State private var pendingFlight: LocalJourneyFlight?
+    @State private var noticeTask: Task<Void, Never>?
+    @State private var noticeRevision = 0
     @State private var flightSearchRevision = 0
     @EnvironmentObject private var storefront: HotelStorefrontStore
 
@@ -101,22 +104,6 @@ struct HotelsHomeView: View {
                 .padding(.top, -40)
                 .padding(.bottom, 20)
 
-                if let selectionMessage {
-                    Label(selectionMessage, systemImage: "checkmark.circle.fill")
-                        .font(.subheadline.weight(.semibold)).padding(15)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
-                        .padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 12)
-                }
-                if manual.componentCount > 0 {
-                    Button { chrome.openHotels(board: .summary) } label: {
-                        HStack {
-                            Label(copy("Мой пакет", "My package", "Mening paketim", "Менинг пакетим"), systemImage: "suitcase")
-                            Spacer(); Text("\(manual.componentCount)"); Image(systemName: "chevron.right")
-                        }.font(.subheadline.weight(.semibold)).padding(15)
-                            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
-                    }.buttonStyle(.plain).padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 12)
-                }
                 IumrahPageHelpCard(mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights")
                     .padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 16)
                 if mode == .hotels && (!manual.routeConfigured || manual.scope == .makkahAndMadinah) {
@@ -151,7 +138,7 @@ struct HotelsHomeView: View {
                                 searchOverride: hotelRequest,
                                 showsSearchControls: false, model: hotelCatalog, onManualRoom: { room in
                                     guard manual.select(room) else { return }
-                                    selectionMessage = copy("Отель добавлен в ваш пакет", "Hotel added to your package", "Mehmonxona paketingizga qo‘shildi", "Меҳмонхона пакетингизга қўшилди")
+                                    showNotice(copy("Отель добавлен в ваш пакет", "Hotel added to your package", "Mehmonxona paketingizga qo‘shildi", "Меҳмонхона пакетингизга қўшилди"))
                                     IumrahHaptics.success()
                                 }
                             )
@@ -170,9 +157,12 @@ struct HotelsHomeView: View {
                 } else {
                     IumrahFlightBrowseCatalog(direction: flightDirection, refreshSignal: flightSearchRevision, model: flightCatalog,
                         tripOverride: browseTrip, requestedDay: requestedFlightDay, requestedSaudiAirport: requestedSaudiAirport,
-                        selectedID: flightDirection == 0 ? manual.outbound?.id : manual.inbound?.id,
+                        selectedID: pendingFlight?.id ?? (flightDirection == 0 ? manual.outbound?.id : manual.inbound?.id),
                         pairedContextID: matchingPairID,
-                        onAdd: { flight in addManualFlight(flight) }) { flight in
+                        onAdd: { flight in
+                            IumrahHaptics.selection()
+                            withAnimation(.easeInOut(duration: 0.2)) { pendingFlight = pendingFlight?.id == flight.id ? nil : flight }
+                        }, onSelectionContextChange: { pendingFlight = nil }) { flight in
                         openedManualFlight = flight
                     }
                     .padding(.horizontal, IumrahDesign.pagePadding)
@@ -183,9 +173,29 @@ struct HotelsHomeView: View {
             .padding(.bottom, 115)
         })
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
-
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if (mode == .flights || mode == .weekends) && openedManualFlight == nil {
+                flightConfirmationBar
+            } else if mode == .hotels && manual.componentCount > 0 {
+                Button(copy("Мой пакет", "My package", "Mening paketim", "Менинг пакетим")) { chrome.openHotels(board: .summary) }
+                    .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
+            }
+        }
+        .overlay(alignment: .top) {
+            if let selectionMessage {
+                HStack(spacing: 10) {
+                    if #available(iOS 18.0, *) {
+                        Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(.green)
+                            .symbolEffect(.bounce, value: noticeRevision)
+                    } else { Image(systemName: "checkmark.circle.fill").font(.title2).foregroundStyle(.green) }
+                    Text(selectionMessage).font(.subheadline.weight(.semibold))
+                }.padding(14).background(.regularMaterial, in: Capsule())
+                    .padding(.top, 12).padding(.horizontal, 16)
+                    .transition(.move(edge: .top).combined(with: .opacity)).allowsHitTesting(false)
+            }
+        }
         .navigationDestination(item: $openedManualFlight) { flight in
-            IumrahManualFlightDetail(flight: flight)
+            IumrahManualFlightDetail(flight: flight, onConfirm: { addManualFlight(flight) })
         }
         .navigationDestination(item: $selectedLegacyPackage) { package in
             StorefrontUmrahPackageDetailView(preview: package)
@@ -198,6 +208,7 @@ struct HotelsHomeView: View {
         .onChange(of: chrome.requestedHotelsBoard) { _, _ in applyRequestedBoard() }
         .onChange(of: chrome.manualBoardRevision) { _, _ in applyRequestedBoard() }
         .onChange(of: manual.scope) { _, scope in
+            pendingFlight = nil
             if scope == .makkahOnly {
                 flightDestination = .jeddah
                 requestedSaudiAirport = "JED"
@@ -206,8 +217,8 @@ struct HotelsHomeView: View {
             if scope == .makkahAndMadinah { requestedSaudiAirport = nil }
             browseTrip.scope = scope
         }
-        .onChange(of: manual.outbound?.id) { _, value in if value != nil { showFlightAddedMessage() } }
-        .onChange(of: manual.inbound?.id) { _, value in if value != nil { showFlightAddedMessage() } }
+        .onChange(of: mode) { _, _ in pendingFlight = nil }
+        .onChange(of: flightSearchRevision) { _, _ in pendingFlight = nil }
         .onChange(of: chrome.requestedHotelTabSearch) { _, value in applyRequestedHotelSearch(value) }
         .onChange(of: chrome.requestedPackageID) { _, value in openRequestedPackage(value) }
         .onChange(of: hotelCity) { _, city in
@@ -230,6 +241,7 @@ struct HotelsHomeView: View {
             if count < childAges.count { childAges = Array(childAges.prefix(count)) }
         }
         .onChange(of: flightDirection) { _, _ in
+            pendingFlight = nil
             flightDestination = SaudiArrivalAirport(rawValue: flightDirection == 0 ? manual.plannedTrip.outboundDestinationCode : manual.plannedTrip.returnOriginCode) ?? .jeddah
             if requestedFlightDay != nil { requestedSaudiAirport = flightDestination.rawValue; updateRequestedFlightDay(); flightSearchRevision += 1 }
         }
@@ -434,6 +446,7 @@ struct HotelsHomeView: View {
 
     private func search() {
         IumrahHaptics.selection()
+        pendingFlight = nil
         withAnimation(.easeInOut(duration: 0.22)) { searchExpanded = false }
         appliedHotelName = hotelName
         if mode == .hotels {
@@ -470,14 +483,43 @@ struct HotelsHomeView: View {
         requestedFlightDay = f.string(from: flightDirection == 0 ? browseTrip.departureDate : browseTrip.returnDate)
     }
 
-    private func addManualFlight(_ flight: LocalJourneyFlight) {
-        guard manual.select(flight) else { return }
-        showFlightAddedMessage()
-        IumrahHaptics.success()
+    @ViewBuilder private var flightConfirmationBar: some View {
+        if let flight = pendingFlight {
+            Button(copy("Добавить рейс в мой пакет", "Add flight to my package", "Reysni paketimga qo‘shish", "Рейсни пакетимга қўшиш")) { addManualFlight(flight) }
+                .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
+        } else if flightDirection == 0 && manual.outbound != nil && manual.inbound == nil {
+            Button(copy("Выбрать обратный рейс", "Choose return flight", "Qaytish reysini tanlash", "Қайтиш рейсини танлаш")) {
+                IumrahHaptics.selection()
+                browseTrip = manual.plannedTrip
+                withAnimation { flightDirection = 1; searchExpanded = false }
+                requestedSaudiAirport = manual.plannedTrip.returnOriginCode
+                updateRequestedFlightDay(); flightSearchRevision += 1
+            }.buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
+        } else if manual.componentCount > 0 {
+            Button(copy("Перейти в мой пакет", "Open my package", "Paketimni ochish", "Пакетимни очиш")) { chrome.openHotels(board: .summary) }
+                .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
+        }
     }
 
-    private func showFlightAddedMessage() {
-        selectionMessage = copy("Авиабилет добавлен в ваш пакет", "Flight added to your package", "Aviachipta paketingizga qo‘shildi", "Авиачипта пакетингизга қўшилди")
+    @discardableResult private func addManualFlight(_ flight: LocalJourneyFlight) -> Bool {
+        guard manual.select(flight) else { IumrahHaptics.error(); return false }
+        pendingFlight = nil
+        showNotice(copy("Рейс добавлен в ваш пакет", "Flight added to your package", "Reys paketingizga qo‘shildi", "Рейс пакетингизга қўшилди"))
+        IumrahHaptics.success()
+        return true
+    }
+
+    private func showNotice(_ message: String) {
+        noticeTask?.cancel()
+        withAnimation(.spring(response: 0.3)) { selectionMessage = message }
+        noticeTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(120))
+                noticeRevision += 1
+                try await Task.sleep(for: .seconds(2.2))
+            } catch { return }
+            withAnimation(.easeOut(duration: 0.2)) { selectionMessage = nil }
+        }
     }
 
     private func refreshSearch() async {
@@ -521,7 +563,7 @@ struct HotelsHomeView: View {
 
     private func applyRequestedBoard() {
         guard let requested = chrome.requestedHotelsBoard else { return }
-        selectionMessage = nil
+        noticeTask?.cancel(); selectionMessage = nil; pendingFlight = nil
         switch requested {
         case .flights:
             mode = .flights

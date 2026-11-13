@@ -828,10 +828,15 @@ private actor IumrahPrayerTimesService {
         formatter.timeZone = city.timeZone
         formatter.dateFormat = "dd-MM-yyyy"
         let dateString = formatter.string(from: date)
-        guard let url = AppConfig.apiURL("/api/services/prayer", query: [
-            .init(name: "city", value: city.rawValue), .init(name: "date", value: dateString)
-        ]) else { throw URLError(.badURL) }
-        var request = URLRequest(url: url)
+        let coordinate = city.coordinate
+        var components = URLComponents(string: "https://api.aladhan.com/v1/timings/\(dateString)")!
+        components.queryItems = [
+            URLQueryItem(name: "latitude", value: String(format: "%.5f", coordinate.latitude)),
+            URLQueryItem(name: "longitude", value: String(format: "%.5f", coordinate.longitude)),
+            URLQueryItem(name: "method", value: "4"),
+            URLQueryItem(name: "school", value: "0")
+        ]
+        var request = URLRequest(url: components.url!)
         request.timeoutInterval = 10
         request.setValue("iumrah-iOS/2.0 (https://iumrah.app)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
@@ -1107,8 +1112,13 @@ private actor IumrahWeatherService {
     }
 
     private func fetch(city: IumrahHolyCity) async throws -> IumrahWeatherSnapshot {
-        guard let url = AppConfig.apiURL("/api/services/weather", query: [.init(name: "city", value: city.rawValue)]) else { throw URLError(.badURL) }
-        var request = URLRequest(url: url)
+        let c = city.coordinate
+        var components = URLComponents(string: "https://api.met.no/weatherapi/locationforecast/2.0/compact")!
+        components.queryItems = [
+            URLQueryItem(name: "lat", value: String(format: "%.4f", c.latitude)),
+            URLQueryItem(name: "lon", value: String(format: "%.4f", c.longitude))
+        ]
+        var request = URLRequest(url: components.url!)
         request.timeoutInterval = 12
         request.setValue("iumrah-iOS/2.0 (https://iumrah.app)", forHTTPHeaderField: "User-Agent")
         request.setValue("application/json", forHTTPHeaderField: "Accept")

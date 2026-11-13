@@ -542,6 +542,7 @@ struct NuiteeHotelDetailView: View {
     var onSelectRate: ((NuiteeRoomRate) -> Void)? = nil
     var onSelectMeals: ((HotelMealChoices) -> Void)? = nil
     @State var selectedMeals = HotelMealChoices()
+    @State private var mealsByOffer: [String: HotelMealChoices] = [:]
 
     @State private var showAllAmenities = false
     @State private var detail: NuiteeHotelDetail?
@@ -602,22 +603,9 @@ struct NuiteeHotelDetailView: View {
                         Text(detail.description).font(.subheadline)
                     }
                 }
-                IumrahHotelStaySummary(checkin: checkin, checkout: checkout, nights: nights)
-                if onSelectRate == nil { staySelector }
-                Label("\(adults) " + NuiteeCopy.text("взрослых", "kattalar", "adults", settings.language)
-                      + (childrenAges.isEmpty ? "" : " · \(childrenAges.count) " + NuiteeCopy.text("детей", "bolalar", "children", settings.language)), systemImage: "person.2")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                if let detail, !(detail.checkin ?? "").isEmpty || !(detail.checkout ?? "").isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(NuiteeCopy.text("Время заселения", "Joylashish vaqti", "Property check-in hours", settings.language)).font(.headline)
-                        if let time = detail.checkin, !time.isEmpty {
-                            LabeledContent(NuiteeCopy.text("Заезд", "Kirish", "Check-in", settings.language), value: time)
-                        }
-                        if let time = detail.checkout, !time.isEmpty {
-                            LabeledContent(NuiteeCopy.text("Выезд", "Chiqish", "Check-out", settings.language), value: time)
-                        }
-                    }.padding(20).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
-                }
+                IumrahHotelStaySummary(checkin: checkin, checkout: checkout, nights: nights,
+                    adults: adults, children: childrenAges.count, checkinTime: detail?.checkin,
+                    checkoutTime: detail?.checkout, editableStay: onSelectRate == nil ? AnyView(staySelector) : nil)
                 IumrahHotelReviewsSection(hotelID: hotel.id, rating: detail?.rating ?? hotel.rating,
                                           reviewCount: detail?.reviewCount ?? hotel.reviewCount)
                 IumrahPageHelpCard(ratesLoading || !ratesCompleted ? "hotel.loading" : ratesError != nil ? "hotel.rates_error" : rates.isEmpty ? (onSelectRate == nil ? "hotel.no_rates" : "hotel.package_no_rates") : chosenOffer != nil ? "hotel.saved" : "hotel.details")
@@ -639,7 +627,7 @@ struct NuiteeHotelDetailView: View {
                         if onSelectRate != nil {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text(rate.roomName).font(.caption).foregroundStyle(.secondary)
-                                IumrahHotelMealsEditor(selection: $selectedMeals, stars: hotel.roundedStars,
+                                IumrahHotelMealsEditor(selection: Binding(get: { mealsByOffer[rate.offerId] ?? selectedMeals }, set: { mealsByOffer[rate.offerId] = $0 }), stars: hotel.roundedStars,
                                     city: hotel.city, included: rate.supplierMeals)
                             }
                             .padding(20)
@@ -776,12 +764,10 @@ struct NuiteeHotelDetailView: View {
             Text("\(checkin.formatted(date: .abbreviated, time: .omitted)) — \(checkout.formatted(date: .abbreviated, time: .omitted))")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(16)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
     }
 
     private func saveRate(_ rate: NuiteeRoomRate) {
-        if let onSelectRate { onSelectMeals?(selectedMeals); onSelectRate(rate); dismiss(); return }
+        if let onSelectRate { onSelectMeals?(mealsByOffer[rate.offerId] ?? selectedMeals); onSelectRate(rate); dismiss(); return }
         NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
             provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
             checkin: dateISO(checkin), checkout: dateISO(checkout), adults: adults,

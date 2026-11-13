@@ -55,8 +55,8 @@ struct IumrahApp: App {
 
     var body: some Scene {
         WindowGroup {
-            IumrahLaunchExperience {
-                RootView(chrome: chrome)
+            IumrahLaunchExperience { link in
+                RootView(chrome: chrome, launchLink: link)
                     .background { IumrahPlatformWindowConfiguration() }
             }
         }

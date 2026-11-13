@@ -505,4 +505,5 @@ struct BookingNuiteeRoomSelection: Codable, Hashable {
     let adults: Int
     let children: [Int]
     var meals: HotelMealChoices? = nil
+    var mealBundleRequested: Bool? = nil
 }

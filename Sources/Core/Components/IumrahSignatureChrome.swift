@@ -346,6 +346,7 @@ struct IumrahAnimatedSearchBorder: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     var radius: CGFloat = 34
     var guidance: Bool = false
+    var greenAccent: Bool = false
     func body(content: Content) -> some View {
         content
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
@@ -355,7 +356,7 @@ struct IumrahAnimatedSearchBorder: ViewModifier {
                                          paused: reduceMotion || scenePhase != .active)) { timeline in
                     let rotation = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * 72
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(AngularGradient(colors: guidance ? [Color(red: 0.96, green: 0.66, blue: 0.08), Color(red: 1, green: 0.83, blue: 0.33), .white, Color(red: 1, green: 0.92, blue: 0.65), Color(red: 0.96, green: 0.66, blue: 0.08)] : [.black, .black, .white, .gray, .black, .white, .black],
+                        .strokeBorder(AngularGradient(colors: greenAccent ? [Color(red: 0.08, green: 0.55, blue: 0.30), Color(red: 0.40, green: 0.88, blue: 0.55), .white, Color(red: 0.14, green: 0.65, blue: 0.39), Color(red: 0.08, green: 0.55, blue: 0.30)] : guidance ? [Color(red: 0.96, green: 0.66, blue: 0.08), Color(red: 1, green: 0.83, blue: 0.33), .white, Color(red: 1, green: 0.92, blue: 0.65), Color(red: 0.96, green: 0.66, blue: 0.08)] : [.black, .black, .white, .gray, .black, .white, .black],
                             center: .center, startAngle: .degrees(rotation), endAngle: .degrees(rotation + 360)), lineWidth: 3)
                         .allowsHitTesting(false)
                 }

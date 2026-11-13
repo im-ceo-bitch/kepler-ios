@@ -79,10 +79,14 @@ extension LocalJourneyRoom {
         f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
         let included = rate.supplierMeals
         let chosen = meals ?? HotelMealChoices()
-        let effective = HotelMealChoices(breakfast: included.breakfast || hotel.roundedStars >= 4 || chosen.breakfast,
-            lunch: city == "makkah" && (included.lunch || chosen.lunch), dinner: included.dinner || chosen.dinner)
+        let bundled = hotel.roundedStars <= 3
+        let bundleRequested = chosen.breakfast || chosen.lunch || chosen.dinner
+        let effective = HotelMealChoices(breakfast: included.breakfast || hotel.roundedStars >= 4 || (bundled ? bundleRequested : chosen.breakfast),
+            lunch: (!bundled || city == "makkah") && (included.lunch || (bundled ? bundleRequested : chosen.lunch)),
+            dinner: included.dinner || (bundled ? bundleRequested : chosen.dinner))
         return .init(id:id, city:city, hotelId:hotel.id, offerId:rate.offerId, roomId:rate.roomId,
-                     checkin:f.string(from:checkin), checkout:f.string(from:checkout), adults:adults, children:childrenAges, meals:effective)
+                     checkin:f.string(from:checkin), checkout:f.string(from:checkout), adults:adults, children:childrenAges, meals:effective,
+                     mealBundleRequested: bundled ? bundleRequested : nil)
     }
     var bookingHotel: HotelSummary {
         HotelSummary(id:hotel.id, name:hotel.name, city:city == "madinah" ? "Madinah" : "Makkah",

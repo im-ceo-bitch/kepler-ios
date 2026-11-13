@@ -175,6 +175,11 @@ struct NuiteeGuestReview: Decodable, Identifiable {
     let cons: String
     let source: String
     let language: String
+    let originalHeadline: String?
+    let originalPros: String?
+    let originalCons: String?
+    let isTranslated: Bool?
+    let translationUnavailable: Bool?
 }
 struct NuiteeReviewsEnvelope: Decodable {
     let ok: Bool

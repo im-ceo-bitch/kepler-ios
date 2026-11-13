@@ -41,6 +41,8 @@ struct TransferSelectionView: View {
     }
 
     var familyFlow = false
+    var selectBeforeHotels = false
+    @State private var showHotelsAfterTransfer = false
     var manualConfirm: ((TransferVehicleKind) -> Void)? = nil
     @State private var reviewing = false
 
@@ -67,6 +69,9 @@ struct TransferSelectionView: View {
         .animation(.easeInOut(duration: 0.58), value: isVIP)
         .modifier(IumrahTransferNavigationChrome(embedded: manualConfirm != nil))
         .background { if manualConfirm == nil { transferPageBackground } }
+        .navigationDestination(isPresented: $showHotelsAfterTransfer) {
+            NuiteeJourneyHotelsView(transferAlreadySelected: true)
+        }
         .navigationDestination(isPresented: $showFinalPackage) {
             FinalPackageView(familyFlow: familyFlow)
         }
@@ -82,7 +87,7 @@ struct TransferSelectionView: View {
         .task(id: pricingSelectionKey) {
             // Wait for a swipe/counter gesture to settle, never a request per frame.
             do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
-            guard !Task.isCancelled, !isConfirming, manualConfirm == nil else { return }
+            guard !Task.isCancelled, !isConfirming, manualConfirm == nil, !selectBeforeHotels else { return }
             await refreshBasePackagePrice()
         }
     }
@@ -517,8 +522,8 @@ struct TransferSelectionView: View {
             HStack(spacing: 10) {
                 if isConfirming { ProgressView().tint(.white) }
                 VStack(alignment: .center, spacing: 2) {
-                    Text(isConfirming ? confirmingTitle : (familyFlow ? localized("Собрать пакет","Build package","Paketni yig‘ish","Пакетни йиғиш") : confirmTitle))
-                    if !isConfirming {
+                    Text(selectBeforeHotels ? localized("Далее: выбрать отели", "Next: choose hotels", "Keyingi: mehmonxonalar", "Кейинги: меҳмонхоналар") : isConfirming ? confirmingTitle : (familyFlow ? localized("Собрать пакет","Build package","Paketni yig‘ish","Пакетни йиғиш") : confirmTitle))
+                    if !isConfirming && !selectBeforeHotels {
                         Text(currentPackagePriceTitle)
                             .font(.caption.monospacedDigit())
                             .opacity(0.74)
@@ -529,7 +534,7 @@ struct TransferSelectionView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(IumrahPrimaryButtonStyle())
-        .disabled(isConfirming)
+        .disabled(isConfirming || (selectBeforeHotels && selectedVehicle.passengerCapacity < journey.trip.travelerCount))
     }
 
     // MARK: - Interaction / pricing
@@ -555,6 +560,7 @@ struct TransferSelectionView: View {
 
     @MainActor
     private func refreshBasePackagePrice() async {
+        guard !selectBeforeHotels else { return }
         await journey.buildQuote(forceHotelRefresh: false)
     }
 
@@ -594,6 +600,12 @@ struct TransferSelectionView: View {
         confirmationError = nil
         journey.chooseTransferVehicle(selectedVehicle)
         journey.confirmTransferSelection()
+        if selectBeforeHotels {
+            guard selectedVehicle.passengerCapacity >= journey.trip.travelerCount else {
+                isConfirming = false; journey.transferSelectionConfirmed = false; return
+            }
+            isConfirming = false; showHotelsAfterTransfer = true; IumrahHaptics.success(); return
+        }
 
         await journey.buildQuote(forceHotelRefresh: false)
 

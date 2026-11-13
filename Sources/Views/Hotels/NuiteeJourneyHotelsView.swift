@@ -4,6 +4,8 @@ import SwiftUI
 struct NuiteeJourneyHotelsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var journey: JourneyStore
+    var transferAlreadySelected = false
+    @State private var showFinalAfterHotels = false
     @State private var city = "makkah"
     @State private var roomIndex = 0
     @State private var stars = 0
@@ -119,7 +121,7 @@ struct NuiteeJourneyHotelsView: View {
                     journey.localJourneyRooms[key] = LocalJourneyRoom(id: key, city: city, hotel: hotel, rate: rate,
                         checkin: window.checkIn, checkout: window.checkOut, adults: roomAdults, childrenAges: roomChildren, meals: selectedMeals)
                     if let tier = journey.localPackageTier { journey.trip.packageTier = tier }
-                    journey.transferSelectionConfirmed = false
+                    if !transferAlreadySelected { journey.transferSelectionConfirmed = false }
                     journey.invalidateLocalJourneyQuote()
                     advanceAfterRoomSelection = true
                 }, onSelectMeals: { selectedMeals = $0 })
@@ -130,9 +132,10 @@ struct NuiteeJourneyHotelsView: View {
                 }
         }
         .navigationDestination(isPresented: $showTransfer) { TransferSelectionView() }
+        .navigationDestination(isPresented: $showFinalAfterHotels) { FinalPackageView() }
         .safeAreaInset(edge: .bottom) {
             if journey.localRoomsComplete {
-                Button("Выбрать трансфер") { journey.invalidateLocalJourneyQuote(); showTransfer = true }
+                Button(transferAlreadySelected ? "Посмотреть итог" : "Выбрать трансфер") { finishRooms() }
                     .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
             }
         }
@@ -151,7 +154,13 @@ struct NuiteeJourneyHotelsView: View {
                 return
             }
         }
-        if journey.localRoomsComplete { showTransfer = true }
+        if journey.localRoomsComplete { finishRooms() }
+    }
+
+    private func finishRooms() {
+        journey.invalidateLocalJourneyQuote()
+        if transferAlreadySelected { journey.confirmTransferSelection(); showFinalAfterHotels = true }
+        else { showTransfer = true }
     }
 
     private func invalidateRooms() {

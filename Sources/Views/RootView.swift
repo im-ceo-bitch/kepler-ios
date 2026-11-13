@@ -6,6 +6,7 @@ struct RootView: View {
     @AppStorage("iumrah.hasCompletedOnboarding.cinematic.v4") private var hasCompletedOnboarding = false
     @StateObject private var settings = AppSettingsStore()
     @ObservedObject var chrome: AppChromeStore
+    var launchLink: IumrahLaunchLink? = nil
     @StateObject private var journey = JourneyStore()
     @StateObject private var manualJourney = IumrahManualJourneyStore()
     @StateObject private var bookings = BookingStore()
@@ -130,7 +131,7 @@ struct RootView: View {
                 guard hasCompletedOnboarding else { return }
                 handleOpenedPushIfNeeded()
             }
-            .onChange(of: quickActions.pendingRequest) { _, request in
+            .onChange(of: quickActions.pendingRequest, initial: true) { _, request in
                 guard let request else { return }
                 handleQuickAction(request.action)
                 quickActions.consume()
@@ -147,12 +148,8 @@ struct RootView: View {
             } message: {
                 Text(quickActionSupportMessage)
             }
-            .onOpenURL { url in
-                handleDeepLink(url)
-            }
-            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
-                guard let url = activity.webpageURL else { return }
-                handleDeepLink(url)
+            .onChange(of: launchLink, initial: true) { _, link in
+                if let link { handleDeepLink(link.url) }
             }
             .onChange(of: scenePhase) { _, phase in
                 let screen = telemetryScreen

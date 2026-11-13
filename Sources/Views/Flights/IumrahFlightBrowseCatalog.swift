@@ -14,6 +14,7 @@ struct IumrahFlightBrowseCatalog: View {
     var selectedID: String? = nil
     var pairedContextID: String? = nil
     var onAdd: ((LocalJourneyFlight) -> Void)? = nil
+    var onSelectionContextChange: (() -> Void)? = nil
     let onChoose: (LocalJourneyFlight) -> Void
     private var trip: TripDraft { tripOverride ?? journey.trip }
     @State private var filters = IumrahFlightFilterState()
@@ -92,7 +93,7 @@ struct IumrahFlightBrowseCatalog: View {
         .onChange(of: direction) { _, _ in
             visibleCount = 20; filters = IumrahFlightFilterState(); filters.day = requestedDay
         }
-        .onChange(of: filters) { _, _ in visibleCount = 20 }
+        .onChange(of: filters) { _, _ in visibleCount = 20; onSelectionContextChange?() }
         .onChange(of: identity) { _, _ in visibleCount = 20 }
     }
     private var outboundTitle: String {

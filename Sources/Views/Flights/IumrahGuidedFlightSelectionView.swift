@@ -23,6 +23,7 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var isLoading = false
     @State private var loadingRequestID = UUID()
     @State private var loadError: String?
+    @State private var pendingChoice: FlightChoice?
     @State private var advanceAfterFlightDetail = false
     @State private var selectedDetail: FlightChoice?
     @State private var showTransferPicker = false
@@ -170,6 +171,7 @@ struct IumrahGuidedFlightSelectionView: View {
             }
             .onChange(of: step) { _, _ in
                 visibleCount = 20
+                pendingChoice = nil
                 filters = IumrahFlightFilterState()
                 withAnimation(.easeInOut(duration: 0.28)) {
                     proxy.scrollTo("flight-header", anchor: .top)
@@ -190,20 +192,20 @@ struct IumrahGuidedFlightSelectionView: View {
                 adults: journey.trip.adults,
                 children: journey.trip.children,
                 infants: journey.trip.infants,
-                onChoose: { choose(choice) }
+                onChoose: { pendingChoice = choice; advanceAfterFlightDetail = true }
             )
             .onDisappear {
                 if advanceAfterFlightDetail {
                     advanceAfterFlightDetail = false
-                    advanceFlightSelection()
+                    confirmPendingChoice()
                 }
             }
         }
         .navigationDestination(isPresented: $showTransferPicker) {
-            NuiteeJourneyHotelsView()
+            TransferSelectionView(selectBeforeHotels: true)
         }
         .task { await loadFlights() }
-        .onChange(of: filters) { _, _ in visibleCount = 20 }
+        .onChange(of: filters) { _, _ in visibleCount = 20; pendingChoice = nil }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
             Button(tr("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
         } message: {
@@ -216,30 +218,13 @@ struct IumrahGuidedFlightSelectionView: View {
 
     @ViewBuilder
     private var stageContinueButton: some View {
-        if step == .outbound, outbound != nil {
+        if pendingChoice != nil || (step == .outbound ? outbound != nil : inbound != nil) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) { step = .inbound }
+                if pendingChoice == nil { pendingChoice = step == .outbound ? outbound : inbound }
+                confirmPendingChoice()
             } label: {
-                HStack {
-                    Text(tr("Выбрать обратный перелёт", "Choose return flight", "Qaytish reysini tanlash", "Қайтиш рейсини танлаш"))
-                }
-                .frame(height: IumrahDesign.controlHeight)
-            }
-            .buttonStyle(IumrahPrimaryButtonStyle())
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .background(Color.clear)
-        } else if step == .inbound, hasSelection {
-            Button(action: commitSelection) {
-                HStack {
-                    Text(tr("Выбрать отель", "Choose hotel", "Mehmonxona tanlash", "Меҳмонхона танлаш"))
-                }
-                .frame(height: IumrahDesign.controlHeight)
-            }
-            .buttonStyle(IumrahPrimaryButtonStyle())
-            .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .background(Color.clear)
+                Text(step == .outbound ? tr("Выбрать этот авиабилет", "Choose this flight", "Shu reysni tanlash", "Шу рейсни танлаш") : tr("Выбрать обратный рейс", "Choose this return flight", "Qaytish reysini tanlash", "Қайтиш рейсини танлаш"))
+            }.buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 20).padding(.vertical, 8)
         }
     }
 
@@ -281,6 +266,7 @@ struct IumrahGuidedFlightSelectionView: View {
             if editingSearch {
                 Divider()
                 IumrahFlightSearchEditor {
+                    pendingChoice = nil
                     outbound = nil
                     inbound = nil
                     step = .outbound
@@ -383,9 +369,9 @@ struct IumrahGuidedFlightSelectionView: View {
             flightNumber: choice.flightNumber, origin: choice.origin, destination: choice.destination,
             departureAt: choice.departureAt, arrivalAt: choice.arrivalAt, duration: choice.duration,
             stops: choice.stops, price: choice.price, isAviasales: choice.source == .dataAPI,
-            selected: (step == .outbound ? outbound?.id : inbound?.id) == choice.id,
+            selected: (pendingChoice?.id ?? (step == .outbound ? outbound?.id : inbound?.id)) == choice.id,
             selectedSearchDay: dayKey(IumrahFlightDiscoveryStore.dayFormatter.string(from: currentTarget)),
-            onSelect: { choose(choice) }) {
+            onSelect: { IumrahHaptics.selection(); withAnimation { pendingChoice = pendingChoice?.id == choice.id ? nil : choice } }) {
                 selectedDetail = choice
                 IumrahHaptics.soft()
             }
@@ -409,6 +395,7 @@ struct IumrahGuidedFlightSelectionView: View {
             onSelectDay: { key in
                 guard let date = dateFromISODay(key), date >= Calendar.current.startOfDay(for: Date()),
                       !Calendar.current.isDate(date, inSameDayAs: currentTarget) else { return }
+                pendingChoice = nil
                 if step == .outbound {
                     journey.trip.departureDate = date
                     outbound = nil; inbound = nil
@@ -449,7 +436,8 @@ struct IumrahGuidedFlightSelectionView: View {
         }
     }
 
-    private func choose(_ choice: FlightChoice) {
+    private func confirmPendingChoice() {
+        guard let choice = pendingChoice else { return }
         IumrahHaptics.selection()
         switch step {
         case .outbound:
@@ -463,8 +451,8 @@ struct IumrahGuidedFlightSelectionView: View {
             }
             inbound = choice
         }
-        if selectedDetail != nil { advanceAfterFlightDetail = true }
-        else { advanceFlightSelection() }
+        pendingChoice = nil
+        advanceFlightSelection()
     }
 
     private func advanceFlightSelection() {

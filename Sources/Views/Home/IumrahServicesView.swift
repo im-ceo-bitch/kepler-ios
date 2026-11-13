@@ -17,7 +17,7 @@ enum IumrahServiceKind: String, CaseIterable, Identifiable {
         case .guide: return "GiftCardJourney"
         case .ziyarat: return "ZiyaratQuba1"
         case .haramain: return "HaramainHero"
-        case .support: return "ZiyaratQuba3"
+        case .support: return "IumrahCareTeamHero"
         case .digital: return "IumrahESIMHomeCard"
         }
     }
@@ -32,7 +32,7 @@ enum IumrahServiceKind: String, CaseIterable, Identifiable {
         case .ziyarat: return "map"
         case .haramain: return "tram"
         case .support: return "heart.text.square"
-        case .digital: return "network"
+        case .digital: return "simcard"
         }
     }
 
@@ -113,10 +113,10 @@ enum IumrahServicesCopy {
                 cy: ("Меҳмонхоналар", "Турар жой", "Макка ва Мадинада оилангиз учун қулай яшаш.", "Макка ва Мадинада пакет даражаси, меҳмонлар сони, хона қулайлиги ва масжидгача масофани ҳисобга олиб меҳмонхона танлаймиз. Саналар ва хона тури сафар режангизда кўрсатилади."))
         case .transfer:
             return localized(language,
-                ru: ("Трансфер", "Транспорт", "Встреча в аэропорту и переезды по маршруту.", "Организуем предусмотренные пакетом поездки из аэропорта, между отелями и важными точками маршрута. Подбираем автомобиль под количество пассажиров и багажа. Конкретный транспорт отражается в подтверждённой поездке."),
-                en: ("Transfers", "Transport", "Airport pickup and planned transfers.", "We organize the transfers included in your itinerary between airports, hotels and key stops. The vehicle is chosen for passenger and luggage capacity, with details shown in the confirmed booking."),
-                uz: ("Transfer", "Transport", "Aeroportda kutib olish va yo‘nalish bo‘yicha safarlar.", "Paketga kiritilgan aeroport, mehmonxona va muhim manzillar orasidagi safarlarni tashkil qilamiz. Avtomobil yo‘lovchilar va yuk soniga mos tanlanadi."),
-                cy: ("Трансфер", "Транспорт", "Аэропортда кутиб олиш ва йўналиш бўйича сафарлар.", "Пакетга киритилган аэропорт, меҳмонхона ва муҳим манзиллар орасидаги сафарларни ташкил қиламиз. Автомобиль йўловчилар ва юк сонига мос танланади."))
+                ru: ("Приватный трансфер", "Личный транспорт", "Отдельный автомобиль для вас и вашей семьи.", "Организуем приватные поездки из аэропорта, между отелями и важными точками маршрута — без общей группы. Подбираем автомобиль под количество пассажиров и багажа. Конкретный транспорт отражается в подтверждённой поездке."),
+                en: ("Private transfers", "Private transport", "A dedicated car for you and your family.", "We arrange private rides between airports, hotels and key stops without a shared tour group. The vehicle is chosen for passenger and luggage capacity, with details shown in the confirmed booking."),
+                uz: ("Shaxsiy transfer", "Shaxsiy transport", "Siz va oilangiz uchun alohida avtomobil.", "Aeroport, mehmonxona va muhim manzillar orasida guruhsiz shaxsiy safarlarni tashkil qilamiz. Avtomobil yo‘lovchilar va yuk soniga mos tanlanadi."),
+                cy: ("Шахсий трансфер", "Шахсий транспорт", "Сиз ва оилангиз учун алоҳида автомобиль.", "Аэропорт, меҳмонхона ва муҳим манзиллар орасида гуруҳсиз шахсий сафарларни ташкил қиламиз. Автомобиль йўловчилар ва юк сонига мос танланади."))
         case .guide:
             return localized(language,
                 ru: ("Личный гид", "Сопровождение", "Помощь вашей семье на протяжении поездки.", "Ваша семья путешествует своим составом, без обязательной большой туристической группы. Гид встречает по договорённости, помогает ориентироваться в Саудовской Аравии, сопровождает предусмотренные программой посещения и объясняет этапы умры."),
@@ -143,10 +143,10 @@ enum IumrahServicesCopy {
                 cy: ("iumrah ёрдами", "Ёрдам", "Сафарга оид ташкилий саволларда кўмак.", "Жўнашдан олдин ва Саудия Арабистонида бўлган вақтингизда брон, ҳужжатлар, учрашув ва хизматлар бўйича саволларингизга ёрдам берамиз."))
         case .digital:
             return localized(language,
-                ru: ("Цифровые сервисы", "В приложении", "Маршруты, информация и мобильная связь.", "В приложении доступны iumrah Ziyarat с маршрутами и информацией о местах, отслеживание рейсов и инструменты помощи путешественнику. eSIM и другие дополнительные продукты подключаются по доступности и условиям выбранного пакета."),
-                en: ("Digital services", "In the app", "Routes, travel details and connectivity.", "The app offers iumrah Ziyarat maps and place information, flight tracking and traveler tools. eSIM and other optional products depend on availability and the package you select."),
-                uz: ("Raqamli servislar", "Ilovada", "Yo‘nalishlar, ma’lumot va mobil aloqa.", "Ilovada iumrah Ziyarat yo‘nalishlari, parvoz kuzatuvi va sayohat uchun foydali vositalar mavjud. eSIM va boshqa qo‘shimcha mahsulotlar tanlangan paket shartlariga bog‘liq."),
-                cy: ("Рақамли сервислар", "Иловада", "Йўналишлар, маълумот ва мобил алоқа.", "Иловада iumrah Ziyarat йўналишлари, парвоз кузатуви ва саёҳат учун фойдали воситалар мавжуд. eSIM ва бошқа қўшимча маҳсулотлар танланган пакет шартларига боғлиқ."))
+                ru: ("eSIM — интернет и связь", "Саудовская Аравия", "Мобильный интернет в Саудовской Аравии без физической SIM-карты.", "Подключите eSIM на совместимом телефоне для мобильного интернета в Саудовской Аравии. Пользуйтесь картами, мессенджерами и интернет-звонками. Доступность, объём трафика и условия зависят от выбранного тарифа."),
+                en: ("eSIM — internet & connectivity", "Saudi Arabia", "Mobile internet in Saudi Arabia without a physical SIM.", "Activate an eSIM on a compatible phone for mobile internet in Saudi Arabia. Use maps, messaging and internet calls. Availability, data allowance and terms depend on the selected plan."),
+                uz: ("eSIM — internet va aloqa", "Saudiya Arabistoni", "Saudiya Arabistonida jismoniy SIM-kartasiz mobil internet.", "Mos telefonda eSIM’ni faollashtiring va Saudiya Arabistonida mobil internet, xaritalar, messenjerlar hamda internet qo‘ng‘iroqlaridan foydalaning. Trafik va shartlar tarifga bog‘liq."),
+                cy: ("eSIM — интернет ва алоқа", "Саудия Арабистони", "Саудия Арабистонида жисмоний SIM-картасиз мобил интернет.", "Мос телефонда eSIM’ни фаоллаштиринг ва Саудия Арабистонида мобил интернет, хариталар, мессенжерлар ҳамда интернет қўнғироқларидан фойдаланинг. Трафик ва шартлар тарифга боғлиқ."))
         }
     }
 

@@ -45,15 +45,23 @@ final class NuiteeCatalogModel: ObservableObject {
     private let service = NuiteeHotelService()
     private var generation = UUID()
 
-    func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int) async {
+    func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, forceRefresh: Bool = false) async {
         let version = UUID()
         generation = version
+        if !forceRefresh, let cached = await service.cachedHotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults) {
+            guard generation == version, !Task.isCancelled else { return }
+            errorMessage = nil
+            applyRates(cached)
+            busy = false
+            return
+        }
+        guard generation == version, !Task.isCancelled else { return }
         busy = true
         hotels = [] // Never show old city/date prices while loading a new request.
         errorMessage = nil
         rateError = nil
         do {
-            let catalog = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: true)
+            let catalog = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: true, forceRefresh: forceRefresh)
             guard generation == version, !Task.isCancelled else { return }
             hotels = catalog.hotels.map { hotel in
                 var row = hotel
@@ -62,19 +70,9 @@ final class NuiteeCatalogModel: ObservableObject {
             }
             sandbox = catalog.sandbox
             catalogStale = catalog.hotelCatalogStale
-            let response = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults)
+            let response = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, forceRefresh: forceRefresh)
             guard generation == version, !Task.isCancelled else { return }
-            // Older deployed adapters do not return rateStatus. Derive it from
-            // the completed response, never from elapsed time or sandbox mode.
-            hotels = response.hotels.map { hotel in
-                var row = hotel
-                row.rateStatus = row.minimumRate != nil ? (response.pricesStale ? "cached" : "available")
-                    : response.rateError != nil ? "provider_error" : "no_availability"
-                return row
-            }
-            sandbox = response.sandbox
-            catalogStale = response.hotelCatalogStale || response.pricesStale
-            rateError = response.rateError
+            applyRates(response)
         } catch {
             guard generation == version, !Task.isCancelled else { return }
             if hotels.isEmpty { errorMessage = error.localizedDescription }
@@ -88,6 +86,20 @@ final class NuiteeCatalogModel: ObservableObject {
             }
         }
         if generation == version { busy = false }
+    }
+
+    private func applyRates(_ response: NuiteeHotelListEnvelope) {
+        // Older deployed adapters do not return rateStatus. Derive it from
+        // the completed response, never from elapsed time or sandbox mode.
+        hotels = response.hotels.map { hotel in
+            var row = hotel
+            row.rateStatus = row.minimumRate != nil ? (response.pricesStale ? "cached" : "available")
+                : response.rateError != nil ? "provider_error" : "no_availability"
+            return row
+        }
+        sandbox = response.sandbox
+        catalogStale = response.hotelCatalogStale || response.pricesStale
+        rateError = response.rateError
     }
 }
 
@@ -113,6 +125,8 @@ struct NuiteeHotelsCatalogView: View {
     @State private var draftNights = 1
     @State private var draftAdults = 2
     @State private var searchExpanded = false
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var lastLoadedDay: Date?
     @State private var visibleCount = 20
     @State private var opened: NuiteeHotel?
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
@@ -154,7 +168,7 @@ struct NuiteeHotelsCatalogView: View {
         }
     }
     private var alternativeHotels: [NuiteeHotel] {
-        guard !normalizedQuery.isEmpty else { return [] }
+        guard !normalizedQuery.isEmpty, matchingHotels.isEmpty else { return [] }
         let selected = Set(matchingHotels.map(\.id))
         let preferredStars = matchingHotels.first?.roundedStars
         return candidateHotels.filter { !selected.contains($0.id) }
@@ -301,9 +315,7 @@ struct NuiteeHotelsCatalogView: View {
                             onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
                         )
                     }
-                    if matchingHotels.count > visibleCount {
-                        Color.clear.frame(height: 1).onAppear { visibleCount += 20 }
-                    }
+                    IumrahLoadMoreButton(remaining: matchingHotels.count - visibleCount) { visibleCount += 20 }
                 }
                 if !alternativeHotels.isEmpty {
                     Text(NuiteeCopy.text("Похожие отели в городе", "Shahardagi o‘xshash mehmonxonalar", "Alternative hotels nearby", settings.language))
@@ -321,6 +333,13 @@ struct NuiteeHotelsCatalogView: View {
             }
         }
         .task(id: reloadIdentity) { await reload() }
+        .onChange(of: hotelQuery) { _, _ in visibleCount = 20 }
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            Task { await refreshIfNewDay() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await refreshIfNewDay() } }
+        }
         .onAppear {
             hotelQuery = initialHotelQuery
             consumeHomeSearch(searchOverride ?? chrome.requestedHotelTabSearch)
@@ -363,7 +382,13 @@ struct NuiteeHotelsCatalogView: View {
         hotelSearchFocused = false
     }
 
+    private func refreshIfNewDay() async {
+        guard let lastLoadedDay, !Calendar.current.isDateInToday(lastLoadedDay) else { return }
+        await reload()
+    }
+
     private func reload() async {
+        lastLoadedDay = Date()
         visibleCount = 20
         await model.reload(city: city, checkin: checkin, checkout: checkout, adults: adults)
     }

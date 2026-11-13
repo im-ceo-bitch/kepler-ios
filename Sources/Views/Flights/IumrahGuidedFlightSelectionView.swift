@@ -8,6 +8,7 @@ struct IumrahGuidedFlightSelectionView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var filters = IumrahFlightFilterState()
+    @State private var visibleCount = 20
     @State private var editingSearch = false
     @State private var step: LegStep = .outbound
     @State private var published: [CuratedFlightRecommendation] = []
@@ -168,6 +169,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 isFlightHeaderVisible = bottom > 35
             }
             .onChange(of: step) { _, _ in
+                visibleCount = 20
                 filters = IumrahFlightFilterState()
                 withAnimation(.easeInOut(duration: 0.28)) {
                     proxy.scrollTo("flight-header", anchor: .top)
@@ -201,6 +203,7 @@ struct IumrahGuidedFlightSelectionView: View {
             NuiteeJourneyHotelsView()
         }
         .task { await loadFlights() }
+        .onChange(of: filters) { _, _ in visibleCount = 20 }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
             Button(tr("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
         } message: {
@@ -348,9 +351,10 @@ struct IumrahGuidedFlightSelectionView: View {
                     .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 18))
             }
 
-            flightGroup(directExact, title: tr("Прямые рейсы", "Non-stop flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"))
-            flightGroup(connecting, title: tr("Рейсы с пересадкой", "Connecting flights", "Transferli reyslar", "Трансферли рейслар"))
-            flightGroup(directNearby, title: tr("Соседние даты", "Nearby dates", "Yaqin sanalar", "Яқин саналар"))
+            flightGroup(Array(directExact.prefix(visibleCount)), title: tr("Прямые рейсы", "Non-stop flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"))
+            flightGroup(Array(connecting.prefix(max(0, visibleCount - directExact.count))), title: tr("Рейсы с пересадкой", "Connecting flights", "Transferli reyslar", "Трансферли рейслар"))
+            flightGroup(Array(directNearby.prefix(max(0, visibleCount - directExact.count - connecting.count))), title: tr("Соседние даты", "Nearby dates", "Yaqin sanalar", "Яқин саналар"))
+            IumrahLoadMoreButton(remaining: directExact.count + connecting.count + directNearby.count - visibleCount) { visibleCount += 20 }
 
             Text(tr("Цены Data API — предварительные. Наличие и окончательная стоимость проверяются перед бронированием.",
                     "Data API fares are indicative. Availability and final price are checked before booking.",
@@ -588,6 +592,7 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func loadFlights(preserveCalendar: Bool = false) async {
+        visibleCount = 20
         editingSearch = false
         let requestID = UUID()
         loadingRequestID = requestID

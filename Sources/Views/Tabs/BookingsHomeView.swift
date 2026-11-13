@@ -155,9 +155,6 @@ struct BookingsHomeView: View {
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 0) {
             LazyVStack(spacing: 0) {
-                JourneyTravelInfoView()
-                    .padding(.bottom, 18)
-
                 bookingIdentity(session)
                     .padding(.bottom, 18)
 
@@ -267,8 +264,8 @@ struct BookingsHomeView: View {
             footer: hasActiveBooking ? AnyView(
                 IumrahHeaderTripleTabs(
                     labels: [
-                        localized("Бронирование", "Booking", "Bron", "Брон"),
-                        localized("Статус", "Status", "Holat", "Ҳолат"),
+                        localized("Статус брони", "Booking status", "Bron holati", "Брон ҳолати"),
+                        localized("Документы", "Documents", "Hujjatlar", "Ҳужжатлар"),
                         localized("Расписание", "Schedule", "Jadval", "Жадвал")
                     ],
                     selection: bookingPanel == .booking ? 0 : (bookingPanel == .status ? 1 : 2),

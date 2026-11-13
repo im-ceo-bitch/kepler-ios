@@ -28,7 +28,7 @@ struct NuiteeHotelMinimumRate: Codable, Hashable {
     let offerId: String?
 }
 
-struct NuiteeHotelListEnvelope: Decodable {
+struct NuiteeHotelListEnvelope: Codable {
     let ok: Bool
     let sandbox: Bool
     let city: String

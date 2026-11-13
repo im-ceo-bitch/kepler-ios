@@ -13,14 +13,30 @@ struct NuiteeHotelService {
         return f.string(from: date)
     }
 
-    func hotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false) async throws -> NuiteeHotelListEnvelope {
-        try await APIClient.hotelPrices.get("/api/package/nuitee/hotels", query: [
+    private func listKey(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool) -> String {
+        "\(city.lowercased())-\(Self.dateText(checkin))-\(Self.dateText(checkout))-\(adults)-\(catalogOnly ? "catalog" : "rates")"
+    }
+
+    func cachedHotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false) async -> NuiteeHotelListEnvelope? {
+        await NuiteeDailyHotelCache.shared.read(key: listKey(city: city, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: catalogOnly))
+    }
+
+    func hotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false, forceRefresh: Bool = false) async throws -> NuiteeHotelListEnvelope {
+        let key = listKey(city: city, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: catalogOnly)
+        if !forceRefresh, let cached = await NuiteeDailyHotelCache.shared.read(key: key) { return cached }
+        let response: NuiteeHotelListEnvelope = try await APIClient.hotelPrices.get("/api/package/nuitee/hotels", query: [
             URLQueryItem(name: "city", value: city),
             URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
             URLQueryItem(name: "checkout", value: Self.dateText(checkout)),
             URLQueryItem(name: "adults", value: String(adults)),
             URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")
         ], timeoutInterval: 604800)
+        // Cache successful responses while preserving upstream staleness flags.
+        // Provider failures are never saved as successful results.
+        if response.ok && (catalogOnly || response.rateError == nil) {
+            await NuiteeDailyHotelCache.shared.write(response, key: key)
+        }
+        return response
     }
 
     func detail(hotelID: String, language: String = "en") async throws -> NuiteeHotelDetail {

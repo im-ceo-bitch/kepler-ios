@@ -84,8 +84,9 @@ struct NuiteeJourneyHotelsView: View {
                             favorite: favorites.contains(hotel.id), onOpen: { if ready { opened = hotel } }, onFavorite: {
                                 if favorites.contains(hotel.id) { favorites.remove(hotel.id) } else { favorites.insert(hotel.id) }
                             })
-                            .onAppear { if hotel.id == filtered.prefix(visibleCount).last?.id { visibleCount += 20 } }
+
                     }
+                    IumrahLoadMoreButton(remaining: filtered.count - visibleCount) { visibleCount += 20 }
                     if !loading && filtered.isEmpty { Text("На эти даты отели не найдены.").foregroundStyle(.secondary) }
                 }.padding(.horizontal, 18).padding(.bottom, 24)
             }
@@ -98,7 +99,7 @@ struct NuiteeJourneyHotelsView: View {
         .toolbar(.hidden, for: .tabBar)
         .modifier(IumrahJourneyRefresh {
             await journey.refreshLocalJourneyRoomRates()
-            await load()
+            await load(forceRefresh: true)
         })
         .task(id: searchID) { await load() }
         .onAppear {
@@ -159,11 +160,11 @@ struct NuiteeJourneyHotelsView: View {
         journey.quote = nil
         journey.transferSelectionConfirmed = false
     }
-    @MainActor private func load() async {
+    @MainActor private func load(forceRefresh: Bool = false) async {
         let token = UUID(); requestID = token
         loading = true; error = nil; visibleCount = 20
         do {
-            let response = try await service.hotels(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: max(1, roomAdults))
+            let response = try await service.hotels(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: max(1, roomAdults), forceRefresh: forceRefresh)
             guard requestID == token, !Task.isCancelled else { return }
             hotels = response.hotels; sandbox = response.sandbox
             error = response.rateError

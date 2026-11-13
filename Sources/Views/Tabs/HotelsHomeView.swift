@@ -28,6 +28,7 @@ struct HotelsHomeView: View {
     @State private var searchExpanded = false
     @State private var flightDirection = 0
     @StateObject private var hotelCatalog = NuiteeCatalogModel()
+    @State private var manualHotelLimit = 20
     @StateObject private var flightCatalog = IumrahFlightBrowseModel()
     @State private var appliedHotelName = ""
     @State private var manualQuoteRequired = false
@@ -184,6 +185,7 @@ struct HotelsHomeView: View {
                 nights: applied?.nights ?? hotelNights, adults: applied?.adults ?? hotelAdults)
             if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
         }
+        .onChange(of: hotelName) { _, _ in manualHotelLimit = 20 }
         .onChange(of: hotelChildren) { _, count in
             if count > childAges.count { childAges += Array(repeating: 6, count: count - childAges.count) }
             if count < childAges.count { childAges = Array(childAges.prefix(count)) }
@@ -360,7 +362,8 @@ struct HotelsHomeView: View {
             } else if let manualHotelsError {
                 Text(manualHotelsError).font(.footnote).foregroundStyle(.secondary)
             } else {
-                ForEach(manualHotels.filter { hotelName.isEmpty || $0.name.localizedStandardContains(hotelName) }) { hotel in
+                let matching = manualHotels.filter { hotelName.isEmpty || $0.name.localizedStandardContains(hotelName) }
+                ForEach(Array(matching.prefix(manualHotelLimit))) { hotel in
                     Button { chrome.navigate(to: .care) } label: {
                         HStack(spacing: 12) {
                             HotelCachedImage(rawURL: hotel.coverImageURL)
@@ -380,6 +383,7 @@ struct HotelsHomeView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                IumrahLoadMoreButton(remaining: matching.count - manualHotelLimit) { manualHotelLimit += 20 }
             }
         }
         .padding(.horizontal, IumrahDesign.pagePadding)
@@ -448,12 +452,13 @@ struct HotelsHomeView: View {
                 await hotelCatalog.reload(city: request.city == "madinah" ? .madinah : .makkah,
                     checkin: request.checkin,
                     checkout: Calendar.current.date(byAdding: .day, value: request.nights, to: request.checkin) ?? request.checkin,
-                    adults: request.adults)
+                    adults: request.adults, forceRefresh: true)
             }
         }
     }
 
     @MainActor private func loadManualHotelCatalog() async {
+        manualHotelLimit = 20
         let requestID = UUID()
         manualHotelsRequestID = requestID
         manualHotelsBusy = true

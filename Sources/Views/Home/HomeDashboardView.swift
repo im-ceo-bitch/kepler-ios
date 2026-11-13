@@ -5,20 +5,12 @@ struct HomeDashboardView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
     @EnvironmentObject private var account: IumrahAccountStore
-    @EnvironmentObject private var storefront: HotelStorefrontStore
     @EnvironmentObject private var journey: JourneyStore
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @State private var showZiyarats = false
     @State private var showCareRequestBuilder = false
     @State private var showFlightsService = false
     @State private var showTransferService = false
-    @State private var selectedFlightPackage: StorefrontFlightPackagePreview?
-    @State private var selectedHotel: HotelSummary?
-    @State private var selectedHotelPackageID: String?
-    @State private var packageShareArtifacts: IumrahPackageShareArtifacts?
-    @State private var packageShareError: String?
-    @State private var readyCarouselID: String?
-    @State private var hotelCarouselID: String?
     @State private var buildCarouselID: String? = "configurator"
     @State private var productsCarouselID: String? = "iumrah-system"
     @State private var integrationCarouselID: String? = "plan"
@@ -26,12 +18,7 @@ struct HomeDashboardView: View {
     @State private var showAboutProject = false
     @State private var showGuidedFlightSelection = false
     @State private var focusJourneySearchRevision = 0
-
-    private struct ReadyPackageItem: Identifiable {
-        let option: StorefrontFlightOption
-        let preview: StorefrontFlightPackagePreview
-        var id: String { option.id }
-    }
+    @State private var journeySearchExpanded = false
 
     private var activeSession: StoredBookingSession? {
         bookings.sessions.first { $0.effectiveStatus.uppercased() != "COMPLETED" }
@@ -50,14 +37,6 @@ struct HomeDashboardView: View {
                     try? await Task.sleep(nanoseconds: 120_000_000_000)
                 }
             }
-            .task(id: journey.trip.originCode.uppercased()) {
-                // Hotel/package preparation is intentionally delayed so splash -> Home
-                // never starts media/catalog/network work in the same render transaction.
-                try? await Task.sleep(for: .milliseconds(850))
-                guard !Task.isCancelled else { return }
-                await storefront.prepareIfNeeded()
-                await storefront.updateDepartureAirport(journey.trip.originCode)
-            }
             .navigationDestination(isPresented: $showZiyarats) {
                 ZiyaratJourneyView()
                     .environmentObject(settings)
@@ -72,33 +51,13 @@ struct HomeDashboardView: View {
             .navigationDestination(isPresented: $showTransferService) {
                 IumrahTransferServiceView()
             }
-            .navigationDestination(item: $selectedFlightPackage) { preview in
-                StorefrontUmrahPackageDetailView(preview: preview)
-            }
-            .navigationDestination(item: $selectedHotel) { hotel in
-                HotelDetailView(
-                    hotel: hotel,
-                    autoOpenConfigurator: true,
-                    initialPackageID: selectedHotelPackageID
-                )
-            }
             .navigationDestination(isPresented: $showGuidedFlightSelection) {
                 IumrahGuidedFlightSelectionView()
             }
             .navigationDestination(isPresented: $showAboutProject) {
                 IumrahStoryView()
             }
-            .sheet(item: $packageShareArtifacts) { artifacts in
-                IumrahPackageActivitySheet(artifacts: artifacts)
-            }
-            .alert(homeShareErrorTitle, isPresented: Binding(
-                get: { packageShareError != nil },
-                set: { if !$0 { packageShareError = nil } }
-            )) {
-                Button(homeShareErrorDismiss, role: .cancel) { packageShareError = nil }
-            } message: {
-                Text(packageShareError ?? "")
-            }
+
     }
 
     private var marketingHome: some View {
@@ -106,12 +65,11 @@ struct HomeDashboardView: View {
             IumrahRootScrollingPage(onRefresh: {
                 await bookings.refreshAll()
                 await clientNotifications.refresh(accountToken: account.bearerToken)
-                await storefront.refresh()
             }, searchCardOverlap: 40, header: {
-                IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header)
+                IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header, searchExpanded: $journeySearchExpanded)
             }, content: {
                 LazyVStack(spacing: 30) {
-                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search)
+                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
                     IumrahPageHelpCard("home.default")
@@ -125,9 +83,6 @@ struct HomeDashboardView: View {
                 HomeEmotionalJourneyPrompt()
                 HomeVideoCarousel()
 
-                IumrahHomeAudienceSection(language: settings.language)
-                buildMyUmrahSection
-
                 IumrahHomeServicesSection(
                     language: settings.language,
                     onTransfer: { showTransferService = true },
@@ -136,9 +91,9 @@ struct HomeDashboardView: View {
                     onZiyarats: { showZiyarats = true }
                 )
 
-                readyPackagesSection
-                // Historical Business/D1 hotel showcases are no longer
-                // customer-visible. Live Hotels now displays Nuitee only.
+                buildMyUmrahSection
+                JourneyTravelInfoView(showsPageSelector: true)
+                IumrahHomeAudienceSection(language: settings.language)
                 homeIntegrationsSection
 
                 VStack(alignment: .leading, spacing: 15) {
@@ -538,344 +493,6 @@ struct HomeDashboardView: View {
         .background(pageBackground)
     }
 
-    private var readyPackageEntries: [ReadyPackageItem] {
-        (storefront.flightBoard?.options ?? [])
-            .compactMap { option in
-                guard let preview = storefront.packagePreview(for: option) else { return nil }
-                return ReadyPackageItem(option: option, preview: preview)
-            }
-            .prefix(12)
-            .map { $0 }
-    }
-
-    private var readyPackagesSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            IumrahHomeSectionHeader(title: readyPackagesTitle, subtitle: readyPackagesSubtitle)
-
-            if readyPackageEntries.isEmpty {
-                HStack(spacing: 11) {
-                    ProgressView()
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(readyPackagesLoadingTitle)
-                            .font(.headline)
-                        Text(readyPackagesLoadingBody)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .iumrahHomeFlatCard()
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 13) {
-                        ForEach(readyPackageEntries) { entry in
-                            HomeStorefrontFlightOptionCard(
-                                option: entry.option,
-                                packagePreview: entry.preview,
-                                isCalculating: storefront.isLoading,
-                                language: settings.language,
-                                onOpen: { selectedFlightPackage = entry.preview }
-                            )
-                            .frame(width: 318)
-                            .id(entry.id)
-
-                        }
-
-                        allPackagesCard
-                            .frame(width: 318)
-                            .id("all-flight-packages")
-                    }
-                    .scrollTargetLayout()
-                }
-                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
-                .scrollPosition(id: $readyCarouselID, anchor: .center)
-                .contentMargins(.horizontal, 0, for: .scrollContent)
-                .scrollClipDisabled()
-
-                IumrahHomeCarouselDots(
-                    count: readyPackageEntries.count + 1,
-                    selectedIndex: readyPackagesCarouselIndex
-                )
-            }
-        }
-        .onAppear {
-            if readyCarouselID == nil { readyCarouselID = readyPackageEntries.first?.id ?? "all-flight-packages" }
-        }
-    }
-
-    private var readyPackagesCarouselIndex: Int {
-        let ids = readyPackageEntries.map(\.id) + ["all-flight-packages"]
-        guard let readyCarouselID, let index = ids.firstIndex(of: readyCarouselID) else { return 0 }
-        return index
-    }
-
-    private var allPackagesCard: some View {
-        Button {
-            chrome.openHotels(board: .flights)
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                Image("IumrahFlightsShowcaseHero")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 118)
-                    .clipped()
-
-                VStack(alignment: .leading, spacing: 13) {
-                    Label("Iumrah Flights", systemImage: "airplane")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.black.opacity(0.52))
-
-                    Text(allPackagesTitle)
-                        .font(.system(size: 23, weight: .bold, design: .rounded))
-                        .tracking(-0.45)
-                        .foregroundStyle(.black)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(allPackagesBody)
-                        .font(.subheadline)
-                        .foregroundStyle(Color.black.opacity(0.58))
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack {
-                        Text(allPackagesCTA)
-                    }.frame(maxWidth: .infinity)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 15)
-                    .frame(height: 45)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
-            }
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.055), lineWidth: 0.8)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var homeHotelFirstHotels: [HotelSummary] {
-        Array(
-            storefront.allHotels
-                .filter { storefront.automaticQuote(for: $0) != nil }
-                .prefix(12)
-        )
-    }
-
-    private var hotelFirstPackagesSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            IumrahHomeSectionHeader(
-                title: hotelFirstHomeTitle,
-                subtitle: hotelFirstHomeSubtitle
-            )
-
-            if homeHotelFirstHotels.isEmpty {
-                HStack(spacing: 11) {
-                    ProgressView()
-                    Text(hotelFirstLoadingTitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .iumrahHomeFlatCard()
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 13) {
-                        ForEach(homeHotelFirstHotels) { hotel in
-                            HotelStorefrontCard(
-                                hotel: hotel,
-                                images: storefront.previewImages(for: hotel),
-                                quote: storefront.automaticQuote(for: hotel),
-                                language: settings.language,
-                                isFavorite: storefront.isFavorite(hotel),
-                                onOpen: {
-                                    selectedHotelPackageID = storefront.hotelConfiguratorPreview(for: hotel)?.packageID
-                                    selectedHotel = hotel
-                                },
-                                onFavorite: { storefront.toggleFavorite(hotel) },
-                                onShare: { shareHomeHotelPackage(hotel) }
-                            )
-                            .frame(width: 340)
-                            .id(hotel.id)
-                        }
-
-                        allHotelFirstPackagesCard
-                            .frame(width: 340, height: 204)
-                            .id("all-hotel-first-packages")
-                    }
-                    .scrollTargetLayout()
-                }
-                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
-                .scrollPosition(id: $hotelCarouselID, anchor: .center)
-                .contentMargins(.horizontal, 0, for: .scrollContent)
-                .scrollClipDisabled()
-
-                IumrahHomeCarouselDots(
-                    count: homeHotelFirstHotels.count + 1,
-                    selectedIndex: hotelFirstCarouselIndex
-                )
-            }
-        }
-        .onAppear {
-            if hotelCarouselID == nil {
-                hotelCarouselID = homeHotelFirstHotels.first?.id ?? "all-hotel-first-packages"
-            }
-        }
-    }
-
-    private var allHotelFirstPackagesCard: some View {
-        Button {
-            IumrahHaptics.selection()
-            chrome.openHotels(board: .hotels)
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                Image("IumrahHotelsShowcaseHero")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 102)
-                    .clipped()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(hotelFirstAllTitle)
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
-                    Text(hotelFirstAllBody)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                    Spacer(minLength: 0)
-                    HStack {
-                        Text(hotelFirstAllCTA)
-                    }.frame(maxWidth: .infinity)
-                    .font(.subheadline.weight(.bold))
-                }
-                .padding(14)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(Color.iumrahCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.6)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var hotelFirstCarouselIndex: Int {
-        let ids = homeHotelFirstHotels.map(\.id) + ["all-hotel-first-packages"]
-        guard let hotelCarouselID, let index = ids.firstIndex(of: hotelCarouselID) else { return 0 }
-        return index
-    }
-
-    @MainActor
-    private func shareHomeHotelPackage(_ hotel: HotelSummary) {
-        guard let preview = storefront.hotelConfiguratorPreview(for: hotel) else {
-            packageShareError = homeShareUnavailable
-            IumrahHaptics.error()
-            return
-        }
-        do {
-            packageShareArtifacts = try IumrahPackageShareFactory.make(
-                payload: .defaultHotelFirst(hotel: hotel, preview: preview, language: settings.language),
-                language: settings.language,
-                invitation: false
-            )
-            IumrahHaptics.selection()
-        } catch {
-            packageShareError = homeShareUnavailable
-            IumrahHaptics.error()
-        }
-    }
-
-    private var hotelFirstHomeTitle: String {
-        switch settings.language {
-        case .russian: return "Пакеты с выбранным отелем"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Packages by hotel"
-        case .uzbek: return "Mehmonxona bo‘yicha paketlar"
-        case .uzbekCyrillic: return "Меҳмонхона бўйича пакетлар"
-        }
-    }
-
-    private var hotelFirstHomeSubtitle: String {
-        switch settings.language {
-        case .russian: return "Выберите отель — даты, перелёт и услуги уже собраны в готовый пакет."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Choose the hotel — dates, flights and services are already assembled into a ready package."
-        case .uzbek: return "Mehmonxonani tanlang — sanalar, parvoz va xizmatlar tayyor paketga yig‘ilgan."
-        case .uzbekCyrillic: return "Меҳмонхонани танланг — саналар, парвоз ва хизматлар тайёр пакетга йиғилган."
-        }
-    }
-
-    private var hotelFirstLoadingTitle: String {
-        switch settings.language {
-        case .russian: return "Готовим пакеты по отелям…"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Preparing hotel packages…"
-        case .uzbek: return "Mehmonxona paketlari tayyorlanmoqda…"
-        case .uzbekCyrillic: return "Меҳмонхона пакетлари тайёрланмоқда…"
-        }
-    }
-
-    private var hotelFirstAllTitle: String {
-        switch settings.language {
-        case .russian: return "Посмотреть все пакеты по отелям"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "See all hotel packages"
-        case .uzbek: return "Barcha mehmonxona paketlarini ko‘rish"
-        case .uzbekCyrillic: return "Барча меҳмонхона пакетларини кўриш"
-        }
-    }
-
-    private var hotelFirstAllBody: String {
-        switch settings.language {
-        case .russian: return "Откройте полный каталог отелей и готовых вариантов поездки."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Open the full hotel catalogue and ready-made journey options."
-        case .uzbek: return "Mehmonxonalar va tayyor safar variantlarining to‘liq katalogini oching."
-        case .uzbekCyrillic: return "Меҳмонхоналар ва тайёр сафар вариантларининг тўлиқ каталогини очинг."
-        }
-    }
-
-    private var hotelFirstAllCTA: String {
-        switch settings.language {
-        case .russian: return "Все пакеты"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "All packages"
-        case .uzbek: return "Barcha paketlar"
-        case .uzbekCyrillic: return "Барча пакетлар"
-        }
-    }
-
-    private var homeShareUnavailable: String {
-        switch settings.language {
-        case .russian: return "Не удалось подготовить пакет для отправки. Обновите каталог и попробуйте снова."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "The package could not be prepared for sharing. Refresh the catalogue and try again."
-        case .uzbek: return "Paketni ulashish uchun tayyorlab bo‘lmadi. Katalogni yangilang va qayta urinib ko‘ring."
-        case .uzbekCyrillic: return "Пакетни улашиш учун тайёрлаб бўлмади. Каталогни янгиланг ва қайта уриниб кўринг."
-        }
-    }
-
-    private var homeShareErrorTitle: String {
-        switch settings.language {
-        case .russian: return "Не удалось поделиться"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Could not share"
-        case .uzbek: return "Ulashib bo‘lmadi"
-        case .uzbekCyrillic: return "Улашиб бўлмади"
-        }
-    }
-
-    private var homeShareErrorDismiss: String {
-        switch settings.language {
-        case .russian: return "Понятно"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "OK"
-        case .uzbek: return "Tushunarli"
-        case .uzbekCyrillic: return "Тушунарли"
-        }
-    }
-
     private var buildMyUmrahSection: some View {
         VStack(alignment: .leading, spacing: 15) {
             IumrahHomeSectionHeader(title: buildUmrahSectionTitle, subtitle: buildUmrahSectionSubtitle)
@@ -978,69 +595,6 @@ struct HomeDashboardView: View {
             .contentShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-
-    private var readyPackagesTitle: String {
-        switch settings.language {
-        case .russian: return "Готовые пакеты"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Ready-made packages"
-        case .uzbek: return "Tayyor paketlar"
-        case .uzbekCyrillic: return "Тайёр пакетлар"
-        }
-    }
-
-    private var readyPackagesSubtitle: String {
-        switch settings.language {
-        case .russian: return "Актуальные варианты перелёта уже собраны с отелем и сервисами в единую цену пакета."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Current flight options are already combined with hotel and services into one package price."
-        case .uzbek: return "Amaldagi parvoz variantlari mehmonxona va servislar bilan bitta paket narxiga yig‘ilgan."
-        case .uzbekCyrillic: return "Амалдаги парвоз вариантлари меҳмонхона ва сервислар билан битта пакет нархига йиғилган."
-        }
-    }
-
-    private var readyPackagesLoadingTitle: String {
-        switch settings.language {
-        case .russian: return "Подбираем актуальные пакеты"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Loading current packages"
-        case .uzbek: return "Amaldagi paketlar yuklanmoqda"
-        case .uzbekCyrillic: return "Амалдаги пакетлар юкланмоқда"
-        }
-    }
-
-    private var readyPackagesLoadingBody: String {
-        switch settings.language {
-        case .russian: return "Цены и рейсы обновляются из витрины Iumrah."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Prices and flights are refreshing from the Iumrah storefront."
-        case .uzbek: return "Narxlar va parvozlar Iumrah vitrinasidan yangilanmoqda."
-        case .uzbekCyrillic: return "Нархлар ва парвозлар Iumrah витринасидан янгиланмоқда."
-        }
-    }
-
-    private var allPackagesTitle: String {
-        switch settings.language {
-        case .russian: return "Больше вариантов поездки"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "More journey options"
-        case .uzbek: return "Ko‘proq safar variantlari"
-        case .uzbekCyrillic: return "Кўпроқ сафар вариантлари"
-        }
-    }
-
-    private var allPackagesBody: String {
-        switch settings.language {
-        case .russian: return "Откройте полную витрину авиабилетов и готовых пакетов Iumrah."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Open the complete Iumrah flights and ready-package storefront."
-        case .uzbek: return "Iumrah parvozlari va tayyor paketlarining to‘liq vitrinasini oching."
-        case .uzbekCyrillic: return "Iumrah парвозлари ва тайёр пакетларининг тўлиқ витринасини очинг."
-        }
-    }
-
-    private var allPackagesCTA: String {
-        switch settings.language {
-        case .russian: return "Посмотреть все пакеты"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "View all packages"
-        case .uzbek: return "Barcha paketlarni ko‘rish"
-        case .uzbekCyrillic: return "Барча пакетларни кўриш"
-        }
     }
 
     private var buildUmrahSectionTitle: String {
@@ -1360,6 +914,7 @@ struct HomeDashboardView: View {
             IumrahHaptics.soft()
             // Reuse the actual Home search instead of launching the retired
             // Bookings-tab configurator from a second marketing CTA.
+            withAnimation(.easeInOut(duration: 0.28)) { journeySearchExpanded = true }
             focusJourneySearchRevision += 1
         } label: {
             VStack(alignment: .leading, spacing: 0) {
@@ -1464,7 +1019,7 @@ struct HomeDashboardView: View {
 
     private var configuratorHeroCTA: String {
         switch settings.language {
-        case .russian: return "Создать мою Умру"
+        case .russian: return "Собрать мою Умру"
         case .english, .turkish, .indonesian, .malay, .arabic: return "Create my Umrah"
         case .uzbek: return "Umramni yaratish"
         case .uzbekCyrillic: return "Умрамни яратиш"
@@ -2391,7 +1946,7 @@ private extension View {
 /// This search is only a handoff to the live flights catalogue in Hotels.
 /// Nothing is priced, booked or marked available by this view.
 private struct IumrahHomeJourneySearchHero: View {
-    enum Presentation { case header, search }
+    enum Presentation: Equatable { case header, search }
     let onSearch: () -> Void
     var presentation: Presentation = .search
     @Environment(\.iumrahNavigationChromeStyle) private var navigationChromeStyle
@@ -2399,9 +1954,15 @@ private struct IumrahHomeJourneySearchHero: View {
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var chrome: AppChromeStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
-    @State private var searchExpanded = true
+    @Binding var searchExpanded: Bool
     @State private var showingCalendar = false
     @State private var showingPassengers = false
+
+    init(onSearch: @escaping () -> Void, presentation: Presentation = .search, searchExpanded: Binding<Bool>) {
+        self.onSearch = onSearch
+        self.presentation = presentation
+        _searchExpanded = searchExpanded
+    }
 
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCyrl: String) -> String {
         switch settings.language {

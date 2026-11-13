@@ -175,7 +175,7 @@ enum IumrahFlightClock {
     }
 }
 
-struct IumrahFlightFilterState {
+struct IumrahFlightFilterState: Equatable {
     var directOnly = false
     var airline = ""
     var sort = 0

@@ -10,7 +10,7 @@ struct IumrahFlightBrowseCatalog: View {
     @ObservedObject var model: IumrahFlightBrowseModel
     let onChoose: (LocalJourneyFlight) -> Void
     @State private var filters = IumrahFlightFilterState()
-    @State private var visibleCount = 30
+    @State private var visibleCount = 20
     private var identity: String { "\(journey.trip.originCode):\(refreshSignal)" }
     private var directionFlights: [LocalJourneyFlight] {
         model.flights.filter { direction == 0 ? $0.origin == journey.trip.originCode : $0.destination == journey.trip.originCode }
@@ -48,12 +48,15 @@ struct IumrahFlightBrowseCatalog: View {
                     departureAt: flight.departureAt, arrivalAt: flight.arrivalAt,
                     duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice,
                     isAviasales: flight.id.hasPrefix("feed:"), selectedSearchDay: filters.day) { onChoose(flight) }
-                .onAppear { if flight.id == filtered.prefix(visibleCount).last?.id { visibleCount += 30 } }
+
             }
+            IumrahLoadMoreButton(remaining: filtered.count - visibleCount) { visibleCount += 20 }
         }
         .tint(Color.primary)
         .task(id: identity) { await model.load(trip: journey.trip, language: settings.language) }
-        .onChange(of: direction) { _, _ in visibleCount = 30; filters = IumrahFlightFilterState() }
+        .onChange(of: direction) { _, _ in visibleCount = 20; filters = IumrahFlightFilterState() }
+        .onChange(of: filters) { _, _ in visibleCount = 20 }
+        .onChange(of: identity) { _, _ in visibleCount = 20 }
     }
     private var outboundTitle: String {
         switch settings.language { case .russian: return "Туда"; case .uzbek: return "Borish"; case .uzbekCyrillic: return "Бориш"; default: return "Outbound" }

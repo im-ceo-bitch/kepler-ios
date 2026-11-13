@@ -51,6 +51,8 @@ struct IumrahFlightDiscoveryView: View {
     @State private var seededFromJourney = false
     @State private var searchMode: FlightDiscoverySearchMode = .globalSearch
     @State private var hasSearched = false
+    @State private var offerLimit = 20
+    @State private var recommendedLimits: [String: Int] = [:]
     @State private var searchProgress = 0.0
     @State private var searchRunID = UUID()
     @State private var recommendedFlights: [CuratedFlightRecommendation] = []
@@ -81,6 +83,10 @@ struct IumrahFlightDiscoveryView: View {
             }
         }
         .tint(Color.primary)
+        .onChange(of: selectedAirlineCodes) { _, _ in offerLimit = 20; recommendedLimits = [:] }
+        .onChange(of: directOnly) { _, _ in offerLimit = 20; recommendedLimits = [:] }
+        .onChange(of: departureDate) { _, _ in offerLimit = 20; recommendedLimits = [:] }
+        .onChange(of: returnDate) { _, _ in offerLimit = 20; recommendedLimits = [:] }
         .task {
             seedFromJourneyIfNeeded()
             // The home form is authoritative in guided mode. Do not write stale
@@ -401,7 +407,7 @@ struct IumrahFlightDiscoveryView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
-                        ForEach(items) { recommendation in
+                        ForEach(Array(items.prefix(recommendedLimits[title, default: 20]))) { recommendation in
                             IumrahRecommendedFlightCard(
                                 language: settings.language,
                                 recommendation: recommendation,
@@ -417,6 +423,9 @@ struct IumrahFlightDiscoveryView: View {
                 .scrollTargetBehavior(.viewAligned)
                 .contentMargins(.horizontal, 0, for: .scrollContent)
                 .scrollClipDisabled()
+                IumrahLoadMoreButton(remaining: items.count - recommendedLimits[title, default: 20]) {
+                    recommendedLimits[title, default: 20] += 20
+                }
             }
         }
     }
@@ -848,6 +857,8 @@ struct IumrahFlightDiscoveryView: View {
                     }
                 }
 
+                IumrahLoadMoreButton(remaining: rankedOffers.count - visibleOfferCount) { offerLimit += 20 }
+
                 if hasSearched && !store.isLoading && rankedOffers.count < 2 {
                     partnerGatewayCard
                         .padding(.top, 4)
@@ -1209,6 +1220,7 @@ struct IumrahFlightDiscoveryView: View {
     }
 
     private func refresh() {
+        offerLimit = 20
         store.refresh(
             origin: originCode,
             destination: destinationCode,
@@ -1277,7 +1289,7 @@ struct IumrahFlightDiscoveryView: View {
 
     private var visibleOfferCount: Int {
         guard hasSearched else { return 0 }
-        return min(20, rankedOffers.count)
+        return min(offerLimit, rankedOffers.count)
     }
 
     private var recommendedRefreshKey: String {
@@ -1457,6 +1469,7 @@ struct IumrahFlightDiscoveryView: View {
     }
 
     private func performGlobalSearch() {
+        offerLimit = 20
         searchRunID = UUID()
         searchProgress = 1
         hasSearched = true
@@ -1466,6 +1479,7 @@ struct IumrahFlightDiscoveryView: View {
 
     @MainActor
     private func loadRecommendedFlights() async {
+        recommendedLimits = [:]
         recommendedLoading = true
         recommendedError = nil
         defer { recommendedLoading = false }

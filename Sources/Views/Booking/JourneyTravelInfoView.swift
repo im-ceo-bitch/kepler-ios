@@ -63,6 +63,8 @@ final class JourneyTravelInfoModel: ObservableObject {
     private let prayerService = IumrahPrayerTimesService()
     private let weatherService = IumrahWeatherService()
     private var lastCity: IumrahHolyCity?
+    private var lastRefresh: Date?
+    private var refreshID = UUID()
 
     init() {
         localCityName = Self.timeZoneCityName()
@@ -70,19 +72,24 @@ final class JourneyTravelInfoModel: ObservableObject {
     }
 
     func refresh(city: IumrahHolyCity, force: Bool = false) async {
-        if !force, lastCity == city, prayers != nil, weather != nil { return }
+        if !force, lastCity == city, prayers != nil, weather != nil,
+           let lastRefresh, Calendar.current.isDateInToday(lastRefresh), Date().timeIntervalSince(lastRefresh) < 900 { return }
+        let token = UUID()
+        refreshID = token
         if lastCity != nil, lastCity != city {
             prayers = nil
             weather = nil
         }
         lastCity = city
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer { if refreshID == token { isRefreshing = false } }
 
         async let prayerResult: IumrahPrayerDay? = try? prayerService.prayers(for: city, date: Date(), forceRefresh: force)
         async let weatherResult: IumrahWeatherSnapshot? = try? weatherService.forecast(for: city, forceRefresh: force)
         let (newPrayers, newWeather) = await (prayerResult, weatherResult)
 
+        guard refreshID == token, !Task.isCancelled else { return }
+        lastRefresh = Date()
         if let newPrayers { prayers = newPrayers }
         if let newWeather { weather = newWeather }
         lastError = (newPrayers == nil && newWeather == nil) ? "unavailable" : nil
@@ -114,10 +121,12 @@ struct JourneyTravelInfoView: View {
     @AppStorage("iumrah.booking.travelInfo.city") private var selectedCityRaw = IumrahHolyCity.makkah.rawValue
     @StateObject private var model = JourneyTravelInfoModel()
     @State private var page: JourneyInfoPage = .prayer
+    var showsPageSelector = false
     var onOpenPrayer: (() -> Void)? = nil
     var onOpenWeather: (() -> Void)? = nil
 
-    init(initialPage: JourneyInfoPage = .prayer, onOpenPrayer: (() -> Void)? = nil, onOpenWeather: (() -> Void)? = nil) {
+    init(initialPage: JourneyInfoPage = .prayer, onOpenPrayer: (() -> Void)? = nil, onOpenWeather: (() -> Void)? = nil, showsPageSelector: Bool = false) {
+        self.showsPageSelector = showsPageSelector
         _page = State(initialValue: initialPage)
         self.onOpenPrayer = onOpenPrayer
         self.onOpenWeather = onOpenWeather
@@ -129,6 +138,7 @@ struct JourneyTravelInfoView: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            if showsPageSelector { pageSelector }
             holyCityPicker
 
             TabView(selection: $page) {
@@ -160,11 +170,35 @@ struct JourneyTravelInfoView: View {
         }
         .task(id: city.rawValue) {
             await model.refresh(city: city)
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(900))
+                guard !Task.isCancelled else { break }
+                await model.refresh(city: city)
+            }
         }
         .onChange(of: page) { _, _ in
             IumrahHaptics.selection()
         }
         
+    }
+
+    private var pagePicker: some View {
+        Picker("", selection: $page) {
+            Text(tr("Prayer times", "Время молитв", "Namoz vaqti", "Намоз вақти")).tag(JourneyInfoPage.prayer)
+            Text(tr("Weather", "Погода", "Ob-havo", "Об-ҳаво")).tag(JourneyInfoPage.weather)
+            Text(tr("Saudi time", "Время в Саудии", "Saudiya vaqti", "Саудия вақти")).tag(JourneyInfoPage.clocks)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityLabel(tr("Travel widgets", "Виджеты поездки", "Safar vidjetlari", "Сафар виджетлари"))
+    }
+
+    @ViewBuilder private var pageSelector: some View {
+        if #available(iOS 26.0, *) {
+            pagePicker.padding(6).glassEffect(.regular, in: .capsule)
+        } else {
+            pagePicker
+        }
     }
 
     private var holyCityPicker: some View {

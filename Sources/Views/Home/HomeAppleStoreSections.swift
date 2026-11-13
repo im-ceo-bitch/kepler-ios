@@ -222,19 +222,6 @@ struct IumrahHomeServicesSection: View {
                 selectedIndex: IumrahServiceKind.allCases.firstIndex(of: activeID ?? .visa) ?? 0
             )
 
-            NavigationLink {
-                IumrahServicesView(initialService: .visa)
-            } label: {
-                HStack(spacing: 6) {
-                    Text(IumrahServicesCopy.seeAll(language))
-                    Image(systemName: "arrow.up.right")
-                }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
         }
         .onAppear { if activeID == nil { activeID = .visa } }
     }

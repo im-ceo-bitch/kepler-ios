@@ -38,9 +38,11 @@ struct IumrahSiriOrb: View {
     var palette: Palette = .advisor
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var visible = false
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: frameInterval)) { timeline in
+        TimelineView(.animation(minimumInterval: frameInterval, paused: reduceMotion || !isActive || !visible || scenePhase != .active)) { timeline in
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
                 let seconds = timeline.date.timeIntervalSinceReferenceDate
@@ -76,6 +78,8 @@ struct IumrahSiriOrb: View {
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityHidden(true)
+        .onAppear { visible = true }
+        .onDisappear { visible = false }
     }
 
     private func rim(phase: Double, side: CGFloat, energy: Double, reactive: Bool) -> some View {
@@ -120,7 +124,7 @@ struct IumrahSiriOrb: View {
 
     private var frameInterval: TimeInterval {
         if reduceMotion || !isActive { return 1.0 / 12.0 }
-        return 1.0 / 60.0
+        return 1.0 / 30.0
     }
 
     private func resolvedPhase(_ seconds: TimeInterval) -> Double {

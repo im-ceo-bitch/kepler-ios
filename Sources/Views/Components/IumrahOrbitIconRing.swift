@@ -40,6 +40,7 @@ struct IumrahOrbitIconRing: View {
     var rotationDuration: TimeInterval = IumrahFoundation.Motion.orbitRevolution
     var revealDuration: TimeInterval = IumrahFoundation.Motion.orbitReveal
 
+    @State private var visible = false
     @State private var orbitStart = Date()
     @State private var assemblyStart = Date()
 
@@ -48,8 +49,8 @@ struct IumrahOrbitIconRing: View {
     private var background: Color { lightOnDark ? Color(red: 0.09, green: 0.09, blue: 0.12) : .white }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0,
-                                paused: !isActive || scenePhase != .active || reduceMotion)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0,
+                                paused: !visible || !isActive || scenePhase != .active || reduceMotion)) { timeline in
             let orbitTime = reduceMotion ? 0 : max(0, timeline.date.timeIntervalSince(orbitStart))
             let assemblyTime = reduceMotion ? 4 : max(0, timeline.date.timeIntervalSince(assemblyStart))
             let count = max(1, services.count)
@@ -191,7 +192,8 @@ struct IumrahOrbitIconRing: View {
             .frame(width: diameter, height: diameter)
         }
         .frame(width: diameter, height: diameter)
-        .onAppear { assemblyStart = Date() }
+        .onAppear { visible = true; assemblyStart = Date() }
+        .onDisappear { visible = false }
         .onChange(of: mode) { _, newValue in
             if case .assembling = newValue { assemblyStart = Date() }
         }

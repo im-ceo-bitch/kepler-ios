@@ -19,6 +19,22 @@ struct IumrahFlightBrowseCatalog: View {
     private var trip: TripDraft { tripOverride ?? journey.trip }
     @State private var filters = IumrahFlightFilterState()
     @State private var visibleCount = 20
+    private struct SnapshotKey: Equatable {
+        let revision: Int
+        let origin: String
+        let makkahOnly: Bool
+        let direction: Int
+        let airport: String?
+        let selected: String?
+        let pair: String?
+        let filters: IumrahFlightFilterState
+    }
+    private struct Snapshot {
+        let airlines: [String]
+        let days: [IumrahFlightPriceDay]
+        let filtered: [LocalJourneyFlight]
+    }
+    @State private var memo = IumrahViewMemo<SnapshotKey, Snapshot>()
     private var identity: String { "\(trip.originCode):\(trip.effectiveFlightFilters.cabinClass.rawValue):\(refreshSignal)" }
     private var directionFlights: [LocalJourneyFlight] {
         let candidates = model.flights.filter { flight in
@@ -42,25 +58,34 @@ struct IumrahFlightBrowseCatalog: View {
         }
         return Array(unique.values)
     }
-    private var filtered: [LocalJourneyFlight] {
-        directionFlights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: IumrahFlightClock.local($0.departureAt, airport: $0.origin)) }.sorted { a, b in
+    private func filtered(_ flights: [LocalJourneyFlight]) -> [LocalJourneyFlight] {
+        flights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: IumrahFlightClock.local($0.departureAt, airport: $0.origin)) }.sorted { a, b in
             if filters.sort == 1, a.displayedPrice != b.displayedPrice { return (a.displayedPrice ?? .infinity) < (b.displayedPrice ?? .infinity) }
             if filters.sort == 2, a.durationMinutes != b.durationMinutes { return (a.durationMinutes > 0 ? a.durationMinutes : Int.max) < (b.durationMinutes > 0 ? b.durationMinutes : Int.max) }
             return a.departureAt == b.departureAt ? a.id < b.id : a.departureAt < b.departureAt
         }
     }
-    private var calendarFlights: [LocalJourneyFlight] {
-        directionFlights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false) }
+    private func calendarFlights(_ flights: [LocalJourneyFlight]) -> [LocalJourneyFlight] {
+        flights.filter { filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false) }
     }
     private func addAction(_ flight: LocalJourneyFlight) -> (() -> Void)? {
         guard let onAdd else { return nil }
         return { onAdd(flight) }
     }
     var body: some View {
+        let key = SnapshotKey(revision: model.revision, origin: trip.originCode,
+            makkahOnly: trip.scope == .makkahOnly, direction: direction, airport: requestedSaudiAirport,
+            selected: selectedID, pair: pairedContextID, filters: filters)
+        let snapshot = memo.value(for: key) {
+            let flights = directionFlights
+            return Snapshot(airlines: Array(Set(flights.map(\.airlineCode))).sorted(),
+                days: IumrahFlightSearchControls.priceDays(calendarFlights(flights).map { (IumrahFlightClock.local($0.departureAt, airport: $0.origin), $0.displayedPrice) }),
+                filtered: filtered(flights))
+        }
         LazyVStack(spacing: 14) {
             IumrahFlightSearchControls(filters: $filters,
-                airlines: Array(Set(directionFlights.map(\.airlineCode))).sorted(),
-                days: IumrahFlightSearchControls.priceDays(calendarFlights.map { (IumrahFlightClock.local($0.departureAt, airport: $0.origin), $0.displayedPrice) }),
+                airlines: snapshot.airlines,
+                days: snapshot.days,
                 onSelectDay: { day in
                     filters.day = day
                     Task { await model.loadDay(day, trip: trip, direction: direction, language: settings.language) }
@@ -69,11 +94,11 @@ struct IumrahFlightBrowseCatalog: View {
             if let error = model.error {
                 Text(error).font(.footnote).foregroundStyle(.secondary)
                 Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await model.load(trip: trip, language: settings.language) } }
-            } else if !model.loading && filtered.isEmpty {
+            } else if !model.loading && snapshot.filtered.isEmpty {
                 Text(NuiteeCopy.text("Пока нет рейсов на выбранном направлении", "Bu yo‘nalishda reyslar hali yo‘q", "No flights available for this direction", settings.language))
                     .foregroundStyle(.secondary).padding(.vertical, 24)
             }
-            ForEach(Array(filtered.prefix(visibleCount))) { flight in
+            ForEach(Array(snapshot.filtered.prefix(visibleCount))) { flight in
                 IumrahFlightResultCard(airline: flight.airline, airlineCode: flight.airlineCode,
                     flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination,
                     departureAt: flight.departureAt, arrivalAt: flight.arrivalAt,
@@ -82,7 +107,7 @@ struct IumrahFlightBrowseCatalog: View {
                     onSelect: addAction(flight)) { onChoose(flight) }
 
             }
-            IumrahLoadMoreButton(remaining: filtered.count - visibleCount) { visibleCount += 20 }
+            IumrahLoadMoreButton(remaining: snapshot.filtered.count - visibleCount) { visibleCount += 20 }
         }
         .tint(Color.primary)
         .task(id: identity) {
@@ -106,13 +131,17 @@ struct IumrahFlightBrowseCatalog: View {
 
 @MainActor
 final class IumrahFlightBrowseModel: ObservableObject {
-    @Published private(set) var flights: [LocalJourneyFlight] = []
+    @Published private(set) var flights: [LocalJourneyFlight] = [] {
+        didSet { revision &+= 1 }
+    }
+    private(set) var revision = 0
     @Published private(set) var loading = false
     @Published private(set) var error: String?
     private var requestID = UUID()
     func load(trip: TripDraft, language: AppSettingsStore.Language) async {
         let token = UUID(); requestID = token
         loading = true; error = nil; flights = []
+        defer { if requestID == token { loading = false } }
         let origin = trip.originCode.uppercased()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
         let day = IumrahFlightDiscoveryStore.dayFormatter.string(from: tomorrow)
@@ -131,10 +160,11 @@ final class IumrahFlightBrowseModel: ObservableObject {
             }
         } catch { failures += 1 }
         guard requestID == token, !Task.isCancelled else { return }
-        flights = sortedUnique(result)
+        await publishSorted(result, token: token)
+        guard requestID == token, !Task.isCancelled else { return }
         // Both Saudi airports, both directions. Cached monthly feeds include
         // tomorrow onward; published rows above cover the full available year.
-        guard trip.effectiveFlightFilters.cabinClass == .economy else { loading = false; return }
+        guard trip.effectiveFlightFilters.cabinClass == .economy else { return }
         let months = Set([tomorrow, Calendar.current.date(byAdding: .month, value: 1, to: tomorrow) ?? tomorrow]
             .map { IumrahFlightDiscoveryStore.monthFormatter.string(from: $0) })
         for airport in ["JED", "MED"] {
@@ -153,14 +183,15 @@ final class IumrahFlightBrowseModel: ObservableObject {
                         }
                     } catch { failures += 1 }
                     guard requestID == token, !Task.isCancelled else { return }
-                    flights = sortedUnique(result)
                 }
+                // Publish once per route instead of rebuilding the calendar twice per route.
+                await publishSorted(result, token: token)
+                guard requestID == token, !Task.isCancelled else { return }
             }
         }
         if failures > 0 && result.isEmpty {
             error = NuiteeCopy.text("Не удалось загрузить рейсы. Нажмите «Повторить».", "Reyslar yuklanmadi. «Qayta urinish» tugmasini bosing.", "Could not load flights. Tap Retry.", language)
         }
-        if requestID == token { loading = false }
     }
     func loadDay(_ day: String, trip: TripDraft, direction: Int, language: AppSettingsStore.Language) async {
         guard trip.effectiveFlightFilters.cabinClass == .economy else { return }
@@ -186,12 +217,22 @@ final class IumrahFlightBrowseModel: ObservableObject {
             } catch { failures += 1 }
         }
         guard requestID == token, !Task.isCancelled else { return }
-        flights = sortedUnique(result)
+        await publishSorted(result, token: token)
+        guard requestID == token, !Task.isCancelled else { return }
         if failures == 2 {
             error = NuiteeCopy.text("Не удалось загрузить рейсы на эту дату.", "Bu sana uchun reyslar yuklanmadi.", "Could not load flights for this date.", language)
         }
     }
-    private func sortedUnique(_ values: [LocalJourneyFlight]) -> [LocalJourneyFlight] {
+    private func publishSorted(_ values: [LocalJourneyFlight], token: UUID) async {
+        // The input is an immutable value snapshot; only the final assignment
+        // touches the MainActor. A superseded search must never publish.
+        let sorted = await Task.detached(priority: .userInitiated) {
+            Self.sortedUnique(values)
+        }.value
+        guard requestID == token, !Task.isCancelled else { return }
+        if flights != sorted { flights = sorted }
+    }
+    nonisolated private static func sortedUnique(_ values: [LocalJourneyFlight]) -> [LocalJourneyFlight] {
         var unique: [String: LocalJourneyFlight] = [:]
         for flight in values {
             let source = flight.publishedIsPair == true ? "pair:" + (flight.publishedID ?? flight.id) : "independent"

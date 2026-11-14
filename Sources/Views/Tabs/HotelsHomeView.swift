@@ -76,7 +76,7 @@ struct HotelsHomeView: View {
         IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, helpContext: mode == .transfer ? "transfer.default" : mode == .summary ? "review.local" : mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights", header: {
             fixedHeader
         }, content: {
-            VStack(alignment: .leading, spacing: 0) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 if mode == .transfer {
                     IumrahManualTransferCatalog()
                 } else if mode == .summary {
@@ -129,7 +129,7 @@ struct HotelsHomeView: View {
                         manualHotelQuote
                         manualHotelList
                     } else {
-                        VStack(alignment: .leading, spacing: 12) {
+                        LazyVStack(alignment: .leading, spacing: 12) {
                             NuiteeHotelsCatalogView(
                                 refreshSignal: hotelSearchRevision,
                                 initialHotelQuery: appliedHotelName,
@@ -396,7 +396,7 @@ struct HotelsHomeView: View {
                 ForEach(Array(matching.prefix(manualHotelLimit))) { hotel in
                     Button { chrome.navigate(to: .care) } label: {
                         HStack(spacing: 12) {
-                            HotelCachedImage(rawURL: hotel.coverImageURL)
+                            HotelCachedImage(rawURL: hotel.coverImageURL, thumbnailPixelDimension: 768)
                                 .frame(width: 74, height: 74).clipped()
                                 .clipShape(RoundedRectangle(cornerRadius: 15))
                             VStack(alignment: .leading, spacing: 5) {

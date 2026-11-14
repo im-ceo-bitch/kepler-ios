@@ -15,8 +15,11 @@ enum IumrahWidgetSyncService {
             languageCode: languageCode
         )
 
-        _ = IumrahWidgetSharedStore.save(snapshot)
-        WidgetCenter.shared.reloadAllTimelines()
+        let previous = IumrahWidgetSharedStore.load()
+        guard previous.activeBooking != snapshot.activeBooking || previous.plannedTrip != snapshot.plannedTrip
+                || previous.identity != snapshot.identity || previous.languageCode != snapshot.languageCode
+                || previous.schemaVersion != snapshot.schemaVersion else { return }
+        if IumrahWidgetSharedStore.save(snapshot) { WidgetCenter.shared.reloadAllTimelines() }
     }
 
     static func updatePlannedTrip(_ trip: UmrahPlannedTrip?) {

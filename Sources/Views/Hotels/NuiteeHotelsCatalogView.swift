@@ -36,7 +36,8 @@ enum NuiteeCity: String, CaseIterable {
 
 @MainActor
 final class NuiteeCatalogModel: ObservableObject {
-    @Published var hotels: [NuiteeHotel] = []
+    @Published var hotels: [NuiteeHotel] = [] { didSet { revision &+= 1 } }
+    private(set) var revision = 0
     @Published var sandbox = true
     @Published var catalogStale = false
     @Published var rateError: String?
@@ -48,6 +49,7 @@ final class NuiteeCatalogModel: ObservableObject {
     func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, forceRefresh: Bool = false) async {
         let version = UUID()
         generation = version
+        defer { if generation == version { busy = false } }
         if !forceRefresh, let cached = await service.cachedHotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults) {
             guard generation == version, !Task.isCancelled else { return }
             errorMessage = nil
@@ -85,7 +87,6 @@ final class NuiteeCatalogModel: ObservableObject {
                 }
             }
         }
-        if generation == version { busy = false }
     }
 
     private func applyRates(_ response: NuiteeHotelListEnvelope) {
@@ -130,6 +131,9 @@ struct NuiteeHotelsCatalogView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastLoadedDay: Date?
     @State private var visibleCount = 20
+    private struct FilterKey: Equatable { let revision: Int; let stars: Int; let query: String }
+    private struct FilterResult { let candidateCount: Int; let matches: [NuiteeHotel]; let alternatives: [NuiteeHotel] }
+    @State private var filterMemo = IumrahViewMemo<FilterKey, FilterResult>()
     @State private var opened: NuiteeHotel?
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
 
@@ -158,34 +162,24 @@ struct NuiteeHotelsCatalogView: View {
     private var reloadIdentity: String {
         [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults), String(homeSearchRevision), String(refreshSignal)].joined(separator: ":")
     }
-    private var candidateHotels: [NuiteeHotel] {
-        model.hotels.filter { stars == 0 || $0.roundedStars == stars }
-    }
     private var normalizedQuery: String { hotelQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
-    private var matchingHotels: [NuiteeHotel] {
-        guard !normalizedQuery.isEmpty else { return candidateHotels }
-        let terms = normalizedQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        return candidateHotels.filter { hotel in
-            let haystack = hotel.name + " " + (hotel.address ?? "")
-            return terms.allSatisfy { haystack.localizedStandardContains($0) }
-        }
-    }
-    private var alternativeHotels: [NuiteeHotel] {
-        guard !normalizedQuery.isEmpty, matchingHotels.isEmpty else { return [] }
-        let selected = Set(matchingHotels.map(\.id))
-        let preferredStars = matchingHotels.first?.roundedStars
-        return candidateHotels.filter { !selected.contains($0.id) }
-            .sorted { a, b in
-                let first = preferredStars.map { abs($0 - a.roundedStars) } ?? 0
-                let second = preferredStars.map { abs($0 - b.roundedStars) } ?? 0
-                if first != second { return first < second }
-                return (a.rating ?? 0) > (b.rating ?? 0)
+    private func filteredHotels() -> FilterResult {
+        filterMemo.value(for: FilterKey(revision: model.revision, stars: stars, query: normalizedQuery)) {
+            let candidates = model.hotels.filter { stars == 0 || $0.roundedStars == stars }
+            let terms = normalizedQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+            let matches = terms.isEmpty ? candidates : candidates.filter { hotel in
+                let haystack = hotel.name + " " + (hotel.address ?? "")
+                return terms.allSatisfy { haystack.localizedStandardContains($0) }
             }
-            .prefix(8).map { $0 }
+            let alternatives = !terms.isEmpty && matches.isEmpty
+                ? Array(candidates.sorted { ($0.rating ?? 0) > ($1.rating ?? 0) }.prefix(8)) : []
+            return FilterResult(candidateCount: candidates.count, matches: matches, alternatives: alternatives)
+        }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let snapshot = filteredHotels()
+        LazyVStack(alignment: .leading, spacing: 16) {
             if showsSearchControls {
             IumrahGraphiteSearchSurface(
                 isExpanded: $searchExpanded,
@@ -293,7 +287,7 @@ struct NuiteeHotelsCatalogView: View {
                     .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
                 }
                 .frame(maxWidth: .infinity).padding(25)
-            } else if candidateHotels.isEmpty && !model.busy {
+            } else if snapshot.candidateCount == 0 && !model.busy {
                 ContentUnavailableView(NuiteeCopy.text("Нет отелей", "Mehmonxonalar topilmadi", "No hotels", settings.language), systemImage: "building.2", description: Text(NuiteeCopy.text("Попробуйте другой фильтр или даты", "Filtr yoki sanani almashtiring", "Change stars or dates", settings.language)))
             } else {
                 if !normalizedQuery.isEmpty {
@@ -301,30 +295,30 @@ struct NuiteeHotelsCatalogView: View {
                         .font(.headline)
                 }
                 HStack {
-                    Text("\(matchingHotels.count) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))
+                    Text("\(snapshot.matches.count) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary)
                     Spacer()
                     if model.busy { ProgressView().controlSize(.small) }
                 }
-                if matchingHotels.isEmpty && !normalizedQuery.isEmpty {
+                if snapshot.matches.isEmpty && !normalizedQuery.isEmpty {
                     Text(NuiteeCopy.text("Точных совпадений нет. Ниже — другие отели города.", "Mos mehmonxona topilmadi. Quyida boshqa variantlar.", "No matching hotels. Explore other stays below.", settings.language))
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 LazyVStack(spacing: 12) {
-                    ForEach(Array(matchingHotels.prefix(visibleCount))) { hotel in
+                    ForEach(Array(snapshot.matches.prefix(visibleCount))) { hotel in
                         NuiteeHotelListingCard(
                             hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
                             favorite: favorites.contains(hotel.id),
                             onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
                         )
                     }
-                    IumrahLoadMoreButton(remaining: matchingHotels.count - visibleCount) { visibleCount += 20 }
+                    IumrahLoadMoreButton(remaining: snapshot.matches.count - visibleCount) { visibleCount += 20 }
                 }
-                if !alternativeHotels.isEmpty {
+                if !snapshot.alternatives.isEmpty {
                     Text(NuiteeCopy.text("Похожие отели в городе", "Shahardagi o‘xshash mehmonxonalar", "Alternative hotels nearby", settings.language))
                         .font(.headline).padding(.top, 12)
                     LazyVStack(spacing: 12) {
-                        ForEach(alternativeHotels) { hotel in
+                        ForEach(snapshot.alternatives) { hotel in
                             NuiteeHotelListingCard(
                                 hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
                                 favorite: favorites.contains(hotel.id),
@@ -502,15 +496,15 @@ private struct NuiteeHotelCollage: View {
     var body: some View {
         GeometryReader { box in
             if images.count < 2 {
-                HotelCachedImage(rawURL: images.first)
+                HotelCachedImage(rawURL: images.first, thumbnailPixelDimension: 512)
                     .frame(width: box.size.width, height: box.size.height)
                     .clipped()
             } else if images.count == 2 {
                 VStack(spacing: 3) {
-                    HotelCachedImage(rawURL: images[0])
+                    HotelCachedImage(rawURL: images[0], thumbnailPixelDimension: 512)
                         .frame(height: box.size.height * 0.64)
                         .clipped()
-                    HotelCachedImage(rawURL: images[1])
+                    HotelCachedImage(rawURL: images[1], thumbnailPixelDimension: 512)
                         .frame(height: box.size.height * 0.36 - 3)
                         .clipped()
                 }
@@ -518,10 +512,10 @@ private struct NuiteeHotelCollage: View {
             let gap: CGFloat = 3
             let upper = box.size.height * 0.64
             VStack(spacing: gap) {
-                HotelCachedImage(rawURL: images.first).frame(height: upper).clipped()
+                HotelCachedImage(rawURL: images.first, thumbnailPixelDimension: 512).frame(height: upper).clipped()
                 HStack(spacing: gap) {
-                    HotelCachedImage(rawURL: images.count > 1 ? images[1] : nil)
-                    HotelCachedImage(rawURL: images.count > 2 ? images[2] : nil)
+                    HotelCachedImage(rawURL: images.count > 1 ? images[1] : nil, thumbnailPixelDimension: 512)
+                    HotelCachedImage(rawURL: images.count > 2 ? images[2] : nil, thumbnailPixelDimension: 512)
                 }
                 .frame(height: max(0, box.size.height - upper - gap))
             }
@@ -567,7 +561,7 @@ struct NuiteeHotelDetailView: View {
 
     var body: some View {
         ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 24) {
+            LazyVStack(alignment: .leading, spacing: 24) {
                 collage
                 VStack(alignment: .leading, spacing: 9) {
                     Text(hotel.name).font(.system(size: 30, weight: .bold, design: .rounded))
@@ -964,47 +958,13 @@ private struct NuiteeHotelGallery: View {
     }
 }
 
-private actor NuiteePreviewGate {
-    static let shared = NuiteePreviewGate()
-    private var running = false
-    private var cache: [String: [String]] = [:]
-    private var failedUntil: [String: Date] = [:]
-    func images(hotelID: String) async -> [String] {
-        if let cached = cache[hotelID] { return cached }
-        if let until = failedUntil[hotelID], until > Date() { return [] }
-        while running {
-            do { try await Task.sleep(for: .milliseconds(150)) } catch { return [] }
-        }
-        guard !Task.isCancelled else { return [] }
-        if let cached = cache[hotelID] { return cached }
-        running = true
-        defer { running = false }
-        do {
-            let detail = try await NuiteeHotelService().detail(hotelID: hotelID)
-            let images = IumrahHotelPhotoIdentity.unique(detail.images)
-            cache[hotelID] = images
-            return images
-        } catch {
-            failedUntil[hotelID] = Date().addingTimeInterval(120)
-            return []
-        }
-    }
-}
+// Catalogue rows use only already returned media. Full hotel details and photo
+// galleries are fetched when the user opens the hotel, not while scrolling.
 private struct NuiteeCatalogPreviewCollage: View {
     let hotel: NuiteeHotel
-    @State private var enriched: [String] = []
-    private var images: [String] {
-        let source = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 })
-        return enriched.isEmpty ? source : enriched
-    }
     var body: some View {
-        NuiteeHotelCollage(images: Array(images.prefix(3)))
-            .task(id: hotel.id) {
-                guard images.count < 3 else { return }
-                let loaded = await NuiteePreviewGate.shared.images(hotelID: hotel.id)
-                guard !Task.isCancelled else { return }
-                if !loaded.isEmpty { enriched = loaded }
-            }
+        let source = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 })
+        NuiteeHotelCollage(images: Array(source.prefix(3)))
     }
 }
 

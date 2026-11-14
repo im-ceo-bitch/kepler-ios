@@ -8,7 +8,7 @@ struct HotelCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             ZStack(alignment: .topLeading) {
-                HotelCachedImage(rawURL: hotel.coverImageURL)
+                HotelCachedImage(rawURL: hotel.coverImageURL, thumbnailPixelDimension: 768)
                     .frame(maxWidth: .infinity)
                     .frame(height: 210)
                     .clipped()

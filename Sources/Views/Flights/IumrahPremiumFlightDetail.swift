@@ -166,7 +166,7 @@ struct IumrahPremiumFlightDetail: View {
             let cropOffset = livePosition == nil ? 0 : diameter * 0.22
             ZStack(alignment: .top) {
                 IumrahHemisphereMap(projection: route?.projection ?? .arabia,
-                    presentation: .globe, palette: .dark, isAnimating: scenePhase == .active,
+                    presentation: .globe, palette: .dark, isAnimating: false,
                     lightIntensity: 0.88, mapOpacity: 1)
                     .frame(width: diameter, height: diameter)
                     .offset(y: -cropOffset)

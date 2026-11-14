@@ -356,9 +356,12 @@ final class BookingStore: ObservableObject {
 
     func applyCanonicalLink(_ value: IumrahAccountLinkBookingResponse, to bookingID: String) {
         guard let index = sessions.firstIndex(where: { $0.id == bookingID }) else { return }
-        sessions[index].pilgrimID = value.pilgrimID
-        sessions[index].bookingNumber = value.bookingNumber ?? sessions[index].bookingNumber
-        sessions[index].bookingDisplayNumber = value.bookingDisplayNumber ?? sessions[index].bookingDisplayNumber
+        var updated = sessions[index]
+        updated.pilgrimID = value.pilgrimID
+        updated.bookingNumber = value.bookingNumber ?? updated.bookingNumber
+        updated.bookingDisplayNumber = value.bookingDisplayNumber ?? updated.bookingDisplayNumber
+        guard updated != sessions[index] else { return }
+        sessions[index] = updated
         persist()
     }
 

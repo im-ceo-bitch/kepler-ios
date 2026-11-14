@@ -38,6 +38,8 @@ struct IumrahFlightResultCard: View {
         return tr("\(duration / 60) ч \(duration % 60) мин", "\(duration / 60)h \(duration % 60)m", "\(duration / 60) soat \(duration % 60) daq", "\(duration / 60) соат \(duration % 60) дақ")
     }
     var body: some View {
+        let arrival = self.arrival
+        let localDeparture = self.localDeparture
         Button(action: action) {
             VStack(alignment: .leading, spacing: 13) {
                 HStack(spacing: 10) {
@@ -127,25 +129,61 @@ enum IumrahFlightCopy {
 /// A calculated arrival is display-only, never written into a supplier itinerary.
 enum IumrahFlightClock {
     struct Arrival { let time: String; let day: String; let estimated: Bool }
+    private static let localCache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>(); cache.countLimit = 8192; return cache
+    }()
+    private static let dayCache: NSCache<NSString, NSString> = {
+        let cache = NSCache<NSString, NSString>(); cache.countLimit = 1024; return cache
+    }()
+    private static let formatterLock = NSLock()
+    private static let isoStandard = ISO8601DateFormatter()
+    private static let isoFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    private static let localFormatters = NSCache<NSString, DateFormatter>()
+    private static func instant(_ value: String) -> Date? {
+        formatterLock.lock(); defer { formatterLock.unlock() }
+        return isoStandard.date(from: value) ?? isoFractional.date(from: value)
+    }
+    private static func localTimestamp(_ date: Date, zone: TimeZone) -> String {
+        formatterLock.lock(); defer { formatterLock.unlock() }
+        let key = zone.identifier as NSString
+        let formatter: DateFormatter
+        if let existing = localFormatters.object(forKey: key) { formatter = existing }
+        else {
+            formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = zone; formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            localFormatters.countLimit = 64; localFormatters.setObject(formatter, forKey: key)
+        }
+        return formatter.string(from: date)
+    }
     static func time(_ value: String) -> String {
         guard value.count >= 16 else { return "—" }
         return String(value.dropFirst(11).prefix(5))
     }
     static func day(_ value: String, locale: Locale) -> String {
+        let key = (locale.identifier + "|" + String(value.prefix(10))) as NSString
+        if let cached = dayCache.object(forKey: key) { return cached as String }
         let parser = DateFormatter(); parser.locale = Locale(identifier: "en_US_POSIX"); parser.timeZone = TimeZone(secondsFromGMT: 0); parser.dateFormat = "yyyy-MM-dd"
         guard let date = parser.date(from: String(value.prefix(10))) else { return "" }
         let output = DateFormatter(); output.locale = locale; output.timeZone = parser.timeZone; output.setLocalizedDateFormatFromTemplate("d MMM")
-        return output.string(from: date)
+        let result = output.string(from: date)
+        dayCache.setObject(result as NSString, forKey: key)
+        return result
     }
     static func local(_ value: String, airport: String) -> String {
+        let key = (airport.uppercased() + "|" + value) as NSString
+        if let cached = localCache.object(forKey: key) { return cached as String }
         guard let zone = FlightReferenceCatalog.timeZone(for: airport) else { return value }
-        let parser = ISO8601DateFormatter()
-        var date = parser.date(from: value)
-        if date == nil { parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; date = parser.date(from: value) }
-        guard let date else { return value }
-        let output = DateFormatter(); output.locale = Locale(identifier: "en_US_POSIX"); output.timeZone = zone
-        output.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        return output.string(from: date)
+        guard let date = instant(value) else {
+            localCache.setObject(value as NSString, forKey: key)
+            return value
+        }
+        let result = localTimestamp(date, zone: zone)
+        localCache.setObject(result as NSString, forKey: key)
+        return result
     }
     static func arrival(actual: String?, departure: String, duration: Int, origin: String, destination: String) -> Arrival? {
         if let actual, actual.count >= 16 {
@@ -154,12 +192,7 @@ enum IumrahFlightClock {
         }
         guard duration > 0, let originZone = FlightReferenceCatalog.timeZone(for: origin),
               let destinationZone = FlightReferenceCatalog.timeZone(for: destination) else { return nil }
-        let iso = ISO8601DateFormatter()
-        var date = iso.date(from: departure)
-        if date == nil {
-            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            date = iso.date(from: departure)
-        }
+        var date = instant(departure)
         if date == nil {
             let parser = DateFormatter(); parser.locale = Locale(identifier: "en_US_POSIX"); parser.timeZone = originZone
             parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
@@ -381,6 +414,8 @@ private struct IumrahCenteredFareChart: UIViewRepresentable {
         private var parent: IumrahCenteredFareChart
         private var deferredParent: IumrahCenteredFareChart?
         private var items: [Item] = []
+        private var lastBuiltDay: Date?
+        private var maxPrice: Double = 1
         private var focus = 0
         private var committedDay: String?
         private var userScrolling = false
@@ -396,13 +431,18 @@ private struct IumrahCenteredFareChart: UIViewRepresentable {
             let selectionChanged = parent.selectedDay != next.selectedDay
             let localeChanged = parent.locale != next.locale || parent.noPriceLabel != next.noPriceLabel
             let oldDay = items.indices.contains(focus) ? items[focus].day : nil
-            parent = next
+            let today = Calendar.current.startOfDay(for: Date())
+            let needsRebuild = lastBuiltDay != today || parent.days != next.days || parent.minimumDay != next.minimumDay || selectionChanged || localeChanged
+            parent = next // Always retain the current callback, even when data is unchanged.
+            guard needsRebuild else { return }
+            lastBuiltDay = today
             let newItems = IumrahFareDateWindow.items(prices: next.days, selected: next.selectedDay ?? oldDay, minimum: next.minimumDay)
                 .map { Item(day: $0.day, price: $0.price) }
             let changed = newItems != items || localeChanged
             if changed || selectionChanged {
                 let oldFocus = items.indices.contains(focus) ? items[focus].day : nil
                 items = newItems
+                maxPrice = max(items.compactMap(\.price).max() ?? 1, 1)
                 committedDay = next.selectedDay
                 focus = items.firstIndex(where: { $0.day == (next.selectedDay ?? oldFocus) }) ?? items.firstIndex(where: { $0.price != nil }) ?? 0
                 if changed { view.reloadData() }
@@ -427,8 +467,7 @@ private struct IumrahCenteredFareChart: UIViewRepresentable {
             guard items.indices.contains(index) else { return }
             let item = items[index]
             let selected = focus == index
-            let maximum = max(items.compactMap(\.price).max() ?? 1, 1)
-            let barHeight = item.price.map { max(10, 55 * $0 / maximum) } ?? 3
+            let barHeight = item.price.map { max(10, 55 * $0 / maxPrice) } ?? 3
             let date = IumrahFlightClock.day(item.day, locale: parent.locale)
             let price = item.price.map { "$" + $0.formatted(.number.precision(.fractionLength(0))) } ?? "—"
             cell.contentConfiguration = UIHostingConfiguration {

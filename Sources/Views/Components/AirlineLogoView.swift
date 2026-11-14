@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Airline mark used by verified flight results and curated direct-flight cards.
 /// Known carriers with unreliable public logo endpoints can provide a local asset;
@@ -6,6 +7,8 @@ import SwiftUI
 struct AirlineLogoView: View {
     let airlineCode: String?
     var size: CGFloat = 38
+    @State private var remoteLogo: UIImage?
+    @State private var loadedURL: URL?
 
     var body: some View {
         ZStack {
@@ -17,17 +20,11 @@ struct AirlineLogoView: View {
                     .resizable()
                     .scaledToFit()
                     .padding(size * 0.08)
-            } else if let logoURL {
-                AsyncImage(url: logoURL) { phase in
-                    if case .success(let image) = phase {
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .padding(size * 0.14)
-                    } else {
-                        fallback
-                    }
-                }
+            } else if let remoteLogo, loadedURL == logoURL {
+                Image(uiImage: remoteLogo)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(size * 0.14)
             } else {
                 fallback
             }
@@ -38,6 +35,13 @@ struct AirlineLogoView: View {
                 .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
         }
         .accessibilityHidden(true)
+        .task(id: logoURL) {
+            guard localAssetName == nil, let url = logoURL else { return }
+            if loadedURL == url, remoteLogo != nil { return }
+            let image = await HotelImageCache.shared.image(for: url, maximumPixelDimension: 160)
+            guard !Task.isCancelled else { return }
+            loadedURL = url; remoteLogo = image
+        }
     }
 
     private var verifiedCode: String? {

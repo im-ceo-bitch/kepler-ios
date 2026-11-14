@@ -9,7 +9,6 @@ struct TransferSelectionView: View {
     @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
 
     @State private var selectedIndex = 1
-    @State private var dragOffset: CGFloat = 0
     @State private var showFinalPackage = false
     @State private var isConfirming = false
     @State private var confirmationError: String?
@@ -66,7 +65,6 @@ struct TransferSelectionView: View {
                 .environment(\.colorScheme, isVIP ? .dark : .light)
         }
         }
-        .animation(.easeInOut(duration: 0.58), value: isVIP)
         .modifier(IumrahTransferNavigationChrome(embedded: manualConfirm != nil))
         .background { if manualConfirm == nil { transferPageBackground } }
         .navigationDestination(isPresented: $showHotelsAfterTransfer) {
@@ -210,74 +208,8 @@ struct TransferSelectionView: View {
     }
 
     private var vehicleStage: some View {
-        GeometryReader { proxy in
-            let width = max(proxy.size.width, 1)
-            let pageWidth = max(width * 0.88, 1)
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 36, style: .continuous)
-                    .fill(isVIP ? Color.black : Color.white)
-
-                if isVIP {
-                    RadialGradient(
-                        colors: [
-                            .white.opacity(0.78),
-                            .white.opacity(0.34),
-                            .white.opacity(0.08),
-                            .clear
-                        ],
-                        center: .center,
-                        startRadius: 8,
-                        endRadius: 240
-                    )
-                    .blur(radius: 10)
-                    .scaleEffect(1.12)
-                }
-
-                TransferStageBackground(
-                    label: vehicleClassTitle(selectedVehicle).uppercased(),
-                    number: String(format: "%02d", selectedIndex + 1),
-                    parallax: dragOffset * 0.16,
-                    vip: isVIP
-                )
-
-                ForEach(Array(vehicles.enumerated()), id: \.element.id) { index, vehicle in
-                    let relative = CGFloat(index - selectedIndex) + (dragOffset / pageWidth)
-                    let distance = min(abs(relative), 1.35)
-                    let scale = 1 - min(distance, 1) * 0.10
-                    let opacity = 1 - min(distance, 1) * 0.42
-
-                    TransferVehicleHero(vehicle: vehicle, active: distance < 0.16)
-                        .scaleEffect(scale)
-                        .opacity(opacity)
-                        .offset(
-                            x: relative * width * 0.92,
-                            y: min(distance, 1) * 8
-                        )
-                        .zIndex(Double(10 - distance))
-                        .accessibilityHidden(index != selectedIndex)
-                }
-            }
-            .contentShape(Rectangle())
-            .clipped()
-            .gesture(
-                DragGesture(minimumDistance: 8, coordinateSpace: .local)
-                    .onChanged { value in
-                        guard !isConfirming else { return }
-                        dragOffset = resistedTranslation(value.translation.width)
-                    }
-                    .onEnded { value in
-                        guard !isConfirming else { return }
-                        finishDrag(value, pageWidth: pageWidth)
-                    }
-            )
-        }
-        .frame(height: 340)
-        .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 36, style: .continuous)
-                .strokeBorder(isVIP ? Color.white.opacity(0.12) : Color.primary.opacity(0.055), lineWidth: 0.8)
-        }
+        TransferVehicleStage(selectedIndex: selectedIndex, label: vehicleClassTitle(selectedVehicle),
+            isConfirming: isConfirming, onSelect: selectVehicleIndex)
     }
 
     private var vehicleInformation: some View {
@@ -564,28 +496,8 @@ struct TransferSelectionView: View {
         await journey.buildQuote(forceHotelRefresh: false)
     }
 
-    private func resistedTranslation(_ raw: CGFloat) -> CGFloat {
-        if selectedIndex == 0, raw > 0 { return raw * 0.32 }
-        if selectedIndex == vehicles.count - 1, raw < 0 { return raw * 0.32 }
-        return raw
-    }
-
-    private func finishDrag(_ value: DragGesture.Value, pageWidth: CGFloat) {
-        let projected = value.predictedEndTranslation.width
-        let threshold = pageWidth * 0.19
-        var target = selectedIndex
-
-        if projected < -threshold {
-            target = min(vehicles.count - 1, selectedIndex + 1)
-        } else if projected > threshold {
-            target = max(0, selectedIndex - 1)
-        }
-
-        withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
-            selectedIndex = target
-            dragOffset = 0
-        }
-
+    private func selectVehicleIndex(_ target: Int) {
+        selectedIndex = target
         let selected = vehicles[target]
         if journey.selectedTransferVehicle != selected {
             journey.chooseTransferVehicle(selected)
@@ -807,6 +719,105 @@ struct TransferSelectionView: View {
 
 // MARK: - Cinematic vehicle stage
 
+private struct TransferVehicleStage: View {
+    let selectedIndex: Int
+    let label: String
+    let isConfirming: Bool
+    let onSelect: (Int) -> Void
+    @State private var dragOffset: CGFloat = 0
+    private let vehicles = TransferVehicleKind.allCases
+    private var isVIP: Bool { vehicles[selectedIndex] == .yukon }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = max(proxy.size.width, 1)
+            let pageWidth = max(width * 0.88, 1)
+
+            ZStack {
+                RoundedRectangle(cornerRadius: 36, style: .continuous)
+                    .fill(isVIP ? Color.black : Color.white)
+
+                if isVIP {
+                    RadialGradient(
+                        colors: [
+                            .white.opacity(0.78),
+                            .white.opacity(0.34),
+                            .white.opacity(0.08),
+                            .clear
+                        ],
+                        center: .center,
+                        startRadius: 8,
+                        endRadius: 240
+                    )
+                    .scaleEffect(1.12)
+                }
+
+                TransferStageBackground(
+                    label: label.uppercased(),
+                    number: String(format: "%02d", selectedIndex + 1),
+                    parallax: dragOffset * 0.16,
+                    vip: isVIP
+                )
+
+                ForEach(Array(vehicles.enumerated()), id: \.element.id) { index, vehicle in
+                    let relative = CGFloat(index - selectedIndex) + (dragOffset / pageWidth)
+                    let distance = min(abs(relative), 1.35)
+                    let scale = 1 - min(distance, 1) * 0.10
+                    let opacity = 1 - min(distance, 1) * 0.42
+
+                    if abs(relative) < 1.65 {
+                    TransferVehicleHero(vehicle: vehicle, active: distance < 0.16)
+                        .scaleEffect(scale)
+                        .opacity(opacity)
+                        .offset(
+                            x: relative * width * 0.92,
+                            y: min(distance, 1) * 8
+                        )
+                        .zIndex(Double(10 - distance))
+                        .accessibilityHidden(index != selectedIndex)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+            .clipped()
+            .gesture(
+                DragGesture(minimumDistance: 8, coordinateSpace: .local)
+                    .onChanged { value in
+                        guard !isConfirming else { return }
+                        dragOffset = resistedTranslation(value.translation.width)
+                    }
+                    .onEnded { value in
+                        guard !isConfirming else { return }
+                        finishDrag(value, pageWidth: pageWidth)
+                    }
+            )
+        }
+        .frame(height: 340)
+        .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 36, style: .continuous)
+                .strokeBorder(isVIP ? Color.white.opacity(0.12) : Color.primary.opacity(0.055), lineWidth: 0.8)
+        }
+    }
+
+    private func resistedTranslation(_ raw: CGFloat) -> CGFloat {
+        if selectedIndex == 0, raw > 0 { return raw * 0.32 }
+        if selectedIndex == vehicles.count - 1, raw < 0 { return raw * 0.32 }
+        return raw
+    }
+    private func finishDrag(_ value: DragGesture.Value, pageWidth: CGFloat) {
+        let projected = value.predictedEndTranslation.width
+        let threshold = pageWidth * 0.19
+        var target = selectedIndex
+        if projected < -threshold { target = min(vehicles.count - 1, selectedIndex + 1) }
+        else if projected > threshold { target = max(0, selectedIndex - 1) }
+        withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
+            dragOffset = 0
+            onSelect(target)
+        }
+    }
+}
+
 private struct TransferVehicleHero: View {
     let vehicle: TransferVehicleKind
     let active: Bool
@@ -856,7 +867,7 @@ private struct HaramainPhotoGallery: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
+            LazyHStack(spacing: 10) {
                 ForEach(images, id: \.self) { name in
                     Image(name)
                         .resizable()

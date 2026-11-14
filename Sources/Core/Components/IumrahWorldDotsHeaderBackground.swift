@@ -10,6 +10,7 @@ struct IumrahWorldDotsHeaderBackground: View {
     var mapOpacity: Double = 0.425
     var waveSpeed: Double = 0.56
     var waveIntensity: Double = 0.78
+    var isAnimating = true
 
     var body: some View {
         GeometryReader { geometry in
@@ -23,7 +24,7 @@ struct IumrahWorldDotsHeaderBackground: View {
                 // Fixed 2:1 geometry retains geographic proportions. Only the
                 // header viewport clips the atlas, not the country outlines.
                 IumrahWorldDotsMap(
-                    isAnimating: true,
+                    isAnimating: isAnimating,
                     waveSpeed: waveSpeed,
                     waveIntensity: waveIntensity,
                     opacity: mapOpacity

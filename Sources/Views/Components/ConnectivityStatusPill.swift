@@ -13,7 +13,9 @@ import SwiftUI
 struct IumrahAnimatedConnectivityIndicator: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var connectivity = IumrahConnectivityMonitor()
+    @ObservedObject private var connectivity = IumrahConnectivityMonitor.shared
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var visible = false
 
     var lightStyle = false
 
@@ -24,14 +26,18 @@ struct IumrahAnimatedConnectivityIndicator: View {
     private let height: CGFloat = 34
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !visible || scenePhase != .active)) { context in
             indicator(at: context.date)
         }
         .frame(width: expandedWidth, height: height, alignment: .trailing)
-        .task(id: connectivity.status) {
+        .onAppear { visible = true }
+        .onDisappear { visible = false }
+        .task(id: "\(connectivity.status)-\(scenePhase)-\(visible)") {
+            guard visible, scenePhase == .active else { return }
             await runPresentationCycle(for: connectivity.status)
         }
-        .task {
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
             // Preserve the existing reachability behaviour. The animated control
             // only changes presentation, not the network source of truth.
             while !Task.isCancelled {

@@ -65,7 +65,7 @@ final class ClientNotificationCenter: ObservableObject {
     private init() {
         if let data = UserDefaults.standard.data(forKey: cacheKey),
            let cached = try? JSONDecoder().decode([ClientSystemNotification].self, from: data) {
-            notifications = cached
+            notifications = cached.sorted(by: notificationSort)
         }
         if let stored = UserDefaults.standard.array(forKey: dismissedHomeKey) as? [String] {
             dismissedHomeIDs = Set(stored)
@@ -74,7 +74,7 @@ final class ClientNotificationCenter: ObservableObject {
     }
 
     var inboxNotifications: [ClientSystemNotification] {
-        notifications.sorted(by: notificationSort)
+        notifications
     }
 
     var homeNotifications: [ClientSystemNotification] {
@@ -126,10 +126,14 @@ final class ClientNotificationCenter: ObservableObject {
                 query: [URLQueryItem(name: "installationID", value: installationID)],
                 headers: authorizationHeaders(accountToken)
             )
-            notifications = response.notifications.sorted(by: notificationSort)
-            latest = homeNotifications.first
-            persistCache()
-            lastError = nil
+            let next = response.notifications.sorted(by: notificationSort)
+            if notifications != next {
+                notifications = next
+                let first = homeNotifications.first
+                if latest != first { latest = first }
+                persistCache()
+            }
+            if lastError != nil { lastError = nil }
         } catch {
             lastError = error.localizedDescription
         }

@@ -16,6 +16,7 @@ struct RootView: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @ObservedObject private var quickActions = IumrahQuickActionCenter.shared
     @State private var hasBootstrappedAfterOnboarding = false
+    @State private var bookingLinkMemo = BookingLinkMemo()
     @State private var isSupportQuickActionDialogPresented = false
 
     var body: some View {
@@ -68,9 +69,13 @@ struct RootView: View {
                     await syncClientNotifications()
                 }
             }
-            .onChange(of: bookings.sessions) { _, _ in
+            .onChange(of: bookings.sessions) { previous, current in
                 syncWidgets()
-                quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
+                if previous.first?.displayBookingNumber != current.first?.displayBookingNumber {
+                    quickActions.refreshShortcutItems(language: settings.language, activeBooking: current.first)
+                }
+                // Status, hotel hydration and canonical display numbers are not new subscriptions.
+                guard bookingSubscriptionKeys(previous) != bookingSubscriptionKeys(current) else { return }
                 Task {
                     await linkLocalBookingsToAccount()
                     guard hasCompletedOnboarding else { return }
@@ -80,6 +85,11 @@ struct RootView: View {
                 }
             }
             .onChange(of: account.account) { _, newAccount in
+                if newAccount == nil {
+                    bookingLinkMemo.accountToken = nil
+                    bookingLinkMemo.pending.removeAll()
+                    bookingLinkMemo.linked.removeAll()
+                }
                 bookings.setAccountToken(account.bearerToken)
                 syncLocalProfileFromAccount()
                 syncWidgets()
@@ -164,6 +174,7 @@ struct RootView: View {
                 syncWidgets()
                 Task {
                     await push.refreshAndRegisterIfAllowed()
+                    await linkLocalBookingsToAccount()
                     // Retry booking-scoped chat push registration whenever the app
                     // returns to foreground. Previously a transient registration
                     // failure could remain silent until another unrelated state change.
@@ -407,13 +418,42 @@ struct RootView: View {
         }
     }
 
+    private struct BookingSubscriptionKey: Hashable {
+        let id: String
+        let token: String
+    }
+    private func bookingSubscriptionKeys(_ sessions: [StoredBookingSession]) -> Set<BookingSubscriptionKey> {
+        Set(sessions.map { BookingSubscriptionKey(id: $0.id, token: $0.accessToken) })
+    }
+
+    private final class BookingLinkMemo {
+        var accountToken: String?
+        var linked = Set<BookingSubscriptionKey>()
+        var pending = Set<BookingSubscriptionKey>()
+    }
+
     @MainActor
     private func linkLocalBookingsToAccount() async {
-        guard account.isAuthenticated else { return }
+        guard account.isAuthenticated, let accountToken = account.bearerToken else { return }
+        if bookingLinkMemo.accountToken != accountToken {
+            bookingLinkMemo.accountToken = accountToken
+            bookingLinkMemo.linked.removeAll()
+            bookingLinkMemo.pending.removeAll()
+        }
+        bookingLinkMemo.linked.formIntersection(bookingSubscriptionKeys(bookings.sessions))
         for session in bookings.sessions {
+            guard account.bearerToken == accountToken else { return }
             let bookingToken = session.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !bookingToken.isEmpty else { continue }
-            if let linked = try? await account.linkBooking(bookingID: session.id, bookingToken: bookingToken) {
+            let key = BookingSubscriptionKey(id: session.id, token: session.accessToken)
+            guard !bookingLinkMemo.linked.contains(key), bookingLinkMemo.pending.insert(key).inserted else { continue }
+            let linked = try? await account.linkBooking(bookingID: session.id, bookingToken: bookingToken)
+            // Ignore a late response from an account that has since signed out.
+            guard bookingLinkMemo.accountToken == accountToken else { return }
+            bookingLinkMemo.pending.remove(key)
+            guard account.bearerToken == accountToken else { return }
+            if let linked {
+                bookingLinkMemo.linked.insert(key)
                 bookings.applyCanonicalLink(linked, to: session.id)
             }
         }

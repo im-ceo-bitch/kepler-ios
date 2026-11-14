@@ -37,8 +37,23 @@ import Foundation
         await cache.write(response, key: key, now: today)
         let filename = dir.appendingPathComponent(key + ".json")
         try Data("bad json".utf8).write(to: filename)
-        let corrupted = await cache.read(key: key, now: today)
-        precondition(corrupted == nil, "corrupt file recovery")
-        print("PASS: 12 cache checks")
+        let hot = await cache.read(key: key, now: today)
+        precondition(hot?.city == "makkah", "valid in-memory entry survives disk corruption")
+        let cold = NuiteeDailyHotelCache(directory: dir)
+        let corrupted = await cold.read(key: key, now: today)
+        precondition(corrupted == nil, "corrupt file recovery on cold read")
+        // Four recently used keys only: evicted entries remain readable on disk.
+        for i in 0..<5 { await cache.write(response, key: "test-\(i)", now: today) }
+        let evicted = dir.appendingPathComponent("test-0.json")
+        try FileManager.default.removeItem(at: evicted)
+        let evictedRead = await cache.read(key: "test-0", now: today)
+        precondition(evictedRead == nil, "oldest entry evicted from memory")
+        let retained = dir.appendingPathComponent("test-4.json")
+        try FileManager.default.removeItem(at: retained)
+        let retainedRead = await cache.read(key: "test-4", now: today)
+        precondition(retainedRead != nil, "recent entry retained in memory")
+        let expiredHot = await cache.read(key: "test-4", now: tomorrow)
+        precondition(expiredHot == nil, "in-memory entry respects expiry")
+        print("PASS: 16 cache checks")
     }
 }

@@ -263,7 +263,7 @@ struct IumrahManualPackageView: View {
         return VStack(alignment: .leading, spacing: 14) {
             status(title, symbol: "bed.double", selected: room != nil)
             if let room {
-                HotelCachedImage(rawURL: room.hotel.coverImageURL).frame(height: 154).frame(maxWidth: .infinity).clipped().clipShape(RoundedRectangle(cornerRadius: 17))
+                HotelCachedImage(rawURL: room.hotel.coverImageURL, thumbnailPixelDimension: 768).frame(height: 154).frame(maxWidth: .infinity).clipped().clipShape(RoundedRectangle(cornerRadius: 17))
                 Text(room.hotel.name).font(.title3.bold())
                 HStack { if room.hotel.roundedStars > 0 { Text(String(repeating: "★", count: room.hotel.roundedStars)) }; if let rating = room.hotel.rating { Text(String(format: "%.1f", rating)) } }.font(.caption).foregroundStyle(.secondary)
                 Text(room.rate.roomName).font(.subheadline.weight(.medium))

@@ -1005,7 +1005,7 @@ struct PrimaryHotelView: View {
 
     private func hotelImage(_ hotel: HotelSummary) -> some View {
         GeometryReader { proxy in
-            HotelCachedImage(rawURL: hotel.coverImageURL)
+            HotelCachedImage(rawURL: hotel.coverImageURL, thumbnailPixelDimension: 768)
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .clipped()
         }

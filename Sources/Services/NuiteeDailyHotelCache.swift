@@ -8,6 +8,15 @@ actor NuiteeDailyHotelCache {
         let response: NuiteeHotelListEnvelope
     }
     private let directory: URL
+    private var hot: [String: Entry] = [:]
+    private var order: [String] = []
+    private var lastCleanup = Date.distantPast
+    private func remember(_ entry: Entry, key: String) {
+        hot[key] = entry
+        order.removeAll { $0 == key }
+        order.append(key)
+        while order.count > 4 { hot.removeValue(forKey: order.removeFirst()) }
+    }
     init(directory: URL? = nil) {
         self.directory = directory ?? (FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory)
             .appendingPathComponent("iumrah-nuitee-daily-v1", isDirectory: true)
@@ -21,18 +30,27 @@ actor NuiteeDailyHotelCache {
         return directory.appendingPathComponent(String(safe) + ".json")
     }
     func read(key: String, now: Date = Date()) -> NuiteeHotelListEnvelope? {
+        if let entry = hot[key], Self.isFresh(savedAt: entry.savedAt, now: now) {
+            remember(entry, key: key); return entry.response
+        }
+        hot.removeValue(forKey: key); order.removeAll { $0 == key }
         let url = file(key)
         guard let data = try? Data(contentsOf: url), let entry = try? JSONDecoder().decode(Entry.self, from: data), Self.isFresh(savedAt: entry.savedAt, now: now) else {
             try? FileManager.default.removeItem(at: url)
             return nil
         }
+        remember(entry, key: key)
         return entry.response
     }
     func write(_ response: NuiteeHotelListEnvelope, key: String, now: Date = Date()) {
+        let entry = Entry(savedAt: now, response: response)
+        remember(entry, key: key)
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let data = try JSONEncoder().encode(Entry(savedAt: now, response: response))
+            let data = try JSONEncoder().encode(entry)
             try data.write(to: file(key), options: .atomic)
+            guard now.timeIntervalSince(lastCleanup) >= 3600 else { return }
+            lastCleanup = now
             // Remove yesterday's records even for searches not revisited today.
             for url in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
                 if let date = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,

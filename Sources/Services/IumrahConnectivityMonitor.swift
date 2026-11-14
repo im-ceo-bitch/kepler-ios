@@ -28,6 +28,7 @@ enum IumrahConnectivityStatus: Hashable {
 /// NWPathMonitor reacts immediately to radio/Wi-Fi changes, while the short
 /// HTTPS probe prevents a connected-but-unusable network from being shown as online.
 final class IumrahConnectivityMonitor: ObservableObject {
+    static let shared = IumrahConnectivityMonitor()
     @Published private(set) var status: IumrahConnectivityStatus = .checking
 
     private let pathMonitor = NWPathMonitor()
@@ -47,6 +48,7 @@ final class IumrahConnectivityMonitor: ObservableObject {
         return URLSession(configuration: configuration)
     }()
     private var probeTask: Task<Void, Never>?
+    private var lastProbe = Date.distantPast
 
     init() {
         pathMonitor.pathUpdateHandler = { [weak self] path in
@@ -65,6 +67,7 @@ final class IumrahConnectivityMonitor: ObservableObject {
 
     @MainActor
     func refresh() {
+        guard Date().timeIntervalSince(lastProbe) >= 20 else { return }
         apply(pathStatus: pathMonitor.currentPath.status)
     }
 
@@ -72,7 +75,7 @@ final class IumrahConnectivityMonitor: ObservableObject {
     private func apply(pathStatus: NWPath.Status) {
         guard pathStatus == .satisfied else {
             probeTask?.cancel()
-            status = .offline
+            if status != .offline { status = .offline }
             return
         }
 
@@ -85,6 +88,7 @@ final class IumrahConnectivityMonitor: ObservableObject {
     @MainActor
     private func startProbe() {
         probeTask?.cancel()
+        lastProbe = Date()
 
         var request = URLRequest(url: AppConfig.apiBaseURL)
         request.httpMethod = "HEAD"
@@ -104,13 +108,14 @@ final class IumrahConnectivityMonitor: ObservableObject {
 
                 await MainActor.run {
                     guard let self else { return }
-                    self.status = hasInternetResponse ? .online : .offline
+                    let next: IumrahConnectivityStatus = hasInternetResponse ? .online : .offline
+                    if self.status != next { self.status = next }
                 }
             } catch {
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
                     guard let self else { return }
-                    self.status = .offline
+                    if self.status != .offline { self.status = .offline }
                 }
             }
         }

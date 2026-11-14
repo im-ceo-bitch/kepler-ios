@@ -17,6 +17,8 @@ struct IumrahSystemGlow: View {
     var intensity: Double = 1.0
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var visible = false
 
     private let violet = Color(red: 0.49, green: 0.22, blue: 1.00)
     private let electricPurple = Color(red: 0.72, green: 0.26, blue: 1.00)
@@ -25,7 +27,7 @@ struct IumrahSystemGlow: View {
     private let softPink = Color(red: 0.98, green: 0.28, blue: 0.76)
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: frameInterval)) { timeline in
+        TimelineView(.animation(minimumInterval: frameInterval, paused: reduceMotion || !isActive || !visible || scenePhase != .active)) { timeline in
             GeometryReader { proxy in
                 let size = proxy.size
                 let seconds = timeline.date.timeIntervalSinceReferenceDate
@@ -47,11 +49,13 @@ struct IumrahSystemGlow: View {
             }
         }
         .accessibilityHidden(true)
+        .onAppear { visible = true }
+        .onDisappear { visible = false }
     }
 
     private var frameInterval: TimeInterval {
         if reduceMotion || !isActive { return 1.0 / 12.0 }
-        return 1.0 / 60.0
+        return 1.0 / 30.0
     }
 
     private func resolvedPhase(_ seconds: TimeInterval) -> Double {

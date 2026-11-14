@@ -46,11 +46,11 @@ struct HotelDetailView: View {
             let contentWidth = max(0, proxy.size.width - (IumrahDesign.pagePadding * 2))
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     heroCarousel
                         .frame(width: proxy.size.width)
 
-                    VStack(alignment: .leading, spacing: 30) {
+                    LazyVStack(alignment: .leading, spacing: 30) {
                         identitySection
 
                         if selectionFlow || bookingID != nil {

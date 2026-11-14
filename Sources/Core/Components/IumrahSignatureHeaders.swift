@@ -199,7 +199,7 @@ struct IumrahPrimaryTabHeader: View {
         .frame(maxWidth: .infinity)
         .frame(height: discovery ? IumrahSignatureHeaderGeometry.contentHeight + 52 : IumrahSignatureHeaderGeometry.contentHeight + (footer == nil ? 0 : 34), alignment: .top)
         .background {
-            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33)
+            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33, isAnimating: !discovery)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: discovery ? IumrahSignatureHeaderGeometry.bottomRadius : 0, bottomTrailingRadius: discovery ? IumrahSignatureHeaderGeometry.bottomRadius : 0))
         }
         .accessibilityElement(children: .contain)

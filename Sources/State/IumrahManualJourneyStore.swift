@@ -5,32 +5,36 @@ import SwiftUI
 /// No local package price, fare markup, or booking proof is generated here.
 @MainActor
 final class IumrahManualJourneyStore: ObservableObject {
-    @Published var outbound: LocalJourneyFlight?
-    @Published var inbound: LocalJourneyFlight?
-    @Published var rooms: [String: LocalJourneyRoom] = [:]
-    @Published var transfer: TransferVehicleKind?
-    @Published var haramainSelected = false
-    @Published var haramainFareClass: HaramainFareClass = .economy
-    @Published var haramainAdultTickets = 1
-    @Published var scope: JourneyScope = .makkahAndMadinah
-    @Published var routeConfigured = false
-    @Published var plannedOrigin = "TAS"
-    @Published var plannedArrival: SaudiArrivalAirport = .jeddah
-    @Published var plannedDeparture = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date()
-    @Published var plannedReturn = Calendar.current.date(byAdding: .day, value: 21, to: Date()) ?? Date()
-    @Published var adults = 2
-    @Published var cabin: FlightCabinClass = .economy
+    private var cachedRevisionKey: String?
+    @Published var outbound: LocalJourneyFlight? = nil { didSet { cachedRevisionKey = nil } }
+    @Published var inbound: LocalJourneyFlight? = nil { didSet { cachedRevisionKey = nil } }
+    @Published var rooms: [String: LocalJourneyRoom] = [:] { didSet { cachedRevisionKey = nil } }
+    @Published var transfer: TransferVehicleKind? = nil { didSet { cachedRevisionKey = nil } }
+    @Published var haramainSelected = false { didSet { cachedRevisionKey = nil } }
+    @Published var haramainFareClass: HaramainFareClass = .economy { didSet { cachedRevisionKey = nil } }
+    @Published var haramainAdultTickets = 1 { didSet { cachedRevisionKey = nil } }
+    @Published var scope: JourneyScope = .makkahAndMadinah { didSet { cachedRevisionKey = nil } }
+    @Published var routeConfigured = false { didSet { cachedRevisionKey = nil } }
+    @Published var plannedOrigin = "TAS" { didSet { cachedRevisionKey = nil } }
+    @Published var plannedArrival: SaudiArrivalAirport = .jeddah { didSet { cachedRevisionKey = nil } }
+    @Published var plannedDeparture = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date() { didSet { cachedRevisionKey = nil } }
+    @Published var plannedReturn = Calendar.current.date(byAdding: .day, value: 21, to: Date()) ?? Date() { didSet { cachedRevisionKey = nil } }
+    @Published var adults = 2 { didSet { cachedRevisionKey = nil } }
+    @Published var cabin: FlightCabinClass = .economy { didSet { cachedRevisionKey = nil } }
 
     var componentCount: Int { (outbound == nil ? 0 : 1) + (inbound == nil ? 0 : 1) + rooms.count + (transfer == nil ? 0 : 1) }
     var cities: [String] { scope == .makkahOnly ? ["makkah"] : ["makkah", "madinah"] }
     var revisionKey: String {
+        if let cachedRevisionKey { return cachedRevisionKey }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let values = (try? encoder.encode(rooms))?.base64EncodedString() ?? ""
         let flights = (try? encoder.encode([outbound, inbound]))?.base64EncodedString() ?? ""
         let components = [flights, values, transfer?.rawValue ?? "", scope.rawValue, String(adults), cabin.rawValue]
         let route = [plannedOrigin, plannedArrival.rawValue, String(plannedDeparture.timeIntervalSince1970), String(plannedReturn.timeIntervalSince1970), String(routeConfigured)]
         let train = [String(haramainSelected), haramainFareClass.rawValue, String(haramainAdultTickets)]
-        return (components + route + train).joined(separator: "|")
+        let key = (components + route + train).joined(separator: "|")
+        cachedRevisionKey = key
+        return key
     }
     @discardableResult func select(_ flight: LocalJourneyFlight) -> Bool {
         if ["JED", "MED"].contains(flight.destination) {

@@ -1,0 +1,20 @@
+# iumrah iOS — performance update (2026-11-14)
+
+Scope: public Flights and Hotels discovery, Flight First configurator, Nuitee hotel/room selection and hotel detail, manual package and transfer carousel. Base: `kepler-ios-main 2.zip` (all 1,330 local ZIP records recovered and CRC-checked; central directory was truncated).
+
+## Changes
+- Flight catalogues memoize derived search/filter/calendar results by data revision and the relevant search/selection context. Flight First ranks candidates with precomputed day offsets rather than repeating date parsing inside sorting comparisons. Same source/compatibility rules, date filtering, grouping and price ordering remain. Timestamp conversion uses bounded caches and reusable synchronized formatters. The calendar rail skips rebuilding its collection-view data for unrelated SwiftUI updates.
+- Hotel catalogue memoizes filtering and uses lazy vertical lists. Hotel listing cards now use only catalogue-supplied preview/cover photos: no per-card hotel detail API requests or polling loop. Where only one preview is available, the existing single-photo layout is used; the full gallery remains in hotel detail. Room/detail and guided hotel lists use lazy layout.
+- Shared image actor coalesces duplicate requests for the same URL and thumbnail size; small catalogue images are capped at 512 px, other regular images at 960 px, full-screen fit galleries at 1600 px, airline logos at 160 px. Decoded cache cost target remains 48 MiB, with up to 80 entries; short bounded retry cooldown avoids repeated failed downloads. Disk cache keeps compressed original media as before. Existing images and source URLs remain unchanged.
+- Transfer drag state lives in a child carousel, not the entire package page. Selection and price refresh remain on the settled gesture; car swipe spring, haptic feedback, transfer capacity, rail selection and backend price authority remain. Train image strip uses lazy horizontal layout.
+- Discovery and journey header maps and flight-detail hemisphere use static illumination rather than an uninterrupted decorative animation. Actual flight status and live overlay updates are unchanged. This is a deliberate GPU load trade-off; home header animation remains.
+- Manual package revision key caches its original JSON-derived value until any relevant published field changes. No quote/booking data is persisted by this optimization. Search-loading state cleanup handles canceled tasks without clearing a newer request's loading state.
+
+## Validation performed
+- Swift frontend syntax parse of all 321 Swift source files: PASS.
+- `bash scripts/test_iumrah_performance.sh`: PASS (memoization, key invalidation, 2,000 repeated timezone conversions, fractional ISO timestamp, local timestamps, actual/estimated arrival).
+- `bash scripts/test_nuitee_daily_cache.sh`: PASS (12 cache checks).
+- The patch contains only source files, this note and the new smoke test/script. No backend, D1, API contract, project.yml, signing, version, or GitHub workflow changes.
+
+## Device acceptance (required before production)
+Build the usual Release/TestFlight configuration and test on the physical iPhone 11, not a simulator. Cold launch; open Hotels and Flights, scroll at least 50 results, load more, change date/star/airline/direct filters, open a result and return. Run the full Flight First flow (outbound, return, transfer, Makkah room, Madinah room, final quote), manual package and transfer carousel (swipe both ways and test VIP/train). Repeat 3 times; verify pricing and selections, no stale results or crashes. In Instruments use Animation Hitches/Core Animation, Time Profiler and Allocations; compare cold and warm runs with the previous build. Target responsive 60 Hz rendering on iPhone 11 (16.7 ms frame budget), no prolonged main-thread stalls and no sustained memory growth. Actual frame rates, memory and build/signing have not been measured here: this environment has no iOS SDK, Xcode, physical iPhone or Instruments. Do not mark production QA complete until those checks pass.

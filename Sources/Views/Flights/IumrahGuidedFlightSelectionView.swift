@@ -29,6 +29,26 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var showTransferPicker = false
     @State private var isFlightHeaderVisible = true
     @State private var isShowingSourceHelp = false
+    @State private var dataRevision = 0
+    private struct SnapshotKey: Equatable {
+        let revision: Int
+        let trip: TripDraft
+        let step: LegStep
+        let outbound: FlightChoice?
+        let filters: IumrahFlightFilterState
+        let today: Date
+        let timeZone: String
+        let flexDays: Int
+    }
+    private struct Snapshot {
+        let available: [FlightChoice]
+        let airlines: [String]
+        let days: [IumrahFlightPriceDay]
+        let direct: [FlightChoice]
+        let connecting: [FlightChoice]
+        let nearby: [FlightChoice]
+    }
+    @State private var memo = IumrahViewMemo<SnapshotKey, Snapshot>()
 
     private enum LegStep: Hashable { case outbound, inbound }
     fileprivate enum Source: Hashable { case published, dataAPI }
@@ -140,9 +160,24 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     var body: some View {
+        let key = SnapshotKey(revision: dataRevision, trip: journey.trip, step: step,
+            outbound: outbound, filters: filters, today: Calendar.current.startOfDay(for: Date()),
+            timeZone: TimeZone.current.identifier, flexDays: flexDays)
+        let snapshot = memo.value(for: key) {
+            let available = availableCandidates
+            let visible = visibleCandidates(available)
+            var direct: [FlightChoice] = [], connecting: [FlightChoice] = [], nearby: [FlightChoice] = []
+            for choice in visible {
+                if dayOffset(for: choice) != 0 { nearby.append(choice) }
+                else if choice.stops == 0 { direct.append(choice) }
+                else if choice.stops > 0 { connecting.append(choice) }
+            }
+            return Snapshot(available: available, airlines: Array(Set(available.map(\.airlineCode))).sorted(),
+                days: observedFareDays, direct: direct, connecting: connecting, nearby: nearby)
+        }
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     blackHero
                         .id("flight-header")
                         .background {
@@ -151,10 +186,10 @@ struct IumrahGuidedFlightSelectionView: View {
                                     value: geo.frame(in: .named("flightFirstScroll")).maxY)
                             }
                         }
-                    VStack(alignment: .leading, spacing: 16) {
+                    LazyVStack(alignment: .leading, spacing: 16) {
                         stepSelector.id("flight-step-selector")
-                        searchControls
-                        resultsSection
+                        searchControls(snapshot)
+                        resultsSection(snapshot)
                             .id("flight-results")
                     }
                     .padding(.horizontal, 20)
@@ -167,7 +202,8 @@ struct IumrahGuidedFlightSelectionView: View {
             .modifier(IumrahJourneyRefresh { await loadFlights() })
             .coordinateSpace(name: "flightFirstScroll")
             .onPreferenceChange(IumrahScrollingHeroBottomKey.self) { bottom in
-                isFlightHeaderVisible = bottom > 35
+                let visible = bottom > 35
+                if isFlightHeaderVisible != visible { isFlightHeaderVisible = visible }
             }
             .onChange(of: step) { _, _ in
                 visibleCount = 20
@@ -299,11 +335,11 @@ struct IumrahGuidedFlightSelectionView: View {
         ], selection: step, onSelect: { step = $0 }, height: 58)
     }
 
-    private var resultsSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
+    private func resultsSection(_ snapshot: Snapshot) -> some View {
+        LazyVStack(alignment: .leading, spacing: 15) {
             if isLoading { ProgressView().frame(maxWidth: .infinity) }
 
-            if step == .inbound && outbound != nil && availableCandidates.isEmpty && !isLoading {
+            if step == .inbound && outbound != nil && snapshot.available.isEmpty && !isLoading {
                 Text(tr("Для выбранного рейса туда пока нет совместимых обратных вариантов. Выберите другой рейс туда или измените даты.",
                         "No compatible return flights for your outbound choice. Choose another outbound flight or change dates.",
                         "Tanlangan borish reysiga mos qaytish reysi yo‘q. Boshqa reys yoki sanani tanlang.",
@@ -320,7 +356,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 .buttonStyle(IumrahSecondaryButtonStyle())
             }
 
-            if let loadError, availableCandidates.isEmpty {
+            if let loadError, snapshot.available.isEmpty {
                 Text(loadError).font(.footnote).foregroundStyle(.secondary)
                 Button(tr("Повторить", "Retry", "Qayta urinish", "Қайта уриниш")) {
                     Task { await loadFlights() }
@@ -328,7 +364,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 .buttonStyle(IumrahSecondaryButtonStyle())
             }
 
-            if !isLoading && availableCandidates.isEmpty && loadError == nil {
+            if !isLoading && snapshot.available.isEmpty && loadError == nil {
                 Label(tr("Подходящих рейсов пока нет. Попробуйте другие даты или класс.",
                          "No matching flights yet. Try different dates or cabin class.",
                          "Mos reyslar hozircha yo‘q. Boshqa sana yoki klassni tanlang.",
@@ -339,10 +375,10 @@ struct IumrahGuidedFlightSelectionView: View {
                     .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 18))
             }
 
-            flightGroup(Array(directExact.prefix(visibleCount)), title: tr("Прямые рейсы", "Non-stop flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"))
-            flightGroup(Array(connecting.prefix(max(0, visibleCount - directExact.count))), title: tr("Рейсы с пересадкой", "Connecting flights", "Transferli reyslar", "Трансферли рейслар"))
-            flightGroup(Array(directNearby.prefix(max(0, visibleCount - directExact.count - connecting.count))), title: tr("Соседние даты", "Nearby dates", "Yaqin sanalar", "Яқин саналар"))
-            IumrahLoadMoreButton(remaining: directExact.count + connecting.count + directNearby.count - visibleCount) { visibleCount += 20 }
+            flightGroup(Array(snapshot.direct.prefix(visibleCount)), title: tr("Прямые рейсы", "Non-stop flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"))
+            flightGroup(Array(snapshot.connecting.prefix(max(0, visibleCount - snapshot.direct.count))), title: tr("Рейсы с пересадкой", "Connecting flights", "Transferli reyslar", "Трансферли рейслар"))
+            flightGroup(Array(snapshot.nearby.prefix(max(0, visibleCount - snapshot.direct.count - snapshot.connecting.count))), title: tr("Соседние даты", "Nearby dates", "Yaqin sanalar", "Яқин саналар"))
+            IumrahLoadMoreButton(remaining: snapshot.direct.count + snapshot.connecting.count + snapshot.nearby.count - visibleCount) { visibleCount += 20 }
 
             Text(tr("Цены Data API — предварительные. Наличие и окончательная стоимость проверяются перед бронированием.",
                     "Data API fares are indicative. Availability and final price are checked before booking.",
@@ -356,7 +392,7 @@ struct IumrahGuidedFlightSelectionView: View {
     @ViewBuilder
     private func flightGroup(_ flights: [FlightChoice], title: String) -> some View {
         if !flights.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
+            LazyVStack(alignment: .leading, spacing: 10) {
                 Text(title)
                     .font(.headline)
                 ForEach(flights) { choice in
@@ -388,10 +424,10 @@ struct IumrahGuidedFlightSelectionView: View {
         let prices = calendarOffers.map { (IumrahFlightClock.local($0.departureAt, airport: $0.origin), Optional($0.price)) }
         return IumrahFlightSearchControls.priceDays(prices + calendarPrices)
     }
-    private var searchControls: some View {
+    private func searchControls(_ snapshot: Snapshot) -> some View {
         IumrahFlightSearchControls(filters: $filters,
-            airlines: Array(Set(availableCandidates.map(\.airlineCode))).sorted(),
-            days: observedFareDays,
+            airlines: snapshot.airlines,
+            days: snapshot.days,
             selectedDay: dayKey(IumrahFlightDiscoveryStore.dayFormatter.string(from: currentTarget)),
             minimumDay: minimumSearchDay,
             onSelectDay: { key in
@@ -428,8 +464,8 @@ struct IumrahGuidedFlightSelectionView: View {
             filters.accepts(stops: $0.transfers, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false)
         }
     }
-    private var visibleCandidates: [FlightChoice] {
-        availableCandidates.filter {
+    private func visibleCandidates(_ candidates: [FlightChoice]) -> [FlightChoice] {
+        candidates.filter {
             filters.accepts(stops: $0.stops, airline: $0.airlineCode, departure: $0.departureAt, includeDay: false)
         }.sorted { a, b in
             if filters.sort == 1, a.price != b.price { return (a.price ?? .infinity) < (b.price ?? .infinity) }
@@ -523,30 +559,23 @@ struct IumrahGuidedFlightSelectionView: View {
             return a.id < b.id
         }
         var seen = Set<String>()
-        return candidates.filter { choice in
-            guard choice.stops >= 0,
-                  let flightDay = dateFromISODay(dayKey(IumrahFlightClock.local(choice.departureAt, airport: choice.origin))),
-                  flightDay >= Calendar.current.startOfDay(for: Date()),
-                  abs(dayOffset(for: choice)) <= flexDays,
-                  !(step == .inbound && dayKey(IumrahFlightClock.local(choice.departureAt, airport: choice.origin)) <= dayKey(outbound.map { IumrahFlightClock.local($0.departureAt, airport: $0.origin) } ?? "")) else { return false }
-            return seen.insert(choice.dedupeKey).inserted
-        }.sorted { a, b in
-            let aRank = rank(a), bRank = rank(b)
-            if aRank != bRank { return aRank < bRank }
-            if dayOffset(for: a) != 0 && dayOffset(for: b) != 0 && abs(dayOffset(for: a)) != abs(dayOffset(for: b)) {
-                return abs(dayOffset(for: a)) < abs(dayOffset(for: b))
-            }
-            if a.departureAt != b.departureAt { return a.departureAt < b.departureAt }
-            return a.id < b.id
+        let today = Calendar.current.startOfDay(for: Date())
+        let outboundDay = dayKey(outbound.map { IumrahFlightClock.local($0.departureAt, airport: $0.origin) } ?? "")
+        var ranked: [(choice: FlightChoice, offset: Int, rank: Int)] = []
+        for choice in candidates {
+            let day = dayKey(IumrahFlightClock.local(choice.departureAt, airport: choice.origin))
+            guard choice.stops >= 0, let flightDay = dateFromISODay(day), flightDay >= today else { continue }
+            let offset = dayOffset(for: choice)
+            guard abs(offset) <= flexDays, !(step == .inbound && day <= outboundDay),
+                  seen.insert(choice.dedupeKey).inserted else { continue }
+            ranked.append((choice, offset, offset == 0 ? (choice.stops == 0 ? 0 : 1) : 2))
         }
-    }
-
-    private var directExact: [FlightChoice] { visibleCandidates.filter { $0.stops == 0 && dayOffset(for: $0) == 0 } }
-    private var directNearby: [FlightChoice] { visibleCandidates.filter { dayOffset(for: $0) != 0 } }
-    private var connecting: [FlightChoice] { visibleCandidates.filter { $0.stops > 0 && dayOffset(for: $0) == 0 } }
-
-    private func rank(_ choice: FlightChoice) -> Int {
-        dayOffset(for: choice) == 0 ? (choice.stops == 0 ? 0 : 1) : 2
+        return ranked.sorted { a, b in
+            if a.rank != b.rank { return a.rank < b.rank }
+            if a.offset != 0 && b.offset != 0 && abs(a.offset) != abs(b.offset) { return abs(a.offset) < abs(b.offset) }
+            if a.choice.departureAt != b.choice.departureAt { return a.choice.departureAt < b.choice.departureAt }
+            return a.choice.id < b.choice.id
+        }.map { $0.choice }
     }
 
     private func publishedCabinMatches(_ item: CuratedFlightRecommendation) -> Bool {
@@ -586,7 +615,7 @@ struct IumrahGuidedFlightSelectionView: View {
         editingSearch = false
         let requestID = UUID()
         loadingRequestID = requestID
-        if !preserveCalendar { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = [] }
+        if !preserveCalendar { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = []; dataRevision &+= 1 }
         isLoading = true
         loadError = nil
         defer { if loadingRequestID == requestID { isLoading = false } }
@@ -596,13 +625,13 @@ struct IumrahGuidedFlightSelectionView: View {
         do {
             let result = try await curatedService.load(trip: trip)
             guard !Task.isCancelled, loadingRequestID == requestID else { return }
-            published = result
+            published = result; dataRevision &+= 1
         } catch {
             guard loadingRequestID == requestID else { return }
-            published = []
+            published = []; dataRevision &+= 1
             loadError = error.localizedDescription
         }
-        if selectedCabin != .economy { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = []; return }
+        if selectedCabin != .economy { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = []; dataRevision &+= 1; return }
         let legs: [(String, String, Date)] = [(outboundCode, destinationCode, trip.departureDate),
                                               (returnCode, outboundCode, trip.returnDate)]
         let orderedLegs = step == .outbound ? [0, 1] : [1, 0]
@@ -617,7 +646,7 @@ struct IumrahGuidedFlightSelectionView: View {
             if let value = try? await service.offers(origin: origin, destination: destination, departure: selected, direct: false, limit: 100) {
                 collected += value.offers.filter { $0.origin.uppercased() == origin && $0.destination.uppercased() == destination }
                 guard !Task.isCancelled, loadingRequestID == requestID else { return }
-                if index == 0 { dataOutbound = collected } else { dataReturn = collected }
+                if index == 0 { dataOutbound = collected } else { dataReturn = collected }; dataRevision &+= 1
             }
             guard !Task.isCancelled, loadingRequestID == requestID else { return }
             var calendar: [FlightDiscoveryCalendarDay] = []
@@ -633,14 +662,14 @@ struct IumrahGuidedFlightSelectionView: View {
                     calendarCache[cacheKey] = CalendarCacheEntry(days: value.days, expires: Date().addingTimeInterval(300))
                 }
                 guard !Task.isCancelled, loadingRequestID == requestID else { return }
-                if index == 0 { outboundCalendar = calendar } else { returnCalendar = calendar }
+                if index == 0 { outboundCalendar = calendar } else { returnCalendar = calendar }; dataRevision &+= 1
                 if offerMonths.contains(month), let value = try? await service.offers(origin: origin, destination: destination, departure: month, direct: false, limit: 100) {
                     collected += value.offers.filter { $0.origin.uppercased() == origin && $0.destination.uppercased() == destination }
                     guard !Task.isCancelled, loadingRequestID == requestID else { return }
                     // Keep the exact date version if both endpoints returned the same offer ID.
                     var seen = Set<String>()
                     let unique = collected.filter { seen.insert($0.id).inserted }
-                    if index == 0 { dataOutbound = unique } else { dataReturn = unique }
+                    if index == 0 { dataOutbound = unique } else { dataReturn = unique }; dataRevision &+= 1
                 }
             }
         }

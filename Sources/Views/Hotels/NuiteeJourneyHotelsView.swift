@@ -12,6 +12,10 @@ struct NuiteeJourneyHotelsView: View {
     @State private var favorites: Set<String> = []
     @State private var visibleCount = 20
     @State private var hotels: [NuiteeHotel] = []
+    @State private var hotelRevision = 0
+    @State private var loadedSearchID: String?
+    private struct HotelFilterKey: Equatable { let revision: Int; let stars: Int }
+    @State private var hotelMemo = IumrahViewMemo<HotelFilterKey, [NuiteeHotel]>()
     @State private var sandbox = false
     @State private var loading = false
     @State private var error: String?
@@ -33,13 +37,21 @@ struct NuiteeJourneyHotelsView: View {
     }
     private var roomChildren: [Int] { ages.enumerated().filter { $0.offset % journey.trip.rooms == roomIndex }.map(\.element) }
     private var ready: Bool { ages.count == journey.trip.children + journey.trip.infants && !ages.contains(-1) && roomAdults > 0 }
-    private var filtered: [NuiteeHotel] { hotels.filter { stars == 0 || $0.roundedStars == stars } }
+    private var filtered: [NuiteeHotel] {
+        guard loadedSearchID == searchID else { return [] }
+        return hotelMemo.value(for: HotelFilterKey(revision: hotelRevision, stars: stars)) {
+            hotels.filter { stars == 0 || $0.roundedStars == stars }
+        }
+    }
     private var searchID: String { "\(city):\(roomAdults):\(window.checkIn):\(window.checkOut)" }
 
     var body: some View {
+        let results = filtered
+        let stay = window
+        let adults = roomAdults
         ScrollViewReader { proxy in
         ScrollView {
-            VStack(spacing: 18) {
+            LazyVStack(spacing: 18) {
                 IumrahJourneyHeader {
                     IumrahJourneyDisclosureCard(title: "Отели и номера", total: "\(journey.trip.travelerCount) чел. · \(journey.trip.rooms) ном.",
                         subtitle: "\(journey.trip.hotelStayStartDate.formatted(date: .abbreviated, time: .omitted)) — \(journey.trip.returnDate.formatted(date: .abbreviated, time: .omitted))",
@@ -81,15 +93,15 @@ struct NuiteeJourneyHotelsView: View {
                     }
                     if loading { ProgressView().frame(maxWidth: .infinity) }
                     if let error { Text(error).font(.footnote).foregroundStyle(.secondary) }
-                    ForEach(Array(filtered.prefix(visibleCount))) { hotel in
-                        NuiteeHotelListingCard(hotel: hotel, nights: window.nights, adults: roomAdults, sandbox: sandbox,
+                    ForEach(Array(results.prefix(visibleCount))) { hotel in
+                        NuiteeHotelListingCard(hotel: hotel, nights: stay.nights, adults: adults, sandbox: sandbox,
                             favorite: favorites.contains(hotel.id), onOpen: { if ready { opened = hotel } }, onFavorite: {
                                 if favorites.contains(hotel.id) { favorites.remove(hotel.id) } else { favorites.insert(hotel.id) }
                             })
 
                     }
-                    IumrahLoadMoreButton(remaining: filtered.count - visibleCount) { visibleCount += 20 }
-                    if !loading && filtered.isEmpty { Text("На эти даты отели не найдены.").foregroundStyle(.secondary) }
+                    IumrahLoadMoreButton(remaining: results.count - visibleCount) { visibleCount += 20 }
+                    if !loading && results.isEmpty { Text("На эти даты отели не найдены.").foregroundStyle(.secondary) }
                 }.padding(.horizontal, 18).padding(.bottom, 24)
             }
         }
@@ -171,16 +183,18 @@ struct NuiteeJourneyHotelsView: View {
     }
     @MainActor private func load(forceRefresh: Bool = false) async {
         let token = UUID(); requestID = token
+        let requestedSearchID = searchID
         loading = true; error = nil; visibleCount = 20
+        if loadedSearchID != requestedSearchID { hotels = []; hotelRevision &+= 1; loadedSearchID = nil }
+        defer { if requestID == token { loading = false } }
         do {
             let response = try await service.hotels(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: max(1, roomAdults), forceRefresh: forceRefresh)
-            guard requestID == token, !Task.isCancelled else { return }
-            hotels = response.hotels; sandbox = response.sandbox
+            guard requestID == token, searchID == requestedSearchID, !Task.isCancelled else { return }
+            hotels = response.hotels; hotelRevision &+= 1; loadedSearchID = requestedSearchID; sandbox = response.sandbox
             error = response.rateError
         } catch {
-            guard requestID == token, !Task.isCancelled else { return }
-            hotels = []; self.error = error.localizedDescription
+            guard requestID == token, searchID == requestedSearchID, !Task.isCancelled else { return }
+            hotels = []; hotelRevision &+= 1; loadedSearchID = nil; self.error = error.localizedDescription
         }
-        if requestID == token { loading = false }
     }
 }

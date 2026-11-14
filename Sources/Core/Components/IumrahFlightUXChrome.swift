@@ -213,11 +213,11 @@ struct IumrahJourneyHeader<Summary: View>: View {
                 if flightHeading != nil {
                     ZStack(alignment: .bottom) {
                         IumrahFlightPalette.hero
-                        IumrahHemisphereMap(presentation: .horizon, palette: .dark, lightIntensity: 0.85, mapOpacity: 0.42)
+                        IumrahHemisphereMap(presentation: .horizon, palette: .dark, isAnimating: false, lightIntensity: 0.85, mapOpacity: 0.42)
                             .frame(height: 148)
                     }
                 } else {
-                    IumrahWorldDotsHeaderBackground(mapOpacity: 0.30)
+                    IumrahWorldDotsHeaderBackground(mapOpacity: 0.30, isAnimating: false)
                 }
             }
             .offset(y: 0)

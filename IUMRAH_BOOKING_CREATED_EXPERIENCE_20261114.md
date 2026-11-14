@@ -4,17 +4,21 @@ Base: kepler-ios-main 4.zip, commit 5b83c109d17860ed4d2ae29bc9f4ebb4738c6931.
 
 ## Changes
 - Shared `IumrahBookingCreatedContent` for the guest checkout and legacy celebration. The new non-flippable black summary card uses the existing native, spectral `Canvas` renderer extracted from `IumrahBookingDomeCard`; the original renderer and flip-card appearance are preserved.
-- Original PCM chip-ting sound bundled in Resources/Animations, success haptic synchronized with the drawn checkmark, once per mounted successful checkout. Reduce Motion draws the static confirmation immediately. Removed early success haptics and the competing automatic Hotel Storefront navigation.
+- User-selected confirmation sound (MP3 decoded to PCM WAV) bundled in Resources/Animations, success haptic synchronized with the drawn checkmark, once per mounted successful checkout. Reduce Motion draws the static confirmation immediately. Removed early success haptics and the competing automatic Hotel Storefront navigation.
 - Shows real server booking number, pilgrim ID, party size, total and per-person price. The success screen is gated by the existing guest verification, server-identity reconciliation and contact attachment; no client-generated booking IDs or payment confirmation.
 - Verified SMS/email destination, actual Telegram link flow (including linked state on return), status update explanation, next steps and opening the saved booking. Contact attachment is not a delivery receipt. No new account or payment endpoints.
 - 30-minute **estimate** based on persisted server availability-start/creation timestamps, bounded by earlier server deadline; no new timer on reopen. After zero, display a continuing-check message, not failure or automatic confirmation. Current booking status refreshed while visible and active, every 20 seconds until availability phase ends. Booking tab/detail use the same estimate. Existing server SLA, payment hold and document deadlines remain intact.
 - Main confirmation content translated into eight app languages. Existing navigation, theme and secure guest access remain in place.
 
+## V2 sound replacement
+- The supplied MP3 is decoded without trimming, gain changes or added effects. Identical WAV on iOS and Web. SHA-256: `8cee475a36a92382a04e4c1fb9bfef6fce444cab130aa71e55e474324c48a21d`. Existing playback timing and haptic behavior are unchanged.
+- V1 verification below applies to unchanged code; V2 audio checked locally, device playback not verified.
+
 ## Verification
 - Swift frontend parse succeeded for changed source files (Linux Swift; no iOS SDK). Full Xcode compile, iPhone rendering, sound/haptics and live backend delivery require device/TestFlight QA.
 - `swiftc Sources/Models/IumrahBookingAvailabilityEstimate.swift Tests/IumrahBookingAvailabilityEstimateSmoke.swift -o /tmp/iumrah-eta && /tmp/iumrah-eta`: 11/11 passed.
 - Four selected Node contract suites: 13/14 passed. The remaining storefront visual contract expected `iumrahFlightDetailChrome()` in `PackageFlightLegDetailCard`; that symbol is also absent from the uploaded unmodified source. It is unrelated to the completion patch and not silently suppressed.
-- Renderer byte-for-byte comparison passed; all eight new copy tables contain 24 entries; original WAV is 44.1 kHz mono signed 16-bit PCM, 0.46s.
+- Renderer byte-for-byte comparison passed; all eight new copy tables contain 24 entries; V2 WAV is 44.1 kHz stereo signed 16-bit PCM, 1.38449s.
 - Production notifications: iOS continues to call the unified backend verified-phone/verified-email routes. The uploaded repo documents that its PackageEngine source is rollback-only. Actual initial SMS and subsequent delivery cannot be proven from this iOS archive. Do not deploy that old backend; verify the unified Business worker's initial/status dispatch separately.
 
 ## Deployment

@@ -299,7 +299,7 @@ struct IumrahBookingCreatedContent: View {
     }
 }
 
-/// An original, bundled two-tone success sound. System Sound Services respects
+/// The bundled, user-selected booking confirmation sound. System Sound Services respects
 /// the device's silent-mode behavior and does not take over the audio session.
 private enum IumrahBookingCreatedSound {
     @MainActor private static let soundID: SystemSoundID? = {

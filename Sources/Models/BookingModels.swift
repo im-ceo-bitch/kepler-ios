@@ -195,6 +195,8 @@ struct ChatListResponse: Decodable {
     let nextCursor: String?
     let hasMore: Bool?
     let staffReadMessageIDs: [String]?
+    let scopeVersion: String?
+    let reset: Bool?
 }
 
 struct ChatMessagePostResponse: Decodable {

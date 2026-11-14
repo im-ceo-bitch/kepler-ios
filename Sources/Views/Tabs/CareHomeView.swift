@@ -22,6 +22,8 @@ struct CareHomeView: View {
         } ?? bookings.sessions.first
     }
 
+    private var chatAvailable: Bool { bookings.hasCareAccount || activeSession != nil }
+
     private var fixedHeader: some View {
         IumrahPrimaryTabHeader(
                     title: tr("Support", "Поддержка", "Yordam", "Ёрдам"),
@@ -29,12 +31,12 @@ struct CareHomeView: View {
                         labels: [tr("Call", "Позвонить", "Qo‘ng‘iroq", "Қўнғироқ"),
                                  "Telegram", tr("Chat", "Чат", "Chat", "Чат")],
                         symbols: ["phone.fill", "paperplane.fill", "message.fill"],
-                        enabled: [!preferredPhone.isEmpty, telegramURL != nil, activeSession != nil],
+                        enabled: [!preferredPhone.isEmpty, telegramURL != nil, chatAvailable],
                         onSelect: { index in
                             switch index {
                             case 0: openPhone()
                             case 1: openTelegram()
-                            case 2: if activeSession != nil { showHeaderChat = true }
+                            case 2: if chatAvailable { showHeaderChat = true }
                             default: break
                             }
                         }
@@ -48,7 +50,7 @@ struct CareHomeView: View {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
-                IumrahPageHelpCard(activeSession == nil ? "support.no_booking" : "support.active").padding(.bottom, 18)
+                IumrahPageHelpCard(chatAvailable ? "support.active" : "support.no_booking").padding(.bottom, 18)
 
                 if adaptiveLayout.isWide {
                     HStack(alignment: .top, spacing: 22) {
@@ -83,7 +85,9 @@ struct CareHomeView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
         .navigationDestination(isPresented: $showHeaderChat) {
-            if let session = openedChatBookingID.flatMap({ bookings.booking(id: $0) }) ?? activeSession {
+            if bookings.hasCareAccount {
+                BookingChatView(bookingID: "account").id("account")
+            } else if let session = openedChatBookingID.flatMap({ bookings.booking(id: $0) }) ?? activeSession {
                 BookingChatView(bookingID: session.id).id(session.id)
             } else {
                 ContentUnavailableView("Чат будет доступен после бронирования", systemImage: "message")
@@ -101,7 +105,7 @@ struct CareHomeView: View {
     }
 
     private func openRequestedChat() {
-        guard let id = chrome.requestedChatBookingID, bookings.booking(id: id) != nil else { return }
+        guard let id = chrome.requestedChatBookingID, (id == "account" && bookings.hasCareAccount) || bookings.booking(id: id) != nil else { return }
         openedChatBookingID = id
         chrome.requestedChatBookingID = nil
         showHeaderChat = true
@@ -160,7 +164,13 @@ struct CareHomeView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                if let activeSession {
+                if bookings.hasCareAccount {
+                    Label(tr("Your personal Care chat is available", "Ваш личный чат Care доступен", "Shaxsiy Care chatingiz mavjud", "Шахсий Care чатингиз мавжуд"), systemImage: "checkmark.circle")
+                        .font(.system(size: 14.5, weight: .semibold, design: .rounded))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(13)
+                        .background(neutralTileBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                } else if let activeSession {
                     activeBookingContext(activeSession)
                 } else {
                     lockedChatNote
@@ -180,9 +190,9 @@ struct CareHomeView: View {
     @ViewBuilder
     private var careActions: some View {
         HStack(alignment: .top, spacing: 9) {
-            if let activeSession {
+            if chatAvailable {
                 NavigationLink {
-                    BookingChatView(bookingID: activeSession.id)
+                    BookingChatView(bookingID: bookings.hasCareAccount ? "account" : (activeSession?.id ?? "account"))
                 } label: {
                     careActionTile(
                         icon: "message.fill",

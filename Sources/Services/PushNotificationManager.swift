@@ -7,6 +7,7 @@ struct IumrahPushEvent: Equatable {
     let type: String
     let bookingID: String?
     let status: String?
+    let pilgrimID: String?
     let notificationID: String?
     let destination: String?
     let destinationBookingID: String?
@@ -125,6 +126,7 @@ final class PushNotificationManager: ObservableObject {
             type: type,
             bookingID: bookingID,
             status: status,
+            pilgrimID: userInfo["pilgrimID"] as? String,
             notificationID: notificationID,
             destination: destination,
             destinationBookingID: destinationBookingID

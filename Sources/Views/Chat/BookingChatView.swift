@@ -11,7 +11,8 @@ struct BookingChatView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
 
-    let bookingID: String
+    let requestedBookingID: String
+    private var bookingID: String { bookings.careChatKey(for: requestedBookingID) }
 
     @StateObject private var appearance: CareChatAppearanceStore
 
@@ -40,11 +41,11 @@ struct BookingChatView: View {
     private let scrollCoordinateSpace = "care-chat-scroll-space"
 
     init(bookingID: String) {
-        self.bookingID = bookingID
+        self.requestedBookingID = bookingID
         _appearance = StateObject(wrappedValue: CareChatAppearanceStore(bookingID: bookingID))
     }
 
-    private var session: StoredBookingSession? { bookings.booking(id: bookingID) }
+    private var session: StoredBookingSession? { bookingID == "account" ? nil : bookings.booking(id: requestedBookingID) }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -67,7 +68,7 @@ struct BookingChatView: View {
                     .background(Color(uiColor: .systemBackground))
                 }
             }
-            .task {
+            .task(id: bookingID) {
                 messages = bookings.cachedChat(for: bookingID)
                 isLoading = messages.isEmpty
                 rebuildMessagePresentation()
@@ -106,7 +107,7 @@ struct BookingChatView: View {
             }
             .onChange(of: bookings.chats[bookingID]) { _, value in
                 // Clear visible history immediately on sign-out/account switch.
-                if value == nil { messages = []; rebuildMessagePresentation() }
+                if let value { messages = value } else { messages = [] }; rebuildMessagePresentation()
             }
             .onChange(of: messages) { _, _ in
                 rebuildMessagePresentation()
@@ -145,6 +146,7 @@ struct BookingChatView: View {
             registeredImmersive = true
             chrome.beginInternalNavigation()
         }
+        .onChange(of: bookingID) { _, newValue in push.activeChatBookingID = newValue }
         .onDisappear {
             if push.activeChatBookingID == bookingID { push.activeChatBookingID = nil }
             guard registeredImmersive else { return }

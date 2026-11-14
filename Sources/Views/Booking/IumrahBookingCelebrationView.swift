@@ -309,20 +309,20 @@ private struct IumrahCelebrationParticleField: View {
 
     var body: some View {
         GeometryReader { proxy in
-            TimelineView(.animation) { context in
+            IumrahDecorativeTimeline(paused: reduceMotion) { date in
                 ZStack {
                     if !(reduceMotion || systemReduceMotion) {
                         automaticParticles(
-                            date: context.date,
+                            date: date,
                             size: proxy.size
                         )
 
                         tapParticles(
-                            date: context.date,
+                            date: date,
                             size: proxy.size
                         )
                     } else {
-                        reducedMotionHalo(date: context.date, size: proxy.size)
+                        reducedMotionHalo(date: date, size: proxy.size)
                     }
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)

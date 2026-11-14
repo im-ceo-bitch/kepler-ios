@@ -16,7 +16,7 @@ final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
             // Restore local prayer reminders after normal launches, without
             // requesting permissions or touching flight/booking notifications.
             _ = await IumrahPrayerNotifications.synchronize(state: IumrahPrayerState())
-            quickActions.refreshShortcutItems(language: AppSettingsStore.Language(rawValue: UserDefaults.standard.string(forKey: "iumrah.language") ?? AppSettingsStore.Language.uzbek.rawValue) ?? .uzbek, activeBooking: BookingSessionVault.load().first)
+            quickActions.refreshShortcutItems(language: AppSettingsStore.Language(rawValue: UserDefaults.standard.string(forKey: "iumrah.language") ?? AppSettingsStore.Language.uzbek.rawValue) ?? .uzbek, activeBooking: await BookingSessionVault.loadAsync().first)
         }
 
         if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
@@ -33,7 +33,7 @@ final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
         Task { @MainActor in
             quickActions.refreshShortcutItems(
                 language: AppSettingsStore.Language(rawValue: UserDefaults.standard.string(forKey: "iumrah.language") ?? AppSettingsStore.Language.uzbek.rawValue) ?? .uzbek,
-                activeBooking: BookingSessionVault.load().first
+                activeBooking: await BookingSessionVault.loadAsync().first
             )
         }
     }
@@ -84,13 +84,9 @@ final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         if !notification.request.identifier.hasPrefix("iumrah.prayer.") {
-            let inCurrentChat = await MainActor.run {
-                let manager = PushNotificationManager.shared
-                manager.receiveRemotePayload(notification.request.content.userInfo, opened: false)
-                guard let active = manager.activeChatBookingID, let event = manager.lastEvent else { return false }
-                return event.type.hasPrefix("chat_") && event.bookingID == active
+            await MainActor.run {
+                PushNotificationManager.shared.receiveRemotePayload(notification.request.content.userInfo, opened: false)
             }
-            if inCurrentChat { return [.list, .badge] }
         }
         return [.banner, .list, .sound, .badge]
     }

@@ -529,8 +529,8 @@ private struct IumrahBackendNetworkView: View {
             let center = CGPoint(x: size.width * 0.5, y: size.height * 0.5)
             let points = modulePoints(in: size)
 
-            TimelineView(.animation(minimumInterval: 1.0 / 45.0)) { timeline in
-                let seconds = timeline.date.timeIntervalSinceReferenceDate
+            IumrahDecorativeTimeline { date in
+                let seconds = date.timeIntervalSinceReferenceDate
                 let phase = reduceMotion ? 0.34 : seconds.truncatingRemainder(dividingBy: 4.2) / 4.2
 
                 ZStack {

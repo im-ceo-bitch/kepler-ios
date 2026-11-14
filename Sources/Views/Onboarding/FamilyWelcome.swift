@@ -56,8 +56,8 @@ struct FamilyQuoteOrbit: View {
     let still: Bool
     private let symbols = ["airplane", "bed.double.fill", "car.fill", "person.fill"]
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 24, paused: still)) { tick in
-            let phase = still ? 0 : tick.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * .pi * 2 / 5
+        IumrahDecorativeTimeline(maxFPS: 24, paused: still) { date in
+            let phase = still ? 0 : date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * .pi * 2 / 5
             ZStack {
                 Circle().stroke(.secondary.opacity(0.22)).frame(width: 96, height: 96)
                 Image(systemName: "suitcase.fill").font(.title)

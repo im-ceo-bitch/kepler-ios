@@ -51,6 +51,13 @@ actor HotelImageCache {
         self.directory = directory
     }
 
+    func purgeMemory() { memory.removeAllObjects() }
+
+    func setMemoryLimit(_ bytes: Int) {
+        if bytes < memory.totalCostLimit { memory.removeAllObjects() }
+        memory.totalCostLimit = bytes
+    }
+
     func image(for url: URL, maximumPixelDimension: Int = 960) async -> UIImage? {
         guard !Task.isCancelled else { return nil }
         let dimension = max(128, min(1600, maximumPixelDimension))
@@ -120,6 +127,8 @@ actor HotelImageCache {
     }
 
     private func load(url: URL, key: NSURL, dimension: Int) async -> UIImage? {
+        let trace = IumrahPerformanceTrace.begin("Image load")
+        defer { IumrahPerformanceTrace.end("Image load", trace) }
 
         let diskURL = fileURL(for: url)
         if let attributes = try? fileManager.attributesOfItem(atPath: diskURL.path),
@@ -159,7 +168,7 @@ actor HotelImageCache {
         let prioritized = urls.filter { seen.insert($0).inserted }.prefix(12)
         for url in prioritized {
             guard !Task.isCancelled else { return }
-            _ = await image(for: url)
+            _ = await image(for: url, maximumPixelDimension: 512)
         }
     }
 

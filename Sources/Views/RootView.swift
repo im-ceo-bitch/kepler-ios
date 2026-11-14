@@ -6,6 +6,7 @@ struct RootView: View {
     @AppStorage("iumrah.hasCompletedOnboarding.cinematic.v4") private var hasCompletedOnboarding = false
     @StateObject private var settings = AppSettingsStore()
     @ObservedObject var chrome: AppChromeStore
+    var launchLink: IumrahLaunchLink? = nil
     @StateObject private var journey = JourneyStore()
     @StateObject private var manualJourney = IumrahManualJourneyStore()
     @StateObject private var bookings = BookingStore()
@@ -15,12 +16,14 @@ struct RootView: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @ObservedObject private var quickActions = IumrahQuickActionCenter.shared
     @State private var hasBootstrappedAfterOnboarding = false
+    @State private var bookingLinkMemo = BookingLinkMemo()
     @State private var isSupportQuickActionDialogPresented = false
 
     var body: some View {
         IumrahAdaptiveLayoutHost {
             rootContent
         }
+            .modifier(IumrahPerformanceHost())
             .preferredColorScheme(settings.appearance.colorScheme)
             .environment(\.layoutDirection, settings.language.isRightToLeft ? .rightToLeft : .leftToRight)
             .environmentObject(settings)
@@ -37,6 +40,7 @@ struct RootView: View {
                 quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
             }
             .onChange(of: chrome.currentTab) { _, next in
+                IumrahPerformanceTrace.event("Tab switched")
                 let screen = telemetryName(for: next)
                 Task { await IumrahIntelligence.shared.screenChanged(to: screen) }
             }
@@ -67,9 +71,13 @@ struct RootView: View {
                     await syncClientNotifications()
                 }
             }
-            .onChange(of: bookings.sessions) { _, _ in
+            .onChange(of: bookings.sessions) { previous, current in
                 syncWidgets()
-                quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
+                if previous.first?.displayBookingNumber != current.first?.displayBookingNumber {
+                    quickActions.refreshShortcutItems(language: settings.language, activeBooking: current.first)
+                }
+                // Status, hotel hydration and canonical display numbers are not new subscriptions.
+                guard bookingSubscriptionKeys(previous) != bookingSubscriptionKeys(current) else { return }
                 Task {
                     await linkLocalBookingsToAccount()
                     guard hasCompletedOnboarding else { return }
@@ -79,6 +87,11 @@ struct RootView: View {
                 }
             }
             .onChange(of: account.account) { _, newAccount in
+                if newAccount == nil {
+                    bookingLinkMemo.accountToken = nil
+                    bookingLinkMemo.pending.removeAll()
+                    bookingLinkMemo.linked.removeAll()
+                }
                 bookings.setAccountToken(account.bearerToken)
                 syncLocalProfileFromAccount()
                 syncWidgets()
@@ -118,12 +131,11 @@ struct RootView: View {
             .onChange(of: push.eventRevision) { _, _ in
                 guard hasCompletedOnboarding else { return }
                 Task {
+                    await bookings.refreshAll()
+                    await clientNotifications.refresh(accountToken: account.bearerToken)
                     if let bookingID = push.lastEvent?.bookingID,
                        push.lastEvent?.type.hasPrefix("chat_") == true {
                         _ = try? await bookings.loadChat(for: bookingID)
-                    } else {
-                        await bookings.refreshAll()
-                        await clientNotifications.refresh(accountToken: account.bearerToken)
                     }
                 }
             }
@@ -131,7 +143,7 @@ struct RootView: View {
                 guard hasCompletedOnboarding else { return }
                 handleOpenedPushIfNeeded()
             }
-            .onChange(of: quickActions.pendingRequest) { _, request in
+            .onChange(of: quickActions.pendingRequest, initial: true) { _, request in
                 guard let request else { return }
                 handleQuickAction(request.action)
                 quickActions.consume()
@@ -148,12 +160,8 @@ struct RootView: View {
             } message: {
                 Text(quickActionSupportMessage)
             }
-            .onOpenURL { url in
-                handleDeepLink(url)
-            }
-            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
-                guard let url = activity.webpageURL else { return }
-                handleDeepLink(url)
+            .onChange(of: launchLink, initial: true) { _, link in
+                if let link { handleDeepLink(link.url) }
             }
             .onChange(of: scenePhase) { _, phase in
                 let screen = telemetryScreen
@@ -168,6 +176,7 @@ struct RootView: View {
                 syncWidgets()
                 Task {
                     await push.refreshAndRegisterIfAllowed()
+                    await linkLocalBookingsToAccount()
                     // Retry booking-scoped chat push registration whenever the app
                     // returns to foreground. Previously a transient registration
                     // failure could remain silent until another unrelated state change.
@@ -390,7 +399,6 @@ struct RootView: View {
         }
         if let bookingID = event.bookingID {
             if event.type.hasPrefix("chat_") {
-                chrome.requestedChatBookingID = bookingID
                 chrome.navigate(to: .care)
             } else {
                 chrome.openBooking(id: bookingID)
@@ -412,14 +420,43 @@ struct RootView: View {
         }
     }
 
+    private struct BookingSubscriptionKey: Hashable {
+        let id: String
+        let token: String
+    }
+    private func bookingSubscriptionKeys(_ sessions: [StoredBookingSession]) -> Set<BookingSubscriptionKey> {
+        Set(sessions.map { BookingSubscriptionKey(id: $0.id, token: $0.accessToken) })
+    }
+
+    private final class BookingLinkMemo {
+        var accountToken: String?
+        var linked = Set<BookingSubscriptionKey>()
+        var pending = Set<BookingSubscriptionKey>()
+    }
+
     @MainActor
     private func linkLocalBookingsToAccount() async {
-        guard account.isAuthenticated else { return }
+        guard account.isAuthenticated, let accountToken = account.bearerToken else { return }
+        if bookingLinkMemo.accountToken != accountToken {
+            bookingLinkMemo.accountToken = accountToken
+            bookingLinkMemo.linked.removeAll()
+            bookingLinkMemo.pending.removeAll()
+        }
+        bookingLinkMemo.linked.formIntersection(bookingSubscriptionKeys(bookings.sessions))
         for session in bookings.sessions {
+            guard account.bearerToken == accountToken else { return }
             let bookingToken = session.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !bookingToken.isEmpty else { continue }
-            if let linked = try? await account.linkBooking(bookingID: session.id, bookingToken: bookingToken) {
-                bookings.applyCanonicalLink(linked, to: session.id)
+            let key = BookingSubscriptionKey(id: session.id, token: session.accessToken)
+            guard !bookingLinkMemo.linked.contains(key), bookingLinkMemo.pending.insert(key).inserted else { continue }
+            let linked = try? await account.linkBooking(bookingID: session.id, bookingToken: bookingToken)
+            // Ignore a late response from an account that has since signed out.
+            guard bookingLinkMemo.accountToken == accountToken else { return }
+            bookingLinkMemo.pending.remove(key)
+            guard account.bearerToken == accountToken else { return }
+            if let linked {
+                bookingLinkMemo.linked.insert(key)
+                await bookings.applyCanonicalLink(linked, to: session.id)
             }
         }
     }
@@ -529,5 +566,6 @@ struct RootView: View {
 
     private func tabScreen<Content: View>(for tab: AppTab, @ViewBuilder content: () -> Content) -> some View {
         AppNavigationContainer(tab: tab) { content() }
+            .environment(\.iumrahTabIsActive, chrome.currentTab == tab)
     }
 }

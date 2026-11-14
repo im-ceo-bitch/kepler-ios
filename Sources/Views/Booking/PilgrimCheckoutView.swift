@@ -1683,7 +1683,7 @@ struct PilgrimCheckoutView: View {
         _ = profile
         bookings.setAccountToken(account.bearerToken)
         if let linked = try? await account.linkBooking(bookingID: bookingID, bookingToken: session.accessToken) {
-            bookings.applyCanonicalLink(linked, to: bookingID)
+            await bookings.applyCanonicalLink(linked, to: bookingID)
         }
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)
@@ -1739,7 +1739,7 @@ struct PilgrimCheckoutView: View {
             guard let session else { throw APIError.missingBookingToken }
             bookings.setAccountToken(account.bearerToken)
             let linked = try await account.linkBooking(bookingID: bookingID, bookingToken: session.accessToken)
-            bookings.applyCanonicalLink(linked, to: bookingID)
+            await bookings.applyCanonicalLink(linked, to: bookingID)
             if let token = account.bearerToken { await bookings.restoreAccountTrips(token: token) }
             await loadCheckout(showLoader: false)
             IumrahHaptics.success()

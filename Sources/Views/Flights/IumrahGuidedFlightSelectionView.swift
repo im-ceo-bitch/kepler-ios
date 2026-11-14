@@ -611,6 +611,8 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func loadFlights(preserveCalendar: Bool = false) async {
+        let trace = IumrahPerformanceTrace.begin("Guided flight load")
+        defer { IumrahPerformanceTrace.end("Guided flight load", trace) }
         visibleCount = 20
         editingSearch = false
         let requestID = UUID()

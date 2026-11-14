@@ -206,6 +206,8 @@ struct IumrahManualPackageView: View {
     }
     private func money(_ value: Decimal) -> String { "$" + String(format: "%.2f", NSDecimalNumber(decimal: value).doubleValue) }
     @MainActor private func requestQuote() async {
+        let trace = IumrahPerformanceTrace.begin("Manual package quote")
+        defer { IumrahPerformanceTrace.end("Manual package quote", trace) }
         let key = manual.revisionKey
         pricedJourney = nil; pricedKey = nil; estimate = nil; estimateKey = nil; busy = false
         guard manual.hasPriceComponent else { return }

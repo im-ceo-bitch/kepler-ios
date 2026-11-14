@@ -1,18 +1,14 @@
 import Foundation
-import CryptoKit
 import SwiftUI
 
 enum BookingStoreError: LocalizedError {
     case permanentDeleteUnavailable
     case authoritativeQuoteRequired
-    case identityPending
 
     var errorDescription: String? {
         switch self {
         case .permanentDeleteUnavailable:
             return "Permanent booking deletion is not available on the server."
-        case .identityPending:
-            return "Booking saved. Waiting for server booking number and iumrah ID. Retry without creating another booking."
         case .authoritativeQuoteRequired:
             return "The package price must be confirmed by the secure iumrah PackageEngine before booking."
         }
@@ -35,11 +31,7 @@ final class BookingStore: ObservableObject {
     private let accountService = IumrahAccountService()
     private let legacyStorageKey = "iumrah.booking.sessions.v1"
     private var accountToken: String?
-    private var chatCacheKeys: [String: String] = [:]
-    private var chatCursors: [String: String] = [:]
-    private var chatLoads: [String: Task<[ChatMessage], Error>] = [:]
-    private var chatAuthGeneration = UUID()
-
+    private var refreshTask: Task<Void, Never>?
 
     init() {
         loadFromStorage()
@@ -106,16 +98,13 @@ final class BookingStore: ObservableObject {
             hotelSelection: BookingHotelSelectionSnapshot(hotel: hotel, room: room, roomCategory: roomCategory, authoritativeRoomId: authoritativeMakkahRoomId),
             madinahHotelSelection: madinahHotel.map { BookingHotelSelectionSnapshot(hotel: $0, room: madinahRoom, roomCategory: madinahRoomCategory, authoritativeRoomId: authoritativeMadinahRoomId) }
         )
-        if let trip = response.trip, trip.bookingID == session.id {
-            session.mergeOperationalTrip(trip)
-        }
         session.transferVehicle = transferVehicle ?? .carnival
         // Keep only the opaque proof until PackageEngine accepts responsibility for
         // the server-owned cost report. Persist immediately after the canonical booking
         // response so an app termination during Business/profile synchronization cannot
         // lose the reconciliation job. No supplier pricing is readable here.
         session.pendingGeneratorQuoteProof = quote.quoteProof
-        upsert(session)
+        await upsert(session)
 
         // Hand the confidential report to PackageEngine immediately after the
         // canonical booking exists. PackageEngine either commits it to an existing
@@ -130,7 +119,7 @@ final class BookingStore: ObservableObject {
             )
             if pricingReportCommitted {
                 session.pendingGeneratorQuoteProof = nil
-                upsert(session)
+                await upsert(session)
             }
         }
 
@@ -179,7 +168,7 @@ final class BookingStore: ObservableObject {
         if pricingReportCommitted {
             session.pendingGeneratorQuoteProof = nil
         }
-        upsert(session)
+        await upsert(session)
         if let makkahSelection = session.hotelSelection {
             _ = try? await bookingService.updateHotelSelection(
                 id: session.id,
@@ -255,22 +244,17 @@ final class BookingStore: ObservableObject {
         return false
     }
 
-    /// Reconcile a committed booking without issuing another create request.
-    func resolveBookingIdentity(_ saved: StoredBookingSession) async throws -> StoredBookingSession {
-        var session = booking(id: saved.id) ?? saved
-        if session.hasServerIdentity { return session }
-        let operational = try await bookingService.fetchOperationalTrip(
-            id: session.id, headers: ["x-booking-token": session.accessToken]
-        )
-        guard operational.trip.bookingID == session.id else { throw BookingStoreError.identityPending }
-        session.mergeOperationalTrip(operational.trip, statusHistory: operational.statusHistory)
-        session.guide = operational.assignment?.guide ?? session.guide
-        upsert(session)
-        guard session.hasServerIdentity else { throw BookingStoreError.identityPending }
-        return session
+    func refreshAll() async {
+        if let refreshTask { await refreshTask.value; return }
+        let task = Task { @MainActor in await performRefreshAll() }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
     }
 
-    func refreshAll() async {
+    private func performRefreshAll() async {
+        let trace = IumrahPerformanceTrace.begin("Booking refresh")
+        defer { IumrahPerformanceTrace.end("Booking refresh", trace) }
         var staleBookingIDs = Set<String>()
 
         for session in sessions {
@@ -340,35 +324,28 @@ final class BookingStore: ObservableObject {
         }
 
         for id in staleBookingIDs { purgeLocalBooking(id: id) }
-        persist()
+        _ = await BookingSessionVault.saveAsync(sessions)
     }
 
     func setAccountToken(_ token: String?) {
-        let next = token?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if next != accountToken {
-            chatAuthGeneration = UUID()
-            for task in chatLoads.values { task.cancel() }
-            chatLoads.removeAll()
-            chats.removeAll()
-            chatCursors.removeAll()
-            chatCacheKeys.removeAll()
-            // Disk caches are credential-scoped; remove on account transition to avoid retaining private chat history.
-            if accountToken != nil { try? FileManager.default.removeItem(at: chatCacheDirectory) }
-        }
-        accountToken = next
+        accountToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     func restoreAccountTrips(token: String) async {
         setAccountToken(token)
         guard let trips = try? await accountService.trips(token: token) else { return }
         for trip in trips {
+            guard accountToken == token else { return }
             guard let detail = try? await accountService.tripDetail(bookingID: trip.bookingID, token: token) else { continue }
+            guard accountToken == token else { return }
             if let index = sessions.firstIndex(where: { $0.id == trip.bookingID }) {
-                sessions[index].booking = detail.booking
-                sessions[index].mergeOperationalTrip(detail.trip, statusHistory: detail.statusHistory)
-                sessions[index].guide = detail.assignment?.guide ?? sessions[index].guide
-                mergeRemoteHotelSelection(detail.booking.hotelSelection, into: &sessions[index].hotelSelection)
-                mergeRemoteHotelSelection(detail.booking.madinahHotelSelection, into: &sessions[index].madinahHotelSelection)
+                var updated = sessions[index]
+                updated.booking = detail.booking
+                updated.mergeOperationalTrip(detail.trip, statusHistory: detail.statusHistory)
+                updated.guide = detail.assignment?.guide ?? updated.guide
+                mergeRemoteHotelSelection(detail.booking.hotelSelection, into: &updated.hotelSelection)
+                mergeRemoteHotelSelection(detail.booking.madinahHotelSelection, into: &updated.madinahHotelSelection)
+                if updated != sessions[index] { sessions[index] = updated }
             } else {
                 let profile = detail.booking.pilgrimProfile
                 var restored = StoredBookingSession(
@@ -388,36 +365,42 @@ final class BookingStore: ObservableObject {
                 sessions.append(restored)
             }
         }
-        sessions.sort { $0.booking.createdAt > $1.booking.createdAt }
-        persist()
+        let sorted = sessions.sorted { $0.booking.createdAt > $1.booking.createdAt }
+        if sorted != sessions { sessions = sorted }
+        _ = await BookingSessionVault.saveAsync(sessions)
     }
 
-    func applyCanonicalLink(_ value: IumrahAccountLinkBookingResponse, to bookingID: String) {
+    func applyCanonicalLink(_ value: IumrahAccountLinkBookingResponse, to bookingID: String) async {
         guard let index = sessions.firstIndex(where: { $0.id == bookingID }) else { return }
-        sessions[index].pilgrimID = value.pilgrimID
-        sessions[index].bookingNumber = value.bookingNumber ?? sessions[index].bookingNumber
-        sessions[index].bookingDisplayNumber = value.bookingDisplayNumber ?? sessions[index].bookingDisplayNumber
-        persist()
+        var updated = sessions[index]
+        updated.pilgrimID = value.pilgrimID
+        updated.bookingNumber = value.bookingNumber ?? updated.bookingNumber
+        updated.bookingDisplayNumber = value.bookingDisplayNumber ?? updated.bookingDisplayNumber
+        guard updated != sessions[index] else { return }
+        sessions[index] = updated
+        await persist()
     }
 
     private func mergeRemoteBooking(_ booking: RemoteBooking, operational: ClientTripResponse?, bookingID: String) {
         guard let index = sessions.firstIndex(where: { $0.id == bookingID }) else { return }
-        sessions[index].booking = booking
-        if let trip = operational?.trip { sessions[index].mergeOperationalTrip(trip, statusHistory: operational?.statusHistory) }
-        mergeOperationalStatusHistory(operational?.statusHistory, into: &sessions[index])
-        sessions[index].guide = operational?.assignment?.guide ?? sessions[index].guide
+        var updated = sessions[index]
+        updated.booking = booking
+        if let trip = operational?.trip { updated.mergeOperationalTrip(trip, statusHistory: operational?.statusHistory) }
+        mergeOperationalStatusHistory(operational?.statusHistory, into: &updated)
+        updated.guide = operational?.assignment?.guide ?? updated.guide
         if let profile = booking.pilgrimProfile {
-            sessions[index].travelerName = profile.displayName
-            sessions[index].telegram = profile.telegram
-            sessions[index].whatsapp = profile.whatsapp
+            updated.travelerName = profile.displayName
+            updated.telegram = profile.telegram
+            updated.whatsapp = profile.whatsapp
         }
-        mergeRemoteHotelSelection(booking.hotelSelection, into: &sessions[index].hotelSelection)
-        mergeRemoteHotelSelection(booking.madinahHotelSelection, into: &sessions[index].madinahHotelSelection)
+        mergeRemoteHotelSelection(booking.hotelSelection, into: &updated.hotelSelection)
+        mergeRemoteHotelSelection(booking.madinahHotelSelection, into: &updated.madinahHotelSelection)
         if let customization = booking.customization {
-            sessions[index].ziyaratMakkahOverride = customization.ziyaratMakkah
-            sessions[index].ziyaratMadinahOverride = customization.ziyaratMadinah
-            sessions[index].esimOverride = customization.esim
+            updated.ziyaratMakkahOverride = customization.ziyaratMakkah
+            updated.ziyaratMadinahOverride = customization.ziyaratMadinah
+            updated.esimOverride = customization.esim
         }
+        if updated != sessions[index] { sessions[index] = updated }
     }
 
     private func mergeOperationalStatusHistory(_ history: [BookingStatusHistoryEntry]?, into session: inout StoredBookingSession) {
@@ -468,126 +451,43 @@ final class BookingStore: ObservableObject {
         return items
     }
 
-    private struct ChatCacheSnapshot: Codable {
-        let cursor: String
-        let messages: [ChatMessage]
-    }
-
-    private var chatCacheDirectory: URL {
-        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("iumrah-care-private-v1", isDirectory: true)
-    }
-
-    private func chatCacheKey(for session: StoredBookingSession) -> String? {
-        guard let headers = clientHeaderCandidates(for: session).first,
-              let credential = headers["Authorization"] ?? headers["x-booking-token"] else { return nil }
-        return SHA256.hash(data: Data("\(session.id)|\(credential)".utf8)).map { String(format: "%02x", $0) }.joined()
-    }
-
-    func cachedChat(for bookingID: String) -> [ChatMessage] {
-        guard let session = booking(id: bookingID), let key = chatCacheKey(for: session) else { return [] }
-        if chatCacheKeys[bookingID] == key { return chats[bookingID] ?? [] }
-        chatCacheKeys[bookingID] = key
-        let url = chatCacheDirectory.appendingPathComponent(key + ".json")
-        let snapshot = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(ChatCacheSnapshot.self, from: $0) }
-        chatCursors[bookingID] = snapshot?.cursor ?? "0"
-        chats[bookingID] = snapshot?.messages ?? []
-        return snapshot?.messages ?? []
-    }
-
-    private func persistChat(_ bookingID: String) {
-        guard let session = booking(id: bookingID), let key = chatCacheKey(for: session), chatCacheKeys[bookingID] == key,
-              let data = try? JSONEncoder().encode(ChatCacheSnapshot(cursor: chatCursors[bookingID] ?? "0", messages: chats[bookingID] ?? [])) else { return }
-        do {
-            try FileManager.default.createDirectory(at: chatCacheDirectory, withIntermediateDirectories: true)
-            try data.write(to: chatCacheDirectory.appendingPathComponent(key + ".json"), options: [.atomic, .completeFileProtection])
-        } catch { /* Cache is disposable; authoritative messages remain on the server. */ }
-    }
-
-    private func mergeChat(_ incoming: [ChatMessage], for bookingID: String, readIDs: [String] = []) -> [ChatMessage] {
-        var byID: [String: ChatMessage] = [:]
-        for message in chats[bookingID] ?? [] { byID[message.id] = message }
-        for var message in incoming {
-            if byID[message.id]?.readByStaff == true { message.readByStaff = true }
-            byID[message.id] = message
-        }
-        for id in readIDs { byID[id]?.readByStaff = true }
-        return byID.values.sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
-    }
-
     func loadChat(for bookingID: String) async throws -> [ChatMessage] {
-        if let running = chatLoads[bookingID] { return try await running.value }
-        guard let session = booking(id: bookingID), let key = chatCacheKey(for: session) else { throw APIError.missingBookingToken }
-        _ = cachedChat(for: bookingID)
-        let generation = chatAuthGeneration
-        let task = Task { @MainActor in
-            // A bounded page loop catches up on large histories without downloading old messages on each open.
-            for _ in 0..<20 {
-                try Task.checkCancellation()
-                let cursor = chatCursors[bookingID] ?? "0"
-                let unread = (chats[bookingID] ?? []).filter { $0.senderType == "client" && $0.readByStaff != true }.suffix(80).map(\.id)
-                let (response, headers) = try await performWithClientAuthorization(for: session) { headers in
-                    try await chatService.loadChat(bookingID: bookingID, after: cursor, unread: unread, headers: headers)
-                }
-                try Task.checkCancellation()
-                guard generation == chatAuthGeneration, chatCacheKeys[bookingID] == key else { throw CancellationError() }
-                // If the account token fell back to a booking token, the server still authorizes this exact booking.
-                _ = headers
-                if !response.messages.isEmpty || !(response.staffReadMessageIDs ?? []).isEmpty {
-                    let merged = mergeChat(response.messages, for: bookingID, readIDs: response.staffReadMessageIDs ?? [])
-                    if chats[bookingID] != merged { chats[bookingID] = merged }
-                }
-                chatCursors[bookingID] = response.nextCursor ?? "0"
-                if !response.messages.isEmpty || !(response.staffReadMessageIDs ?? []).isEmpty || cursor != chatCursors[bookingID] { persistChat(bookingID) }
-                guard response.hasMore == true, let next = response.nextCursor, next != cursor else { break }
-            }
-            return chats[bookingID] ?? []
+        guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
+        let (response, headers) = try await performWithClientAuthorization(for: session) { headers in
+            try await chatService.loadChat(bookingID: bookingID, headers: headers)
         }
-        chatLoads[bookingID] = task
-        defer { if generation == chatAuthGeneration { chatLoads[bookingID] = nil } }
-        return try await task.value
+        let messages = response.messages.sorted(by: { $0.createdAt < $1.createdAt })
+        chats[bookingID] = messages
+        _ = try? await chatService.markRead(bookingID: bookingID, headers: headers)
+        return messages
     }
 
-    func send(message: String, for bookingID: String, clientMessageID: String = UUID().uuidString) async throws -> ChatMessage {
+    func send(message: String, for bookingID: String) async throws -> ChatMessage {
         guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
-        _ = cachedChat(for: bookingID)
-        let generation = chatAuthGeneration
         let (created, _) = try await performWithClientAuthorization(for: session) { headers in
-            try await chatService.send(message: message, bookingID: bookingID, clientMessageID: clientMessageID, headers: headers)
+            try await chatService.send(message: message, bookingID: bookingID, headers: headers)
         }
-        guard generation == chatAuthGeneration else { throw CancellationError() }
-        chats[bookingID] = mergeChat([created], for: bookingID)
-        persistChat(bookingID)
+        var current = chats[bookingID] ?? []
+        current.append(created)
+        chats[bookingID] = current.sorted(by: { $0.createdAt < $1.createdAt })
         return created
     }
 
     func sendPhoto(data: Data, for bookingID: String) async throws -> ChatMessage {
         guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
-        _ = cachedChat(for: bookingID)
-        let generation = chatAuthGeneration
         let (created, _) = try await performWithClientAuthorization(for: session) { headers in
             try await chatService.sendPhoto(data: data, bookingID: bookingID, headers: headers)
         }
-        guard generation == chatAuthGeneration else { throw CancellationError() }
-        chats[bookingID] = mergeChat([created], for: bookingID)
-        persistChat(bookingID)
+        var current = chats[bookingID] ?? []
+        current.append(created)
+        chats[bookingID] = current.sorted(by: { $0.createdAt < $1.createdAt })
         return created
     }
 
     func chatAttachmentData(path: String, bookingID: String) async throws -> Data {
         guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
-        guard let key = chatCacheKey(for: session) else { throw APIError.missingBookingToken }
-        let generation = chatAuthGeneration
-        let pathHash = SHA256.hash(data: Data(path.utf8)).map { String(format: "%02x", $0) }.joined()
-        let url = chatCacheDirectory.appendingPathComponent(key + "-" + pathHash + ".media")
-        if let data = try? Data(contentsOf: url), !data.isEmpty { return data }
         let (data, _) = try await performWithClientAuthorization(for: session) { headers in
             try await chatService.loadAttachment(path: path, headers: headers)
-        }
-        guard generation == chatAuthGeneration else { throw CancellationError() }
-        if data.count <= 5_000_000 {
-            try? FileManager.default.createDirectory(at: chatCacheDirectory, withIntermediateDirectories: true)
-            try? data.write(to: url, options: [.atomic, .completeFileProtection])
         }
         return data
     }
@@ -686,7 +586,7 @@ final class BookingStore: ObservableObject {
             sessions[index].hotelSelection = snapshot
         }
         sessions[index].pendingChangeConfirmation = true
-        persist()
+        await persist()
     }
 
     func updateContacts(bookingID: String, telegram: String, whatsapp: String) async throws {
@@ -719,11 +619,13 @@ final class BookingStore: ObservableObject {
                 accessToken: session.accessToken,
                 profile: updatedProfile
             ) {
-                sessions[index].mergeOperationalTrip(response.trip, statusHistory: response.statusHistory)
-                sessions[index].guide = response.assignment?.guide ?? sessions[index].guide
+                if let currentIndex = sessions.firstIndex(where: { $0.id == bookingID }) {
+                    sessions[currentIndex].mergeOperationalTrip(response.trip, statusHistory: response.statusHistory)
+                    sessions[currentIndex].guide = response.assignment?.guide ?? sessions[currentIndex].guide
+                }
             }
         }
-        persist()
+        await persist()
     }
 
     func updateZiyarat(bookingID: String, makkah: Bool, madinah: Bool) async throws {
@@ -740,7 +642,7 @@ final class BookingStore: ObservableObject {
         sessions[index].ziyaratMakkahOverride = makkah
         sessions[index].ziyaratMadinahOverride = madinah
         sessions[index].pendingChangeConfirmation = true
-        persist()
+        await persist()
     }
 
 
@@ -752,14 +654,14 @@ final class BookingStore: ObservableObject {
         guard let index = sessions.firstIndex(where: { $0.id == bookingID }) else { return }
         sessions[index].esimOverride = enabled
         sessions[index].pendingChangeConfirmation = true
-        persist()
+        await persist()
     }
 
     func requestChangeConfirmation(bookingID: String, message: String) async throws {
         _ = try await send(message: message, for: bookingID)
         guard let index = sessions.firstIndex(where: { $0.id == bookingID }) else { return }
         sessions[index].pendingChangeConfirmation = false
-        persist()
+        await persist()
     }
 
     private func syncHotelSelectionIfNeeded(
@@ -789,7 +691,7 @@ final class BookingStore: ObservableObject {
     func deleteBooking(id: String) async throws {
         guard let session = booking(id: id) else {
             purgeLocalBooking(id: id)
-            persist()
+            await persist()
             return
         }
 
@@ -815,7 +717,7 @@ final class BookingStore: ObservableObject {
         }
 
         purgeLocalBooking(id: id)
-        persist()
+        await persist()
     }
 
     private func clientHeaderCandidates(for session: StoredBookingSession) -> [[String: String]] {
@@ -913,13 +815,6 @@ final class BookingStore: ObservableObject {
     }
     private func purgeLocalBooking(id: String) {
         sessions.removeAll(where: { $0.id == id })
-        chatLoads[id]?.cancel()
-        chatLoads[id] = nil
-        if let key = chatCacheKeys.removeValue(forKey: id) {
-            let files = (try? FileManager.default.contentsOfDirectory(at: chatCacheDirectory, includingPropertiesForKeys: nil)) ?? []
-            for file in files where file.lastPathComponent == key + ".json" || file.lastPathComponent.hasPrefix(key + "-") { try? FileManager.default.removeItem(at: file) }
-        }
-        chatCursors[id] = nil
         chats[id] = nil
         itineraries[id] = nil
     }
@@ -959,17 +854,17 @@ final class BookingStore: ObservableObject {
         )
     }
 
-    private func upsert(_ session: StoredBookingSession) {
+    private func upsert(_ session: StoredBookingSession) async {
         if let index = sessions.firstIndex(where: { $0.id == session.id }) {
-            sessions[index] = session
+            if sessions[index] != session { sessions[index] = session }
         } else {
             sessions.insert(session, at: 0)
         }
-        persist()
+        await persist()
     }
 
-    private func persist() {
-        _ = BookingSessionVault.save(sessions)
+    private func persist() async {
+        _ = await BookingSessionVault.saveAsync(sessions)
     }
 
     private func loadFromStorage() {

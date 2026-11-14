@@ -47,12 +47,12 @@ struct IumrahWorldDotsMap: View {
     }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !shouldAnimate)) { timeline in
+        IumrahDecorativeTimeline(paused: !shouldAnimate) { date in
             GeometryReader { geometry in
                 let width = max(0.0, min(geometry.size.width, geometry.size.height * mapRatio))
                 let height = width / mapRatio
                 let phase = shouldAnimate
-                    ? Float(timeline.date.timeIntervalSince(startDate).truncatingRemainder(dividingBy: 3600))
+                    ? Float(max(0, date.timeIntervalSince(startDate)).truncatingRemainder(dividingBy: 3600))
                     : Float(0)
 
                 Image("IumrahWorldDots")

@@ -60,10 +60,13 @@ extension JourneyStore {
         localJourneyRooms.values.sorted { $0.id < $1.id }.map(\.bookingSelection)
     }
     var localBookingInputKey: String {
+        if let cachedLocalBookingInputKey { return cachedLocalBookingInputKey }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         let rooms = (try? encoder.encode(localBookingRooms)).flatMap { String(data:$0,encoding:.utf8) } ?? ""
         let flightKey = localJourneyFlights.map { $0.id + ":" + $0.departureAt }.joined(separator: "|")
-        return flightKey + "|" + (mixedFlightIdentity ?? "") + "|" + rooms + "|" + String(trip.hashValue) + "|" + (selectedTransferVehicle?.rawValue ?? "") + "|" + String(haramainTrainSelected) + "|" + String(haramainTicketCount) + "|" + haramainFareClass.rawValue
+        let key = flightKey + "|" + (mixedFlightIdentity ?? "") + "|" + rooms + "|" + String(trip.hashValue) + "|" + (selectedTransferVehicle?.rawValue ?? "") + "|" + String(haramainTrainSelected) + "|" + String(haramainTicketCount) + "|" + haramainFareClass.rawValue
+        cachedLocalBookingInputKey = key
+        return key
     }
     var localPackageTier: PackageTier? {
         let stars = localJourneyRooms.values.map { $0.hotel.roundedStars }

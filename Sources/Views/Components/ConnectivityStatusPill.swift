@@ -15,6 +15,8 @@ struct IumrahAnimatedConnectivityIndicator: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var connectivity = IumrahConnectivityMonitor.shared
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.iumrahTabIsActive) private var activeTab
+    @Environment(\.iumrahPerformanceProfile) private var performanceProfile
     @State private var visible = false
 
     var lightStyle = false
@@ -26,18 +28,18 @@ struct IumrahAnimatedConnectivityIndicator: View {
     private let height: CGFloat = 34
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !visible || scenePhase != .active)) { context in
-            indicator(at: context.date)
+        IumrahDecorativeTimeline(maxFPS: 24, paused: !visible, staticWhenConstrained: true) { date in
+            indicator(at: date)
         }
         .frame(width: expandedWidth, height: height, alignment: .trailing)
         .onAppear { visible = true }
         .onDisappear { visible = false }
-        .task(id: "\(connectivity.status)-\(scenePhase)-\(visible)") {
-            guard visible, scenePhase == .active else { return }
+        .task(id: "\(connectivity.status)-\(scenePhase)-\(visible)-\(activeTab)-\(performanceProfile.rawValue)-\(reduceMotion)") {
+            guard visible, activeTab, scenePhase == .active else { return }
             await runPresentationCycle(for: connectivity.status)
         }
-        .task(id: scenePhase) {
-            guard scenePhase == .active else { return }
+        .task(id: "\(scenePhase)-\(visible)-\(activeTab)") {
+            guard visible, activeTab, scenePhase == .active else { return }
             // Preserve the existing reachability behaviour. The animated control
             // only changes presentation, not the network source of truth.
             while !Task.isCancelled {
@@ -121,7 +123,7 @@ struct IumrahAnimatedConnectivityIndicator: View {
     private func runPresentationCycle(for status: IumrahConnectivityStatus) async {
         isExpanded = false
 
-        guard !reduceMotion else {
+        guard !reduceMotion, performanceProfile != .efficiency else {
             isExpanded = status != .checking
             return
         }

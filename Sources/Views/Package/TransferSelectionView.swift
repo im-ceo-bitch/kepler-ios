@@ -473,6 +473,8 @@ struct TransferSelectionView: View {
 
     @MainActor
     private func prepareTransferSelection() async {
+        let trace = IumrahPerformanceTrace.begin("Transfer prepare")
+        defer { IumrahPerformanceTrace.end("Transfer prepare", trace) }
         journey.ensureHaramainTicketDefaults()
         if familyFlow {
             let choice = journey.selectedTransferVehicle ?? journey.recommendedTransferVehicle()
@@ -507,6 +509,8 @@ struct TransferSelectionView: View {
 
     @MainActor
     private func confirmTransfer() async {
+        let trace = IumrahPerformanceTrace.begin("Transfer confirm")
+        defer { IumrahPerformanceTrace.end("Transfer confirm", trace) }
         guard !isConfirming else { return }
         isConfirming = true
         confirmationError = nil

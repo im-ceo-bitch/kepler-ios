@@ -13,24 +13,50 @@ struct HotelPackagePriceGraphSheet: View {
     @State private var isOpeningPackage = false
     @State private var packageUnavailable = false
 
-    private var days: [Date] {
+    private struct Day: Identifiable {
+        let id: String
+        let title: String
+        let number: String
+        let weekday: String
+    }
+    private struct GraphKey: Equatable {
+        let revision: Int
+        let start: Date
+        let locale: String
+        let timeZone: String
+    }
+    private struct Graph {
+        let days: [Day]
+        let prices: [String: HotelPackagePricePoint]
+        let minimum: Decimal?
+        let maximum: Double
+    }
+    @State private var memo = IumrahViewMemo<GraphKey, Graph>()
+
+    private var graph: Graph {
         let calendar = Calendar(identifier: .gregorian)
-        let start = calendar.startOfDay(for: Date())
-        return (0..<90).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
-    }
-
-    private var priceByDay: [String: HotelPackagePricePoint] {
-        Dictionary(uniqueKeysWithValues: storefront.hotelPackagePriceCalendar.map { ($0.id, $0) })
-    }
-
-    private var selectedPrice: HotelPackagePricePoint? { priceByDay[selectedDayID] }
-
-    private var minimumPrice: Decimal? { storefront.hotelPackagePriceCalendar.map(\.pricePerPersonUSD).min() }
-    private var maximumPrice: Double {
-        max(1, storefront.hotelPackagePriceCalendar.map { NSDecimalNumber(decimal: $0.pricePerPersonUSD).doubleValue }.max() ?? 1)
+        let key = GraphKey(revision: storefront.packagePriceRevision,
+                           start: calendar.startOfDay(for: Date()),
+                           locale: settings.language.localeIdentifier, timeZone: calendar.timeZone.identifier)
+        return memo.value(for: key) {
+            let idFormatter = DateFormatter(); idFormatter.calendar = calendar
+            idFormatter.locale = Locale(identifier: "en_US_POSIX"); idFormatter.dateFormat = "yyyy-MM-dd"
+            let titleFormatter = DateFormatter(); titleFormatter.locale = Locale(identifier: key.locale); titleFormatter.dateStyle = .long
+            let weekdayFormatter = DateFormatter(); weekdayFormatter.locale = Locale(identifier: key.locale); weekdayFormatter.dateFormat = "EEEEE"
+            let days = (0..<90).compactMap { calendar.date(byAdding: .day, value: $0, to: key.start) }.map { date in
+                Day(id: idFormatter.string(from: date), title: titleFormatter.string(from: date),
+                    number: String(Calendar.current.component(.day, from: date)), weekday: weekdayFormatter.string(from: date))
+            }
+            let points = storefront.hotelPackagePriceCalendar
+            return Graph(days: days, prices: Dictionary(uniqueKeysWithValues: points.map { ($0.id, $0) }),
+                         minimum: points.map(\.pricePerPersonUSD).min(),
+                         maximum: max(1, points.map { NSDecimalNumber(decimal: $0.pricePerPersonUSD).doubleValue }.max() ?? 1))
+        }
     }
 
     var body: some View {
+        let snapshot = graph
+        let selectedPrice = snapshot.prices[selectedDayID]
         NavigationStack {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 25) {
@@ -46,7 +72,7 @@ struct HotelPackagePriceGraphSheet: View {
                         HStack {
                             Image(systemName: "calendar")
                                 .foregroundStyle(.blue)
-                            Text(selectedDateTitle)
+                            Text(snapshot.days.first(where: { $0.id == selectedDayID })?.title ?? "—")
                                 .font(.headline)
                             Spacer()
                             Text("USD")
@@ -58,10 +84,9 @@ struct HotelPackagePriceGraphSheet: View {
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(alignment: .bottom, spacing: 9) {
-                                ForEach(days, id: \.self) { date in
-                                    let id = dateID(date)
-                                    dayColumn(date: date, quote: priceByDay[id], selected: selectedDayID == id)
-                                        .id(id)
+                                ForEach(snapshot.days) { day in
+                                    dayColumn(day: day, quote: snapshot.prices[day.id], selected: selectedDayID == day.id, minimumPrice: snapshot.minimum, maximumPrice: snapshot.maximum)
+                                        .id(day.id)
                                 }
                             }
                             .scrollTargetLayout()
@@ -173,18 +198,20 @@ struct HotelPackagePriceGraphSheet: View {
             }
             .onAppear {
                 if selectedDayID.isEmpty {
-                    let availableIDs = Set(days.map(dateID))
+                    let availableIDs = Set(snapshot.days.map(\.id))
                     let first = storefront.hotelPackagePriceCalendar
                         .first(where: { availableIDs.contains($0.id) })?.id
-                        ?? days.first.map(dateID) ?? ""
+                        ?? snapshot.days.first?.id ?? ""
                     selectedDayID = first
                     centeredDayID = first
                 }
             }
             .task {
                 await storefront.prepareIfNeeded()
-                if selectedPrice == nil,
-                   let available = storefront.hotelPackagePriceCalendar.first(where: { priceByDay[$0.id] != nil }) {
+                let refreshed = graph
+                let visibleIDs = Set(refreshed.days.map(\.id))
+                if refreshed.prices[selectedDayID] == nil,
+                   let available = storefront.hotelPackagePriceCalendar.first(where: { visibleIDs.contains($0.id) }) {
                     withAnimation(.smooth(duration: 0.30)) {
                         selectedDayID = available.id
                         centeredDayID = available.id
@@ -196,14 +223,14 @@ struct HotelPackagePriceGraphSheet: View {
         .presentationDragIndicator(.visible)
     }
 
-    private func dayColumn(date: Date, quote: HotelPackagePricePoint?, selected: Bool) -> some View {
+    private func dayColumn(day: Day, quote: HotelPackagePricePoint?, selected: Bool, minimumPrice: Decimal?, maximumPrice: Double) -> some View {
         let amount = quote.map { NSDecimalNumber(decimal: $0.pricePerPersonUSD).doubleValue }
         let best = quote != nil && quote?.pricePerPersonUSD == minimumPrice
         return Button {
-            guard selectedDayID != dateID(date) else { return }
+            guard selectedDayID != day.id else { return }
             withAnimation(.smooth(duration: 0.25)) {
-                selectedDayID = dateID(date)
-                centeredDayID = dateID(date)
+                selectedDayID = day.id
+                centeredDayID = day.id
             }
             IumrahHaptics.soft()
         } label: {
@@ -219,9 +246,9 @@ struct HotelPackagePriceGraphSheet: View {
                     .fill(selected ? Color.blue : (best ? Color.green : Color.gray.opacity(0.28)))
                     .frame(width: 43, height: amount.map { CGFloat(max(30.0, min(142.0, 142.0 * $0 / maximumPrice))) } ?? 7)
                     .frame(height: 145, alignment: .bottom)
-                Text(dayNumber(date))
+                Text(day.number)
                     .font(.system(size: 15, weight: selected ? .bold : .medium, design: .rounded))
-                Text(weekday(date))
+                Text(day.weekday)
                     .font(.caption2)
             }
             .foregroundStyle(selected ? Color.blue : Color.primary)
@@ -230,36 +257,7 @@ struct HotelPackagePriceGraphSheet: View {
             .background(selected ? Color.blue.opacity(0.07) : Color.clear, in: RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(dateTitle(date)), \(quote.map { money($0.pricePerPersonUSD) } ?? "—")")
-    }
-
-    private var selectedDateTitle: String {
-        guard let date = days.first(where: { dateID($0) == selectedDayID }) else { return "—" }
-        return dateTitle(date)
-    }
-
-    private func dateID(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
-
-    private func dateTitle(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: settings.language.localeIdentifier)
-        formatter.dateStyle = .long
-        return formatter.string(from: date)
-    }
-
-    private func dayNumber(_ date: Date) -> String { String(Calendar.current.component(.day, from: date)) }
-
-    private func weekday(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: settings.language.localeIdentifier)
-        formatter.dateFormat = "EEEEE"
-        return formatter.string(from: date)
+        .accessibilityLabel("\(day.title), \(quote.map { money($0.pricePerPersonUSD) } ?? "—")")
     }
 
     private func money(_ value: Decimal) -> String {

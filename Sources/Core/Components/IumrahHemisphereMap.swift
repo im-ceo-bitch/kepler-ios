@@ -47,9 +47,9 @@ struct IumrahHemisphereMap: View {
             let fraction: CGFloat = presentation == .horizon ? 0.48 : 1
             let diameter = min(proxy.size.width, proxy.size.height / fraction)
             let land = IumrahHemispherePathCache.path(for: projection)
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !animates)) { timeline in
+            IumrahDecorativeTimeline(paused: !animates) { date in
                 let period = cycleDuration.isFinite ? max(6, min(60, cycleDuration)) : 12
-                let elapsed = animates ? timeline.date.timeIntervalSince(startDate) : 0
+                let elapsed = animates ? max(0, date.timeIntervalSince(startDate)) : 0
                 let phase = elapsed.truncatingRemainder(dividingBy: period) / period * 2 * .pi
                 let intensity = lightIntensity.isFinite ? max(0, min(1, lightIntensity)) : 0
                 let opacity = mapOpacity.isFinite ? max(0, min(1, mapOpacity)) : 1

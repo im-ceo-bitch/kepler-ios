@@ -5,6 +5,8 @@ struct UmrahAdvisorWave: View {
     var isActive: Bool
     var compact = false
 
+    @Environment(\.iumrahPerformanceProfile) private var performanceProfile
+
     private let waveColors: [Color] = [
         Color(red: 1.00, green: 0.72, blue: 0.30),
         Color(red: 1.00, green: 0.65, blue: 0.18),
@@ -16,9 +18,9 @@ struct UmrahAdvisorWave: View {
     ]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: isActive ? 1.0 / 30.0 : 1.0 / 14.0)) { timeline in
+        IumrahDecorativeTimeline(paused: !isActive) { date in
             Canvas { context, size in
-                let time = timeline.date.timeIntervalSinceReferenceDate
+                let time = date.timeIntervalSinceReferenceDate
                 let centerY = size.height * 0.52
                 let centerX = size.width / 2
 
@@ -29,7 +31,7 @@ struct UmrahAdvisorWave: View {
                     let speed = isActive ? 2.8 : 0.78
                     let phase = [0.0, 1.3, 2.7, 0.8, 3.9, 5.2, 4.1][index]
 
-                    for x in stride(from: 0.0, through: Double(size.width), by: 2.0) {
+                    for x in stride(from: 0.0, through: Double(size.width), by: performanceProfile == .efficiency ? 4.0 : 2.0) {
                         let normalizedX = x / max(Double(size.width), 1)
                         let distance = abs(x - Double(centerX)) / max(Double(centerX), 1)
                         let edgeFade = max(0, 1 - distance)

@@ -39,6 +39,7 @@ struct UmrahAnimatedText: View {
     var isArabic = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.iumrahPerformanceProfile) private var performanceProfile
 
     var body: some View {
         ZStack(alignment: alignment == .center ? .center : .leading) {
@@ -51,7 +52,7 @@ struct UmrahAnimatedText: View {
                 .environment(\.layoutDirection, isArabic ? .rightToLeft : .leftToRight)
                 .fixedSize(horizontal: false, vertical: true)
                 .id(text)
-                .transition(reduceMotion ? .opacity : .umrahTextChange)
+                .transition((reduceMotion || performanceProfile == .efficiency) ? .opacity : .umrahTextChange)
         }
         .animation(reduceMotion ? .easeInOut(duration: 0.22) : .smooth(duration: 0.46, extraBounce: 0), value: text)
     }
@@ -60,11 +61,12 @@ struct UmrahAnimatedText: View {
 private struct UmrahEntranceMotion: ViewModifier {
     @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.iumrahPerformanceProfile) private var performanceProfile
 
     func body(content: Content) -> some View {
         content
             .opacity(appeared ? 1 : 0)
-            .blur(radius: appeared || reduceMotion ? 0 : 5)
+            .blur(radius: appeared || reduceMotion || performanceProfile == .efficiency ? 0 : 5)
             .offset(y: appeared || reduceMotion ? 0 : 8)
             .scaleEffect(appeared || reduceMotion ? 1 : 0.994)
             .onAppear {

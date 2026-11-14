@@ -27,10 +27,10 @@ struct IumrahSystemGlow: View {
     private let softPink = Color(red: 0.98, green: 0.28, blue: 0.76)
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: frameInterval, paused: reduceMotion || !isActive || !visible || scenePhase != .active)) { timeline in
+        IumrahDecorativeTimeline(paused: !isActive || !visible, staticWhenConstrained: true) { date in
             GeometryReader { proxy in
                 let size = proxy.size
-                let seconds = timeline.date.timeIntervalSinceReferenceDate
+                let seconds = date.timeIntervalSinceReferenceDate
                 let phase = resolvedPhase(seconds)
 
                 ZStack {

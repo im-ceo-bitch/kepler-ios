@@ -139,6 +139,8 @@ final class IumrahFlightBrowseModel: ObservableObject {
     @Published private(set) var error: String?
     private var requestID = UUID()
     func load(trip: TripDraft, language: AppSettingsStore.Language) async {
+        let trace = IumrahPerformanceTrace.begin("Flight catalogue load")
+        defer { IumrahPerformanceTrace.end("Flight catalogue load", trace) }
         let token = UUID(); requestID = token
         loading = true; error = nil; flights = []
         defer { if requestID == token { loading = false } }
@@ -194,6 +196,8 @@ final class IumrahFlightBrowseModel: ObservableObject {
         }
     }
     func loadDay(_ day: String, trip: TripDraft, direction: Int, language: AppSettingsStore.Language) async {
+        let trace = IumrahPerformanceTrace.begin("Flight day load")
+        defer { IumrahPerformanceTrace.end("Flight day load", trace) }
         guard trip.effectiveFlightFilters.cabinClass == .economy else { return }
         let token = UUID(); requestID = token
         loading = true; error = nil

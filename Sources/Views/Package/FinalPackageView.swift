@@ -410,6 +410,8 @@ struct LegacyFinalPackageView: View {
         .background(.regularMaterial)
     }
     @MainActor private func recalculatePrice() async {
+        let trace = IumrahPerformanceTrace.begin("Final package quote")
+        defer { IumrahPerformanceTrace.end("Final package quote", trace) }
         guard !isCalculatingPrice else { return }
         isCalculatingPrice = true
         defer { isCalculatingPrice = false }

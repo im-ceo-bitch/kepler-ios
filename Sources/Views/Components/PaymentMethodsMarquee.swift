@@ -17,12 +17,12 @@ struct IumrahPaymentMethodsMarquee: View {
 
     var body: some View {
         GeometryReader { _ in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+            IumrahDecorativeTimeline(maxFPS: 24) { date in
                 let itemWidth: CGFloat = compact ? 84 : 98
                 let spacing: CGFloat = compact ? 14 : 18
                 let groupWidth = CGFloat(logos.count) * (itemWidth + spacing)
                 let speed: Double = compact ? 21 : 25
-                let traveled = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate * speed
+                let traveled = reduceMotion ? 0 : date.timeIntervalSinceReferenceDate * speed
                 let offset = CGFloat(traveled.truncatingRemainder(dividingBy: Double(groupWidth)))
 
                 HStack(spacing: spacing) {

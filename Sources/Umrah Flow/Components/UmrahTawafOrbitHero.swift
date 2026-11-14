@@ -8,7 +8,7 @@ struct UmrahTawafOrbitHero: View {
     let language: UmrahGuideLanguage
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.iumrahPerformanceProfile) private var performanceProfile
 
     private var currentRound: Int { min(7, completed + 1) }
 
@@ -17,15 +17,15 @@ struct UmrahTawafOrbitHero: View {
             ZStack(alignment: .leading) {
                 Color.black
 
-                TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || scenePhase != .active)) { timeline in
+                IumrahDecorativeTimeline { date in
                     Canvas(opaque: false, rendersAsynchronously: true) { context, size in
                         let leftArea = size.width * 0.55
                         context.clip(to: Path(CGRect(x: 0, y: 0, width: leftArea, height: size.height)))
-                        let t = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
+                        let t = reduceMotion ? 0.0 : date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 3600)
                         let center = CGPoint(x: -7, y: size.height * 0.50)
 
                         // Deterministic varied segments avoid re-randomizing on redraw.
-                        for index in 0..<150 {
+                        for index in stride(from: 0, to: 150, by: performanceProfile == .efficiency ? 2 : 1) {
                             let indexD = Double(index)
                             let seed = Double((index * 127 + 23) % 997) / 997.0
                             let noise = Double((index * 283 + 83) % 991) / 991.0

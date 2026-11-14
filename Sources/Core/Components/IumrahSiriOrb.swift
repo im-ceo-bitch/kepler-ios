@@ -42,10 +42,10 @@ struct IumrahSiriOrb: View {
     @State private var visible = false
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: frameInterval, paused: reduceMotion || !isActive || !visible || scenePhase != .active)) { timeline in
+        IumrahDecorativeTimeline(paused: !isActive || !visible) { date in
             GeometryReader { proxy in
                 let side = min(proxy.size.width, proxy.size.height)
-                let seconds = timeline.date.timeIntervalSinceReferenceDate
+                let seconds = date.timeIntervalSinceReferenceDate
                 let phase = resolvedPhase(seconds)
                 let energy = resolvedAudioEnergy
                 let reactive = audioLevel != nil

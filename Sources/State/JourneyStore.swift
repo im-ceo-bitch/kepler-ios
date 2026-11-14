@@ -26,10 +26,11 @@ struct GeneratorGroupSavingsQuoteSet: Hashable {
 
 @MainActor
 final class JourneyStore: ObservableObject {
-    @Published var trip = TripDraft()
+    var cachedLocalBookingInputKey: String?
+    @Published var trip = TripDraft() { didSet { cachedLocalBookingInputKey = nil } }
     @Published var usesLocalJourney = false
-    @Published var localJourneyFlights: [LocalJourneyFlight] = []
-    @Published var localJourneyRooms: [String: LocalJourneyRoom] = [:]
+    @Published var localJourneyFlights: [LocalJourneyFlight] = [] { didSet { cachedLocalBookingInputKey = nil } }
+    @Published var localJourneyRooms: [String: LocalJourneyRoom] = [:] { didSet { cachedLocalBookingInputKey = nil } }
     /// User-facing ±0…4-day discovery window. Does not change the booked dates.
     @Published var flightSearchFlexDays: Int = 0
 
@@ -53,11 +54,11 @@ final class JourneyStore: ObservableObject {
     // Transfer is a first-class generator stage shared by both flight paths.
     // The base transfer price is package-wide; vehicle class controls the service
     // experience, while Haramain is the only optional priced hybrid-route add-on.
-    @Published var selectedTransferVehicle: TransferVehicleKind?
-    @Published var haramainTrainSelected = false
-    @Published var haramainFareClass: HaramainFareClass = .economy
-    @Published var haramainAdultTickets = 0
-    @Published var haramainChildTickets = 0
+    @Published var selectedTransferVehicle: TransferVehicleKind? { didSet { cachedLocalBookingInputKey = nil } }
+    @Published var haramainTrainSelected = false { didSet { cachedLocalBookingInputKey = nil } }
+    @Published var haramainFareClass: HaramainFareClass = .economy { didSet { cachedLocalBookingInputKey = nil } }
+    @Published var haramainAdultTickets = 0 { didSet { cachedLocalBookingInputKey = nil } }
+    @Published var haramainChildTickets = 0 { didSet { cachedLocalBookingInputKey = nil } }
     @Published var transferSelectionConfirmed = false
 
     @Published var hotels: [HotelSummary] = []
@@ -322,7 +323,7 @@ final class JourneyStore: ObservableObject {
         }
     }
 
-    @Published var mixedFlightIdentity: String? = nil
+    @Published var mixedFlightIdentity: String? = nil { didSet { cachedLocalBookingInputKey = nil } }
 
     func clearStagedUmrahFlights() {
         mixedFlightIdentity = nil

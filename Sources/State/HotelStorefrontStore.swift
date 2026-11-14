@@ -11,10 +11,10 @@ struct HotelPackagePricePoint: Identifiable, Hashable {
 
 @MainActor
 final class HotelStorefrontStore: ObservableObject {
-    @Published private(set) var makkahHotels: [HotelSummary] = []
-    @Published private(set) var madinahHotels: [HotelSummary] = []
+    @Published private(set) var makkahHotels: [HotelSummary] = [] { didSet { rebuildHotelLookup() } }
+    @Published private(set) var madinahHotels: [HotelSummary] = [] { didSet { rebuildHotelLookup() } }
     @Published private(set) var details: [String: HotelDetail] = [:]
-    @Published private(set) var flightBoard: StorefrontFlightBoardResponse?
+    @Published private(set) var flightBoard: StorefrontFlightBoardResponse? { didSet { rebuildFlightLookup() } }
     @Published private(set) var standardQuotes: [String: HotelStorefrontQuote] = [:]
     @Published private(set) var comfortQuotes: [String: HotelStorefrontQuote] = [:]
     @Published private(set) var luxuryQuotes: [String: HotelStorefrontQuote] = [:]
@@ -30,9 +30,20 @@ final class HotelStorefrontStore: ObservableObject {
     private let packageEngine = RemotePackageEngineClient()
     private let favoritesKey = "iumrah.hotelStorefront.favorites.v1"
     private let snapshotURL: URL
+    private let snapshotQueue = DispatchQueue(label: "com.iumrah.hotel.snapshot", qos: .utility)
+    private var pendingSnapshotWrite: DispatchWorkItem?
+    private var didRestoreSnapshot = false
+    private var snapshotRevision = 0
+    private var hotelLookup: [String: HotelSummary] = [:]
+    private var flightLookup: [String: StorefrontFlightOption] = [:]
+    private var packageApplyRevision = 0
+    private var originGeneration = UUID()
+    private var packagePriceIndex: [HotelPackagePricePoint] = []
+    @Published private(set) var packagePriceRevision = 0
     private var preparationTask: Task<Void, Never>?
     private var hotelPackageRefreshTask: Task<Void, Never>?
     private var imageWarmupTask: Task<Void, Never>?
+    private var lastWarmupURLs: [URL] = []
     private var hotelServerPackages: [String: [StorefrontServerPackageSnapshot]] = [:]
     private var flightServerPackages: [String: StorefrontServerPackageSnapshot] = [:]
 
@@ -41,7 +52,6 @@ final class HotelStorefrontStore: ObservableObject {
             ?? FileManager.default.temporaryDirectory
         snapshotURL = caches.appendingPathComponent("iumrah-hotel-storefront-v3.json")
         favoriteHotelIDs = Set(UserDefaults.standard.stringArray(forKey: favoritesKey) ?? [])
-        restoreDiskSnapshot()
     }
 
     var allHotels: [HotelSummary] { makkahHotels + madinahHotels }
@@ -51,22 +61,25 @@ final class HotelStorefrontStore: ObservableObject {
     /// flag visible to the customer instead of silently discarding all quotes.
     /// Missing dates are never inferred from nightly hotel rates or airline fares.
     var hotelPackagePriceCalendar: [HotelPackagePricePoint] {
+        let cutoff = Calendar(identifier: .gregorian).startOfDay(for: Date()).addingTimeInterval(-86_400)
+        return packagePriceIndex.filter { $0.date >= cutoff }
+    }
+
+    nonisolated private static func buildPackagePriceIndex(_ groups: [String: [StorefrontServerPackageSnapshot]]) -> [HotelPackagePricePoint] {
         var cheapest: [String: HotelPackagePricePoint] = [:]
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd"
-        let today = Calendar(identifier: .gregorian).startOfDay(for: Date())
-        for (hotelID, group) in hotelServerPackages {
+        for (hotelID, group) in groups {
             guard isValidHotelFirstGroup(group, hotelID: hotelID) else { continue }
             for item in group {
                 guard item.status.lowercased() == "ready",
                       item.currency.uppercased() == "USD",
                       let price = item.pricePerPerson, price > 0 else { continue }
                 let dateText = String(item.startDate.prefix(10))
-                guard let date = formatter.date(from: dateText),
-                      date >= today.addingTimeInterval(-86_400) else { continue }
+                guard let date = formatter.date(from: dateText) else { continue }
                 let value = HotelPackagePricePoint(id: dateText, date: date, pricePerPersonUSD: price, isEstimated: item.isEstimated, packageID: item.id)
                 if let previous = cheapest[dateText], previous.pricePerPersonUSD <= price { continue }
                 cheapest[dateText] = value
@@ -95,11 +108,11 @@ final class HotelStorefrontStore: ObservableObject {
     }
 
     func prepareIfNeeded() async {
-        if hasPrepared { return }
         if let preparationTask {
             await preparationTask.value
             return
         }
+        if hasPrepared { return }
         let task = Task { @MainActor in await prepare(force: false) }
         preparationTask = task
         await task.value
@@ -107,20 +120,25 @@ final class HotelStorefrontStore: ObservableObject {
     }
 
     func refresh() async {
-        if let preparationTask { await preparationTask.value }
+        if let preparationTask { await preparationTask.value; return }
         let task = Task { @MainActor in await prepare(force: true) }
         preparationTask = task
         await task.value
         preparationTask = nil
     }
 
-    func hotel(id: String) -> HotelSummary? {
-        allHotels.first(where: { $0.id == id })
+    private func rebuildHotelLookup() {
+        hotelLookup = Dictionary(allHotels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
+    private func rebuildFlightLookup() {
+        flightLookup = Dictionary((flightBoard?.options ?? []).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+    func hotel(id: String) -> HotelSummary? { hotelLookup[id] }
 
     func detail(for hotel: HotelSummary) -> HotelDetail? { details[hotel.id] }
 
     func ingest(detail: HotelDetail) {
+        guard details[detail.id] != detail else { return }
         details[detail.id] = detail
         persistDiskSnapshot()
         startImageWarmup()
@@ -141,7 +159,20 @@ final class HotelStorefrontStore: ObservableObject {
 
         hotelPackageRefreshTask?.cancel()
         hotelPackageRefreshTask = nil
+        let originChanged = departureOriginCode != normalized
         departureOriginCode = normalized
+        snapshotRevision &+= 1
+        packageApplyRevision &+= 1
+        let generation = UUID()
+        originGeneration = generation
+        if originChanged {
+            // Never present the previous departure airport's package prices.
+            flightBoard = nil
+            flightPackagePreviews = [:]
+            flightServerPackages = [:]
+            hotelServerPackages = [:]
+            publishHotelQuoteIndexes(Self.buildHotelQuoteIndexes([:]))
+        }
 
         async let boardRequest = flightBoardResult(origin: normalized)
         async let hotelPackagesRequest = serverPackagesPageResult(mode: "hotel-first", origin: normalized)
@@ -150,10 +181,12 @@ final class HotelStorefrontStore: ObservableObject {
             boardRequest, hotelPackagesRequest, flightPackagesRequest
         )
 
-        if case .success(let board) = boardResult { flightBoard = board }
+        guard !Task.isCancelled, departureOriginCode == normalized, originGeneration == generation else { return }
+        if case .success(let board) = boardResult, flightBoard != board { flightBoard = board }
         let hotelPage = try? hotelPageResult.get()
         let flightPackages = (try? flightPackagesResult.get()) ?? []
-        applyServerPackages(hotelPackages: hotelPage?.items ?? [], flightPackages: flightPackages)
+        await applyServerPackages(hotelPackages: hotelPage?.items ?? [], flightPackages: flightPackages, origin: normalized)
+        guard !Task.isCancelled, departureOriginCode == normalized, originGeneration == generation else { return }
         hasPrepared = !allHotels.isEmpty || !flightPackagePreviews.isEmpty
         errorMessage = nil
         persistDiskSnapshot()
@@ -194,11 +227,11 @@ final class HotelStorefrontStore: ObservableObject {
                     return false
                 })
                 values.append(snapshot)
-                let sorted = sortedHotelFirstSnapshots(values.filter { isUsableHotelFirstSnapshot($0, hotelID: hotelID) })
+                let sorted = Self.sortedHotelFirstSnapshots(values.filter { Self.isUsableHotelFirstSnapshot($0, hotelID: hotelID) })
                 if !sorted.isEmpty {
                     objectWillChange.send()
                     hotelServerPackages[hotelID] = sorted
-                    rebuildHotelQuoteIndexes()
+                    publishHotelQuoteIndexes(Self.buildHotelQuoteIndexes(hotelServerPackages))
                 }
             }
             // A direct package-ID deep link may resolve one immutable variant before
@@ -216,7 +249,7 @@ final class HotelStorefrontStore: ObservableObject {
     /// outbound is reused where inventory allows and each return date has its own
     /// immutable 10-digit Package ID.
     func hotelConfiguratorPreviews(for hotel: HotelSummary) -> [StorefrontFlightPackagePreview] {
-        sortedHotelFirstSnapshots(hotelServerPackages[hotel.id] ?? []).compactMap {
+        Self.sortedHotelFirstSnapshots(hotelServerPackages[hotel.id] ?? []).compactMap {
             serverPreview($0, forceHotelFirst: true)
         }
     }
@@ -303,7 +336,7 @@ final class HotelStorefrontStore: ObservableObject {
     }
 
     func publishedFarePerTraveler(optionID: String) -> Decimal? {
-        guard let option = flightBoard?.options.first(where: { $0.id == optionID }),
+        guard let option = flightLookup[optionID],
               option.currency.caseInsensitiveCompare("USD") == .orderedSame,
               option.perTravelerFare.isFinite,
               option.perTravelerFare > 0 else { return nil }
@@ -443,9 +476,17 @@ final class HotelStorefrontStore: ObservableObject {
     /// batches. iOS never generates a missing Hotel First package locally.
     private func prepare(force: Bool) async {
         guard force || !hasPrepared else { return }
+        let trace = IumrahPerformanceTrace.begin("Hotel storefront prepare")
+        defer { IumrahPerformanceTrace.end("Hotel storefront prepare", trace) }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        await restoreDiskSnapshot()
+        guard !Task.isCancelled else { return }
+        let origin = departureOriginCode
+        let generation = originGeneration
+        hotelPackageRefreshTask?.cancel()
+        hotelPackageRefreshTask = nil
 
         async let makkahRequest = hotelListResult(cities: ["Makkah", "Mecca", "Makka"])
         async let madinahRequest = hotelListResult(cities: [
@@ -453,9 +494,9 @@ final class HotelStorefrontStore: ObservableObject {
             "Al Madinah", "Al Medina",
             "Madinah Al Munawwarah", "Al Madinah Al Munawwarah"
         ])
-        async let flightRequest = flightBoardResult(origin: departureOriginCode)
-        async let hotelPackagesRequest = serverPackagesPageResult(mode: "hotel-first", origin: departureOriginCode)
-        async let flightPackagesRequest = serverPackagesResult(mode: "flight-first", origin: departureOriginCode)
+        async let flightRequest = flightBoardResult(origin: origin)
+        async let hotelPackagesRequest = serverPackagesPageResult(mode: "hotel-first", origin: origin)
+        async let flightPackagesRequest = serverPackagesResult(mode: "flight-first", origin: origin)
 
         // Resolve the hotel catalogue first. Package generation must never hold the
         // list hostage: these async package requests are already running in parallel,
@@ -463,11 +504,11 @@ final class HotelStorefrontStore: ObservableObject {
         let (makkahResult, madinahResult) = await (makkahRequest, madinahRequest)
         var hotelErrors: [Error] = []
         switch makkahResult {
-        case .success(let hotels): makkahHotels = hotels
+        case .success(let hotels): if makkahHotels != hotels { makkahHotels = hotels }
         case .failure(let error): hotelErrors.append(error)
         }
         switch madinahResult {
-        case .success(let hotels): madinahHotels = hotels
+        case .success(let hotels): if madinahHotels != hotels { madinahHotels = hotels }
         case .failure(let error): hotelErrors.append(error)
         }
         persistDiskSnapshot()
@@ -485,11 +526,13 @@ final class HotelStorefrontStore: ObservableObject {
         let (flightResult, hotelPageResult, flightPackagesResult) = await (
             flightRequest, hotelPackagesRequest, flightPackagesRequest
         )
-        if case .success(let board) = flightResult { flightBoard = board }
+        guard !Task.isCancelled, departureOriginCode == origin, originGeneration == generation else { return }
+        if case .success(let board) = flightResult, flightBoard != board { flightBoard = board }
 
         let hotelPage = try? hotelPageResult.get()
         let flightPackages = (try? flightPackagesResult.get()) ?? []
-        applyServerPackages(hotelPackages: hotelPage?.items ?? [], flightPackages: flightPackages)
+        await applyServerPackages(hotelPackages: hotelPage?.items ?? [], flightPackages: flightPackages, origin: origin)
+        guard !Task.isCancelled, departureOriginCode == origin, originGeneration == generation else { return }
 
         // Details/photos are lazy. Package cards are immutable server snapshots;
         // incomplete hotels remain visible with a forming state until their atomic
@@ -546,7 +589,8 @@ final class HotelStorefrontStore: ObservableObject {
 
                 let page = try await storefront.serverPackagesPage(mode: "hotel-first", origin: origin)
                 guard !Task.isCancelled, departureOriginCode == origin else { return }
-                applyHotelServerPackages(page.items)
+                await applyHotelServerPackages(page.items, origin: origin)
+                guard !Task.isCancelled, departureOriginCode == origin else { return }
                 hasPrepared = !allHotels.isEmpty || !flightPackagePreviews.isEmpty
 
                 if page.complete || refresh.complete { return }
@@ -563,13 +607,32 @@ final class HotelStorefrontStore: ObservableObject {
 
     private func applyServerPackages(
         hotelPackages: [StorefrontServerPackageSnapshot],
-        flightPackages: [StorefrontServerPackageSnapshot]
-    ) {
-        applyHotelServerPackages(hotelPackages)
+        flightPackages: [StorefrontServerPackageSnapshot], origin: String
+    ) async {
+        let generation = originGeneration
+        await applyHotelServerPackages(hotelPackages, origin: origin)
+        guard !Task.isCancelled, departureOriginCode == origin, originGeneration == generation else { return }
         applyFlightServerPackages(flightPackages)
     }
 
-    private func applyHotelServerPackages(_ packages: [StorefrontServerPackageSnapshot]) {
+    private func applyHotelServerPackages(_ packages: [StorefrontServerPackageSnapshot], origin: String) async {
+        packageApplyRevision &+= 1
+        let revision = packageApplyRevision
+        let result = await Task.detached(priority: .userInitiated) {
+            let trace = IumrahPerformanceTrace.begin("Hotel package indexing")
+            defer { IumrahPerformanceTrace.end("Hotel package indexing", trace) }
+            let accepted = Self.groupHotelServerPackages(packages)
+            return (accepted, Self.buildHotelQuoteIndexes(accepted))
+        }.value
+        guard !Task.isCancelled, departureOriginCode == origin, packageApplyRevision == revision else { return }
+        if hotelServerPackages != result.0 {
+            objectWillChange.send()
+            hotelServerPackages = result.0
+        }
+        publishHotelQuoteIndexes(result.1)
+    }
+
+    nonisolated private static func groupHotelServerPackages(_ packages: [StorefrontServerPackageSnapshot]) -> [String: [StorefrontServerPackageSnapshot]] {
         var grouped: [String: [StorefrontServerPackageSnapshot]] = [:]
         for item in packages where item.entryMode == "hotel-first" {
             let hotelID = item.hotelFirstAnchorHotelId ?? item.makkahHotelId ?? item.madinahHotelId
@@ -599,11 +662,10 @@ final class HotelStorefrontStore: ObservableObject {
             let sorted = sortedHotelFirstSnapshots(Array(byVariant.values))
             if !sorted.isEmpty { accepted[hotelID] = sorted }
         }
-        hotelServerPackages = accepted
-        rebuildHotelQuoteIndexes()
+        return accepted
     }
 
-    private func isUsableHotelFirstSnapshot(_ item: StorefrontServerPackageSnapshot, hotelID: String) -> Bool {
+    nonisolated private static func isUsableHotelFirstSnapshot(_ item: StorefrontServerPackageSnapshot, hotelID: String) -> Bool {
         guard item.entryMode == "hotel-first",
               item.status.lowercased() == "ready",
               isPublicPackageID(item.id),
@@ -615,22 +677,29 @@ final class HotelStorefrontStore: ObservableObject {
     }
 
     private func applyFlightServerPackages(_ packages: [StorefrontServerPackageSnapshot]) {
-        flightServerPackages = Dictionary(uniqueKeysWithValues: packages.map { ($0.id, $0) })
+        flightServerPackages = Dictionary(packages.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         var previews: [String: StorefrontFlightPackagePreview] = [:]
         for item in packages {
             guard let preview = serverPreview(item) else { continue }
             previews[item.outboundOfferId] = preview
             if previews[item.inboundOfferId] == nil { previews[item.inboundOfferId] = preview }
         }
-        flightPackagePreviews = previews
+        if flightPackagePreviews != previews { flightPackagePreviews = previews }
     }
 
-    private func rebuildHotelQuoteIndexes() {
+    private struct HotelQuoteIndexes {
+        let standard: [String: HotelStorefrontQuote]
+        let comfort: [String: HotelStorefrontQuote]
+        let luxury: [String: HotelStorefrontQuote]
+        let prices: [HotelPackagePricePoint]
+    }
+
+    nonisolated private static func buildHotelQuoteIndexes(_ groups: [String: [StorefrontServerPackageSnapshot]]) -> HotelQuoteIndexes {
         var standard: [String: HotelStorefrontQuote] = [:]
         var comfort: [String: HotelStorefrontQuote] = [:]
         var luxury: [String: HotelStorefrontQuote] = [:]
 
-        for (hotelID, group) in hotelServerPackages {
+        for (hotelID, group) in groups {
             guard let item = sortedHotelFirstSnapshots(group).first,
                   let total = item.totalPackagePrice,
                   let perPerson = item.pricePerPerson else { continue }
@@ -657,12 +726,20 @@ final class HotelStorefrontStore: ObservableObject {
             }
         }
 
-        standardQuotes = standard
-        comfortQuotes = comfort
-        luxuryQuotes = luxury
+        return HotelQuoteIndexes(standard: standard, comfort: comfort, luxury: luxury, prices: buildPackagePriceIndex(groups))
     }
 
-    private func isValidHotelFirstGroup(_ values: [StorefrontServerPackageSnapshot], hotelID: String) -> Bool {
+    private func publishHotelQuoteIndexes(_ index: HotelQuoteIndexes) {
+        if packagePriceIndex != index.prices {
+            packagePriceIndex = index.prices
+            packagePriceRevision &+= 1
+        }
+        if standardQuotes != index.standard { standardQuotes = index.standard }
+        if comfortQuotes != index.comfort { comfortQuotes = index.comfort }
+        if luxuryQuotes != index.luxury { luxuryQuotes = index.luxury }
+    }
+
+    nonisolated private static func isValidHotelFirstGroup(_ values: [StorefrontServerPackageSnapshot], hotelID: String) -> Bool {
         let sorted = sortedHotelFirstSnapshots(values)
         guard sorted.count == 3 else { return false }
         let expectedVariants = ["short", "balanced", "extended"]
@@ -700,11 +777,11 @@ final class HotelStorefrontStore: ObservableObject {
         return true
     }
 
-    private func isPublicPackageID(_ value: String) -> Bool {
+    nonisolated private static func isPublicPackageID(_ value: String) -> Bool {
         value.count == 10 && value.allSatisfy { $0.isNumber }
     }
 
-    private func sortedHotelFirstSnapshots(_ values: [StorefrontServerPackageSnapshot]) -> [StorefrontServerPackageSnapshot] {
+    nonisolated private static func sortedHotelFirstSnapshots(_ values: [StorefrontServerPackageSnapshot]) -> [StorefrontServerPackageSnapshot] {
         values.sorted { lhs, rhs in
             let left = lhs.hotelFirstVariantIndex ?? 99
             let right = rhs.hotelFirstVariantIndex ?? 99
@@ -1386,23 +1463,30 @@ final class HotelStorefrontStore: ObservableObject {
         return formatter
     }
 
-    private func restoreDiskSnapshot() {
-        guard let data = try? Data(contentsOf: snapshotURL),
-              let snapshot = try? JSONDecoder().decode(HotelStorefrontDiskSnapshot.self, from: data) else { return }
+    private func restoreDiskSnapshot() async {
+        guard !didRestoreSnapshot else { return }
+        didRestoreSnapshot = true
+        guard snapshotRevision == 0 else { return }
+        let revision = snapshotRevision
+        let url = snapshotURL
+        let snapshot = await Task.detached(priority: .utility) { () -> HotelStorefrontDiskSnapshot? in
+            let trace = IumrahPerformanceTrace.begin("Hotel snapshot read")
+            defer { IumrahPerformanceTrace.end("Hotel snapshot read", trace) }
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode(HotelStorefrontDiskSnapshot.self, from: data)
+        }.value
+        // Never let a late disk read overwrite fresher network/selection data.
+        guard !Task.isCancelled, revision == snapshotRevision, let snapshot else { return }
         makkahHotels = snapshot.makkahHotels
         madinahHotels = snapshot.madinahHotels
-        details = Dictionary(uniqueKeysWithValues: snapshot.hotelDetails.map { ($0.id, $0) })
+        details = Dictionary(snapshot.hotelDetails.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         flightBoard = snapshot.flightBoard
         departureOriginCode = snapshot.flightBoard?.origin.uppercased() ?? "TAS"
-        // Package prices are intentionally not rebuilt from disk. The app renders
-        // cached hotel media immediately and then obtains the current 24h server snapshot.
-        // Disk hotel/flight metadata renders immediately; server package snapshots refresh separately.
-        // once per launch. Photo bytes themselves live in the persistent image cache.
-        hasPrepared = false
         startImageWarmup()
     }
 
     private func persistDiskSnapshot() {
+        snapshotRevision &+= 1
         let snapshot = HotelStorefrontDiskSnapshot(
             makkahHotels: makkahHotels,
             madinahHotels: madinahHotels,
@@ -1410,8 +1494,18 @@ final class HotelStorefrontStore: ObservableObject {
             flightBoard: flightBoard,
             savedAt: Date()
         )
-        guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        try? data.write(to: snapshotURL, options: .atomic)
+        let url = snapshotURL
+        pendingSnapshotWrite?.cancel()
+        let work = DispatchWorkItem {
+            let trace = IumrahPerformanceTrace.begin("Hotel snapshot write")
+            defer { IumrahPerformanceTrace.end("Hotel snapshot write", trace) }
+            guard let data = try? JSONEncoder().encode(snapshot) else { return }
+            try? data.write(to: url, options: .atomic)
+        }
+        pendingSnapshotWrite = work
+        // Serial queue preserves snapshot order; rapid changes coalesce. This is
+        // a disposable cache only, never the booking or authentication vault.
+        snapshotQueue.asyncAfter(deadline: .now() + .milliseconds(250), execute: work)
     }
 
     private func startImageWarmup() {
@@ -1421,6 +1515,8 @@ final class HotelStorefrontStore: ObservableObject {
             .prefix(6)
             .flatMap { previewImages(for: $0, limit: 1) }
             .compactMap { AppConfig.absoluteURL($0) }
+        guard critical != lastWarmupURLs else { return }
+        lastWarmupURLs = critical
         imageWarmupTask?.cancel()
         imageWarmupTask = Task(priority: .utility) {
             await HotelImageCache.shared.prefetch(urls: critical)

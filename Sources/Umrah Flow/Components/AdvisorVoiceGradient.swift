@@ -14,6 +14,8 @@ struct AdvisorVoiceGradient: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    @Environment(\.iumrahPerformanceProfile) private var performanceProfile
+
     @State private var displayedAmplitude: CGFloat = 0
 
     private var palette: Palette {
@@ -26,8 +28,8 @@ struct AdvisorVoiceGradient: View {
 
     var body: some View {
         GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: isSpeaking ? 1.0 / 45.0 : 1.0 / 20.0, paused: reduceMotion)) { timeline in
-                let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            IumrahDecorativeTimeline(maxFPS: 30, paused: !isSpeaking) { date in
+                let time = reduceMotion ? 0 : date.timeIntervalSinceReferenceDate
                 let width = proxy.size.width
                 let fullHeight = proxy.size.height
                 let energy = max(isSpeaking ? 0.10 : 0.045, displayedAmplitude)
@@ -157,7 +159,7 @@ struct AdvisorVoiceGradient: View {
                     )
                 )
                 .frame(width: width * 0.92, height: 38 + 32 * energy)
-                .blur(radius: 14 + 9 * energy)
+                .blur(radius: performanceProfile == .efficiency ? 8 : 14 + 9 * energy)
                 .offset(y: 12)
                 .opacity(0.74 + 0.24 * energy)
 
@@ -168,7 +170,7 @@ struct AdvisorVoiceGradient: View {
                 endPoint: .trailing
             )
             .frame(height: height * (0.34 + 0.10 * energy))
-            .blur(radius: 30 + 16 * energy)
+            .blur(radius: performanceProfile == .efficiency ? 18 : 30 + 16 * energy)
             .offset(y: height * 0.13)
             .opacity(bloomOpacity)
         }
@@ -193,7 +195,7 @@ struct AdvisorVoiceGradient: View {
                 )
             )
             .frame(width: width, height: height)
-            .blur(radius: blur)
+            .blur(radius: performanceProfile == .efficiency ? blur * 0.55 : blur)
     }
 }
 

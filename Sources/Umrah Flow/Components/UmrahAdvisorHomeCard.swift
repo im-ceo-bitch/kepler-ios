@@ -193,8 +193,8 @@ struct UmrahAdvisorHomeAura: View {
 
     var body: some View {
         GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 8.0 : 1.0 / 30.0)) { timeline in
-                let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            IumrahDecorativeTimeline(staticWhenConstrained: true) { date in
+                let time = reduceMotion ? 0 : date.timeIntervalSinceReferenceDate
                 let radius = max(proxy.size.width, proxy.size.height) * 0.82
 
                 ZStack {

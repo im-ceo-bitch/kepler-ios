@@ -52,8 +52,8 @@ struct UmrahFlowBackground: View {
 
     var body: some View {
         GeometryReader { proxy in
-            TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 / 6.0 : 1.0 / 20.0)) { timeline in
-                let time = reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
+            IumrahDecorativeTimeline(maxFPS: 20, staticWhenConstrained: true) { date in
+                let time = reduceMotion ? 0 : date.timeIntervalSinceReferenceDate
                 let radius = max(proxy.size.width, proxy.size.height) * 0.95
 
                 ZStack {

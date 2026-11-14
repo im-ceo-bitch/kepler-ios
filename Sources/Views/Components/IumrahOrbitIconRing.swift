@@ -49,10 +49,9 @@ struct IumrahOrbitIconRing: View {
     private var background: Color { lightOnDark ? Color(red: 0.09, green: 0.09, blue: 0.12) : .white }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0,
-                                paused: !visible || !isActive || scenePhase != .active || reduceMotion)) { timeline in
-            let orbitTime = reduceMotion ? 0 : max(0, timeline.date.timeIntervalSince(orbitStart))
-            let assemblyTime = reduceMotion ? 4 : max(0, timeline.date.timeIntervalSince(assemblyStart))
+        IumrahDecorativeTimeline(paused: !visible || !isActive) { date in
+            let orbitTime = reduceMotion ? 0 : max(0, date.timeIntervalSince(orbitStart))
+            let assemblyTime = reduceMotion ? 4 : max(0, date.timeIntervalSince(assemblyStart))
             let count = max(1, services.count)
             let step = max(0.35, revealDuration)
             let tick = Int(orbitTime / step)

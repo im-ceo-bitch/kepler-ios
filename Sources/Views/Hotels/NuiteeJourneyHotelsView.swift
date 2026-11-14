@@ -182,6 +182,8 @@ struct NuiteeJourneyHotelsView: View {
         journey.transferSelectionConfirmed = false
     }
     @MainActor private func load(forceRefresh: Bool = false) async {
+        let trace = IumrahPerformanceTrace.begin("Journey hotel load")
+        defer { IumrahPerformanceTrace.end("Journey hotel load", trace) }
         let token = UUID(); requestID = token
         let requestedSearchID = searchID
         loading = true; error = nil; visibleCount = 20

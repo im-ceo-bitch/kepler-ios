@@ -202,11 +202,11 @@ struct CareConversationBackground: View {
         GeometryReader { proxy in
             ZStack {
                 if wallpaper.isAnimated && !reduceMotion && motionEnabled {
-                    TimelineView(.periodic(from: .now, by: 1.0 / 15.0)) { context in
+                    IumrahDecorativeTimeline(maxFPS: 15, staticWhenConstrained: true) { date in
                         animatedBase(
                             wallpaper,
                             size: proxy.size,
-                            time: context.date.timeIntervalSinceReferenceDate
+                            time: date.timeIntervalSinceReferenceDate
                         )
                     }
                 } else {

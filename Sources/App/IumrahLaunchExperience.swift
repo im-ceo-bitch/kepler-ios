@@ -93,6 +93,8 @@ struct IumrahLaunchExperience<Content: View>: View {
             finish(); return
         }
         hasStarted = true
+        let trace = IumrahPerformanceTrace.begin("Cold launch handoff")
+        defer { IumrahPerformanceTrace.end("Cold launch handoff", trace) }
         let clock = ContinuousClock()
         let start = clock.now
         startDate = Date()

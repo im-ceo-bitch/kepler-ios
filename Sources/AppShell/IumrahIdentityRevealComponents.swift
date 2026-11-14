@@ -198,8 +198,8 @@ struct IumrahIdentitySealOverlay: View {
                     )
                 )
 
-            TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0, paused: reduceMotion)) { context in
-                let seconds = context.date.timeIntervalSinceReferenceDate
+            IumrahDecorativeTimeline { date in
+                let seconds = date.timeIntervalSinceReferenceDate
                 let phase = CGFloat(seconds.truncatingRemainder(dividingBy: 3.2) / 3.2)
                 let shimmerX = (-halfWidth * 0.8) + (phase * halfWidth * 2.2)
 

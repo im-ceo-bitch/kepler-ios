@@ -71,7 +71,7 @@ struct IumrahIdentityDomeCard: View {
     }
 
     private var frontFace: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { timeline in
+        IumrahDecorativeTimeline(paused: isFlipped) { date in
             GeometryReader { proxy in
                 ZStack(alignment: .topLeading) {
                     cardBackground
@@ -80,7 +80,7 @@ struct IumrahIdentityDomeCard: View {
                         renderDome(
                             in: &context,
                             size: size,
-                            time: reduceMotion ? 0.85 : timeline.date.timeIntervalSinceReferenceDate
+                            time: reduceMotion ? 0.85 : date.timeIntervalSinceReferenceDate
                         )
                     }
                     .allowsHitTesting(false)

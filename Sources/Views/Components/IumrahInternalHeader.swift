@@ -131,12 +131,12 @@ private struct GeneratorProgressStrip: View {
 /// there is no edge clipping or visual "teleporting" from a fade mask.
 private struct GeneratorStageCarousel: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.iumrahPerformanceProfile) private var profile
 
     let stage: TripProgressStage
 
     @State private var carouselPosition: CGFloat = 0
     @State private var dragTranslation: CGFloat = 0
-    @State private var glowBreath = false
     @State private var resetGeneration = 0
 
     private let itemSpacing: CGFloat = 68
@@ -182,13 +182,7 @@ private struct GeneratorStageCarousel: View {
             carouselPosition = CGFloat(target)
             dragTranslation = 0
             resetGeneration = 0
-            glowBreath = false
-
-            guard !reduceMotion else { return }
-
-            withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
-                glowBreath = true
-            }
+            guard !reduceMotion, profile != .efficiency else { return }
 
             // One continuous 360° presentation lap on entry. The state itself
             // is unbounded; sin/cos provide the wrap, so an item physically
@@ -262,9 +256,9 @@ private struct GeneratorStageCarousel: View {
                     endRadius: 96
                 )
             )
-            .frame(width: glowBreath ? 158 : 142, height: glowBreath ? 44 : 38)
-            .blur(radius: 15)
-            .opacity(glowBreath ? 0.88 : 0.68)
+            .frame(width: 150, height: 40)
+            .blur(radius: profile == .efficiency ? 8 : 15)
+            .opacity(0.78)
             .offset(y: 14)
             .animation(.easeInOut(duration: 0.58), value: activeStage.rawValue)
             .allowsHitTesting(false)
@@ -338,7 +332,7 @@ private struct GeneratorStageCarousel: View {
     }
 
     private func blur(for frontness: CGFloat) -> CGFloat {
-        5.5 * (1 - frontness)
+        (profile == .efficiency ? 0 : 5.5) * (1 - frontness)
     }
 
     private func verticalOffset(for frontness: CGFloat) -> CGFloat {

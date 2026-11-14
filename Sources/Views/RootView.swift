@@ -6,6 +6,7 @@ struct RootView: View {
     @AppStorage("iumrah.hasCompletedOnboarding.cinematic.v4") private var hasCompletedOnboarding = false
     @StateObject private var settings = AppSettingsStore()
     @ObservedObject var chrome: AppChromeStore
+    let launchLink: URL?
     @StateObject private var journey = JourneyStore()
     @StateObject private var manualJourney = IumrahManualJourneyStore()
     @StateObject private var bookings = BookingStore()
@@ -16,6 +17,12 @@ struct RootView: View {
     @ObservedObject private var quickActions = IumrahQuickActionCenter.shared
     @State private var hasBootstrappedAfterOnboarding = false
     @State private var isSupportQuickActionDialogPresented = false
+    @State private var lastHandledLaunchLink: URL?
+
+    init(chrome: AppChromeStore, launchLink: URL? = nil) {
+        self.chrome = chrome
+        self.launchLink = launchLink
+    }
 
     var body: some View {
         IumrahAdaptiveLayoutHost {
@@ -35,6 +42,11 @@ struct RootView: View {
             }
             .task { @MainActor in
                 quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
+                handlePendingLaunchLink()
+            }
+            .onChange(of: launchLink) { _, next in
+                if next == nil { lastHandledLaunchLink = nil }
+                handlePendingLaunchLink()
             }
             .onChange(of: chrome.currentTab) { _, next in
                 let screen = telemetryName(for: next)
@@ -102,6 +114,7 @@ struct RootView: View {
             }
             .onChange(of: hasCompletedOnboarding) { _, completed in
                 guard completed else { return }
+                handlePendingLaunchLink()
                 Task {
                     await IumrahIntelligence.shared.record("onboarding_completed", screen: "onboarding")
                     await IumrahIntelligence.shared.screenChanged(to: telemetryName(for: chrome.currentTab))
@@ -229,6 +242,15 @@ struct RootView: View {
         let digits = IumrahQuickActionCenter.shared.supportPhoneNumber.filter { !$0.isWhitespace }
         guard let url = URL(string: "tel://\(digits)") else { return }
         UIApplication.shared.open(url)
+    }
+
+    // The launch wrapper can receive a URL before RootView is mounted. Route it
+    // once after onboarding, using the same router as live universal links.
+    @MainActor
+    private func handlePendingLaunchLink() {
+        guard hasCompletedOnboarding, let launchLink, launchLink != lastHandledLaunchLink else { return }
+        lastHandledLaunchLink = launchLink
+        handleDeepLink(launchLink)
     }
 
     @MainActor

@@ -75,6 +75,17 @@ struct L10n {
                 return text("booking_delete_server_required", language)
             case .authoritativeQuoteRequired:
                 return text("booking_authoritative_quote_required", language)
+            case .identityPending:
+                switch language {
+                case .russian: return "Не удалось получить номер бронирования и iumrah ID. Повторите синхронизацию, не создавая новую заявку."
+                case .english: return "The booking number and iumrah ID are not available yet. Retry syncing without creating another booking."
+                case .uzbek: return "Bron raqami va iumrah ID hali olinmadi. Yangi bron yaratmasdan sinxronlashni qayta urinib ko‘ring."
+                case .uzbekCyrillic: return "Брон рақами ва iumrah ID ҳали олинмади. Янги брон яратмасдан синхронлашни қайта уриниб кўринг."
+                case .arabic: return "لم يتم استلام رقم الحجز ومعرّف iumrah بعد. أعد المزامنة دون إنشاء حجز جديد."
+                case .turkish: return "Rezervasyon numarası ve iumrah ID henüz alınamadı. Yeni rezervasyon oluşturmadan eşitlemeyi yeniden deneyin."
+                case .indonesian: return "Nomor pemesanan dan iumrah ID belum tersedia. Coba sinkronkan kembali tanpa membuat pemesanan baru."
+                case .malay: return "Nombor tempahan dan iumrah ID belum tersedia. Cuba segerakkan semula tanpa membuat tempahan baharu."
+                }
             }
         }
         if let flightError = error as? FlightEngineAvailabilityError {

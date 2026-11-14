@@ -517,4 +517,69 @@ struct BookingNuiteeRoomSelection: Codable, Hashable {
     let adults: Int
     let children: [Int]
     var meals: HotelMealChoices? = nil
+    // Keep newer configurator payloads intact when merging chat/identity updates.
+    var mealBundleRequested: BookingMealBundlePayload? = nil
+}
+
+extension BookingNuiteeRoomSelection {
+    // The configurator may use a Bool or a structured Codable meal selection.
+    // Do not discard or stringify either: preserve its original JSON wire value.
+    init<Bundle: Encodable>(id: String, city: String, hotelId: String, offerId: String,
+                            roomId: String, checkin: String, checkout: String,
+                            adults: Int, children: [Int], meals: HotelMealChoices? = nil,
+                            mealBundleRequested: Bundle?) {
+        self.init(id: id, city: city, hotelId: hotelId, offerId: offerId, roomId: roomId,
+                  checkin: checkin, checkout: checkout, adults: adults, children: children,
+                  meals: meals, mealBundleRequested: mealBundleRequested.map { BookingMealBundlePayload(value: $0) })
+    }
+}
+
+/// Lossless JSON-compatible representation of a meal bundle request. The wrapper
+/// encodes its value directly, not as a nested object or JSON string.
+indirect enum BookingMealBundlePayload: Codable, Hashable {
+    case null
+    case boolean(Bool)
+    case integer(Int64)
+    case number(Decimal)
+    case string(String)
+    case array([BookingMealBundlePayload])
+    case object([String: BookingMealBundlePayload])
+    case invalid
+
+    init<T: Encodable>(value: T) {
+        do {
+            let data = try JSONEncoder().encode(value)
+            self = try JSONDecoder().decode(Self.self, from: data)
+        } catch {
+            // Fail when the request is encoded rather than silently dropping a selection.
+            self = .invalid
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() { self = .null }
+        else if let value = try? container.decode(Bool.self) { self = .boolean(value) }
+        else if let value = try? container.decode(Int64.self) { self = .integer(value) }
+        else if let value = try? container.decode(Decimal.self) { self = .number(value) }
+        else if let value = try? container.decode(String.self) { self = .string(value) }
+        else if let value = try? container.decode([Self].self) { self = .array(value) }
+        else { self = .object(try container.decode([String: Self].self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .null: try container.encodeNil()
+        case .boolean(let value): try container.encode(value)
+        case .integer(let value): try container.encode(value)
+        case .number(let value): try container.encode(value)
+        case .string(let value): try container.encode(value)
+        case .array(let value): try container.encode(value)
+        case .object(let value): try container.encode(value)
+        case .invalid:
+            throw EncodingError.invalidValue(self, .init(codingPath: encoder.codingPath,
+                debugDescription: "Invalid meal bundle request"))
+        }
+    }
 }

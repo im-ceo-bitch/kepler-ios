@@ -4,9 +4,12 @@ struct ChatService {
     private let api = APIClient.shared
 
     func loadChat(bookingID: String, after: String, scope: String?, unread: [String], headers: [String: String]) async throws -> ChatListResponse {
-        try await api.get(
+        var query = [URLQueryItem(name: "after", value: after)]
+        if let scope { query.append(URLQueryItem(name: "scope", value: scope)) }
+        query.append(contentsOf: unread.prefix(80).map { URLQueryItem(name: "unread", value: $0) })
+        return try await api.get(
             "/api/catalog/hotels/client/chats/\(bookingID)/messages",
-            query: [URLQueryItem(name: "after", value: after)] + (scope.map { [URLQueryItem(name: "scope", value: $0)] } ?? []) + unread.prefix(80).map { URLQueryItem(name: "unread", value: $0) },
+            query: query,
             headers: headers
         )
     }

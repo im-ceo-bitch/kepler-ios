@@ -48,52 +48,87 @@ struct BookingChatView: View {
     private var session: StoredBookingSession? { bookingID == "account" ? nil : bookings.booking(id: requestedBookingID) }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ZStack(alignment: .bottom) {
-                CareConversationBackground(
-                    wallpaper: appearance.wallpaper,
-                    customImage: appearance.customImage,
-                    motionEnabled: !showCareProfile
-                )
+        chatScreen
+            .navigationDestination(isPresented: $showCareProfile) { careProfileScreen }
+            .navigationBarBackButtonHidden(false)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .tint(.white)
+            .statusBarHidden(false)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .onAppear(perform: chatDidAppear)
+            .onChange(of: bookingID) { _, newValue in push.activeChatBookingID = newValue }
+            .onDisappear(perform: chatDidDisappear)
+    }
 
-                conversation(proxy: proxy)
+    private var careProfileScreen: some View {
+        CareContactInfoView(
+            appearance: appearance,
+            profile: careProfile,
+            language: settings.language,
+            bookingNumber: session?.displayBookingNumber,
+            onCall: openPhone,
+            onTelegram: openTelegram,
+            onWhatsApp: openWhatsApp,
+            onClose: { showCareProfile = false }
+        )
+    }
+
+    private var chatScreen: some View {
+        ScrollViewReader { proxy in
+            chatWithEvents(proxy: proxy)
+        }
+    }
+
+    private func chatSurface(proxy: ScrollViewProxy) -> some View {
+        ZStack(alignment: .bottom) {
+            CareConversationBackground(
+                wallpaper: appearance.wallpaper,
+                customImage: appearance.customImage,
+                motionEnabled: !showCareProfile
+            )
+            conversation(proxy: proxy)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { composerInset(proxy: proxy) }
+    }
+
+    @ViewBuilder
+    private func composerInset(proxy: ScrollViewProxy) -> some View {
+        if !showCareProfile {
+            VStack(spacing: 6) {
+                if let errorMessage { errorBar(errorMessage, proxy: proxy) }
+                composer(proxy: proxy)
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if !showCareProfile {
-                    VStack(spacing: 6) {
-                        if let errorMessage { errorBar(errorMessage, proxy: proxy) }
-                        composer(proxy: proxy)
-                    }
-                    .padding(.vertical, 6)
-                    .background(Color(uiColor: .systemBackground))
-                }
-            }
-            .task(id: bookingID) {
-                messages = bookings.cachedChat(for: bookingID)
-                isLoading = messages.isEmpty
-                rebuildMessagePresentation()
-                await Task.yield()
-                scrollToLatest(proxy, animated: false)
-                await load(proxy: proxy)
-                await Task.yield()
-                scrollToLatest(proxy, animated: false)
-                while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(15)) } catch { break }
-                    if scenePhase == .active { await load(silent: true, proxy: proxy) }
-                }
-            }
-            .task {
-                await loadCareProfile()
-                await PushNotificationManager.shared.ensureAuthorizationForBookedTrips(hasBookings: true)
-                if let token = push.deviceToken { await bookings.syncPushSubscriptions(deviceToken: token, locale: settings.language.rawValue) }
-            }
-            .onChange(of: push.eventRevision) { _, _ in
-                guard push.lastEvent?.bookingID == bookingID, push.lastEvent?.type.hasPrefix("chat_") == true else { return }
+            .padding(.vertical, 6)
+            .background(Color(uiColor: .systemBackground))
+        }
+    }
+
+    private func chatWithTasks(proxy: ScrollViewProxy) -> some View {
+        chatSurface(proxy: proxy)
+            .task(id: bookingID) { await synchronizeConversation(proxy: proxy) }
+            .task { await prepareConversation() }
+    }
+
+    private func chatWithRefreshEvents(proxy: ScrollViewProxy) -> some View {
+        chatWithTasks(proxy: proxy)
+            .onChange(of: push.eventRevision) { _, _ in handlePushEvent(proxy: proxy) }
+            .onChange(of: scenePhase) { _, phase in
+                guard phase == .active else { return }
                 Task { await load(silent: true, proxy: proxy) }
             }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active { Task { await load(silent: true, proxy: proxy) } }
+            .onChange(of: bookings.chats[bookingID]) { _, value in
+                messages = value ?? []
+                rebuildMessagePresentation()
             }
+            .onChange(of: messages) { _, _ in rebuildMessagePresentation() }
+    }
+
+    private func chatWithEvents(proxy: ScrollViewProxy) -> some View {
+        chatWithRefreshEvents(proxy: proxy)
             .onChange(of: selectedPhoto) { _, item in
                 guard let item else { return }
                 Task { await sendPhoto(item, proxy: proxy) }
@@ -105,54 +140,57 @@ struct BookingChatView: View {
                     scrollToLatest(proxy)
                 }
             }
-            .onChange(of: bookings.chats[bookingID]) { _, value in
-                // Clear visible history immediately on sign-out/account switch.
-                if let value { messages = value } else { messages = [] }; rebuildMessagePresentation()
-            }
-            .onChange(of: messages) { _, _ in
-                rebuildMessagePresentation()
-            }
             .toolbar {
-                if !showCareProfile {
-                    chatToolbarContent
-                }
+                if !showCareProfile { chatToolbarContent }
             }
+    }
+
+    @MainActor
+    private func synchronizeConversation(proxy: ScrollViewProxy) async {
+        messages = bookings.cachedChat(for: bookingID)
+        isLoading = messages.isEmpty
+        rebuildMessagePresentation()
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        scrollToLatest(proxy, animated: false)
+        await load(proxy: proxy)
+        await Task.yield()
+        guard !Task.isCancelled else { return }
+        scrollToLatest(proxy, animated: false)
+        while !Task.isCancelled {
+            do { try await Task.sleep(for: .seconds(15)) } catch { break }
+            if scenePhase == .active { await load(silent: true, proxy: proxy) }
         }
-        .navigationDestination(isPresented: $showCareProfile) {
-            CareContactInfoView(
-                appearance: appearance,
-                profile: careProfile,
-                language: settings.language,
-                bookingNumber: session?.displayBookingNumber,
-                onCall: openPhone,
-                onTelegram: openTelegram,
-                onWhatsApp: openWhatsApp,
-                onClose: { showCareProfile = false }
-            )
+    }
+
+    @MainActor
+    private func prepareConversation() async {
+        await loadCareProfile()
+        await PushNotificationManager.shared.ensureAuthorizationForBookedTrips(hasBookings: true)
+        if let token = push.deviceToken {
+            await bookings.syncPushSubscriptions(deviceToken: token, locale: settings.language.rawValue)
         }
-        .navigationBarBackButtonHidden(false)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Color.black, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .tint(.white)
-        .statusBarHidden(false)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
-        .onAppear {
-            CareChatFeedback.shared.prepare()
-            push.activeChatBookingID = bookingID
-            guard !registeredImmersive else { return }
-            registeredImmersive = true
-            chrome.beginInternalNavigation()
-        }
-        .onChange(of: bookingID) { _, newValue in push.activeChatBookingID = newValue }
-        .onDisappear {
-            if push.activeChatBookingID == bookingID { push.activeChatBookingID = nil }
-            guard registeredImmersive else { return }
-            registeredImmersive = false
-            chrome.endInternalNavigation()
-        }
+    }
+
+    private func handlePushEvent(proxy: ScrollViewProxy) {
+        guard push.lastEvent?.bookingID == bookingID,
+              push.lastEvent?.type.hasPrefix("chat_") == true else { return }
+        Task { await load(silent: true, proxy: proxy) }
+    }
+
+    private func chatDidAppear() {
+        CareChatFeedback.shared.prepare()
+        push.activeChatBookingID = bookingID
+        guard !registeredImmersive else { return }
+        registeredImmersive = true
+        chrome.beginInternalNavigation()
+    }
+
+    private func chatDidDisappear() {
+        if push.activeChatBookingID == bookingID { push.activeChatBookingID = nil }
+        guard registeredImmersive else { return }
+        registeredImmersive = false
+        chrome.endInternalNavigation()
     }
 
     // MARK: - Conversation

@@ -24,6 +24,8 @@ final class PushNotificationManager: ObservableObject {
     @Published private(set) var eventRevision: Int = 0
     @Published private(set) var openRevision: Int = 0
 
+    var activeChatBookingID: String?
+
     private let tokenDefaultsKey = "iumrah.app.apns.device-token"
 
     private init() {

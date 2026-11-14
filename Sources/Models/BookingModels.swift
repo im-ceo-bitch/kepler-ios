@@ -154,6 +154,7 @@ struct BookingHotelNames: Codable, Hashable {
 struct BookingCreateResponse: Decodable {
     let booking: RemoteBooking
     let accessToken: String?
+    let trip: ClientTripSnapshot?
 }
 
 struct RemoteBooking: Codable, Identifiable, Hashable {
@@ -191,6 +192,9 @@ struct ChatListResponse: Decodable {
     let ok: Bool?
     let bookingID: String?
     let messages: [ChatMessage]
+    let nextCursor: String?
+    let hasMore: Bool?
+    let staffReadMessageIDs: [String]?
 }
 
 struct ChatMessagePostResponse: Decodable {
@@ -208,7 +212,7 @@ struct ChatMessage: Codable, Identifiable, Hashable {
     let attachmentID: String?
     let attachmentURL: String?
     let createdAt: String
-    let readByStaff: Bool?
+    var readByStaff: Bool?
 }
 
 struct BookingItineraryItem: Codable, Identifiable, Hashable {
@@ -408,6 +412,12 @@ struct StoredBookingSession: Codable, Identifiable, Hashable {
         return String(repeating: "0", count: 8 - digits.count) + digits
     }
 
+    var hasServerIdentity: Bool {
+        guard let pilgrimID, let bookingNumber, bookingNumber > 0,
+              let number = Int(pilgrimID), number > 0, pilgrimID.count <= 8 else { return false }
+        return pilgrimID.allSatisfy(\.isNumber)
+    }
+
     var displayBookingNumber: String {
         if let value = bookingDisplayNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty { return value }
         if let bookingNumber, bookingNumber > 0 { return "#" + String(format: "%04d", bookingNumber) }
@@ -505,5 +515,4 @@ struct BookingNuiteeRoomSelection: Codable, Hashable {
     let adults: Int
     let children: [Int]
     var meals: HotelMealChoices? = nil
-    var mealBundleRequested: Bool? = nil
 }

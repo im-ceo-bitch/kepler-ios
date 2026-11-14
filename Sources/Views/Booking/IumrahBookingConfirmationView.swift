@@ -4,6 +4,7 @@ import SwiftUI
 /// It does not sign the visitor into an account or create an account.
 struct IumrahBookingConfirmationView: View {
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var bookings: BookingStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let createBooking: @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession
@@ -338,12 +339,14 @@ struct IumrahBookingConfirmationView: View {
                 telegram: "",
                 whatsapp: ""
             )
-            let session: StoredBookingSession
-            if let savedBooking { session = savedBooking }
+            let committed: StoredBookingSession
+            if let savedBooking { committed = savedBooking }
             else {
-                session = try await createBooking(profile)
-                savedBooking = session // retries never create a duplicate booking
+                committed = try await createBooking(profile)
+                savedBooking = committed // retries never create a duplicate booking
             }
+            let session = try await bookings.resolveBookingIdentity(committed)
+            savedBooking = session
             if channel == .sms {
                 try await verificationService.attachVerifiedPhone(
                     verificationToken: verificationProof,
@@ -365,7 +368,15 @@ struct IumrahBookingConfirmationView: View {
             IumrahHaptics.success()
             successPulse = false
         } catch {
-            errorMessage = error.localizedDescription
+            if let savedBooking, !savedBooking.hasServerIdentity {
+                errorMessage = copy("Заявка сохранена. Не удалось получить номер брони и iumrah ID. Повторите подтверждение — новая заявка не будет создана.",
+                                    "Request saved. The booking number and iumrah ID are not ready. Retry confirmation; no new request will be created.",
+                                    "Ariza saqlandi. Bron raqami va iumrah ID hali tayyor emas. Tasdiqlashni qaytaring — yangi ariza yaratilmaydi.",
+                                    "Ариза сақланди. Брон рақами ва iumrah ID ҳали тайёр эмас. Тасдиқлашни такрорланг — янги ариза яратилмайди.",
+                                    "تم حفظ الطلب. رقم الحجز ومعرف iumrah غير جاهزين. أعد التأكيد دون إنشاء طلب جديد.")
+            } else {
+                errorMessage = error.localizedDescription
+            }
             IumrahHaptics.error()
         }
     }
@@ -405,8 +416,15 @@ struct IumrahBookingConfirmationView: View {
                 .font(.subheadline)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Text(session.displayBookingNumber)
-                .font(.title3.monospacedDigit().weight(.bold))
+            VStack(spacing: 6) {
+                Text(session.displayBookingNumber)
+                    .font(.title3.monospacedDigit().weight(.bold))
+                if let id = session.displayPilgrimID {
+                    Text("iumrah ID · \(id)")
+                        .font(.subheadline.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+            }
             VStack(spacing: 5) {
                 Text(copy("Итого за пакет", "Package total", "Paketning umumiy narxi", "Пакетнинг умумий нархи", "إجمالي الباقة"))
                     .font(.footnote).foregroundStyle(.secondary)

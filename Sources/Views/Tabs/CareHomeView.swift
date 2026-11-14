@@ -5,9 +5,11 @@ struct CareHomeView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.iumrahAdaptiveLayout) private var adaptiveLayout
     @EnvironmentObject private var bookings: BookingStore
+    @EnvironmentObject private var chrome: AppChromeStore
     @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var showHeaderChat = false
+    @State private var openedChatBookingID: String?
     @State private var careProfile: IumrahPublicProfile?
     @State private var isLoadingCareProfile = false
     @AppStorage("iumrah.care.cachedPhoneSA") private var cachedPhoneSA = ""
@@ -17,7 +19,7 @@ struct CareHomeView: View {
     private var activeSession: StoredBookingSession? {
         bookings.sessions.first { session in
             !["COMPLETED", "CANCELLED"].contains(session.effectiveStatus.uppercased())
-        }
+        } ?? bookings.sessions.first
     }
 
     private var fixedHeader: some View {
@@ -42,10 +44,11 @@ struct CareHomeView: View {
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshCare() }, helpContext: activeSession == nil ? "support.no_booking" : "support.active", header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshCare() }, header: {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
+                IumrahPageHelpCard(activeSession == nil ? "support.no_booking" : "support.active").padding(.bottom, 18)
 
                 if adaptiveLayout.isWide {
                     HStack(alignment: .top, spacing: 22) {
@@ -80,17 +83,28 @@ struct CareHomeView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
         .navigationDestination(isPresented: $showHeaderChat) {
-            if let activeSession {
-                BookingChatView(bookingID: activeSession.id)
+            if let session = openedChatBookingID.flatMap({ bookings.booking(id: $0) }) ?? activeSession {
+                BookingChatView(bookingID: session.id).id(session.id)
             } else {
                 ContentUnavailableView("Чат будет доступен после бронирования", systemImage: "message")
             }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: chrome.requestedChatBookingID) { _, _ in openRequestedChat() }
+        .onAppear { openRequestedChat() }
+        .onChange(of: bookings.sessions) { _, _ in openRequestedChat() }
+        .onChange(of: showHeaderChat) { _, shown in if !shown { openedChatBookingID = nil } }
         .task {
             await refreshCare()
         }
+    }
+
+    private func openRequestedChat() {
+        guard let id = chrome.requestedChatBookingID, bookings.booking(id: id) != nil else { return }
+        openedChatBookingID = id
+        chrome.requestedChatBookingID = nil
+        showHeaderChat = true
     }
 
     // MARK: - Intro

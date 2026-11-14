@@ -1,14 +1,18 @@
 import Foundation
+import CryptoKit
 import SwiftUI
 
 enum BookingStoreError: LocalizedError {
     case permanentDeleteUnavailable
     case authoritativeQuoteRequired
+    case identityPending
 
     var errorDescription: String? {
         switch self {
         case .permanentDeleteUnavailable:
             return "Permanent booking deletion is not available on the server."
+        case .identityPending:
+            return "Booking saved. Waiting for server booking number and iumrah ID. Retry without creating another booking."
         case .authoritativeQuoteRequired:
             return "The package price must be confirmed by the secure iumrah PackageEngine before booking."
         }
@@ -31,6 +35,11 @@ final class BookingStore: ObservableObject {
     private let accountService = IumrahAccountService()
     private let legacyStorageKey = "iumrah.booking.sessions.v1"
     private var accountToken: String?
+    private var chatCacheKeys: [String: String] = [:]
+    private var chatCursors: [String: String] = [:]
+    private var chatLoads: [String: Task<[ChatMessage], Error>] = [:]
+    private var chatAuthGeneration = UUID()
+
 
     init() {
         loadFromStorage()
@@ -97,6 +106,9 @@ final class BookingStore: ObservableObject {
             hotelSelection: BookingHotelSelectionSnapshot(hotel: hotel, room: room, roomCategory: roomCategory, authoritativeRoomId: authoritativeMakkahRoomId),
             madinahHotelSelection: madinahHotel.map { BookingHotelSelectionSnapshot(hotel: $0, room: madinahRoom, roomCategory: madinahRoomCategory, authoritativeRoomId: authoritativeMadinahRoomId) }
         )
+        if let trip = response.trip, trip.bookingID == session.id {
+            session.mergeOperationalTrip(trip)
+        }
         session.transferVehicle = transferVehicle ?? .carnival
         // Keep only the opaque proof until PackageEngine accepts responsibility for
         // the server-owned cost report. Persist immediately after the canonical booking
@@ -243,6 +255,21 @@ final class BookingStore: ObservableObject {
         return false
     }
 
+    /// Reconcile a committed booking without issuing another create request.
+    func resolveBookingIdentity(_ saved: StoredBookingSession) async throws -> StoredBookingSession {
+        var session = booking(id: saved.id) ?? saved
+        if session.hasServerIdentity { return session }
+        let operational = try await bookingService.fetchOperationalTrip(
+            id: session.id, headers: ["x-booking-token": session.accessToken]
+        )
+        guard operational.trip.bookingID == session.id else { throw BookingStoreError.identityPending }
+        session.mergeOperationalTrip(operational.trip, statusHistory: operational.statusHistory)
+        session.guide = operational.assignment?.guide ?? session.guide
+        upsert(session)
+        guard session.hasServerIdentity else { throw BookingStoreError.identityPending }
+        return session
+    }
+
     func refreshAll() async {
         var staleBookingIDs = Set<String>()
 
@@ -317,7 +344,18 @@ final class BookingStore: ObservableObject {
     }
 
     func setAccountToken(_ token: String?) {
-        accountToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let next = token?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if next != accountToken {
+            chatAuthGeneration = UUID()
+            for task in chatLoads.values { task.cancel() }
+            chatLoads.removeAll()
+            chats.removeAll()
+            chatCursors.removeAll()
+            chatCacheKeys.removeAll()
+            // Disk caches are credential-scoped; remove on account transition to avoid retaining private chat history.
+            if accountToken != nil { try? FileManager.default.removeItem(at: chatCacheDirectory) }
+        }
+        accountToken = next
     }
 
     func restoreAccountTrips(token: String) async {
@@ -356,12 +394,9 @@ final class BookingStore: ObservableObject {
 
     func applyCanonicalLink(_ value: IumrahAccountLinkBookingResponse, to bookingID: String) {
         guard let index = sessions.firstIndex(where: { $0.id == bookingID }) else { return }
-        var updated = sessions[index]
-        updated.pilgrimID = value.pilgrimID
-        updated.bookingNumber = value.bookingNumber ?? updated.bookingNumber
-        updated.bookingDisplayNumber = value.bookingDisplayNumber ?? updated.bookingDisplayNumber
-        guard updated != sessions[index] else { return }
-        sessions[index] = updated
+        sessions[index].pilgrimID = value.pilgrimID
+        sessions[index].bookingNumber = value.bookingNumber ?? sessions[index].bookingNumber
+        sessions[index].bookingDisplayNumber = value.bookingDisplayNumber ?? sessions[index].bookingDisplayNumber
         persist()
     }
 
@@ -433,43 +468,126 @@ final class BookingStore: ObservableObject {
         return items
     }
 
-    func loadChat(for bookingID: String) async throws -> [ChatMessage] {
-        guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
-        let (response, headers) = try await performWithClientAuthorization(for: session) { headers in
-            try await chatService.loadChat(bookingID: bookingID, headers: headers)
-        }
-        let messages = response.messages.sorted(by: { $0.createdAt < $1.createdAt })
-        chats[bookingID] = messages
-        _ = try? await chatService.markRead(bookingID: bookingID, headers: headers)
-        return messages
+    private struct ChatCacheSnapshot: Codable {
+        let cursor: String
+        let messages: [ChatMessage]
     }
 
-    func send(message: String, for bookingID: String) async throws -> ChatMessage {
-        guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
-        let (created, _) = try await performWithClientAuthorization(for: session) { headers in
-            try await chatService.send(message: message, bookingID: bookingID, headers: headers)
+    private var chatCacheDirectory: URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("iumrah-care-private-v1", isDirectory: true)
+    }
+
+    private func chatCacheKey(for session: StoredBookingSession) -> String? {
+        guard let headers = clientHeaderCandidates(for: session).first,
+              let credential = headers["Authorization"] ?? headers["x-booking-token"] else { return nil }
+        return SHA256.hash(data: Data("\(session.id)|\(credential)".utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    func cachedChat(for bookingID: String) -> [ChatMessage] {
+        guard let session = booking(id: bookingID), let key = chatCacheKey(for: session) else { return [] }
+        if chatCacheKeys[bookingID] == key { return chats[bookingID] ?? [] }
+        chatCacheKeys[bookingID] = key
+        let url = chatCacheDirectory.appendingPathComponent(key + ".json")
+        let snapshot = (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(ChatCacheSnapshot.self, from: $0) }
+        chatCursors[bookingID] = snapshot?.cursor ?? "0"
+        chats[bookingID] = snapshot?.messages ?? []
+        return snapshot?.messages ?? []
+    }
+
+    private func persistChat(_ bookingID: String) {
+        guard let session = booking(id: bookingID), let key = chatCacheKey(for: session), chatCacheKeys[bookingID] == key,
+              let data = try? JSONEncoder().encode(ChatCacheSnapshot(cursor: chatCursors[bookingID] ?? "0", messages: chats[bookingID] ?? [])) else { return }
+        do {
+            try FileManager.default.createDirectory(at: chatCacheDirectory, withIntermediateDirectories: true)
+            try data.write(to: chatCacheDirectory.appendingPathComponent(key + ".json"), options: [.atomic, .completeFileProtection])
+        } catch { /* Cache is disposable; authoritative messages remain on the server. */ }
+    }
+
+    private func mergeChat(_ incoming: [ChatMessage], for bookingID: String, readIDs: [String] = []) -> [ChatMessage] {
+        var byID: [String: ChatMessage] = [:]
+        for message in chats[bookingID] ?? [] { byID[message.id] = message }
+        for var message in incoming {
+            if byID[message.id]?.readByStaff == true { message.readByStaff = true }
+            byID[message.id] = message
         }
-        var current = chats[bookingID] ?? []
-        current.append(created)
-        chats[bookingID] = current.sorted(by: { $0.createdAt < $1.createdAt })
+        for id in readIDs { byID[id]?.readByStaff = true }
+        return byID.values.sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
+    }
+
+    func loadChat(for bookingID: String) async throws -> [ChatMessage] {
+        if let running = chatLoads[bookingID] { return try await running.value }
+        guard let session = booking(id: bookingID), let key = chatCacheKey(for: session) else { throw APIError.missingBookingToken }
+        _ = cachedChat(for: bookingID)
+        let generation = chatAuthGeneration
+        let task = Task { @MainActor in
+            // A bounded page loop catches up on large histories without downloading old messages on each open.
+            for _ in 0..<20 {
+                try Task.checkCancellation()
+                let cursor = chatCursors[bookingID] ?? "0"
+                let unread = (chats[bookingID] ?? []).filter { $0.senderType == "client" && $0.readByStaff != true }.suffix(80).map(\.id)
+                let (response, headers) = try await performWithClientAuthorization(for: session) { headers in
+                    try await chatService.loadChat(bookingID: bookingID, after: cursor, unread: unread, headers: headers)
+                }
+                try Task.checkCancellation()
+                guard generation == chatAuthGeneration, chatCacheKeys[bookingID] == key else { throw CancellationError() }
+                // If the account token fell back to a booking token, the server still authorizes this exact booking.
+                _ = headers
+                if !response.messages.isEmpty || !(response.staffReadMessageIDs ?? []).isEmpty {
+                    let merged = mergeChat(response.messages, for: bookingID, readIDs: response.staffReadMessageIDs ?? [])
+                    if chats[bookingID] != merged { chats[bookingID] = merged }
+                }
+                chatCursors[bookingID] = response.nextCursor ?? "0"
+                if !response.messages.isEmpty || !(response.staffReadMessageIDs ?? []).isEmpty || cursor != chatCursors[bookingID] { persistChat(bookingID) }
+                guard response.hasMore == true, let next = response.nextCursor, next != cursor else { break }
+            }
+            return chats[bookingID] ?? []
+        }
+        chatLoads[bookingID] = task
+        defer { if generation == chatAuthGeneration { chatLoads[bookingID] = nil } }
+        return try await task.value
+    }
+
+    func send(message: String, for bookingID: String, clientMessageID: String = UUID().uuidString) async throws -> ChatMessage {
+        guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
+        _ = cachedChat(for: bookingID)
+        let generation = chatAuthGeneration
+        let (created, _) = try await performWithClientAuthorization(for: session) { headers in
+            try await chatService.send(message: message, bookingID: bookingID, clientMessageID: clientMessageID, headers: headers)
+        }
+        guard generation == chatAuthGeneration else { throw CancellationError() }
+        chats[bookingID] = mergeChat([created], for: bookingID)
+        persistChat(bookingID)
         return created
     }
 
     func sendPhoto(data: Data, for bookingID: String) async throws -> ChatMessage {
         guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
+        _ = cachedChat(for: bookingID)
+        let generation = chatAuthGeneration
         let (created, _) = try await performWithClientAuthorization(for: session) { headers in
             try await chatService.sendPhoto(data: data, bookingID: bookingID, headers: headers)
         }
-        var current = chats[bookingID] ?? []
-        current.append(created)
-        chats[bookingID] = current.sorted(by: { $0.createdAt < $1.createdAt })
+        guard generation == chatAuthGeneration else { throw CancellationError() }
+        chats[bookingID] = mergeChat([created], for: bookingID)
+        persistChat(bookingID)
         return created
     }
 
     func chatAttachmentData(path: String, bookingID: String) async throws -> Data {
         guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
+        guard let key = chatCacheKey(for: session) else { throw APIError.missingBookingToken }
+        let generation = chatAuthGeneration
+        let pathHash = SHA256.hash(data: Data(path.utf8)).map { String(format: "%02x", $0) }.joined()
+        let url = chatCacheDirectory.appendingPathComponent(key + "-" + pathHash + ".media")
+        if let data = try? Data(contentsOf: url), !data.isEmpty { return data }
         let (data, _) = try await performWithClientAuthorization(for: session) { headers in
             try await chatService.loadAttachment(path: path, headers: headers)
+        }
+        guard generation == chatAuthGeneration else { throw CancellationError() }
+        if data.count <= 5_000_000 {
+            try? FileManager.default.createDirectory(at: chatCacheDirectory, withIntermediateDirectories: true)
+            try? data.write(to: url, options: [.atomic, .completeFileProtection])
         }
         return data
     }
@@ -795,6 +913,13 @@ final class BookingStore: ObservableObject {
     }
     private func purgeLocalBooking(id: String) {
         sessions.removeAll(where: { $0.id == id })
+        chatLoads[id]?.cancel()
+        chatLoads[id] = nil
+        if let key = chatCacheKeys.removeValue(forKey: id) {
+            let files = (try? FileManager.default.contentsOfDirectory(at: chatCacheDirectory, includingPropertiesForKeys: nil)) ?? []
+            for file in files where file.lastPathComponent == key + ".json" || file.lastPathComponent.hasPrefix(key + "-") { try? FileManager.default.removeItem(at: file) }
+        }
+        chatCursors[id] = nil
         chats[id] = nil
         itineraries[id] = nil
     }

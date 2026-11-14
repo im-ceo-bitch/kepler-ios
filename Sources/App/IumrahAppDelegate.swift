@@ -84,9 +84,13 @@ final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         if !notification.request.identifier.hasPrefix("iumrah.prayer.") {
-            await MainActor.run {
-                PushNotificationManager.shared.receiveRemotePayload(notification.request.content.userInfo, opened: false)
+            let inCurrentChat = await MainActor.run {
+                let manager = PushNotificationManager.shared
+                manager.receiveRemotePayload(notification.request.content.userInfo, opened: false)
+                guard let active = manager.activeChatBookingID, let event = manager.lastEvent else { return false }
+                return event.type.hasPrefix("chat_") && event.bookingID == active
             }
+            if inCurrentChat { return [.list, .badge] }
         }
         return [.banner, .list, .sound, .badge]
     }

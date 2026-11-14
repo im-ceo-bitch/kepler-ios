@@ -3,17 +3,18 @@ import Foundation
 struct ChatService {
     private let api = APIClient.shared
 
-    func loadChat(bookingID: String, headers: [String: String]) async throws -> ChatListResponse {
+    func loadChat(bookingID: String, after: String, unread: [String], headers: [String: String]) async throws -> ChatListResponse {
         try await api.get(
             "/api/catalog/hotels/client/chats/\(bookingID)/messages",
+            query: [URLQueryItem(name: "after", value: after)] + unread.prefix(80).map { URLQueryItem(name: "unread", value: $0) },
             headers: headers
         )
     }
 
-    func send(message: String, bookingID: String, headers: [String: String]) async throws -> ChatMessage {
+    func send(message: String, bookingID: String, clientMessageID: String, headers: [String: String]) async throws -> ChatMessage {
         let response: ChatMessagePostResponse = try await api.post(
             "/api/catalog/hotels/client/chats/\(bookingID)/messages",
-            body: ChatMessageSendRequest(body: message, clientMessageID: UUID().uuidString),
+            body: ChatMessageSendRequest(body: message, clientMessageID: clientMessageID),
             headers: headers
         )
         return response.message

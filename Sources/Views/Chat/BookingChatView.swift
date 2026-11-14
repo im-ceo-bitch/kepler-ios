@@ -5,6 +5,8 @@ import UIKit
 struct BookingChatView: View {
     private let directCarePhone = "+998508898845"
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var push = PushNotificationManager.shared
     @EnvironmentObject private var bookings: BookingStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
@@ -16,6 +18,7 @@ struct BookingChatView: View {
     @State private var messages: [ChatMessage] = []
     @State private var draft = ""
     @State private var failedDraft: String?
+    @State private var failedMessageID: String?
     @State private var pendingOutgoing: PendingOutgoingMessage?
     @State private var launchingOutgoing: PendingOutgoingMessage?
     @State private var isSending = false
@@ -31,7 +34,6 @@ struct BookingChatView: View {
     @State private var presentationByID: [String: CareMessagePresentation] = [:]
     @FocusState private var composerFocused: Bool
     @State private var scrollViewportHeight: CGFloat = 0
-    @State private var composerPanelHeight: CGFloat = 56
     @Namespace private var sendNamespace
 
     private let bottomAnchorID = "care-chat-bottom-anchor"
@@ -54,45 +56,42 @@ struct BookingChatView: View {
                 )
 
                 conversation(proxy: proxy)
-                    .ignoresSafeArea(.container, edges: .bottom)
-
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !showCareProfile {
                     VStack(spacing: 6) {
-                        if let errorMessage {
-                            errorBar(errorMessage, proxy: proxy)
-                        }
+                        if let errorMessage { errorBar(errorMessage, proxy: proxy) }
                         composer(proxy: proxy)
                     }
-                    .padding(.bottom, composerFocused ? 4 : 7)
-                    .background {
-                        GeometryReader { geometry in
-                            Color.clear
-                                .onAppear { composerPanelHeight = geometry.size.height }
-                                .onChange(of: geometry.size.height) { _, value in
-                                    composerPanelHeight = value
-                                }
-                        }
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(10)
+                    .padding(.vertical, 6)
+                    .background(Color(uiColor: .systemBackground))
                 }
-
             }
-            // The conversation and its wallpaper extend through the physical bottom edge.
-            // Only the keyboard safe area remains active, so the composer follows the
-            // keyboard exactly instead of leaving the old static safe-area band.
-            .ignoresSafeArea(.container, edges: .bottom)
             .task {
-                await PushNotificationManager.shared.ensureAuthorizationForBookedTrips(hasBookings: true)
-                await loadCareProfile()
+                messages = bookings.cachedChat(for: bookingID)
+                isLoading = messages.isEmpty
+                rebuildMessagePresentation()
+                await Task.yield()
+                scrollToLatest(proxy, animated: false)
                 await load(proxy: proxy)
                 await Task.yield()
                 scrollToLatest(proxy, animated: false)
-
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(6))
-                    await load(silent: true, proxy: proxy)
+                    do { try await Task.sleep(for: .seconds(15)) } catch { break }
+                    if scenePhase == .active { await load(silent: true, proxy: proxy) }
                 }
+            }
+            .task {
+                await loadCareProfile()
+                await PushNotificationManager.shared.ensureAuthorizationForBookedTrips(hasBookings: true)
+                if let token = push.deviceToken { await bookings.syncPushSubscriptions(deviceToken: token, locale: settings.language.rawValue) }
+            }
+            .onChange(of: push.eventRevision) { _, _ in
+                guard push.lastEvent?.bookingID == bookingID, push.lastEvent?.type.hasPrefix("chat_") == true else { return }
+                Task { await load(silent: true, proxy: proxy) }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { await load(silent: true, proxy: proxy) } }
             }
             .onChange(of: selectedPhoto) { _, item in
                 guard let item else { return }
@@ -104,6 +103,10 @@ struct BookingChatView: View {
                     try? await Task.sleep(for: .milliseconds(120))
                     scrollToLatest(proxy)
                 }
+            }
+            .onChange(of: bookings.chats[bookingID]) { _, value in
+                // Clear visible history immediately on sign-out/account switch.
+                if value == nil { messages = []; rebuildMessagePresentation() }
             }
             .onChange(of: messages) { _, _ in
                 rebuildMessagePresentation()
@@ -128,15 +131,22 @@ struct BookingChatView: View {
         }
         .navigationBarBackButtonHidden(false)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Color.black, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .tint(.white)
+        .statusBarHidden(false)
         .toolbar(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
             CareChatFeedback.shared.prepare()
+            push.activeChatBookingID = bookingID
             guard !registeredImmersive else { return }
             registeredImmersive = true
             chrome.beginInternalNavigation()
         }
         .onDisappear {
+            if push.activeChatBookingID == bookingID { push.activeChatBookingID = nil }
             guard registeredImmersive else { return }
             registeredImmersive = false
             chrome.endInternalNavigation()
@@ -187,10 +197,11 @@ struct BookingChatView: View {
                 .padding(.top, 14)
                 .padding(.bottom, 16)
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: max(scrollViewportHeight - 24, 0), alignment: .bottom)
+                .frame(minHeight: max(scrollViewportHeight - 32, 0), alignment: .bottom)
             }
+            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
-            .contentMargins(.bottom, max(64, composerPanelHeight + 4), for: .scrollContent)
+            .contentMargins(.bottom, 4, for: .scrollContent)
             .coordinateSpace(name: scrollCoordinateSpace)
             .background {
                 GeometryReader { geometry in
@@ -282,6 +293,7 @@ struct BookingChatView: View {
         VStack(spacing: 14) {
             ProgressView()
                 .controlSize(.regular)
+                .tint(conversationSecondary)
             Text(L10n.text("chat_load", settings.language))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(conversationSecondary)
@@ -357,6 +369,7 @@ struct BookingChatView: View {
                             .monospacedDigit()
                         ProgressView()
                             .controlSize(.mini)
+                            .tint(composerControlColor)
                             .tint(.white.opacity(0.76))
                     }
                     .foregroundStyle(.white.opacity(0.72))
@@ -397,7 +410,7 @@ struct BookingChatView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(spacing: 3) {
                             Text("iumrah Care")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 16, weight: .semibold))
                                 .lineLimit(1)
                             Image(systemName: "chevron.forward")
                                 .font(.system(size: 7.5, weight: .bold))
@@ -428,6 +441,7 @@ struct BookingChatView: View {
             } label: {
                 Image(systemName: "info.circle")
                     .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(.white)
             }
             .accessibilityLabel(tr(
                 "Care information",
@@ -511,17 +525,15 @@ struct BookingChatView: View {
                         .disabled(!canSend)
                         .transition(.scale(scale: 0.86).combined(with: .opacity))
                     } else {
-                        Image(systemName: "waveform")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.secondary)
-                            .frame(width: 30, height: 30)
-                            .transition(.scale(scale: 0.90).combined(with: .opacity))
+                        // No decorative microphone: voice messaging is not implemented.
+                        Color.clear.frame(width: 2, height: 30)
                     }
                 }
                 .padding(.trailing, 4)
                 .padding(.bottom, 3)
             }
-            .frame(minHeight: 36, maxHeight: 92, alignment: .bottom)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(minHeight: 38, alignment: .bottom)
             .frame(maxWidth: .infinity)
             .background(composerFieldBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
@@ -570,7 +582,7 @@ struct BookingChatView: View {
     }
 
     private var outgoingAccentColor: Color {
-        Color(uiColor: .systemBlue)
+        colorScheme == .dark ? Color(white: 0.24) : .black
     }
 
     private var canSend: Bool {
@@ -616,28 +628,24 @@ struct BookingChatView: View {
 
     @MainActor
     private func load(silent: Bool = false, proxy: ScrollViewProxy? = nil) async {
-        if !silent { isLoading = true }
+        if !silent && messages.isEmpty { isLoading = true }
         defer { if !silent { isLoading = false } }
 
         do {
             let previousIDs = Set(messages.map(\.id))
-            let hadExistingMessages = !messages.isEmpty
             let loaded = try await bookings.loadChat(for: bookingID)
-                .sorted(by: { $0.createdAt < $1.createdAt })
 
             let newIncoming = loaded.filter { message in
                 !previousIDs.contains(message.id) && !isMine(message)
             }
 
             if loaded != messages {
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) {
-                    messages = loaded
-                }
+                messages = loaded
             }
 
             if failedDraft == nil { errorMessage = nil }
 
-            guard silent, hadExistingMessages, !newIncoming.isEmpty else { return }
+            guard silent, !newIncoming.isEmpty else { return }
 
             if appearance.soundsEnabled {
                 CareChatFeedback.shared.play(.receive)
@@ -652,7 +660,7 @@ struct BookingChatView: View {
                 unseenIncomingCount += newIncoming.count
             }
         } catch {
-            if !silent { errorMessage = chatErrorMessage(error) }
+            if !silent && !(error is CancellationError) { errorMessage = chatErrorMessage(error) }
         }
     }
 
@@ -663,9 +671,11 @@ struct BookingChatView: View {
 
         isSending = true
         errorMessage = nil
+        let requestID = failedDraft == message ? (failedMessageID ?? UUID().uuidString) : UUID().uuidString
         failedDraft = nil
+        failedMessageID = nil
 
-        let pending = PendingOutgoingMessage(id: UUID().uuidString, body: message, createdAt: Date())
+        let pending = PendingOutgoingMessage(id: requestID, body: message, createdAt: Date())
         launchingOutgoing = pending
         draft = ""
 
@@ -686,7 +696,7 @@ struct BookingChatView: View {
         scrollToLatest(proxy)
 
         do {
-            _ = try await bookings.send(message: message, for: bookingID)
+            _ = try await bookings.send(message: message, for: bookingID, clientMessageID: requestID)
             var transaction = Transaction()
             transaction.animation = nil
             withTransaction(transaction) {
@@ -703,6 +713,7 @@ struct BookingChatView: View {
             }
             draft = message
             failedDraft = message
+            failedMessageID = requestID
             errorMessage = L10n.format("chat_send_failed", settings.language, chatErrorMessage(error))
             if appearance.soundsEnabled {
                 CareChatFeedback.shared.play(.error)
@@ -961,9 +972,7 @@ struct BookingChatView: View {
         appearance.wallpaper.isVisual ? .white.opacity(0.68) : .secondary
     }
 
-    private var headerPrimary: Color {
-        appearance.wallpaper.isVisual ? .white : .primary
-    }
+    private var headerPrimary: Color { .white }
 
     private func tr(_ en: String, _ ru: String, _ uz: String, _ cyrl: String) -> String {
         switch settings.language {

@@ -125,7 +125,7 @@ struct CareChatMessageRow: View {
     }
 
     private var outgoingBubbleColor: Color {
-        Color(uiColor: .systemBlue)
+        colorScheme == .dark ? Color(white: 0.24) : .black
     }
 
     private var incomingStrokeColor: Color {
@@ -353,11 +353,10 @@ private struct CareChatImageViewer: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
-            .modifier(IumrahNativeChromeButton())
-            .environment(\.colorScheme, .dark)
-            .frame(minWidth: 44, minHeight: 44)
+            .careNativeGlassButton()
             .padding(.top, 12)
             .padding(.trailing, 16)
         }

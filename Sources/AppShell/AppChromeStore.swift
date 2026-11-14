@@ -37,6 +37,7 @@ final class AppChromeStore: ObservableObject {
     @Published var shouldStartTripBuilder = false
     @Published var shouldStartFlightFirstBuilder = false
     @Published var requestedBookingID: String?
+    @Published var requestedChatBookingID: String?
     @Published var requestedHotelID: String?
     @Published var requestedHotelConfiguratorID: String?
     @Published var requestedHotelConfiguratorDeepLink: HotelConfiguratorDeepLink?

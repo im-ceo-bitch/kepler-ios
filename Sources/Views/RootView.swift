@@ -24,6 +24,12 @@ struct RootView: View {
         self.launchLink = launchLink
     }
 
+    // The current app shell hands off IumrahLaunchLink?, not URL?. Keep the
+    // legacy URL initializer for other callers and normalize the envelope here.
+    init<LaunchLink>(chrome: AppChromeStore, launchLink: LaunchLink?) {
+        self.init(chrome: chrome, launchLink: RootLaunchURLAdapter.resolve(launchLink))
+    }
+
     var body: some View {
         IumrahAdaptiveLayoutHost {
             rootContent
@@ -552,5 +558,63 @@ struct RootView: View {
 
     private func tabScreen<Content: View>(for tab: AppTab, @ViewBuilder content: () -> Content) -> some View {
         AppNavigationContainer(tab: tab) { content() }
+    }
+}
+
+// Compatibility boundary for the launch wrapper. Keep the existing URL router
+// independent of the wrapper's concrete type (which changed after V30's base).
+private enum RootLaunchURLAdapter {
+    static func resolve<T>(_ link: T?) -> URL? {
+        guard let link else { return nil }
+        return extract(link, depth: 0, allowsString: false)
+    }
+
+    private static func extract(_ value: Any, depth: Int, allowsString: Bool) -> URL? {
+        guard depth < 6 else { return nil }
+        if let url = value as? URL { return supported(url) ? url : nil }
+        if let components = value as? URLComponents, let url = components.url {
+            return supported(url) ? url : nil
+        }
+        if let string = value as? String {
+            guard allowsString, let url = URL(string: string), supported(url) else { return nil }
+            return url
+        }
+
+        let mirror = Mirror(reflecting: value)
+        switch mirror.displayStyle {
+        case .optional:
+            guard let child = mirror.children.first else { return nil }
+            return extract(child.value, depth: depth + 1, allowsString: allowsString)
+        case .struct, .enum, .tuple, .class:
+            break
+        default:
+            return nil
+        }
+
+        // Prefer explicitly named URL fields to unrelated metadata in the envelope.
+        let urlFields: Set<String> = ["url", "webpageurl", "deeplinkurl", "launchurl", "incomingurl", "rawurl", "absoluteurl", "linkurl", "_url"]
+        let preferred = mirror.children.filter { child in
+            child.label.map { urlFields.contains($0.lowercased()) } ?? false
+        }
+        let preferredURLs = Set(preferred.compactMap { extract($0.value, depth: depth + 1, allowsString: true) })
+        if preferredURLs.count == 1 { return preferredURLs.first }
+        if preferredURLs.count > 1 { return nil }
+
+        // Also support an enum's associated URL or a nested typed envelope.
+        // Do not parse arbitrary strings such as UUIDs, names or other metadata.
+        let candidates = Set(mirror.children.compactMap { child in
+            extract(child.value, depth: depth + 1, allowsString: false)
+        })
+        return candidates.count == 1 ? candidates.first : nil
+    }
+
+    private static func supported(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        switch scheme {
+        case "https": return url.host?.lowercased() == "iumrah.app"
+        case "iumrah": return url.host?.lowercased() == "widget"
+        case "iumrahapp": return url.host?.lowercased() == "hotel"
+        default: return false
+        }
     }
 }

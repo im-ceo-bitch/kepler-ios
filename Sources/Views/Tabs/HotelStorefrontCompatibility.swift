@@ -1284,7 +1284,6 @@ struct StorefrontUmrahPackageDetailView: View {
     @State private var isProfileSheetPresented = false
     @State private var isSubmitting = false
     @State private var bookingError: String?
-    @State private var createdBookingID: String?
     @State private var flightPickerSheet: StorefrontFlightPickerSheetKind?
     @State private var selectedOutboundChoice: StorefrontConfiguratorFlightChoice?
     @State private var selectedInboundChoice: StorefrontConfiguratorFlightChoice?
@@ -1418,9 +1417,6 @@ struct StorefrontUmrahPackageDetailView: View {
                     guard isPrepared else { return }
                     refreshQuote()
                 }
-        }
-        .navigationDestination(item: $createdBookingID) { bookingID in
-            BookingDetailView(bookingID: bookingID)
         }
         .sheet(item: $infoSheet) { sheet in
             StorefrontPackageInformationSheet(
@@ -3006,8 +3002,6 @@ struct StorefrontUmrahPackageDetailView: View {
             if let deviceToken = push.deviceToken {
                 await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
             }
-            IumrahHaptics.success()
-            createdBookingID = session.id
             return session
         } catch {
             bookingError = L10n.error(error, settings.language)

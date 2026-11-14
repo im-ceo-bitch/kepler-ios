@@ -61,33 +61,18 @@ struct IumrahBookingDomeCard: View {
     }
 
     private var frontFace: some View {
-        IumrahDecorativeTimeline(paused: isFlipped) { date in
-            GeometryReader { proxy in
-                ZStack(alignment: .topLeading) {
-                    cardBackground
-
-                    Canvas(rendersAsynchronously: true) { context, size in
-                        renderDome(
-                            in: &context,
-                            size: size,
-                            time: reduceMotion ? 0.85 : date.timeIntervalSinceReferenceDate
-                        )
-                    }
-                    .allowsHitTesting(false)
-
-                    HStack(spacing: 7) {
-                        Text("iumrah Booking")
-                            .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            .tracking(-0.25)
-
-                        BookingActivityDots(paused: isFlipped)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.leading, 16)
-                    .padding(.top, 14)
-                }
-                .frame(width: proxy.size.width, height: proxy.size.height)
+        ZStack(alignment: .topLeading) {
+            cardBackground
+            IumrahBookingDomeAnimation(paused: isFlipped)
+            HStack(spacing: 7) {
+                Text("iumrah Booking")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .tracking(-0.25)
+                BookingActivityDots(paused: isFlipped)
             }
+            .foregroundStyle(.white)
+            .padding(.leading, 16)
+            .padding(.top, 14)
         }
     }
 
@@ -159,6 +144,23 @@ struct IumrahBookingDomeCard: View {
             startPoint: .top,
             endPoint: .bottom
         )
+    }
+
+}
+
+/// Shared original spectral dome renderer; card chrome is independent.
+struct IumrahBookingDomeAnimation: View {
+    var paused = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        IumrahDecorativeTimeline(paused: paused) { date in
+            Canvas(rendersAsynchronously: true) { context, size in
+                renderDome(in: &context, size: size, time: reduceMotion ? 0.85 : date.timeIntervalSinceReferenceDate)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
     }
 
     private func renderDome(

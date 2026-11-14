@@ -504,7 +504,6 @@ struct LegacyFinalPackageView: View {
             if let deviceToken = push.deviceToken {
                 await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)
             }
-            IumrahHaptics.success()
             return session
         } catch {
             errorMessage = L10n.error(error, settings.language)

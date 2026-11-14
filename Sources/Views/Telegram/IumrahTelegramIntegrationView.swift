@@ -4,6 +4,7 @@ enum IumrahTelegramConnectCardStyle {
     case standard
     case dark
     case compact
+    case confirmation
 }
 
 struct IumrahTelegramConnectCard: View {
@@ -24,6 +25,56 @@ struct IumrahTelegramConnectCard: View {
     private let service = TelegramBookingIntegrationService()
 
     var body: some View {
+        Group {
+            if style == .confirmation { confirmationRow }
+            else { standardCard }
+        }
+        .task(id: session.id) { await refreshLinkedState() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, openedTelegram else { return }
+            Task { await refreshLinkedState() }
+        }
+    }
+
+    private var confirmationRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: "paperplane")
+                    .font(.title3.weight(.medium))
+                    .frame(width: 42, height: 42)
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Telegram").font(.subheadline.weight(.semibold))
+                    Text(isLinked ? connectedTitle : tr("All booking updates", "Все статусы бронирования", "Barcha bron holatlari", "Барча брон ҳолатлари"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                if isCheckingLink || isConnecting {
+                    ProgressView().controlSize(.small)
+                } else if isLinked {
+                    Image(systemName: "checkmark.circle").font(.title3)
+                } else {
+                    Button { Task { await connect() } } label: {
+                        Text(tr("Connect", "Подключить", "Ulash", "Улаш"))
+                            .font(.caption.weight(.semibold))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 12).padding(.vertical, 10)
+                            .frame(minHeight: 44)
+                            .foregroundStyle(Color.iumrahPrimaryButtonText)
+                            .background(Color.iumrahPrimaryButtonBackground, in: Capsule())
+                    }.buttonStyle(.plain)
+                }
+            }
+            if openedTelegram && !isLinked {
+                Text(openedHint).font(.caption).foregroundStyle(.secondary)
+            }
+            if let errorMessage {
+                Text(errorMessage).font(.caption).foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var standardCard: some View {
         VStack(alignment: .leading, spacing: style == .compact ? 12 : 15) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
@@ -96,11 +147,6 @@ struct IumrahTelegramConnectCard: View {
         .overlay {
             RoundedRectangle(cornerRadius: style == .compact ? 22 : 26, style: .continuous)
                 .strokeBorder(cardBorder, lineWidth: 0.8)
-        }
-        .task(id: session.id) { await refreshLinkedState() }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, openedTelegram else { return }
-            Task { await refreshLinkedState() }
         }
     }
 

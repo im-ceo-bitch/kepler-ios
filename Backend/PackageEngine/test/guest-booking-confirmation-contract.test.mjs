@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const root = new URL('../../../', import.meta.url);
 const read = name => readFileSync(new URL(name, root), 'utf8');
 const screen = read('Sources/Views/Booking/IumrahBookingConfirmationView.swift');
+const completion = read('Sources/Views/Booking/IumrahBookingCreatedContent.swift');
 const service = read('Sources/Services/IumrahBookingContactService.swift');
 const backend = read('Backend/PackageEngine/src/booking-contact-verification.ts');
 const index = read('Backend/PackageEngine/src/index.ts');
@@ -24,7 +25,7 @@ test('all three booking entry points use a full navigation page and never a prof
 
 test('guest SMS confirmation precedes booking creation and no login or account creation is involved', () => {
   const confirmIndex = screen.indexOf('verificationService.confirmCode(challengeID: challengeID');
-  const bookingIndex = screen.indexOf('session = try await createBooking(profile)');
+  const bookingIndex = screen.indexOf('committed = try await createBooking(profile)');
   const attachIndex = screen.indexOf('verificationService.attachVerifiedPhone(');
   assert.ok(confirmIndex >= 0 && confirmIndex < bookingIndex && bookingIndex < attachIndex);
   assert.match(screen, /firstName: firstName\.trimmingCharacters/);
@@ -33,13 +34,15 @@ test('guest SMS confirmation precedes booking creation and no login or account c
   assert.match(screen, /LoopingVideoView\(resource: "iumrah-security-identity"/);
   assert.match(screen, /settings\.phone = confirmedPhone/);
   assert.doesNotMatch(screen, /startPhoneRegistration|confirmPhoneLogin|password:/);
-  assert.match(screen, /let savedBooking \{ session = savedBooking \}/); // no duplicate on retry
+  assert.match(screen, /let savedBooking \{ committed = savedBooking \}/); // no duplicate on retry
 });
 
 test('Telegram opt-in appears after phone verification on the booking success screen', () => {
   assert.match(screen, /if isFinished, let savedBooking/);
-  assert.match(screen, /IumrahTelegramConnectCard\(session: session, style: \.standard\)/);
-  assert.match(screen, /checkmark\.seal\.fill/);
+  assert.match(completion, /IumrahTelegramConnectCard\(session: current, style: \.confirmation\)/);
+  assert.match(completion, /IumrahBookingDomeAnimation\(\)/);
+  assert.match(completion, /IumrahBookingCreatedSound.play\(\)/);
+  assert.match(screen, /IumrahBookingCreatedContent\(/);
   assert.match(screen, /noPaymentNotice/);
   assert.match(screen, /passportWarning/);
 });

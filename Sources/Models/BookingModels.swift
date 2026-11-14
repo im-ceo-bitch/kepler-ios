@@ -583,3 +583,16 @@ indirect enum BookingMealBundlePayload: Codable, Hashable {
         }
     }
 }
+
+extension StoredBookingSession {
+    var availabilityEstimateDeadline: Date? {
+        IumrahBookingAvailabilityEstimate.deadline(
+            start: availabilityStartedAt ?? latestStatusTimestamp(matching: ["availability_check", "new"]),
+            created: booking.createdAt, serverDeadline: availabilityDeadlineAt
+        )
+    }
+
+    var isCheckingAvailability: Bool {
+        ["NEW", "AVAILABILITY_CHECK"].contains(effectiveStatus.uppercased())
+    }
+}

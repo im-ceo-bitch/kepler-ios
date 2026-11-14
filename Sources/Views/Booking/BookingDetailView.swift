@@ -435,7 +435,7 @@ struct BookingDetailView: View {
                         Text(lifecycleTimerTitle(phase, expired: expired))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                        Text(expired ? lifecycleOvertimeLabel : lifecycleCountdown(remaining))
+                        Text(expired ? (phase.isAvailability ? localized("Проверяем", "Checking", "Tekshirilmoqda", "Текширилмоқда") : lifecycleOvertimeLabel) : lifecycleCountdown(remaining))
                             .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(tint)
                     }
@@ -463,14 +463,7 @@ struct BookingDetailView: View {
     private func lifecyclePhase(for session: StoredBookingSession) -> BookingDetailLifecyclePhase? {
         switch session.effectiveStatus.uppercased() {
         case "NEW", "AVAILABILITY_CHECK":
-            let deadline = lifecycleDeadline(
-                explicit: session.availabilityDeadlineAt,
-                start: session.availabilityStartedAt
-                    ?? session.latestStatusTimestamp(matching: ["availability_check", "new"])
-                    ?? session.booking.createdAt,
-                duration: 6 * 60 * 60
-            )
-            return deadline.map { .availability($0) }
+            return session.availabilityEstimateDeadline.map { .availability($0) }
         case "PAYMENT_PENDING":
             if session.paymentReceivedAt != nil {
                 let deadline = lifecycleDeadline(
@@ -532,7 +525,7 @@ struct BookingDetailView: View {
     private func lifecycleTimerTitle(_ phase: BookingDetailLifecyclePhase, expired: Bool) -> String {
         switch phase {
         case .availability:
-            return expired ? localized("Проверка занимает дольше обычного", "The check is taking longer than usual", "Tekshiruv odatdagidan uzoqroq davom etmoqda", "Текширув одатдагидан узоқроқ давом этмоқда") : localized("До максимального срока проверки", "Until the maximum check time", "Tekshiruvning maksimal muddatigacha", "Текширувнинг максимал муддатигача")
+            return expired ? localized("Проверка занимает дольше обычного", "The check is taking longer than usual", "Tekshiruv odatdagidan uzoqroq davom etmoqda", "Текширув одатдагидан узоқроқ давом этмоқда") : localized("Ориентировочное время проверки", "Estimated check time", "Taxminiy tekshiruv vaqti", "Тахминий текshiruv vaqti")
         case .priceLock:
             return expired ? localized("Срок фиксации цены завершён", "Price hold has ended", "Narxni saqlash muddati tugadi", "Нархни сақлаш муддати тугади") : localized("Цена зафиксирована ещё", "Price held for", "Narx yana shuncha vaqtga saqlanadi", "Нарх яна шунча вақтга сақланади")
         case .paymentConfirmation:
@@ -545,7 +538,7 @@ struct BookingDetailView: View {
     private func lifecycleTimerFootnote(_ phase: BookingDetailLifecyclePhase, expired: Bool) -> String {
         switch phase {
         case .availability:
-            return expired ? localized("Мы продолжаем проверку. Статус обновится автоматически, как только все компоненты будут подтверждены.", "We are continuing the check. The status will update automatically once all components are confirmed.", "Tekshiruv davom etmoqda. Barcha qismlar tasdiqlangach holat avtomatik yangilanadi.", "Текширув давом этмоқда. Барча қисмлар тасдиқлангач ҳолат автоматик янгиланади.") : localized("Обычно подтверждение занимает 1–2 часа. Можно закрыть приложение — статус обновится автоматически.", "Confirmation usually takes 1–2 hours. You can close the app — the status will update automatically.", "Tasdiqlash odatda 1–2 soat davom etadi. Ilovani yopishingiz mumkin — holat avtomatik yangilanadi.", "Тасдиқлаш одатда 1–2 соат давом этади. Иловани ёпишингиз мумкин — ҳолат автоматик янгиланади.")
+            return expired ? localized("Мы продолжаем проверку. Статус обновится автоматически, как только все компоненты будут подтверждены.", "We are continuing the check. The status will update automatically once all components are confirmed.", "Tekshiruv davom etmoqda. Barcha qismlar tasdiqlangach holat avtomatik yangilanadi.", "Текширув давом этмоқда. Барча қисмлар тасдиқлангач ҳолат автоматик янгиланади.") : localized("Обычно проверка занимает около 30 минут, иногда дольше. Можно закрыть приложение — статус обновится автоматически.", "The check usually takes about 30 minutes, sometimes longer. You can close the app — the status will update automatically.", "Tekshiruv odatda 30 daqiqa, ba’zan uzoqroq davom etadi. Ilovani yopishingiz mumkin — holat avtomatik yangilanadi.", "Текширув одатда 30 дақиқа, баъзан узоқроқ давом этади. Иловани ёпишингиз мумкин — ҳолат автоматик янгиланади.")
         case .priceLock:
             return expired ? localized("Перед подтверждением оплаты iumrah повторно проверит актуальную итоговую стоимость.", "Before confirming payment, iumrah will recheck the current total price.", "To‘lovni tasdiqlashdan oldin iumrah yakuniy narxning dolzarbligini qayta tekshiradi.", "Тўловни тасдиқлашдан олдин iumrah якуний нархнинг долзарблигини қайта текширади.") : localized("Авиабилеты и некоторые другие компоненты имеют динамическую стоимость и после окончания периода могут потребовать повторной проверки.", "Flights and some other components have dynamic pricing and may require a fresh check after this period.", "Aviachiptalar va ayrim boshqa qismlar dinamik narxga ega, muddat tugagach qayta tekshiruv talab qilinishi mumkin.", "Авиачипталар ва айрим бошқа қисмлар динамик нархга эга, муддат тугагач қайта текширув талаб қилиниши мумкин.")
         case .paymentConfirmation:
@@ -1766,6 +1759,11 @@ private enum BookingDetailLifecyclePhase {
     case priceLock(Date)
     case paymentConfirmation(Date)
     case documents(Date)
+
+    var isAvailability: Bool {
+        if case .availability = self { return true }
+        return false
+    }
 
     var deadline: Date {
         switch self {

@@ -5,7 +5,9 @@ import SwiftUI
 struct IumrahBookingConfirmationView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var chrome: AppChromeStore
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
 
     let createBooking: @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession
 
@@ -24,7 +26,6 @@ struct IumrahBookingConfirmationView: View {
     @State private var errorMessage: String?
     @State private var isCodeStep = false
     @State private var isFinished = false
-    @State private var successPulse = false
     @FocusState private var activeField: IdentityField?
 
     private let verificationService = IumrahBookingContactService()
@@ -73,9 +74,14 @@ struct IumrahBookingConfirmationView: View {
             .padding(.bottom, 42)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Color.iumrahPageBackground)
-        .navigationTitle(copy("Подтверждение брони", "Booking confirmation", "Bronni tasdiqlash", "Бронни тасдиқлаш", "تأكيد الحجز"))
+        .background(isFinished ? Color(uiColor: .systemBackground) : Color.iumrahPageBackground)
+        .toolbarBackground(isFinished ? Color(uiColor: .systemBackground) : Color.iumrahPageBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(colorScheme, for: .navigationBar)
+        .statusBarHidden(false)
+        .navigationTitle(isFinished ? "" : copy("Подтверждение брони", "Booking confirmation", "Bronni tasdiqlash", "Бронни тасдиқлаш", "تأكيد الحجز"))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(isFinished)
         .toolbar(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear {
@@ -365,15 +371,13 @@ struct IumrahBookingConfirmationView: View {
             settings.lastName = profile.lastName
             if let confirmedPhone { settings.phone = confirmedPhone }
             isFinished = true
-            IumrahHaptics.success()
-            successPulse = false
         } catch {
             if let savedBooking, !savedBooking.hasServerIdentity {
-                errorMessage = copy("Заявка сохранена. Не удалось получить номер брони и iumrah ID. Повторите подтверждение — новая заявка не будет создана.",
-                                    "Request saved. The booking number and iumrah ID are not ready. Retry confirmation; no new request will be created.",
-                                    "Ariza saqlandi. Bron raqami va iumrah ID hali tayyor emas. Tasdiqlashni qaytaring — yangi ariza yaratilmaydi.",
-                                    "Ариза сақланди. Брон рақами ва iumrah ID ҳали тайёр эмас. Тасдиқлашни такрорланг — янги ариза яратилмайди.",
-                                    "تم حفظ الطلب. رقم الحجز ومعرف iumrah غير جاهزين. أعد التأكيد دون إنشاء طلب جديد.")
+                errorMessage = copy("Бронирование сохранено. Не удалось получить номер бронирования и iumrah ID. Повторите подтверждение — новое бронирование не будет создано.",
+                                    "Booking saved. The booking number and iumrah ID are not ready. Retry confirmation; no new booking will be created.",
+                                    "Bron saqlandi. Bron raqami va iumrah ID hali tayyor emas. Tasdiqlashni qaytaring — yangi bron yaratilmaydi.",
+                                    "Брон сақланди. Брон рақами ва iumrah ID ҳали тайёр эмас. Тасдиқлашни такрорланг — янги брон яратилмайди.",
+                                    "تم حفظ الحجز. رقم الحجز ومعرف iumrah غير جاهزين. أعد التأكيد دون إنشاء حجز جديد.")
             } else {
                 errorMessage = error.localizedDescription
             }
@@ -393,81 +397,26 @@ struct IumrahBookingConfirmationView: View {
     }
 
     private func completion(_ session: StoredBookingSession) -> some View {
-        VStack(spacing: 17) {
-            ZStack {
-                Circle().fill(Color.green.opacity(0.10)).frame(width: 168, height: 168)
-                Image(systemName: "checkmark.seal.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(Color.green)
-                    .frame(width: 108, height: 108)
-                    .scaleEffect(successPulse ? 1 : 0.8)
-                    .symbolEffect(.bounce, value: successPulse)
-            }
-            .padding(.top, 48)
-            Text(copy("Заявка создана. Проверяем наличие", "Request created. Checking availability", "Ariza yaratildi. Mavjudlik tekshirilmoqda", "Ариза яратилди. Мавжудлик текширилмоқда", "تم إنشاء الطلب. نتحقق من التوفر"))
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .multilineTextAlignment(.center)
-            Text(copy("Подождите повторной проверки наличия отелей, авиабилетов и остальных услуг: цены могут меняться несколько раз в день. Сейчас вы ничего не оплачиваете. Оплата откроется после подтверждения наличия.",
-                      "We are rechecking all hotels, flights and services; prices may change several times a day. You pay nothing now. Payment will open after availability is reconfirmed.",
-                      "Mehmonxona, reys va xizmatlar qayta tekshirilmoqda: narxlar kun davomida o‘zgarishi mumkin. Hozir to‘lov yo‘q. To‘lov mavjudlik tasdiqlangach ochiladi.",
-                      "Меҳмонхона, рейс ва хизматлар қайта текширилмоқда: нархлар кун давомида ўзгариши мумкин. Ҳозир тўлов йўқ. Тўлов мавжудлик тасдиқлангач очилади.",
-                      "نعيد التحقق من الفنادق والرحلات والخدمات. لا يلزم الدفع الآن حتى يتم تأكيد التوفر."))
-                .font(.subheadline)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            VStack(spacing: 6) {
-                Text(session.displayBookingNumber)
-                    .font(.title3.monospacedDigit().weight(.bold))
-                if let id = session.displayPilgrimID {
-                    Text("iumrah ID · \(id)")
-                        .font(.subheadline.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            VStack(spacing: 5) {
-                Text(copy("Итого за пакет", "Package total", "Paketning umumiy narxi", "Пакетнинг умумий нархи", "إجمالي الباقة"))
-                    .font(.footnote).foregroundStyle(.secondary)
-                Text(session.booking.totalUsd, format: .currency(code: "USD"))
-                    .font(.largeTitle.bold())
-                Text(copy("На одного человека", "Per person", "Bir kishi uchun", "Бир киши учун", "لكل شخص") + ": " + session.booking.perPilgrimUsd.formatted(.currency(code: "USD")))
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(16)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
-            Text(channel == .email
-                 ? copy("Получайте статусы бронирования, документы и билеты в приложении и по email. Дополнительно подключите Telegram.",
-                        "Get booking updates, documents and ticket alerts in the app and by email. You can also connect Telegram.",
-                        "Bron holati, hujjatlar va chiptalarni ilova va email orqali oling. Telegramni ham ulang.",
-                        "Брон ҳолати, ҳужжатлар ва чипталарни илова ва email орқали олинг. Telegramни ҳам уланг.",
-                        "تابع حالة الحجز والوثائق والتذاكر في التطبيق وبالبريد الإلكتروني، ويمكنك ربط تيليجرام أيضًا.")
-                 : copy("Получайте уведомления по SMS и в приложении. Для сообщений в Telegram подключите бота.",
-                        "Get SMS and in-app booking alerts. Connect Telegram for additional updates.",
-                        "SMS va ilova orqali xabarlar oling. Qo‘shimcha xabarlar uchun Telegramni ulang.",
-                        "SMS ва илова орқали хабарлар олинг. Қўшимча хабарлар учун Telegramни уланг.",
-                        "تصلك التحديثات عبر الرسائل وفي التطبيق. يمكنك ربط تيليجرام أيضًا."))
-                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            IumrahTelegramConnectCard(session: session, style: .standard)
+        VStack(spacing: 18) {
+            IumrahBookingCreatedContent(
+                session: session,
+                contact: channel == .sms ? confirmedPhone.map { .sms($0) } : confirmedEmail.map { .email($0) }
+            )
             NavigationLink {
                 BookingDetailView(bookingID: session.id)
             } label: {
-                Label(copy("Открыть бронирование", "Open booking", "Bronni ochish", "Бронни очиш", "عرض الحجز"), systemImage: "arrow.right")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+                Text(copy("Открыть бронирование", "Open booking", "Bronni ochish", "Бронни очиш", "عرض الحجز"))
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
-        }
-        .frame(maxWidth: .infinity)
-        .task {
-            guard !reduceMotion, !successPulse else { return }
-            try? await Task.sleep(for: .milliseconds(220))
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                successPulse = true
+            Button {
+                dismiss()
+                chrome.navigate(to: .booking)
+            } label: {
+                Text(copy("Готово", "Done", "Tayyor", "Тайёр", "تم"))
             }
+            .buttonStyle(IumrahSecondaryButtonStyle())
         }
     }
-
 
     // Guest checkout has its own complete copy instead of relying on English fallbacks
     // from legacy per-screen translation switches.
@@ -492,9 +441,9 @@ struct IumrahBookingConfirmationView: View {
         "Checking…": "Kontrol ediliyor…",
         "Confirm booking": "Rezervasyonu onayla",
         "Send SMS code": "SMS kodu gönder",
-        "Booking request created!": "Rezervasyon talebi oluşturuldu!",
         "We are rechecking hotels, flights and services. We will provide payment instructions after availability is confirmed. Nothing is due now.": "Otel, uçuş ve hizmetlerin müsaitliğini yeniden kontrol ediyoruz. Onaylandıktan sonra ödeme bilgilerini ileteceğiz. Şimdi ödeme yapmanıza gerek yok.",
         "Open booking": "Rezervasyonu aç",
+        "Done": "Tamam",
     ]
     private static let indonesian: [String: String] = [
         "Booking confirmation": "Konfirmasi pemesanan",
@@ -517,9 +466,9 @@ struct IumrahBookingConfirmationView: View {
         "Checking…": "Memeriksa…",
         "Confirm booking": "Konfirmasi pemesanan",
         "Send SMS code": "Kirim kode SMS",
-        "Booking request created!": "Permintaan pemesanan berhasil dibuat!",
         "We are rechecking hotels, flights and services. We will provide payment instructions after availability is confirmed. Nothing is due now.": "Kami sedang memeriksa kembali hotel, penerbangan, dan layanan. Instruksi pembayaran akan diberikan setelah ketersediaan dikonfirmasi. Belum ada pembayaran sekarang.",
         "Open booking": "Buka pemesanan",
+        "Done": "Selesai",
     ]
     private static let malay: [String: String] = [
         "Booking confirmation": "Pengesahan tempahan",
@@ -542,9 +491,9 @@ struct IumrahBookingConfirmationView: View {
         "Checking…": "Menyemak…",
         "Confirm booking": "Sahkan tempahan",
         "Send SMS code": "Hantar kod SMS",
-        "Booking request created!": "Permintaan tempahan berjaya dibuat!",
         "We are rechecking hotels, flights and services. We will provide payment instructions after availability is confirmed. Nothing is due now.": "Kami sedang menyemak semula hotel, penerbangan dan perkhidmatan. Arahan bayaran diberikan selepas ketersediaan disahkan. Tiada bayaran diperlukan sekarang.",
         "Open booking": "Buka tempahan",
+        "Done": "Selesai",
     ]
     private func copy(_ ru: String, _ en: String, _ uz: String, _ uzCy: String, _ ar: String) -> String {
         switch settings.language {

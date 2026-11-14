@@ -51,7 +51,9 @@ test("package checkout recalculates from the original generated fare and persist
   assert.doesNotMatch(detail, /BookingProfileCaptureSheet/);
   assert.match(detail, /let session = try await bookings\.create\(/);
   assert.match(detail, /return session/);
-  assert.match(detail, /BookingDetailView\(bookingID: bookingID\)/);
+  const confirmation = fs.readFileSync(new URL("Sources/Views/Booking/IumrahBookingConfirmationView.swift", root), "utf8");
+  assert.match(confirmation, /BookingDetailView\(bookingID: session\.id\)/);
+  assert.doesNotMatch(detail, /createdBookingID = session\.id/);
 });
 
 test("transfer chooser stays reachable from package customization and preserves the selected transfer", () => {

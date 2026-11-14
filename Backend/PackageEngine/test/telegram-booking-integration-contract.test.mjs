@@ -12,13 +12,15 @@ test('iOS exposes Telegram booking connection on Home, Account, Booking and comp
   const bookings = read('Sources/Views/Tabs/BookingsHomeView.swift');
   const detail = read('Sources/Views/Booking/BookingDetailView.swift');
   const celebration = read('Sources/Views/Booking/IumrahBookingCelebrationView.swift');
+  const completion = read('Sources/Views/Booking/IumrahBookingCreatedContent.swift');
   const service = read('Sources/Services/TelegramBookingIntegrationService.swift');
 
   assert.match(home, /IumrahTelegram(?:EntryCard\(language: settings\.language, large: true\)|IntegrationView\(preferredBookingID: bookings\.sessions\.first\?\.id\))/);
   assert.match(account, /telegramIntegrationSection/);
   assert.match(bookings, /IumrahTelegramConnectCard\(/);
   assert.match(detail, /IumrahTelegramConnectCard\(/);
-  assert.match(celebration, /IumrahTelegramConnectCard\([\s\S]*style: \.dark/);
+  assert.match(celebration, /IumrahBookingCreatedContent\(/);
+  assert.match(completion, /IumrahTelegramConnectCard\(session: current, style: \.confirmation\)/);
   assert.match(service, /\/api\/package\/booking\/\\\(bookingID\)\/telegram-link/);
   assert.match(service, /url\.host\?\.lowercased\(\) == "t\.me"/);
 });

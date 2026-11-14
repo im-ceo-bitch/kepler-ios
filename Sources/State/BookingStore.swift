@@ -273,6 +273,19 @@ final class BookingStore: ObservableObject {
         return session
     }
 
+    /// Refresh only the booking visible on the creation screen, without creating or syncing profiles.
+    func refreshCreatedBookingStatus(id: String) async {
+        guard let initial = booking(id: id), !initial.accessToken.isEmpty else { return }
+        guard let response = try? await bookingService.fetchOperationalTrip(
+            id: id, headers: ["x-booking-token": initial.accessToken]
+        ), !Task.isCancelled, response.trip.bookingID == id,
+            var current = booking(id: id), current.accessToken == initial.accessToken,
+            current.operationStatus == initial.operationStatus else { return }
+        current.mergeOperationalTrip(response.trip, statusHistory: response.statusHistory)
+        current.guide = response.assignment?.guide ?? current.guide
+        if current != booking(id: id) { upsert(current) }
+    }
+
     func refreshAll() async {
         var staleBookingIDs = Set<String>()
 

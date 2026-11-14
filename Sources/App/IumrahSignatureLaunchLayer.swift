@@ -44,7 +44,7 @@ struct IumrahSignatureLaunchLayer: View {
         let headerCenter = topInset + IumrahSignatureHeaderGeometry.topInset + IumrahSignatureHeaderGeometry.logoHeight / 2
         let y = height * 0.48 + (headerCenter - height * 0.48) * CGFloat(handoff)
         let logoWidth = min(width * 0.66, 248)
-        let targetWidth = IumrahSignatureHeaderGeometry.logoWidth
+        let targetWidth = min(IumrahSignatureHeaderGeometry.logoWidth, max(90, width - 2 * IumrahDesign.pagePadding - 184))
         let logoFrameWidth = logoWidth + (targetWidth - logoWidth) * CGFloat(handoff)
         let logoFrameHeight: CGFloat = 82 + (IumrahSignatureHeaderGeometry.logoHeight - 82) * CGFloat(handoff)
         return ZStack {

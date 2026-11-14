@@ -239,9 +239,9 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private var searchSummary: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 5) {
             Button { withAnimation { editingSearch.toggle() } } label: {
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text("\(dayText(journey.trip.departureDate)) – \(dayText(journey.trip.returnDate))")
                     .font(IumrahType.bold(17)).monospacedDigit()
@@ -250,7 +250,7 @@ struct IumrahGuidedFlightSelectionView: View {
                     .font(.caption.weight(.bold))
                     .padding(.horizontal, 10)
                     .frame(height: 30)
-                    .background(IumrahFlightPalette.raised, in: Capsule())
+
             }
             HStack {
                 Text(tr("\(journey.trip.travelerCount) чел.", "\(journey.trip.travelerCount) travelers", "\(journey.trip.travelerCount) kishi", "\(journey.trip.travelerCount) киши"))
@@ -265,17 +265,19 @@ struct IumrahGuidedFlightSelectionView: View {
             }.buttonStyle(.plain)
             if editingSearch {
                 Divider()
-                IumrahFlightSearchEditor {
-                    pendingChoice = nil
-                    outbound = nil
-                    inbound = nil
-                    step = .outbound
-                    editingSearch = false
-                    Task { await loadFlights() }
+                IumrahCompactSearchFields {
+                    IumrahFlightSearchEditor {
+                        pendingChoice = nil
+                        outbound = nil
+                        inbound = nil
+                        step = .outbound
+                        editingSearch = false
+                        Task { await loadFlights() }
+                    }
                 }
             }
         }
-        .padding(16)
+        .padding(12)
         .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22))
         .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(Color.primary.opacity(0.09), lineWidth: 1) }
         .modifier(IumrahCollapseSearchOnPull { editingSearch = false })
@@ -819,7 +821,7 @@ private struct IumrahGuidedFlightDetailView: View {
             .padding(.bottom, IumrahDesign.pagePadding)
         }
         .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
-        .iumrahFlightDetailChrome()
+        .iumrahFlightDetailChrome(title: choice.airlineName, shareText: legs.first?.share ?? "\(choice.origin) → \(choice.destination)")
     }
 
     private func timeText(_ date: String) -> String {

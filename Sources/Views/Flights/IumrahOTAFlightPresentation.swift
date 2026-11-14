@@ -388,7 +388,7 @@ struct IumrahOTAFlightDetailPage: View {
             .padding(.bottom, IumrahDesign.pagePadding)
         }
         .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
-        .iumrahFlightDetailChrome()
+        .iumrahFlightDetailChrome(title: flight.airline, shareText: legs.first?.share ?? "\(flight.origin) → \(flight.destination)")
     }
 
     private func detailGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {

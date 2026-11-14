@@ -25,51 +25,43 @@ struct IumrahPrimaryHeaderBrandRow: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            Group {
+            HStack {
                 if navigationChromeStyle == .drawer {
-                    Button { chrome.openSidebar() } label: {
-                        Image(systemName: "line.3.horizontal")
-                            .font(.system(size: 17, weight: .medium))
-                            .frame(width: 24, height: 24)
-                    }
-                    .modifier(IumrahNativeChromeButton())
-                    .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
-                        ru: "Меню", en: "Menu", uz: "Menyu", cy: "Меню", tr: "Menu", id: "Menu"))
-                } else {
-                    Color.clear.accessibilityHidden(true)
+                    IumrahGlassIconButton(systemName: "line.3.horizontal", size: 44, foreground: .white,
+                        accessibilityLabel: IumrahAccessibilityCopy.text(settings.language,
+                            ru: "Меню", en: "Menu", uz: "Menyu", cy: "Меню", tr: "Menu", id: "Menu")) { chrome.openSidebar() }
                 }
-            }
-            .frame(width: 48, height: 48)
-
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }.frame(width: helpInHeader ? 88 : 48)
+            Spacer(minLength: 4)
             Image("HeaderWordmarkLight")
-                .resizable()
-                .renderingMode(.template)
-                .scaledToFit()
+                .resizable().renderingMode(.template).scaledToFit()
                 .foregroundStyle(.white)
-                .frame(width: IumrahSignatureHeaderGeometry.logoWidth,
-                       height: IumrahSignatureHeaderGeometry.logoHeight)
-                .accessibilityLabel("iumrah")
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 0)
-
-            if helpInHeader { IumrahPageHelpButton() } else {
-            Button { chrome.openNotifications() } label: {
-                Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
-                    .font(.system(size: 17, weight: .medium))
-                            .frame(width: 24, height: 24)
-            }
-            .modifier(IumrahNativeChromeButton())
-            .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
-                ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar",
-                cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
-            .frame(width: 48, height: 48)
+                .frame(maxWidth: IumrahSignatureHeaderGeometry.logoWidth, maxHeight: IumrahSignatureHeaderGeometry.logoHeight)
+                .accessibilityLabel("iumrah").accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 4)
+            if helpInHeader {
+                IumrahNativeHeaderActionGroup {
+                    notificationAction
+                    IumrahPageHelpButton(inSystemToolbar: true)
+                }.frame(width: 88)
+            } else {
+                notificationAction.modifier(IumrahNativeChromeButton()).frame(width: 48, height: 48)
             }
         }
         .frame(height: IumrahSignatureHeaderGeometry.logoHeight)
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
     }
+    private var notificationAction: some View {
+        Button { IumrahHaptics.selection(); chrome.openNotifications() } label: {
+            Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
+                .font(.system(size: 17, weight: .medium))
+        }
+        .accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
+            ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar", cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
+    }
+
 }
 
 /// Shared Booking-style independent pills. Horizontal scrolling avoids truncated

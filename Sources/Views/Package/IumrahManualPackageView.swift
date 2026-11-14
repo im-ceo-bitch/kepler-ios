@@ -31,7 +31,7 @@ struct IumrahManualFlightDetail: View {
                 }.buttonStyle(IumrahPrimaryButtonStyle())
             }.padding(.horizontal, 18).padding(.bottom, 30)
         }.background(Color.iumrahPageBackground)
-            .iumrahFlightDetailChrome()
+            .iumrahFlightDetailChrome(title: leg.title, shareText: leg.share)
     }
     private func t(_ ru: String,_ en: String,_ uz: String,_ cy: String) -> String { IumrahFlightCopy.text(settings.language, ru, en, uz, cy) }
 }
@@ -148,7 +148,7 @@ struct IumrahManualPackageView: View {
             }
     }
     private var tripDetails: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 7) {
             IumrahManualScopePicker()
             fact(t("Аэропорт вылета", "Departure airport", "Jo‘nash aeroporti", "Жўнаш аэропорти"), plan.originCode)
             fact(t("Первый аэропорт прилёта", "First arrival airport", "Birinchi kelish aeroporti", "Биринчи келиш аэропорти"), plan.outboundDestinationCode)

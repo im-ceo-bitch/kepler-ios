@@ -2,70 +2,49 @@ import SwiftUI
 
 struct IumrahActionConfirmationSheet: View {
     @Environment(\.dismiss) private var dismiss
-
-    let imageAsset: String
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     let message: String
     let confirmTitle: String
     let cancelTitle: String
     var confirmColor: Color = .red
     let onConfirm: () -> Void
+    @State private var contentHeight: CGFloat = 310
 
     var body: some View {
-        VStack(spacing: 0) {
-            Image(imageAsset)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 188)
-                .clipped()
-
-            VStack(alignment: .leading, spacing: 14) {
-                Text(title)
-                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                    .tracking(-0.45)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(message)
-                    .font(.system(size: 15.5, weight: .regular, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Button {
-                        IumrahHaptics.selection()
-                        dismiss()
-                    } label: {
-                        Text(cancelTitle)
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .foregroundStyle(.primary)
-                            .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-
-                    Button(role: .destructive) {
-                        IumrahHaptics.error()
-                        onConfirm()
-                        dismiss()
-                    } label: {
-                        Text(confirmTitle)
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .foregroundStyle(.white)
-                            .background(confirmColor, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.top, 4)
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 14) {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.system(size: 32, weight: .medium))
+                    .frame(width: 66, height: 66)
+                    .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 22))
+                    .accessibilityHidden(true)
+                Text(title).font(.title2.bold()).multilineTextAlignment(.center)
+                Text(message).font(.subheadline).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { cancelButton; confirmButton }
+                    VStack(spacing: 8) { confirmButton; cancelButton }
+                }.padding(.top, 4)
             }
-            .padding(20)
+            .padding(.horizontal, 20).padding(.top, 24).padding(.bottom, 18)
+            .frame(maxWidth: .infinity)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                if height > 0 { contentHeight = height + 12 }
+            }
         }
         .background(Color.iumrahPageBackground)
-        .presentationDetents([.height(430)])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.height(contentHeight)])
         .presentationDragIndicator(.visible)
-        .presentationCornerRadius(30)
+    }
+    private var cancelButton: some View {
+        Button { IumrahHaptics.selection(); dismiss() } label: {
+            Text(cancelTitle).font(.headline).frame(maxWidth: .infinity).frame(minHeight: 48)
+        }.buttonStyle(.bordered).buttonBorderShape(.capsule).tint(.primary)
+    }
+    private var confirmButton: some View {
+        Button(role: .destructive) { IumrahHaptics.selection(); onConfirm(); dismiss() } label: {
+            Text(confirmTitle).font(.headline).frame(maxWidth: .infinity).frame(minHeight: 48)
+        }.buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(confirmColor)
     }
 }

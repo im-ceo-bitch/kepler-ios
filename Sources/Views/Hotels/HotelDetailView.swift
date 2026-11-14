@@ -96,12 +96,14 @@ struct HotelDetailView: View {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .accessibilityLabel(L10n.text("hotel_storefront_share", settings.language))
+                IumrahPageHelpButton(inSystemToolbar: true)
                 Button { storefront.toggleFavorite(hotel) } label: {
                     Image(systemName: storefront.isFavorite(hotel) ? "heart.fill" : "heart")
                 }
                 .accessibilityLabel(L10n.text(storefront.isFavorite(hotel) ? "hotel_storefront_favorite_remove" : "hotel_storefront_favorite_add", settings.language))
             }
         }
+        .modifier(IumrahHelpOverlayHost(enabled: true, explicitContext: IumrahHelpContext(key: "hotel.details")))
         .iumrahInternalNavigation()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if shouldShowSelectionBar, let selectedName = currentSelectionName {

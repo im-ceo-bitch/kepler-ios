@@ -79,22 +79,6 @@ struct IumrahPremiumFlightDetail: View {
     }
     private var hero: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if pageHeroInset != nil {
-                HStack(spacing: 8) {
-                    IumrahGlassIconButton(systemName: "chevron.backward", size: 44,
-                        foreground: .white, accessibilityLabel: t("Назад", "Back", "Orqaga", "Орқага")) { dismiss() }
-                    Spacer(minLength: 0)
-                    Text(leg.title).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(1).minimumScaleFactor(0.7)
-                    Spacer(minLength: 0)
-                    ShareLink(item: headerShareText ?? leg.share) {
-                        Image(systemName: "square.and.arrow.up").font(.system(size: 19, weight: .medium))
-                            .frame(width: 24, height: 24)
-                    }.modifier(IumrahNativeChromeButton())
-                        .frame(minWidth: 44, minHeight: 44)
-                        .accessibilityLabel(t("Поделиться", "Share", "Ulashish", "Улашиш"))
-                }
-                .foregroundStyle(.white).padding(.horizontal, 12).padding(.top, 4)
-            }
             VStack(alignment: .leading, spacing: 13) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let number = leg.verifiedNumber, leg.stops == 0 {
@@ -352,19 +336,34 @@ extension View {
             .overlay { RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.75) }
     }
 
-    /// One in-content header; only the background extends into the status-bar safe area.
-    func iumrahFlightDetailChrome() -> some View { modifier(IumrahFlightDetailChromeModifier()) }
+    /// Native system back and trailing toolbar actions for every flight detail destination.
+    func iumrahFlightDetailChrome(title: String, shareText: String) -> some View {
+        modifier(IumrahFlightDetailChromeModifier(title: title, shareText: shareText))
+    }
 }
 
 private struct IumrahFlightDetailChromeModifier: ViewModifier {
     @EnvironmentObject private var chrome: AppChromeStore
+    let title: String
+    let shareText: String
     @State private var registered = false
     func body(content: Content) -> some View {
         content
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(Color.iumrahSignatureBlack, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
-            .navigationBarBackButtonHidden(true)
-            .tint(Color.primary)
+            .navigationBarBackButtonHidden(false)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    ShareLink(item: shareText) { Image(systemName: "square.and.arrow.up") }
+                    IumrahPageHelpButton(inSystemToolbar: true)
+                }
+            }
+            .modifier(IumrahHelpOverlayHost(enabled: true, explicitContext: IumrahHelpContext(key: "flights.details")))
             .background(IumrahFlightPalette.hero, ignoresSafeAreaEdges: .top)
             .background(GeneratorInteractivePopRestorer().frame(width: 0, height: 0))
             .onAppear {

@@ -65,14 +65,13 @@ struct HomeDashboardView: View {
             IumrahRootScrollingPage(onRefresh: {
                 await bookings.refreshAll()
                 await clientNotifications.refresh(accountToken: account.bearerToken)
-            }, searchCardOverlap: 40, header: {
+            }, searchCardOverlap: 40, helpContext: "home.default", header: {
                 IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header, searchExpanded: $journeySearchExpanded)
             }, content: {
                 LazyVStack(spacing: 30) {
                     IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
-                    IumrahPageHelpCard("home.default")
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
                         notifications: Array(clientNotifications.homeNotifications.prefix(5)),
@@ -2078,25 +2077,26 @@ private struct IumrahHomeJourneySearchHero: View {
     }
 
     private var searchFields: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 5) {
             VStack(alignment: .leading, spacing: 5) {
                 AirportSelectorButton(airport: $journey.trip.originAirport,
                                       fallbackCode: $journey.trip.origin,
                                       cornerRadius: 0,
-                                      monochrome: true)
-                    .frame(minHeight: 46)
+                                      monochrome: true, compact: true)
+                    .frame(minHeight: 44)
             }
 
             Divider()
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 3) {
+                fieldCaption(tr("Маршрут умры", "Your Umrah route", "Umra yo‘nalishi", "Умра йўналиши"))
                 IumrahGlassPillSelector(options: [
                     .init(.makkahOnly, tr("Только Мекка", "Makkah only", "Faqat Makka", "Фақат Макка")),
                     .init(.makkahAndMadinah, tr("Мекка + Медина", "Makkah + Madinah", "Makka + Madina", "Макка + Мадина"))
-                ], selection: journey.trip.scope, onSelect: changeRoute, height: 44)
-                fieldCaption(tr("Маршрут умры", "Your Umrah route", "Umra yo‘nalishi", "Умра йўналиши"))
+                ], selection: journey.trip.scope, onSelect: changeRoute, height: 32)
             }
 
             if journey.trip.scope == .makkahAndMadinah {
+                fieldCaption(tr("Первый аэропорт прилёта", "First arrival airport", "Birinchi kelish aeroporti", "Биринчи келиш аэропорти"))
                 IumrahGlassPillSelector(options: [
                     .init(SaudiArrivalAirport.jeddah, tr("Джидда", "Jeddah", "Jidda", "Жидда")),
                     .init(SaudiArrivalAirport.madinah, tr("Медина", "Madinah", "Madina", "Мадина"))
@@ -2106,8 +2106,7 @@ private struct IumrahHomeJourneySearchHero: View {
                     journey.clearStagedUmrahFlights()
                     journey.trip.arrivalAirport = airport
                     journey.trip.selectedReturnAirport = nil
-                })
-                fieldCaption(tr("Первый аэропорт прилёта", "First arrival airport", "Birinchi kelish aeroporti", "Биринчи келиш аэропорти"))
+                }, height: 32)
             }
             Divider()
             Button { showingCalendar = true } label: {
@@ -2121,8 +2120,7 @@ private struct IumrahHomeJourneySearchHero: View {
                         .foregroundStyle(Color.iumrahInk)
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 4)
-                .frame(minHeight: 52)
+                .frame(minHeight: 44)
 
             }
             .buttonStyle(.plain)
@@ -2144,8 +2142,7 @@ private struct IumrahHomeJourneySearchHero: View {
                         .foregroundStyle(Color.iumrahMuted)
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 4)
-                .frame(minHeight: 52)
+                .frame(minHeight: 44)
 
             }
             .buttonStyle(.plain)
@@ -2158,7 +2155,7 @@ private struct IumrahHomeJourneySearchHero: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 18)
                 .frame(maxWidth: .infinity)
-                .frame(height: IumrahDesign.controlHeight)
+                .frame(height: 48)
                 .background(Color.iumrahSignatureBlack,
                             in: Capsule())
             }
@@ -2168,7 +2165,6 @@ private struct IumrahHomeJourneySearchHero: View {
 
 
         }
-        .padding(18)
 
     }
 

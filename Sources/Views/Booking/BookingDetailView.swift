@@ -1543,13 +1543,8 @@ private struct BookingContactEditSheet: View {
             .background(Color.iumrahPageBackground.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .frame(width: 36, height: 36)
-                            .background(Color.iumrahRaisedBackground, in: Circle())
-                    }
-                    .buttonStyle(.plain)
+                    Button { dismiss() } label: { Image(systemName: "xmark") }
+                        .accessibilityLabel("Close")
                 }
             }
         }

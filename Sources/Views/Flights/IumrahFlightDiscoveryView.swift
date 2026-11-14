@@ -3170,7 +3170,7 @@ private struct FlightDiscoveryOfferDetailView: View {
             .padding(.bottom, 20)
         }
         .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
-        .iumrahFlightDetailChrome()
+        .iumrahFlightDetailChrome(title: activeOffer.airlineName, shareText: shareText)
         .task {
             await refreshCurrentFare()
         }

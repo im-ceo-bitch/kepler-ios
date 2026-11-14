@@ -18,17 +18,20 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     private let searchCardOverlap: CGFloat
     private let extendsUnderStatusBar: Bool
     private let headerHelp: Bool
+    private let helpContext: String?
 
     init(
         onRefresh: @escaping () async -> Void,
         searchCardOverlap: CGFloat = 0,
         extendsUnderStatusBar: Bool = true,
         headerHelp: Bool = false,
+        helpContext: String? = nil,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Page
     ) {
         self.extendsUnderStatusBar = extendsUnderStatusBar
-        self.headerHelp = headerHelp
+        self.headerHelp = headerHelp || helpContext != nil
+        self.helpContext = helpContext
         self.onRefresh = onRefresh
         self.searchCardOverlap = searchCardOverlap
         self.masthead = header()
@@ -67,7 +70,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
 
         }
         .coordinateSpace(name: "iumrah.root.nonstickyScroll")
-        .modifier(IumrahHelpOverlayHost(enabled: headerHelp))
+        .modifier(IumrahHelpOverlayHost(enabled: headerHelp, explicitContext: helpContext.map { IumrahHelpContext(key: $0) }, autoOnContextChange: true))
     }
 }
 

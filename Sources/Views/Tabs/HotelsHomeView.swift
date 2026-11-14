@@ -73,7 +73,7 @@ struct HotelsHomeView: View {
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, headerHelp: false, header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, helpContext: mode == .transfer ? "transfer.default" : mode == .summary ? "review.local" : mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights", header: {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
@@ -90,7 +90,7 @@ struct HotelsHomeView: View {
                         ? "\((hotelRequest?.checkin ?? hotelCheckin).formatted(date: .abbreviated, time: .omitted)) · \(hotelRequest?.nights ?? hotelNights) " + copy("ночей", "nights", "tun", "тун")
                         : copy("Даты и пассажиры", "Dates and passengers", "Sanalar va yo‘lovchilar", "Саналар ва йўловчилар")
                 ) {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
                         switch mode {
                         case .hotels: hotelFields
                         case .flights: flightFields
@@ -104,8 +104,6 @@ struct HotelsHomeView: View {
                 .padding(.top, -40)
                 .padding(.bottom, 20)
 
-                IumrahPageHelpCard(mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights")
-                    .padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 16)
                 if mode == .hotels && (!manual.routeConfigured || manual.scope == .makkahAndMadinah) {
                     Picker("City", selection: $hotelCity) {
                         Text(copy("Мекка", "Makkah", "Makka", "Макка")).tag("makkah")
@@ -253,13 +251,12 @@ struct HotelsHomeView: View {
     }
 
     private var hotelFields: some View {
-        VStack(alignment: .leading, spacing: 17) {
-            fieldTitle(copy("Найти отель", "Find a hotel", "Mehmonxona qidirish", "Меҳмонхона қидириш"))
-            VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 fieldLabel(copy("Название отеля (необязательно)", "Hotel name (optional)", "Mehmonxona nomi", "Меҳмонхона номи"))
                 TextField(copy("Например, Hilton", "For example, Hilton", "Masalan, Hilton", "Масалан, Hilton"), text: $hotelName)
                     .textInputAutocapitalization(.words)
-                    .padding(13)
+                    .padding(8)
                     .background(Color.iumrahPageBackground, in: RoundedRectangle(cornerRadius: 15))
             }
             Divider()
@@ -294,12 +291,11 @@ struct HotelsHomeView: View {
     }
 
     private var flightFields: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            fieldTitle(copy("Поиск авиабилетов", "Find flights", "Aviachipta qidirish", "Авиачипта қидириш"))
-            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin, monochrome: true)
+        VStack(alignment: .leading, spacing: 8) {
+            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin, monochrome: true, compact: true)
                 .tint(.primary)
             IumrahManualScopePicker()
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 fieldLabel(flightDirection == 0 ? copy("Аэропорт прилёта", "Arrival airport", "Kelish aeroporti", "Келиш аэропорти") : copy("Аэропорт вылета из Саудии", "Saudi departure airport", "Saudiya jo‘nash aeroporti", "Саудия жўнаш аэропорти"))
                 Picker("Arrival", selection: $flightDestination) {
                     Text(copy("Джидда", "Jeddah", "Jidda", "Жидда")).tag(SaudiArrivalAirport.jeddah)
@@ -323,9 +319,8 @@ struct HotelsHomeView: View {
     }
 
     private var weekendFields: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            fieldTitle(copy("Короткая умра", "Short Umrah", "Qisqa Umra", "Қисқа Умра"))
-            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin)
+        VStack(alignment: .leading, spacing: 8) {
+            AirportSelectorButton(airport: $browseTrip.originAirport, fallbackCode: $browseTrip.origin, monochrome: true, compact: true)
             DatePicker(copy("Дата начала", "Start date", "Boshlanish", "Бошланиш"), selection: $weekendDate, in: Date()..., displayedComponents: .date)
             Stepper(value: $weekendNights, in: 2...4) {
                 Label("\(weekendNights) " + copy("ночей", "nights", "tun", "тун"), systemImage: "moon.stars")
@@ -341,11 +336,11 @@ struct HotelsHomeView: View {
     }
 
     private var travelerControls: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 5) {
             Stepper(value: $flightAdults, in: 1...6) {
                 Label("\(flightAdults) " + copy("взрослых", "adults", "kattalar", "катталар"), systemImage: "person.2")
             }
-            Text(copy("Для детей или нескольких номеров используйте пошаговый конфигуратор на главной.", "For children or multiple rooms use the guided builder on Home.", "Bolalar yoki bir nechta xona uchun bosh sahifadagi konfiguratorni ishlating.", "Болалар ёки бир нечта хона учун бош саҳифадаги конфигураторни ишлатинг.")).font(.caption).foregroundStyle(.secondary)
+            Text(copy("Дети и несколько номеров — в пошаговом режиме.", "Children and multiple rooms: guided mode.", "Bolalar va bir nechta xona — bosqichma-bosqich rejimda.", "Болалар ва бир нечта хона — босқичма-босқич режимда.")).font(.caption2).foregroundStyle(.secondary)
         }
     }
 
@@ -360,7 +355,7 @@ struct HotelsHomeView: View {
             .foregroundStyle(.white)
             .padding(.horizontal, 22)
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .frame(height: 48)
             .background(Color.black, in: Capsule())
         }
         .buttonStyle(.plain)

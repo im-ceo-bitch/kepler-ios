@@ -542,7 +542,6 @@ struct NuiteeHotelDetailView: View {
     var onSelectRate: ((NuiteeRoomRate) -> Void)? = nil
     var onSelectMeals: ((HotelMealChoices) -> Void)? = nil
     @State var selectedMeals = HotelMealChoices()
-    @State private var mealsByOffer: [String: HotelMealChoices] = [:]
 
     @State private var showAllAmenities = false
     @State private var detail: NuiteeHotelDetail?
@@ -606,9 +605,15 @@ struct NuiteeHotelDetailView: View {
                 IumrahHotelStaySummary(checkin: checkin, checkout: checkout, nights: nights,
                     adults: adults, children: childrenAges.count, checkinTime: detail?.checkin,
                     checkoutTime: detail?.checkout, editableStay: onSelectRate == nil ? AnyView(staySelector) : nil)
+                if onSelectRate != nil {
+                    IumrahHotelMealsEditor(selection: $selectedMeals, stars: hotel.roundedStars,
+                        city: hotel.city, included: commonSupplierMeals)
+                        .padding(18)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26))
+                }
                 IumrahHotelReviewsSection(hotelID: hotel.id, rating: detail?.rating ?? hotel.rating,
                                           reviewCount: detail?.reviewCount ?? hotel.reviewCount)
-                IumrahPageHelpCard(ratesLoading || !ratesCompleted ? "hotel.loading" : ratesError != nil ? "hotel.rates_error" : rates.isEmpty ? (onSelectRate == nil ? "hotel.no_rates" : "hotel.package_no_rates") : chosenOffer != nil ? "hotel.saved" : "hotel.details")
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language))
                 if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
                 else if ratesError != nil {
@@ -624,15 +629,6 @@ struct NuiteeHotelDetailView: View {
                     }
                     ForEach(rates) { rate in
                         rateCard(rate)
-                        if onSelectRate != nil {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text(rate.roomName).font(.caption).foregroundStyle(.secondary)
-                                IumrahHotelMealsEditor(selection: Binding(get: { mealsByOffer[rate.offerId] ?? selectedMeals }, set: { mealsByOffer[rate.offerId] = $0 }), stars: hotel.roundedStars,
-                                    city: hotel.city, included: rate.supplierMeals)
-                            }
-                            .padding(20)
-                            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26))
-                        }
                         rateSelectionButton(rate)
                     }
                 }
@@ -672,7 +668,6 @@ struct NuiteeHotelDetailView: View {
             .padding(.bottom, 70)
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea())
-        .modifier(IumrahHelpOverlayHost(enabled: true))
         .navigationTitle(hotel.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.iumrahSignatureBlack, for: .navigationBar)
@@ -687,6 +682,7 @@ struct NuiteeHotelDetailView: View {
                 IumrahPageHelpButton(inSystemToolbar: true)
             }
         }
+        .modifier(IumrahHelpOverlayHost(enabled: true, explicitContext: IumrahHelpContext(key: ratesLoading || !ratesCompleted ? "hotel.loading" : ratesError != nil ? "hotel.rates_error" : rates.isEmpty ? (onSelectRate == nil ? "hotel.no_rates" : "hotel.package_no_rates") : chosenOffer != nil ? "hotel.saved" : "hotel.details")))
         .task(id: settings.language.rawValue) { await refreshDetail() }
         .task(id: reloadID) { await refreshRates() }
         .fullScreenCover(isPresented: $isGalleryPresented) {
@@ -766,8 +762,15 @@ struct NuiteeHotelDetailView: View {
         }
     }
 
+    // An inclusion can be promised before room selection only if every offer has it.
+    private var commonSupplierMeals: HotelMealChoices {
+        guard !rates.isEmpty else { return HotelMealChoices() }
+        return HotelMealChoices(breakfast: rates.allSatisfy { $0.supplierMeals.breakfast },
+            lunch: rates.allSatisfy { $0.supplierMeals.lunch }, dinner: rates.allSatisfy { $0.supplierMeals.dinner })
+    }
+
     private func saveRate(_ rate: NuiteeRoomRate) {
-        if let onSelectRate { onSelectMeals?(mealsByOffer[rate.offerId] ?? selectedMeals); onSelectRate(rate); dismiss(); return }
+        if let onSelectRate { onSelectMeals?(selectedMeals); onSelectRate(rate); dismiss(); return }
         NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
             provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
             checkin: dateISO(checkin), checkout: dateISO(checkout), adults: adults,

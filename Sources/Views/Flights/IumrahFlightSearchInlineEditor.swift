@@ -16,10 +16,10 @@ struct IumrahFlightSearchInlineEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 7) {
             AirportSelectorButton(airport: $draft.originAirport,
                                   fallbackCode: $draft.origin,
-                                  cornerRadius: 16, monochrome: true)
+                                  cornerRadius: 16, monochrome: true, compact: true)
             Picker(label("Маршрут", "Route"), selection: $draft.scope) {
                 Text(label("Только Мекка", "Makkah only")).tag(JourneyScope.makkahOnly)
                 Text(label("Мекка и Медина", "Makkah & Madinah")).tag(JourneyScope.makkahAndMadinah)
@@ -41,7 +41,7 @@ struct IumrahFlightSearchInlineEditor: View {
                 }
             DatePicker(label("Обратно", "Return"), selection: $draft.returnDate,
                        in: draft.departureDate..., displayedComponents: .date)
-            VStack(spacing: 10) {
+            VStack(spacing: 6) {
                 Stepper(label("Взрослых", "Adults") + ": \(draft.adults)", value: $draft.adults, in: 1...9)
                 Stepper(label("Детей", "Children") + ": \(draft.children)", value: $draft.children, in: 0...8)
             }

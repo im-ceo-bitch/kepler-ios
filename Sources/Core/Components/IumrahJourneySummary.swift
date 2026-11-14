@@ -46,12 +46,12 @@ struct IumrahJourneyDisclosureCard<Details: View>: View {
             .buttonStyle(.plain)
             .accessibilityValue(expanded ? Text("Expanded") : Text("Collapsed"))
             if expanded {
-                Divider().padding(.vertical, 14)
-                details
+                Divider().padding(.vertical, 7)
+                IumrahCompactSearchFields { details }
                     .transition(.opacity)
             }
         }
-        .padding(16)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .modifier(IumrahAnimatedSearchBorder())
         .onChange(of: pulling) { _, active in if active { expanded = false } }
@@ -72,7 +72,7 @@ struct IumrahTransferRouteDetails: View {
     private var madinahHotel: String { journey.localJourneyRooms["madinah:0"]?.hotel.name ?? journey.selectedMadinahHotel?.name ?? city(true) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 8) {
             row("airplane.arrival", journey.trip.outboundDestinationCode + " → " + firstHotel)
             row("mappin.and.ellipse", ziyarat(madinahFirst))
             if includesMadinah {

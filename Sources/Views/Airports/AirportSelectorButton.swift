@@ -6,6 +6,7 @@ struct AirportSelectorButton: View {
     @Binding var fallbackCode: String
     var cornerRadius: CGFloat = 17
     var monochrome: Bool = false
+    var compact: Bool = false
     @State private var isPresented = false
     @StateObject private var locator = DepartureAirportLocationResolver()
 
@@ -20,7 +21,7 @@ struct AirportSelectorButton: View {
                         Image(systemName: "airplane.departure")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundStyle(Color.iumrahInk)
-                            .frame(width: 42, height: 42)
+                            .frame(width: compact ? 34 : 42, height: compact ? 34 : 42)
                             .background(Color.iumrahRaisedBackground, in: Circle())
                     } else {
                         IumrahIconBadge(
@@ -39,10 +40,9 @@ struct AirportSelectorButton: View {
                         if let airport {
                             Text(airport.compactTitle)
                                 .font(.headline)
-                            Text(airport.name)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            if !compact {
+                                Text(airport.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
                         } else {
                             Text(fallbackCode.isEmpty ? L10n.text("airport_search_title", settings.language) : fallbackCode.uppercased())
                                 .font(.headline)
@@ -51,6 +51,8 @@ struct AirportSelectorButton: View {
                     Spacer(minLength: 8)
                 }
                 .contentShape(Rectangle())
+                .accessibilityElement(children: .combine)
+                .accessibilityHint(airport?.name ?? "")
             }
             .buttonStyle(.plain)
 
@@ -73,8 +75,8 @@ struct AirportSelectorButton: View {
             .buttonStyle(.plain)
             .accessibilityLabel(L10n.text("airport_title", settings.language))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, compact ? 0 : 12)
+        .padding(.vertical, compact ? 0 : 10)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: cornerRadius))
         .sheet(isPresented: $isPresented) {
             AirportPickerView(selection: $airport, fallbackCode: $fallbackCode)

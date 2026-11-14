@@ -183,6 +183,8 @@ struct IumrahPageHelpCard: View {
 }
 struct IumrahHelpOverlayHost: ViewModifier {
     let enabled: Bool
+    var explicitContext: IumrahHelpContext? = nil
+    var autoOnContextChange = false
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
@@ -195,13 +197,11 @@ struct IumrahHelpOverlayHost: ViewModifier {
             .environment(\.iumrahHelpInHeader, enabled)
             .environment(\.iumrahShowPageHelp, { present() })
             .onPreferenceChange(IumrahHelpContextKey.self) { value in
-                if showing && context != value { closeTask?.cancel() }
-                context = value
-                if enabled && value != nil && !automaticShown {
-                    automaticShown = true
-                    present()
-                }
+                guard explicitContext == nil else { return }
+                updateContext(value)
             }
+            .onAppear { if let explicitContext { updateContext(explicitContext) } }
+            .onChange(of: explicitContext) { _, value in updateContext(value) }
             .overlay(alignment: .top) {
                 if enabled && showing, let context,
                    let copy = IumrahPageHelp.text(context.key, language: settings.language) {
@@ -216,7 +216,7 @@ struct IumrahHelpOverlayHost: ViewModifier {
                                     Text(IumrahHelpLabel.title(settings.language)).font(.headline)
                                     IumrahTypedHelpText(copy: copy, extra: context.extraKey.flatMap { IumrahPageHelp.text($0, language: settings.language)?.body }) {
                                         scheduleDismiss()
-                                    }
+                                    }.id(context.key + (context.extraKey ?? ""))
                                 }.foregroundStyle(Color.iumrahInk).padding(22)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .modifier(IumrahAnimatedSearchBorder(guidance: true))
@@ -235,6 +235,18 @@ struct IumrahHelpOverlayHost: ViewModifier {
                 if active && context != nil { automaticShown = true; present() }
             }
             .onDisappear { closeTask?.cancel(); showing = false; automaticShown = false }
+    }
+    private func updateContext(_ value: IumrahHelpContext?) {
+        let changed = context?.key != value?.key || context?.extraKey != value?.extraKey
+        context = value
+        guard enabled, value != nil else { dismiss(); return }
+        if !automaticShown || (changed && autoOnContextChange) {
+            automaticShown = true
+            present()
+        } else if changed && showing {
+            closeTask?.cancel()
+            scheduleDismiss()
+        }
     }
     private func present() {
         closeTask?.cancel()

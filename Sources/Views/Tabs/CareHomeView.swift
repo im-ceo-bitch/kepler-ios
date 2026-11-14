@@ -42,11 +42,10 @@ struct CareHomeView: View {
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshCare() }, header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshCare() }, helpContext: activeSession == nil ? "support.no_booking" : "support.active", header: {
             fixedHeader
         }, content: {
             VStack(alignment: .leading, spacing: 0) {
-                IumrahPageHelpCard(activeSession == nil ? "support.no_booking" : "support.active").padding(.bottom, 18)
 
                 if adaptiveLayout.isWide {
                     HStack(alignment: .top, spacing: 22) {

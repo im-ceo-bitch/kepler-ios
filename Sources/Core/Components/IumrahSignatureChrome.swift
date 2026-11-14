@@ -276,6 +276,7 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
     @Environment(\.journeyRefreshing) private var refreshing
     @EnvironmentObject private var settings: AppSettingsStore
 
+
     init(isExpanded: Binding<Bool>, summary: String, subtitle: String,
          @ViewBuilder content: () -> Content) {
         _isExpanded = isExpanded
@@ -307,7 +308,8 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
                         .foregroundStyle(.secondary)
                 }
                 .foregroundStyle(Color.primary)
-                .padding(15)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -317,12 +319,13 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
 
             if isExpanded {
                 Rectangle().fill(Color.black.opacity(0.12)).frame(height: 1)
-                content
-                    .padding(15)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                IumrahCompactSearchFields { content }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .frame(minHeight: 80)
+        .frame(minHeight: 62)
         .modifier(IumrahAnimatedSearchBorder())
         .animation(.easeInOut(duration: 0.20), value: isExpanded)
         .onChange(of: pulling || refreshing) { _, active in
@@ -337,6 +340,26 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
         case .uzbekCyrillic: return ru
         default: return en
         }
+    }
+}
+
+/// A measured, bounded viewport for long search forms. Unlike ViewThatFits,
+/// this mounts the controls once and preserves their focus and sheet state.
+struct IumrahCompactSearchFields<Content: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var measuredHeight: CGFloat = 330
+    private var limit: CGFloat { dynamicTypeSize.isAccessibilitySize ? 420 : 330 }
+    private let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: measuredHeight > limit) {
+            content.frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if height > 0 { measuredHeight = height }
+                }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(height: min(measuredHeight, limit))
     }
 }
 

@@ -30,7 +30,7 @@ struct FlightDetailsView: View {
             .padding(.bottom, 42)
         }
         .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
-        .iumrahFlightDetailChrome()
+        .iumrahFlightDetailChrome(title: offer.airline, shareText: "\(offer.airline) \(offer.flightNumber) · \(offer.origin) → \(offer.destination)")
         .task { await enrichAirports() }
     }
 

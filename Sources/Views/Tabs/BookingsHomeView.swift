@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 struct BookingsHomeView: View {
     private enum BookingPanel: String, CaseIterable, Identifiable {
@@ -44,14 +45,12 @@ struct BookingsHomeView: View {
 
     private var bookingTabContent: some View {
         VStack(spacing: 12) {
-            IumrahPageHelpCard(activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : "bookings.schedule")
-                .padding(.horizontal, IumrahDesign.pagePadding).padding(.top, 12)
             if let activeSession { AnyView(activeBookingHub(activeSession)) }
             else { AnyView(emptyBookingHome) }
         }
     }
     private var bookingScrollRoot: AnyView {
-        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, header: {
+        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : "bookings.schedule", header: {
             AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
         }, content: { AnyView(bookingTabContent) })
         .modifier(IumrahPrimaryTabScrollChrome()))
@@ -193,54 +192,36 @@ struct BookingsHomeView: View {
     /// The top deliberately avoids another large card. Like the reference flow,
     /// hierarchy comes from whitespace and typography before the process begins.
     private func bookingIdentity(_ session: StoredBookingSession) -> some View {
-        VStack(spacing: 17) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(activeEyebrow).font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                Text("\(session.booking.route.originCode) → \(session.booking.route.outboundDestination)")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .tracking(-0.9).lineLimit(1).minimumScaleFactor(0.72)
+                Text("\(L10n.date(session.booking.input.startDate, settings.language)) – \(L10n.date(session.booking.input.endDate, settings.language))")
+                    .font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
+                Label(pilgrimCountText(session.booking.input.travelers.totalPeople), systemImage: "person.2.fill")
+                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                BookingIdentityCopyRow(title: localized("Номер брони", "Booking number", "Bron raqami", "Брон рақами"),
+                    value: session.displayBookingNumber == "#----" ? "—" : session.displayBookingNumber, canCopy: session.displayBookingNumber != "#----")
+                if let id = session.displayPilgrimID {
+                    BookingIdentityCopyRow(title: localized("ID паломника", "Pilgrim ID", "Ziyoratchi ID", "Зиёратчи ID"), value: id, canCopy: true)
+                } else {
+                    BookingIdentityCopyRow(title: localized("ID паломника", "Pilgrim ID", "Ziyoratchi ID", "Зиёратчи ID"), value: "—", canCopy: false)
+                }
+                if let name = session.travelerName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+                    BookingIdentityCopyRow(title: localized("Имя и фамилия", "Full name", "Ism va familiya", "Исм ва фамилия"), value: name, canCopy: true)
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
             ZStack {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
                     .fill(Color.iumrahRaisedBackground)
                     .frame(width: 94, height: 94)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.065), lineWidth: 0.7)
-                    }
-
-                Image(systemName: "suitcase.fill")
-                    .font(.system(size: 34, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityHidden(true)
-
-            VStack(spacing: 7) {
-                Text(activeEyebrow)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-
-                Text("\(session.booking.route.originCode) → \(session.booking.route.outboundDestination)")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .tracking(-0.9)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.76)
-                    .lineLimit(1)
-
-                Text("\(L10n.date(session.booking.input.startDate, settings.language)) – \(L10n.date(session.booking.input.endDate, settings.language))")
-                    .font(.system(size: 16, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            HStack(spacing: 8) {
-                identityPill(L10n.format("booking_number_short", settings.language, session.displayBookingNumber))
-                identityPill(pilgrimCountText(session.booking.input.travelers.totalPeople), systemName: "person.2.fill")
-            }
-
-            if let name = session.travelerName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
-                Text(name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
-        .frame(maxWidth: .infinity)
+                    .overlay { RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Color.primary.opacity(0.065), lineWidth: 0.7) }
+                Image(systemName: "suitcase.fill").font(.system(size: 34, weight: .medium))
+                    .symbolRenderingMode(.hierarchical).foregroundStyle(.secondary)
+            }.accessibilityHidden(true)
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func identityPill(_ text: String, systemName: String? = nil) -> some View {
@@ -2125,4 +2106,45 @@ private struct BookingProgressStage {
     let activeSubtitle: String
     let cardTitle: String
     let cardBody: String
+}
+
+
+/// Copy feedback is local to the row and resets independently after 2.5s.
+private struct BookingIdentityCopyRow: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    let title: String
+    let value: String
+    let canCopy: Bool
+    @State private var copied = false
+    @State private var resetTask: Task<Void, Never>?
+    private var copyLabel: String { IumrahFlightCopy.text(settings.language, "Копировать", "Copy", "Nusxalash", "Нусхалаш") }
+    private var copiedLabel: String { IumrahFlightCopy.text(settings.language, "Скопировано", "Copied", "Nusxalandi", "Нусхаланди") }
+    var body: some View {
+        HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption).foregroundStyle(.secondary)
+                Text(value).font(.headline.weight(.semibold)).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+                if canCopy {
+                    Button {
+                        UIPasteboard.general.string = value
+                        IumrahHaptics.success()
+                        resetTask?.cancel()
+                        withAnimation(.easeInOut(duration: 0.18)) { copied = true }
+                        resetTask = Task { @MainActor in
+                            do { try await Task.sleep(for: .milliseconds(2500)) } catch { return }
+                            withAnimation(.easeInOut(duration: 0.18)) { copied = false }
+                        }
+                    } label: {
+                        Image(systemName: copied ? "checkmark.circle.fill" : "doc.on.doc")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(copied ? Color.green : Color.secondary)
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }.buttonStyle(.plain).accessibilityLabel(copied ? copiedLabel : copyLabel + " " + title)
+                }
+        }.frame(minHeight: 44)
+        .onChange(of: value) { _, _ in resetTask?.cancel(); copied = false }
+        .onDisappear { resetTask?.cancel(); copied = false }
+    }
 }

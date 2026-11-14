@@ -75,7 +75,7 @@ struct IumrahGlassPillSelector<Value: Hashable>: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .frame(minHeight: 44)
+        .frame(minHeight: min(height, 44))
     }
 }
 
@@ -96,6 +96,29 @@ struct IumrahNativeChromeButton: ViewModifier {
             content.buttonStyle(.bordered).buttonBorderShape(.circle)
                 .controlSize(.regular).tint(tint ?? .primary)
         }
+    }
+}
+
+/// A single Apple Liquid Glass surface for adjacent header actions. The
+/// individual controls stay semantic buttons without a second glass layer.
+struct IumrahNativeHeaderActionGroup<Content: View>: View {
+    private let content: Content
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+    var body: some View {
+        HStack(spacing: 0) { content }
+            .buttonStyle(IumrahHeaderActionLabelStyle())
+            .iumrahGlass(in: Capsule(), interactive: true, allowsStaticGlass: true, chrome: true)
+            .foregroundStyle(.white)
+            .environment(\.colorScheme, .dark)
+    }
+}
+private struct IumrahHeaderActionLabelStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 19, weight: .medium))
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.60 : 1)
     }
 }
 
@@ -155,7 +178,15 @@ struct IumrahJourneyHeader<Summary: View>: View {
                            height: IumrahSignatureHeaderGeometry.logoHeight)
                     .accessibilityLabel("iumrah")
                 Spacer(minLength: 0)
-                IumrahPageHelpButton()
+                if showsNotifications {
+                    IumrahNativeHeaderActionGroup {
+                        Button { chrome.openNotifications() } label: {
+                            Image(systemName: notifications.unreadCount > 0 ? "bell.badge" : "bell")
+                        }.accessibilityLabel(IumrahAccessibilityCopy.text(settings.language,
+                            ru: "Уведомления", en: "Notifications", uz: "Bildirishnomalar", cy: "Билдиришномалар", tr: "Bildirimler", id: "Notifikasi"))
+                        IumrahPageHelpButton(inSystemToolbar: true)
+                    }
+                } else { IumrahPageHelpButton() }
             }
             .foregroundStyle(.white)
             .environment(\.colorScheme, .dark)

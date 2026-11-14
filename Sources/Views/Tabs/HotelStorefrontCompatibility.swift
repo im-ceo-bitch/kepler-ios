@@ -3431,7 +3431,7 @@ struct PackageFlightLegDetailCard: View {
                             .padding(.bottom, IumrahDesign.pagePadding)
                     }
                     .background(IumrahFlightPalette.page, ignoresSafeAreaEdges: .bottom)
-                    .iumrahFlightDetailChrome()
+                    .iumrahFlightDetailChrome(title: IumrahPremiumFlightLeg(leg).title, shareText: IumrahPremiumFlightLeg(leg).share)
                 } label: {
                     HStack(spacing: 14) {
                         AirlineLogoView(airlineCode: leg.airlineCode, size: 50)

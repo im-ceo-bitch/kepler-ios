@@ -107,11 +107,10 @@ struct IumrahAccountView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, header: {
+            IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, helpContext: account.account == nil ? "account.guest" : "account.signed_in", header: {
                 accountHeader
             }, content: {
                 VStack(spacing: 20) {
-                    IumrahPageHelpCard(account.account == nil ? "account.guest" : "account.signed_in")
 
                     if let profile = account.account {
                         IumrahAccountIdentityHeroCard(
@@ -215,7 +214,6 @@ struct IumrahAccountView: View {
         }
         .sheet(isPresented: $showSignOutConfirmation) {
             IumrahActionConfirmationSheet(
-                imageAsset: "AccountLogoutConfirmHero",
                 title: tr("Sign out of iumrah?", "Выйти из iumrah?", "iumrah akkauntidan chiqasizmi?", "iumrah аккаунтидан чиқасизми?"),
                 message: tr(
                     "Your trips stay safely linked to your iumrah account. You will need to sign in again on this device.",

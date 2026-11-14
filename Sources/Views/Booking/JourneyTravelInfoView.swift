@@ -1289,13 +1289,9 @@ struct IumrahWeatherFullScreenView: View {
                         }
                         .pickerStyle(.segmented)
                         Spacer(minLength: 20)
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 17, weight: .bold))
-                                .frame(width: 40, height: 40)
-                                .background(.ultraThinMaterial, in: Circle())
-                        }
-                        .tint(.white)
+                        IumrahGlassIconButton(systemName: "xmark", size: 44, foreground: .white,
+                            accessibilityLabel: L10n.text("cancel", settings.language)) { dismiss() }
+                            .environment(\.colorScheme, .dark)
                     }
                     .padding(.top, 16)
 

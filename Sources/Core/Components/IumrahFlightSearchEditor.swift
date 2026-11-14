@@ -7,8 +7,8 @@ struct IumrahFlightSearchEditor: View {
     var onApply: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            AirportSelectorButton(airport: $draft.originAirport, fallbackCode: $draft.origin, cornerRadius: 0, monochrome: true)
+        VStack(alignment: .leading, spacing: 6) {
+            AirportSelectorButton(airport: $draft.originAirport, fallbackCode: $draft.origin, cornerRadius: 0, monochrome: true, compact: true)
             DatePicker("Вылет", selection: $draft.departureDate, in: Date()..., displayedComponents: .date)
             DatePicker("Обратно", selection: $draft.returnDate, in: draft.departureDate..., displayedComponents: .date)
             Stepper("Взрослые: \(draft.adults)", value: $draft.adults, in: 1...9)
@@ -23,7 +23,7 @@ struct IumrahFlightSearchEditor: View {
                 Text("Премиум-эконом").tag(FlightCabinClass.premiumEconomy)
                 Text("Бизнес").tag(FlightCabinClass.business)
                 Text("Первый").tag(FlightCabinClass.first)
-            }
+            }.pickerStyle(.menu).tint(.primary)
             Button("Обновить поиск") {
                 journey.resetAfterTripChange()
                 journey.clearStagedUmrahFlights()

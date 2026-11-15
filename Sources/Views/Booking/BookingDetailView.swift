@@ -1401,7 +1401,6 @@ private struct BookingContactEditSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let bookingID: String
-    let embedded: Bool
     @State private var telegram: String
     @State private var whatsapp: String
     @State private var isSaving = false

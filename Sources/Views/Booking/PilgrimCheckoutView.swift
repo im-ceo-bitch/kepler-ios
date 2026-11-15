@@ -390,15 +390,6 @@ struct PilgrimCheckoutView: View {
 
     private func activationCard(_ value: IumrahCheckoutResponse) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 12) {
-                IumrahOrbitV5(services: [.init(id: "passport", symbol: "person.text.rectangle.fill")], diameter: 78, accessibilityTitle: "Passport", pinnedSymbol: "person.text.rectangle.fill")
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("Passports", "Паспорта", "Pasportlar", "Паспортлар")).font(.title3.bold())
-                    Text("\(attached) / \(total)").font(.subheadline.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            ProgressView(value: Double(attached), total: Double(max(1, total))).tint(Color.iumrahCareDark)
             stageHeader(
                 number: "01",
                 icon: "person.badge.key.fill",
@@ -927,6 +918,16 @@ struct PilgrimCheckoutView: View {
                 icon: ready ? "checkmark.circle.fill" : "person.text.rectangle.fill",
                 title: tr("Attach passports", "Прикрепить паспорта", "Pasportlarni biriktirish", "Паспортларни бириктириш")
             )
+
+            HStack(spacing: 12) {
+                IumrahOrbitV5(services: [.init(id: "passport", symbol: "person.text.rectangle.fill")], diameter: 78, accessibilityTitle: "Passport", pinnedSymbol: "person.text.rectangle.fill")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Passports", "Паспорта", "Pasportlar", "Паспортлар")).font(.title3.bold())
+                    Text("\(attached) / \(total)").font(.subheadline.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            ProgressView(value: Double(attached), total: Double(max(1, total))).tint(Color.iumrahCareDark)
 
             Text(ready
                  ? tr("Every pilgrim passport is attached.", "Паспорта всех паломников прикреплены.", "Barcha ziyoratchilar pasporti biriktirilgan.", "Барча зиёратчилар паспорти бириктирилган.")

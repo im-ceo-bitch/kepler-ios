@@ -258,13 +258,19 @@ struct RootView: View {
     // once after onboarding, using the same router as live universal links.
     @MainActor
     private func handlePendingLaunchLink() {
-        guard hasCompletedOnboarding, let launchLink, launchLink != lastHandledLaunchLink else { return }
+        guard let launchLink, launchLink != lastHandledLaunchLink else { return }
+        if !account.isAuthenticated { _ = IumrahReferralLink.capture(launchLink) }
+        guard hasCompletedOnboarding else { return }
         lastHandledLaunchLink = launchLink
         handleDeepLink(launchLink)
     }
 
     @MainActor
     private func handleDeepLink(_ url: URL) {
+        if !account.isAuthenticated, IumrahReferralLink.capture(url) {
+            chrome.navigate(to: .account)
+            return
+        }
         if url.scheme?.lowercased() == "iumrah",
            url.host?.lowercased() == "widget" {
             let components = url.pathComponents.filter { $0 != "/" }

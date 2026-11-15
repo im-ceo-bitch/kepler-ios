@@ -245,6 +245,17 @@ final class IumrahAccountStore: ObservableObject {
         return try await service.securityOverview(token: token)
     }
 
+    func rewardsDashboard() async throws -> IumrahFriendsDashboard {
+        guard let token else { throw APIError.status(401) }
+        do { return try await service.friendsDashboard(token: token) }
+        catch {
+            guard self.token == token else { throw APIError.status(401) }
+            // One retry for an older session without a registered device.
+            _ = try await service.registerCurrentSession(token: token, locale: Locale.current.identifier)
+            return try await service.friendsDashboard(token: token)
+        }
+    }
+
     func friendsDashboard() async throws -> IumrahFriendsDashboard {
         guard let token else { throw APIError.status(401) }
         _ = try? await service.registerCurrentSession(token: token, locale: Locale.current.identifier)
@@ -389,6 +400,7 @@ final class IumrahAccountStore: ObservableObject {
     }
 
     private func setSession(_ response: IumrahAccountAuthResponse) {
+        IumrahReferralLink.clear()
         token = response.session.token
         account = response.account
         lastError = nil

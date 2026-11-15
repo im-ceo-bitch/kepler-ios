@@ -15,6 +15,7 @@
     <key>com.apple.developer.associated-domains</key>
     <array>
         <string>applinks:iumrah.app</string>
+		<string>applinks:iumrah-backend.helloiumrah.workers.dev</string>
     </array>
     <key>keychain-access-groups</key>
     <array>

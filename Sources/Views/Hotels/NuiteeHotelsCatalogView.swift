@@ -109,6 +109,7 @@ struct NuiteeHotelsCatalogView: View {
     var initialHotelQuery: String = ""
     var searchOverride: IumrahHotelTabSearch? = nil
     var showsSearchControls = true
+    let favoritesOnly: Bool
     var onManualRoom: ((LocalJourneyRoom) -> Void)? = nil
     @State private var manualMeals = HotelMealChoices()
     @EnvironmentObject private var settings: AppSettingsStore
@@ -131,19 +132,20 @@ struct NuiteeHotelsCatalogView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastLoadedDay: Date?
     @State private var visibleCount = 20
-    private struct FilterKey: Equatable { let revision: Int; let stars: Int; let query: String }
+    private struct FilterKey: Equatable { let revision: Int; let stars: Int; let query: String; let favorites: Set<String>? }
     private struct FilterResult { let candidateCount: Int; let matches: [NuiteeHotel]; let alternatives: [NuiteeHotel] }
     @State private var filterMemo = IumrahViewMemo<FilterKey, FilterResult>()
     @State private var opened: NuiteeHotel?
     @State private var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
 
     init(refreshSignal: Int, initialHotelQuery: String = "", searchOverride: IumrahHotelTabSearch? = nil,
-         showsSearchControls: Bool = true, model: NuiteeCatalogModel? = nil, onManualRoom: ((LocalJourneyRoom) -> Void)? = nil) {
+         showsSearchControls: Bool = true, model: NuiteeCatalogModel? = nil, favoritesOnly: Bool = false, onManualRoom: ((LocalJourneyRoom) -> Void)? = nil) {
         _model = StateObject(wrappedValue: model ?? NuiteeCatalogModel())
         self.refreshSignal = refreshSignal
         self.initialHotelQuery = initialHotelQuery
         self.searchOverride = searchOverride
         self.showsSearchControls = showsSearchControls
+        self.favoritesOnly = favoritesOnly
         self.onManualRoom = onManualRoom
         _hotelQuery = State(initialValue: initialHotelQuery)
         if let request = searchOverride {
@@ -164,8 +166,8 @@ struct NuiteeHotelsCatalogView: View {
     }
     private var normalizedQuery: String { hotelQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
     private func filteredHotels() -> FilterResult {
-        filterMemo.value(for: FilterKey(revision: model.revision, stars: stars, query: normalizedQuery)) {
-            let candidates = model.hotels.filter { stars == 0 || $0.roundedStars == stars }
+        filterMemo.value(for: FilterKey(revision: model.revision, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil)) {
+            let candidates = model.hotels.filter { (stars == 0 || $0.roundedStars == stars) && (!favoritesOnly || favorites.contains($0.id)) }
             let terms = normalizedQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
             let matches = terms.isEmpty ? candidates : candidates.filter { hotel in
                 let haystack = hotel.name + " " + (hotel.address ?? "")
@@ -287,6 +289,8 @@ struct NuiteeHotelsCatalogView: View {
                     .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
                 }
                 .frame(maxWidth: .infinity).padding(25)
+            } else if favoritesOnly && snapshot.candidateCount == 0 && !model.busy {
+                ContentUnavailableView(NuiteeCopy.text("Нет сохранённых отелей в этом городе", "Bu shaharda saqlangan mehmonxonalar yo‘q", "No saved hotels in this city", settings.language), systemImage: "heart", description: Text(NuiteeCopy.text("Отмечайте понравившиеся отели сердечком в каталоге.", "Katalogda yoqqan mehmonxonalarni yurakcha bilan belgilang.", "Tap the heart on hotels you like in the catalog.", settings.language)))
             } else if snapshot.candidateCount == 0 && !model.busy {
                 ContentUnavailableView(NuiteeCopy.text("Нет отелей", "Mehmonxonalar topilmadi", "No hotels", settings.language), systemImage: "building.2", description: Text(NuiteeCopy.text("Попробуйте другой фильтр или даты", "Filtr yoki sanani almashtiring", "Change stars or dates", settings.language)))
             } else {
@@ -338,6 +342,7 @@ struct NuiteeHotelsCatalogView: View {
             if phase == .active { Task { await refreshIfNewDay() } }
         }
         .onAppear {
+            favorites = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
             hotelQuery = initialHotelQuery
             consumeHomeSearch(searchOverride ?? chrome.requestedHotelTabSearch)
             if !initialHotelQuery.isEmpty { hotelQuery = initialHotelQuery }
@@ -370,7 +375,7 @@ struct NuiteeHotelsCatalogView: View {
     /// Apply Home's request in-place; this view remains the single supplier-backed
     /// search/results surface, including its existing filters and hotel details.
     private func consumeHomeSearch(_ request: IumrahHotelTabSearch?) {
-        guard let request, appliedHomeSearchID != request.id else { return }
+        guard !favoritesOnly, let request, appliedHomeSearchID != request.id else { return }
         appliedHomeSearchID = request.id
         homeSearchRevision += 1 // Repeat searches with identical dates still refresh supplier rates.
         city = request.city == "madinah" ? .madinah : .makkah

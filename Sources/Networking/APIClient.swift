@@ -62,6 +62,9 @@ actor APIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("iumrah-ios-beta/0.25", forHTTPHeaderField: "User-Agent")
         for (key, value) in headers { request.setValue(value, forHTTPHeaderField: key) }
+        if ["/api/package/client/account/register/email/confirm", "/api/package/client/account/register/sms/confirm", "/api/package/client/account/activate/email/confirm", "/api/package/client/account/activate/sms/confirm", "/api/package/client/account/apple/sign-in", "/api/package/client/account/google/sign-in"].contains(path) {
+            for (key, value) in IumrahReferralLink.headers { request.setValue(value, forHTTPHeaderField: key) }
+        }
         request.httpBody = try encoder.encode(body)
 
         let (data, response) = try await session.data(for: request)

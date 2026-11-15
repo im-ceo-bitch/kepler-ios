@@ -309,7 +309,16 @@ struct IumrahTravelDocument: Codable, Identifiable, Hashable {
     let bookingReference: String?
 }
 
+struct IumrahBookingRewardsAmounts: Decodable, Hashable {
+    let totalUsd: Double
+    let giftDiscountUsd: Double
+    let creditAppliedUsd: Double
+    let totalDiscountUsd: Double
+    let payableUsd: Double
+}
+
 struct IumrahCheckoutResponse: Decodable {
+    var rewards: IumrahBookingRewardsAmounts? = nil
     let ok: Bool
     let iumrahID: String
     let accountActive: Bool

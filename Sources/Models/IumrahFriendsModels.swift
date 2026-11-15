@@ -23,6 +23,12 @@ struct IumrahFriendsDashboard: Decodable, Hashable {
     let pendingRewardsUsd: Double
     let earnedRewardsUsd: Double
     let gifts: [IumrahFriendGift]
+    let invitation: IumrahReferralInvitation?
+    let referrals: [IumrahReferralFriend]?
+    let transactions: [IumrahRewardTransaction]?
+    let completedTrips: Int?
+    let paidReferrals: Int?
+    let tier: String?
 }
 
 struct IumrahFriendsAppliedGift: Decodable, Hashable, Identifiable {
@@ -54,4 +60,12 @@ struct IumrahFriendGiftRedeemRequest: Encodable {
 
 struct IumrahFriendCreditApplyRequest: Encodable {
     let amountUsd: Int
+}
+
+struct IumrahReferralInvitation: Decodable, Hashable { let code: String; let url: String }
+struct IumrahReferralFriend: Decodable, Hashable, Identifiable {
+    let id: String; let name: String; let status: String; let rewardUsd: Double; let registeredAt: String; let bookingID: String?
+}
+struct IumrahRewardTransaction: Decodable, Hashable, Identifiable {
+    let id: String; let amountUsd: Double; let type: String; let createdAt: String
 }

@@ -5,6 +5,7 @@ struct IumrahInvoiceShareCard: View {
     @EnvironmentObject private var settings: AppSettingsStore
     let session: StoredBookingSession
     var compact: Bool = false
+    var rewards: IumrahBookingRewardsAmounts? = nil
 
     @State private var shareURL: URL?
     @State private var errorText: String?
@@ -26,7 +27,7 @@ struct IumrahInvoiceShareCard: View {
 
             Button {
                 do {
-                    shareURL = try IumrahInvoiceRenderer.makeInvoice(session: session, language: settings.language)
+                    shareURL = try IumrahInvoiceRenderer.makeInvoice(session: session, language: settings.language, rewards: rewards)
                     IumrahHaptics.soft()
                 } catch {
                     errorText = localizedError
@@ -122,7 +123,7 @@ struct IumrahFileShareSheet: UIViewControllerRepresentable {
 }
 
 enum IumrahInvoiceRenderer {
-    static func makeInvoice(session: StoredBookingSession, language: AppSettingsStore.Language) throws -> URL {
+    static func makeInvoice(session: StoredBookingSession, language: AppSettingsStore.Language, rewards: IumrahBookingRewardsAmounts? = nil) throws -> URL {
         let page = CGRect(x: 0, y: 0, width: 595, height: 842)
         let format = UIGraphicsPDFRendererFormat()
         let metadata: [String: Any] = [
@@ -160,12 +161,16 @@ enum IumrahInvoiceRenderer {
             drawKeyValue(key: travelersLabel(language), value: "\(session.booking.input.travelers.totalPeople)", x: left, y: &y, width: width)
             drawKeyValue(key: packageLabel(language), value: session.booking.planId.capitalized, x: left, y: &y, width: width)
 
+            if let rewards, rewards.totalDiscountUsd > 0 {
+                drawKeyValue(key: label(language, "Стоимость пакета", "Package price", "Paket narxi", "Пакет нархи"), value: String(format: "$%.2f", rewards.totalUsd), x: left, y: &y, width: width)
+                drawKeyValue(key: "iumrah Balance / Gift Cards", value: String(format: "−$%.2f", rewards.totalDiscountUsd), x: left, y: &y, width: width)
+            }
             y += 12
             drawDivider(x: left, y: y, width: width)
             y += 22
 
-            draw(totalLabel(language), at: CGRect(x: left, y: y, width: width * 0.55, height: 30), font: .systemFont(ofSize: 16, weight: .semibold), color: .secondaryLabel)
-            let total = String(format: "$%.2f", session.booking.totalUsd)
+            draw(rewards == nil ? totalLabel(language) : label(language, "К оплате", "Amount due", "To‘lov summasi", "Тўлов суммаси"), at: CGRect(x: left, y: y, width: width * 0.55, height: 30), font: .systemFont(ofSize: 16, weight: .semibold), color: .secondaryLabel)
+            let total = String(format: "$%.2f", rewards?.payableUsd ?? session.booking.totalUsd)
             draw(total, at: CGRect(x: left + width * 0.55, y: y - 3, width: width * 0.45, height: 36), font: .monospacedDigitSystemFont(ofSize: 24, weight: .bold), color: .label, alignment: .right)
             y += 54
 
@@ -438,7 +443,7 @@ struct IumrahPaidReceiptCard: View {
         formatter.numberStyle = .currency
         formatter.currencyCode = "USD"
         formatter.maximumFractionDigits = 0
-        return formatter.string(from: NSNumber(value: session.booking.totalUsd)) ?? String(format: "$%.0f", session.booking.totalUsd)
+        return formatter.string(from: NSNumber(value: checkout.rewards?.payableUsd ?? session.booking.totalUsd)) ?? String(format: "$%.0f", checkout.rewards?.payableUsd ?? session.booking.totalUsd)
     }
 
     private func receiptFact(_ title: String, _ value: String) -> some View {
@@ -606,7 +611,7 @@ enum IumrahPaidReceiptRenderer {
         drawDivider(x: left, y: y, width: width)
         y += 20
         draw(label(language, "ИТОГО ОПЛАЧЕНО", "TOTAL PAID", "JAMI TO‘LANDI", "ЖАМИ ТЎЛАНДИ"), rect: CGRect(x: left, y: y, width: width * 0.55, height: 30), font: .systemFont(ofSize: 13, weight: .bold), color: .secondaryLabel)
-        draw(currency(session.booking.totalUsd), rect: CGRect(x: left + width * 0.55, y: y - 4, width: width * 0.45, height: 38), font: .monospacedDigitSystemFont(ofSize: 26, weight: .bold), color: .label, alignment: .right)
+        draw(currency(checkout.rewards?.payableUsd ?? session.booking.totalUsd), rect: CGRect(x: left + width * 0.55, y: y - 4, width: width * 0.45, height: 38), font: .monospacedDigitSystemFont(ofSize: 26, weight: .bold), color: .label, alignment: .right)
         y += 64
 
         let note = label(

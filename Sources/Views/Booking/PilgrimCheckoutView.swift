@@ -73,6 +73,9 @@ struct PilgrimCheckoutView: View {
     @State private var friendsSummary: IumrahFriendsBookingSummary?
     @State private var giftCode = ""
     @State private var isApplyingFriendBenefit = false
+    @State private var confirmCreditAmount: Int? = nil
+    @AppStorage(IumrahReferralLink.codeKey) private var referralCode = ""
+    @AppStorage(IumrahReferralLink.consentKey) private var referralConsent = false
     @State private var friendsMessage: String?
     @State private var showBookingPage = false
 
@@ -410,6 +413,16 @@ struct PilgrimCheckoutView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            VStack(alignment: .leading, spacing: 8) {
+                TextField(tr("Invitation code (optional)", "Код приглашения (необязательно)", "Taklif kodi (ixtiyoriy)", "Таклиф коди (ихтиёрий)"), text: $referralCode)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .padding(12)
+                    .background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 14))
+                if !referralCode.isEmpty {
+                    Toggle(tr("Share my name, ID and invitation status with my inviter", "Разрешаю показать пригласившему моё имя, ID и статус приглашения", "Ismim, ID va taklif holatini ulashishga roziman", "Исмим, ID ва таклиф ҳолатини улашишга розиман"), isOn: $referralConsent).font(.caption)
+                }
+            }
             Picker("", selection: $activationMethod) {
                 Text("Email").tag(IumrahActivationMethod.email)
                 Text("SMS").tag(IumrahActivationMethod.sms)
@@ -1019,7 +1032,8 @@ struct PilgrimCheckoutView: View {
                 IumrahManualPaymentNotice()
                 IumrahRefundPolicyCard(component: .package, compact: true)
                 if let session {
-                    IumrahInvoiceShareCard(session: session, compact: true)
+                    IumrahInvoiceShareCard(session: session, compact: true, rewards: value.rewards)
+                        .disabled(isApplyingFriendBenefit || value.rewards == nil || (friendsSummary.map { $0.totalDiscountUsd != value.rewards?.totalDiscountUsd } ?? false))
                 }
 
                 friendsBenefitCard
@@ -1075,7 +1089,7 @@ struct PilgrimCheckoutView: View {
                             }
                         }
                         .buttonStyle(IumrahPrimaryButtonStyle())
-                        .disabled(isUploadingReceipt || paymentOptions(value).isEmpty)
+                        .disabled(isUploadingReceipt || isApplyingFriendBenefit || paymentOptions(value).isEmpty || value.rewards == nil || (friendsSummary.map { $0.totalDiscountUsd != value.rewards?.totalDiscountUsd } ?? false))
                     }
                 }
             }
@@ -1158,57 +1172,44 @@ struct PilgrimCheckoutView: View {
 
     @ViewBuilder
     private var friendsBenefitCard: some View {
-        if account.isAuthenticated {
+        if accountMatchesTrip {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    IumrahIconBadge(
-                        systemName: "gift.fill",
-                        role: .gift,
-                        size: 42,
-                        symbolSize: 17,
-                        cornerRadius: 15
-                    )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(settings.language == .turkish ? "iumrah Hediye Kartları" : "Iumrah Gift Cards")
-                            .font(.headline)
-                        Text(tr("Gift Card & Iumrah Balance", "Gift Card и Iumrah Balance", "Gift Card va Iumrah Balance", "Gift Card ва Iumrah Balance"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                HStack {
+                    IumrahIconBadge(systemName: "gift.fill", role: .gift, size: 42, symbolSize: 17, cornerRadius: 15)
+                    Text("iumrah Balance").font(.headline)
                     Spacer()
-                    Image(systemName: "lock.fill")
-                        .foregroundStyle(.secondary)
                 }
-
-                HStack(alignment: .top, spacing: 11) {
-                    Image(systemName: "clock.badge.exclamationmark.fill")
-                        .foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("Gift Cards are not available yet", "Gift Card ещё недоступна", "Gift Card hali mavjud emas", "Gift Card ҳали мавжуд эмас"))
-                            .font(.subheadline.weight(.semibold))
-                        Text(tr(
-                            "The section is already visible in the booking, but applying Gift Cards and Iumrah Balance is temporarily disabled. We will enable it after the payment flow is ready.",
-                            "Раздел уже виден в бронировании, но применение Gift Card и Iumrah Balance временно отключено. Мы включим его после готовности платёжного сценария.",
-                            "Bo‘lim bron ichida ko‘rinadi, ammo Gift Card va Iumrah Balance qo‘llash vaqtincha o‘chirilgan. To‘lov jarayoni tayyor bo‘lgach yoqiladi.",
-                            "Бўлим брон ичида кўринади, аммо Gift Card ва Iumrah Balance қўллаш вақтинча ўчирилган. Тўлов жараёни тайёр бўлгач ёқилади."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                if let summary = friendsSummary {
+                    friendsPricingSummary(summary)
+                    if summary.identityConfirmed, summary.creditAppliedUsd == 0, isPaymentPending, checkout?.receipts.isEmpty == true, checkout?.rewards != nil {
+                        ForEach([100, 200], id: \.self) { amount in
+                            if summary.availableCreditUsd >= Double(amount) && summary.remainingAllowanceUsd >= Double(amount) {
+                                Button { confirmCreditAmount = amount } label: {
+                                    Text(tr("Apply", "Применить", "Qo‘llash", "Қўллаш") + " $\(amount)")
+                                }
+                                .buttonStyle(IumrahPrimaryButtonStyle())
+                                .disabled(isApplyingFriendBenefit || isUploadingReceipt)
+                            }
+                        }
+                    } else if !summary.identityConfirmed {
+                        Text(tr("Verify your identity before using rewards.", "Подтвердите личность для использования бонусов.", "Bonuslar uchun shaxsingizni tasdiqlang.", "Бонуслар учун шахсингизни тасдиқланг.")).font(.caption).foregroundStyle(.secondary)
                     }
+                } else {
+                    Text(tr("Balance unavailable. Refresh to try again.", "Баланс недоступен. Обновите страницу.", "Balans mavjud emas. Yangilang.", "Баланс мавжуд эмас. Янгиланг.")).font(.caption).foregroundStyle(.secondary)
                 }
-                .padding(13)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .strokeBorder(Color.orange.opacity(0.18), lineWidth: 0.8)
-                }
+                if let friendsMessage { Text(friendsMessage).font(.caption).foregroundStyle(.secondary) }
             }
             .padding(14)
             .background(Color.iumrahRaisedBackground.opacity(0.45), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .accessibilityElement(children: .contain)
+            .confirmationDialog(tr("Apply rewards to this booking?", "Списать бонусы в счёт этой поездки?", "Bonuslarni ushbu bronga qo‘llaysizmi?", "Бонусларни ушбу бронга қўллайсизми?"), isPresented: Binding(get: { confirmCreditAmount != nil }, set: { if !$0 { confirmCreditAmount = nil } }), titleVisibility: .visible) {
+                if let amount = confirmCreditAmount {
+                    Button(tr("Apply", "Применить", "Qo‘llash", "Қўллаш") + " $\(amount)") {
+                        confirmCreditAmount = nil
+                        Task { await applyFriendCredit(amountUsd: amount) }
+                    }
+                }
+                Button(tr("Cancel", "Отмена", "Bekor qilish", "Бекор қилиш"), role: .cancel) { confirmCreditAmount = nil }
+            }
         }
     }
 
@@ -1275,7 +1276,7 @@ struct PilgrimCheckoutView: View {
 
     @MainActor
     private func loadFriendsSummary() async {
-        guard let session, account.isAuthenticated else {
+        guard let session, accountMatchesTrip else {
             friendsSummary = nil
             return
         }
@@ -1318,7 +1319,7 @@ struct PilgrimCheckoutView: View {
 
     @MainActor
     private func applyFriendCredit(amountUsd: Int) async {
-        guard let session else { return }
+        guard let session, accountMatchesTrip, !isApplyingFriendBenefit, !isUploadingReceipt else { return }
         isApplyingFriendBenefit = true
         friendsMessage = nil
         defer { isApplyingFriendBenefit = false }
@@ -1329,6 +1330,7 @@ struct PilgrimCheckoutView: View {
                 headers: headers,
                 amountUsd: amountUsd
             )
+            await loadCheckout(showLoader: false)
             friendsMessage = tr("Iumrah Balance applied.", "Iumrah Balance применён.", "Iumrah Balance qo‘llandi.", "Iumrah Balance қўлланди.")
             IumrahHaptics.success()
         } catch APIError.server(_, let code) {

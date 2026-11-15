@@ -50,6 +50,8 @@ struct IumrahAccountView: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @ObservedObject private var push = PushNotificationManager.shared
 
+    @AppStorage(IumrahReferralLink.codeKey) private var pendingReferralCode = ""
+    @AppStorage(IumrahReferralLink.consentKey) private var referralConsent = false
     @State private var guestAccountMode: IumrahGuestAccountMode = .signIn
     @State private var guestAuthMethod: IumrahGuestAuthMethod = .sms
     @State private var loginID = ""
@@ -113,21 +115,25 @@ struct IumrahAccountView: View {
                 VStack(spacing: 20) {
 
                     if let profile = account.account {
-                        IumrahAccountIdentityHeroCard(
-                            profile: profile,
-                            language: settings.language,
-                            publicIdentityURL: identityPublicURL ?? fallbackIdentityURL(profile.iumrahID),
-                            copyMessage: identityCopyMessage,
-                            onCopy: { copyIdentityID(profile) }
-                        )
-
                         userDataEntryCard(profile)
+                        IumrahAccountBalanceEntry(language: settings.language)
+                        IumrahAccountRewardsCarousel(language: settings.language) {
+                            IumrahAccountIdentityHeroCard(
+                                profile: profile,
+                                language: settings.language,
+                                publicIdentityURL: identityPublicURL ?? fallbackIdentityURL(profile.iumrahID),
+                                copyMessage: identityCopyMessage,
+                                onCopy: { copyIdentityID(profile) }
+                            )
+                        }
+                        IumrahAccountFriendsEntry(language: settings.language)
                         travelCompanionsEntryCard
                         walletSection(profile)
 
                         if let active = activeTrip {
                             IumrahTripWalletEntry(session: active, profile: profile, language: settings.language)
                         }
+                        IumrahAccountSavedHotelsEntry(language: settings.language)
                         tripsSection
                         telegramIntegrationSection
                         paymentSecuritySection
@@ -168,7 +174,11 @@ struct IumrahAccountView: View {
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
+        .onChange(of: pendingReferralCode) { _, value in
+            if !account.isAuthenticated, IumrahReferralLink.normalized(value) != nil, guestAccountMode != .register { guestAccountMode = .register }
+        }
         .task {
+            if !account.isAuthenticated, IumrahReferralLink.normalized(pendingReferralCode) != nil { guestAccountMode = .register }
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
             await refreshNotificationStatus()
@@ -742,14 +752,11 @@ struct IumrahAccountView: View {
             IumrahUserDataView()
         } label: {
             HStack(spacing: 15) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(0.11))
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 23, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 56, height: 56)
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 56, height: 56)
+                    .iumrahGlass(in: RoundedRectangle(cornerRadius: 18), tint: Color.white.opacity(0.11), allowsStaticGlass: true)
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(displayName(profile))
@@ -1340,6 +1347,18 @@ struct IumrahAccountView: View {
                 guestRegistrationFields
             }
 
+            if guestAccountMode == .register || !pendingReferralCode.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(tr("Invitation code (optional)", "Код приглашения (необязательно)", "Taklif kodi (ixtiyoriy)", "Таклиф коди (ихтиёрий)")).font(.subheadline.weight(.semibold))
+                    TextField("IUMR-…", text: $pendingReferralCode)
+                        .textInputAutocapitalization(.characters).autocorrectionDisabled()
+                        .padding(12).background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 12))
+                        .onChange(of: pendingReferralCode) { _, _ in referralConsent = false }
+                    if IumrahReferralLink.normalized(pendingReferralCode) != nil {
+                        Toggle(tr("Share my name, pilgrim ID and referral progress with the inviter", "Разрешаю показать пригласившему моё имя, ID паломника и статус приглашения", "Taklif qiluvchiga ismim, ID va taklif holatini ko‘rsatishga roziman", "Таклиф қилувчига исмим, ID ва таклиф ҳолатини кўрсатишга розиман"), isOn: $referralConsent).font(.footnote)
+                    }
+                }
+            }
             if let loginError {
                 Text(loginError)
                     .font(.footnote)

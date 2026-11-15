@@ -9,10 +9,8 @@ struct HomeDashboardView: View {
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @State private var showZiyarats = false
     @State private var showSmartConfigurator = false
-    @State private var showCareRequestBuilder = false
     @State private var showFlightsService = false
     @State private var showTransferService = false
-    @State private var buildCarouselID: String? = "configurator"
     @State private var productsCarouselID: String? = "iumrah-system"
     @State private var integrationCarouselID: String? = "plan"
     @State private var expandedHomeFAQID: String?
@@ -45,9 +43,6 @@ struct HomeDashboardView: View {
                 ZiyaratJourneyView()
                     .environmentObject(settings)
                     .environmentObject(chrome)
-            }
-            .navigationDestination(isPresented: $showCareRequestBuilder) {
-                IumrahCareRequestView()
             }
             .navigationDestination(isPresented: $showFlightsService) {
                 IumrahFlightsView()
@@ -94,7 +89,6 @@ struct HomeDashboardView: View {
                     onZiyarats: { showZiyarats = true }
                 )
 
-                buildMyUmrahSection
                 SmartConfiguratorHomeCard { showSmartConfigurator = true }
                 JourneyTravelInfoView(showsPageSelector: true)
                 IumrahHomeAudienceSection(language: settings.language)
@@ -504,165 +498,6 @@ struct HomeDashboardView: View {
         .background(pageBackground)
     }
 
-    private var buildMyUmrahSection: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            IumrahHomeSectionHeader(title: buildUmrahSectionTitle, subtitle: buildUmrahSectionSubtitle)
-
-            GeometryReader { proxy in
-                let cardWidth = max(298, min(proxy.size.width * 0.94, 352))
-                let cardHeight: CGFloat = 540
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(alignment: .top, spacing: 16) {
-                        hero
-                            .frame(width: cardWidth, height: cardHeight, alignment: .top)
-                            .id("configurator")
-                        careRequestBuilderCard
-                            .frame(width: cardWidth, height: cardHeight, alignment: .top)
-                            .id("care-request")
-                    }
-                    .scrollTargetLayout()
-                }
-                .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
-                .scrollPosition(id: $buildCarouselID, anchor: .center)
-                .contentMargins(.horizontal, 0, for: .scrollContent)
-                .scrollClipDisabled()
-            }
-            .frame(height: 554)
-
-            IumrahHomeCarouselDots(count: 2, selectedIndex: buildCarouselID == "care-request" ? 1 : 0)
-        }
-        .padding(.bottom, 6)
-    }
-
-    private var careRequestBuilderCard: some View {
-        Button {
-            IumrahHaptics.soft()
-            showCareRequestBuilder = true
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    Color.black
-                    Image("IumrahCareShowcaseCard")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                }
-                .frame(height: 220)
-                .clipped()
-
-                VStack(alignment: .leading, spacing: 15) {
-                    HStack(spacing: 8) {
-                        Label("Iumrah Care", systemImage: "heart.fill")
-                            .font(.caption.weight(.bold))
-                            .tracking(0.45)
-                            .foregroundStyle(Color.black.opacity(0.58))
-                        Spacer(minLength: 8)
-                        Text(careRequestTimeBadge)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(Color.black.opacity(0.62))
-                            .padding(.horizontal, 10)
-                            .frame(height: 29)
-                            .background(Color.black.opacity(0.055), in: Capsule())
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(careRequestCardTitle)
-                            .font(.system(size: 31, weight: .bold, design: .rounded))
-                            .tracking(-0.75)
-                            .foregroundStyle(.black)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(careRequestCardBody)
-                            .font(.system(size: 15, design: .rounded))
-                            .foregroundStyle(Color.black.opacity(0.62))
-                            .lineLimit(4)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 16)
-
-                    HStack(spacing: 10) {
-                        Text(careRequestCardCTA)
-                    }.frame(maxWidth: .infinity)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .frame(height: 54)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .padding(20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(Color.white)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.055), lineWidth: 0.8)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var buildUmrahSectionTitle: String {
-        switch settings.language {
-        case .russian: return "Собрать свою Умру"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Build your Umrah"
-        case .uzbek: return "Umrangizni tuzing"
-        case .uzbekCyrillic: return "Умрангизни тузинг"
-        }
-    }
-
-    private var buildUmrahSectionSubtitle: String {
-        switch settings.language {
-        case .russian: return "Соберите пакет сами за несколько минут или передайте подбор Iumrah Care."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Build the package yourself in minutes or let Iumrah Care prepare it for you."
-        case .uzbek: return "Paketni bir necha daqiqada o‘zingiz tuzing yoki tanlovni Iumrah Care’ga topshiring."
-        case .uzbekCyrillic: return "Пакетни бир неча дақиқада ўзингиз тузинг ёки танловни Iumrah Care’га топширинг."
-        }
-    }
-
-    private var careRequestTimeBadge: String {
-        switch settings.language {
-        case .russian: return "ответ ≤ 2 ч"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "reply ≤ 2h"
-        case .uzbek: return "javob ≤ 2 soat"
-        case .uzbekCyrillic: return "жавоб ≤ 2 соат"
-        }
-    }
-
-    private var careRequestCardTitle: String {
-        switch settings.language {
-        case .russian: return "Собрать Умру за меня"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Build my Umrah for me"
-        case .uzbek: return "Umramni men uchun tuzing"
-        case .uzbekCyrillic: return "Умрамни мен учун тузинг"
-        }
-    }
-
-    private var careRequestCardBody: String {
-        switch settings.language {
-        case .russian: return "Укажите месяц или точные даты, бюджет, уровень отеля и главный приоритет. Iumrah Care соберёт персональный вариант."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Choose a month or exact dates, budget, hotel level and your main priority. Iumrah Care will prepare a personal option."
-        case .uzbek: return "Oy yoki aniq sanalar, budjet, mehmonxona darajasi va asosiy ustuvorlikni belgilang. Iumrah Care shaxsiy variant tayyorlaydi."
-        case .uzbekCyrillic: return "Ой ёки аниқ саналар, бюджет, меҳмонхона даражаси ва асосий устуворликни белгиланг. Iumrah Care шахсий вариант тайёрлайди."
-        }
-    }
-
-    private var careRequestCardCTA: String {
-        switch settings.language {
-        case .russian: return "Рассказать о поездке"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Tell us about the trip"
-        case .uzbek: return "Safar haqida aytish"
-        case .uzbekCyrillic: return "Сафар ҳақида айтиш"
-        }
-    }
-
-
     private var homeIntegrationsSection: some View {
         VStack(alignment: .leading, spacing: 15) {
             IumrahHomeSectionHeader(title: integrationsTitle, subtitle: integrationsSubtitle)
@@ -917,126 +752,6 @@ struct HomeDashboardView: View {
         case .english, .turkish, .indonesian, .malay, .arabic: return "Our products"
         case .uzbek: return "Mahsulotlarimiz"
         case .uzbekCyrillic: return "Маҳсулотларимиз"
-        }
-    }
-
-    private var hero: some View {
-        Button {
-            IumrahHaptics.soft()
-            // Reuse the actual Home search instead of launching the retired
-            // Bookings-tab configurator from a second marketing CTA.
-            withAnimation(.easeInOut(duration: 0.28)) { journeySearchExpanded = true }
-            focusJourneySearchRevision += 1
-        } label: {
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    Color.black
-
-                    Image("StoreConfiguratorPhones")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 220)
-                .clipped()
-
-                VStack(alignment: .leading, spacing: 15) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.grid.2x2.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.black.opacity(0.75))
-                            .frame(width: 44, height: 44)
-                            .accessibilityIdentifier("iumrah.orbit.home.configurator")
-                        Label("Iumrah Configurator", systemImage: "slider.horizontal.3")
-                            .font(.caption.weight(.bold))
-                            .tracking(0.45)
-                            .foregroundStyle(Color.black.opacity(0.58))
-                        Spacer(minLength: 8)
-                        Text(configuratorTimeBadge)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(Color.black.opacity(0.62))
-                            .padding(.horizontal, 10)
-                            .frame(height: 29)
-                            .background(Color.black.opacity(0.055), in: Capsule())
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(configuratorHeroTitle)
-                            .font(.system(size: 31, weight: .bold, design: .rounded))
-                            .tracking(-0.75)
-                            .foregroundStyle(.black)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(configuratorHeroBody)
-                            .font(.system(size: 15, weight: .regular, design: .rounded))
-                            .foregroundStyle(Color.black.opacity(0.62))
-                            .lineLimit(4)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 16)
-
-                    HStack(spacing: 10) {
-                        Text(configuratorHeroCTA)
-                    }.frame(maxWidth: .infinity)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .frame(height: 54)
-                    .background(Color.black, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .padding(20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(Color.white)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .background(Color.white)
-            .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.055), lineWidth: 0.8)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(configuratorHeroTitle)
-    }
-
-    private var configuratorTimeBadge: String {
-        switch settings.language {
-        case .russian: return "≈ 5 минут"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "≈ 5 min"
-        case .uzbek: return "≈ 5 daqiqa"
-        case .uzbekCyrillic: return "≈ 5 дақиқа"
-        }
-    }
-
-    private var configuratorHeroTitle: String {
-        switch settings.language {
-        case .russian: return "Соберите свою Умру за 5 минут"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Build your Umrah in 5 minutes"
-        case .uzbek: return "Umrangizni 5 daqiqada tuzing"
-        case .uzbekCyrillic: return "Умрангизни 5 дақиқада тузинг"
-        }
-    }
-
-    private var configuratorHeroBody: String {
-        switch settings.language {
-        case .russian: return "Персональный пакет для вас, вашей семьи или друзей — без обязательной туристической группы из 30–50 человек. Перелёт, отель, трансфер и Iumrah Services собираются в одну поездку."
-        case .english, .turkish, .indonesian, .malay, .arabic: return "A personal package for you, your family or friends — without having to join a 30–50 person tour group. Flights, hotel, transfer and Iumrah Services come together as one journey."
-        case .uzbek: return "Siz, oilangiz yoki do‘stlaringiz uchun shaxsiy paket — 30–50 kishilik majburiy tur guruhisiz. Parvoz, mehmonxona, transfer va Iumrah Services bitta safarga birlashadi."
-        case .uzbekCyrillic: return "Сиз, оилангиз ёки дўстларингиз учун шахсий пакет — 30–50 кишилик мажбурий тур гуруҳисиз. Парвоз, меҳмонхона, трансфер ва Iumrah Services битта сафарга бирлашади."
-        }
-    }
-
-    private var configuratorHeroCTA: String {
-        switch settings.language {
-        case .russian: return "Собрать мою Умру"
-        case .english, .turkish, .indonesian, .malay, .arabic: return "Create my Umrah"
-        case .uzbek: return "Umramni yaratish"
-        case .uzbekCyrillic: return "Умрамни яратиш"
         }
     }
 

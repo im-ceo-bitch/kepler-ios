@@ -21,16 +21,16 @@ struct NuiteeHotelService {
         await NuiteeDailyHotelCache.shared.read(key: listKey(city: city, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: catalogOnly))
     }
 
-    func hotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false, forceRefresh: Bool = false) async throws -> NuiteeHotelListEnvelope {
+    func hotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false, forceRefresh: Bool = false, smartTimeout: Bool = false) async throws -> NuiteeHotelListEnvelope {
         let key = listKey(city: city, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: catalogOnly)
         if !forceRefresh, let cached = await NuiteeDailyHotelCache.shared.read(key: key) { return cached }
-        let response: NuiteeHotelListEnvelope = try await APIClient.hotelPrices.get("/api/package/nuitee/hotels", query: [
+        let response: NuiteeHotelListEnvelope = try await (smartTimeout ? APIClient.shared : APIClient.hotelPrices).get("/api/package/nuitee/hotels", query: [
             URLQueryItem(name: "city", value: city),
             URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
             URLQueryItem(name: "checkout", value: Self.dateText(checkout)),
             URLQueryItem(name: "adults", value: String(adults)),
             URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")
-        ], timeoutInterval: 604800)
+         ], timeoutInterval: smartTimeout ? 45 : 604800)
         // Cache successful responses while preserving upstream staleness flags.
         // Provider failures are never saved as successful results.
         if response.ok && (catalogOnly || response.rateError == nil) {
@@ -54,7 +54,7 @@ struct NuiteeHotelService {
         ], timeoutInterval: 35)
     }
 
-    func rates(hotelID: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], language: String = "en") async throws -> NuiteeRatesEnvelope {
+    func rates(hotelID: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], language: String = "en", smartTimeout: Bool = false) async throws -> NuiteeRatesEnvelope {
         struct Request: Encodable {
             let hotelId: String
             let checkin: String
@@ -63,9 +63,9 @@ struct NuiteeHotelService {
             let children: [Int]
             let language: String
         }
-        return try await APIClient.hotelPrices.post("/api/package/nuitee/rates", body: Request(
+        return try await (smartTimeout ? APIClient.shared : APIClient.hotelPrices).post("/api/package/nuitee/rates", body: Request(
             hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges, language: language
-        ), timeoutInterval: 604800)
+        ), timeoutInterval: smartTimeout ? 35 : 604800)
     }
 
     static func deadlineText(_ value: String, locale: String) -> String {

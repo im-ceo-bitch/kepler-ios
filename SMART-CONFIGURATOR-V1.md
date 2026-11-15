@@ -1,0 +1,11 @@
+# iumrah Smart Configurator v1
+
+Base: kepler-ios-main 5.zip. Shared native first-launch and Home flow. The first launch completion key is unchanged; existing users can use Home → iumrah Smart without resetting onboarding. Existing manual configurator is retained. The original final review, sealed server quote and OTP booking flow are reused.
+
+Deployment: apply the matching Business archive first and use the Business `Deploy iumrah backend` workflow. Do not deploy the iOS legacy package engine: the current iOS archive does not contain the UnifiedDeploySnapshot referenced by its deployment workflow. Verify unified core cutover readiness before live pricing or booking. Do not bypass the gate. No additional database, pricing rules, workflow edits, or secrets are included.
+
+Smart selection: published direct routes first, exact duration then deviation up to four days, including open-jaw routing; fallback uses only Aviasales Data API recent-search cache (monthly one-way rows, up to three pages per route/month, direct first, connections only if no direct pair). No live flight search. Actual travel days and hotel nights are checked separately. Four hotel candidates per city at most; Nuitee real room offers and existing server pricing/verification are required. Only one recommended package is returned; other candidates are not displayed in this version. Comfort requests four-star hotels; existing Nuitee tariff maps 4 stars to Standard. No pricing override. Currently maximum six travelers, adults >=1, children's ages 0–11. Four primary languages localized (Russian, English, Uzbek Latin, Uzbek Cyrillic); other languages use existing English fallback. Server selects published/date candidates; client coordinates existing flight, Nuitee and quote APIs. A fully server-side job orchestration is not implemented in v1.
+
+Testing: Swift syntax for all 330 files and pure Orbit geometry assertions; no Xcode/iOS SDK, device UI, real supplier transactions, OTP delivery, or Cloudflare production deployment verified. Run build-only CI and live staging end-to-end first. Onboarding can be skipped if API unavailable.
+
+Smart does not call Ignav. Existing quote validation rejects Aviasales + Nuitee children/infants, so those parties require published inventory.

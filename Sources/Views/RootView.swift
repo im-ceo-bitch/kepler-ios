@@ -501,7 +501,7 @@ struct RootView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.985)))
             } else {
-                OnboardingFlowView {
+                SmartConfiguratorFlow(firstLaunch: true) {
                     withAnimation(.easeInOut(duration: 0.34)) {
                         hasCompletedOnboarding = true
                     }

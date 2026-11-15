@@ -525,7 +525,7 @@ final class JourneyStore: ObservableObject {
         return hasFinalGeneratorQuote
     }
 
-    private func makeAviasalesFlightPair() -> (outbound: FlightOffer, inbound: FlightOffer?)? {
+    func makeAviasalesFlightPair() -> (outbound: FlightOffer, inbound: FlightOffer?)? {
         if let roundTrip = stagedAviasalesOffers[.roundTrip] {
             guard let outboundDeparture = aviasalesDate(roundTrip.departureAt) else { return nil }
             let outboundDuration = max(45, roundTrip.durationMinutes)
@@ -1148,6 +1148,13 @@ final class JourneyStore: ObservableObject {
             } else if packageFlightPath == .aviasalesSelected {
                 guard let value = makeAviasalesFlightPair() else { throw LocalPricingError.invalidFlightFare }
                 pair = value
+            } else if packageFlightPath == .flexibleDates {
+                guard let out = selectedOutbound, let back = selectedInbound,
+                      out.isVerifiedForBooking, back.isVerifiedForBooking,
+                      out.providerItineraryID != nil, out.providerItineraryID == back.providerItineraryID,
+                      out.requiresSelfTransfer != true, back.requiresSelfTransfer != true,
+                      returnPairMatches(back, outbound: out) else { throw LocalPricingError.invalidFlightFare }
+                pair = (out, back)
             } else {
                 let resolved = try await CuratedFlightRecommendationService.shared.resolvePublishedSelection(trip: requestedTrip, selection: publishedFlightSelection)
                 pair = (resolved.outbound, resolved.inbound)

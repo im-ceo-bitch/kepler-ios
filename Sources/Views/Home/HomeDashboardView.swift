@@ -8,6 +8,7 @@ struct HomeDashboardView: View {
     @EnvironmentObject private var journey: JourneyStore
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @State private var showZiyarats = false
+    @State private var showSmartConfigurator = false
     @State private var showCareRequestBuilder = false
     @State private var showFlightsService = false
     @State private var showTransferService = false
@@ -36,6 +37,9 @@ struct HomeDashboardView: View {
                     if let activeSession { _ = try? await bookings.loadESIMs(for: activeSession.id) }
                     try? await Task.sleep(nanoseconds: 120_000_000_000)
                 }
+            }
+            .fullScreenCover(isPresented: $showSmartConfigurator) {
+                SmartConfiguratorFlow { showSmartConfigurator = false }
             }
             .navigationDestination(isPresented: $showZiyarats) {
                 ZiyaratJourneyView()
@@ -91,6 +95,7 @@ struct HomeDashboardView: View {
                 )
 
                 buildMyUmrahSection
+                SmartConfiguratorHomeCard { showSmartConfigurator = true }
                 JourneyTravelInfoView(showsPageSelector: true)
                 IumrahHomeAudienceSection(language: settings.language)
                 homeIntegrationsSection

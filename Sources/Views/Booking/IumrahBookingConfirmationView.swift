@@ -8,6 +8,7 @@ struct IumrahBookingConfirmationView: View {
     @EnvironmentObject private var chrome: AppChromeStore
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.smartBookingDone) private var smartBookingDone
 
     let createBooking: @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession
 
@@ -409,7 +410,7 @@ struct IumrahBookingConfirmationView: View {
             }
             .buttonStyle(IumrahPrimaryButtonStyle())
             Button {
-                dismiss()
+                if let smartBookingDone { smartBookingDone() } else { dismiss() }
                 chrome.navigate(to: .booking)
             } label: {
                 Text(copy("Готово", "Done", "Tayyor", "Тайёр", "تم"))

@@ -404,8 +404,9 @@ struct IumrahBookingConfirmationView: View {
                 session: session,
                 contact: channel == .sms ? confirmedPhone.map { .sms($0) } : confirmedEmail.map { .email($0) }
             )
-            NavigationLink {
-                BookingDetailView(bookingID: session.id)
+            Button {
+                if let smartBookingDone { smartBookingDone() } else { dismiss() }
+                chrome.openBooking(id: session.id)
             } label: {
                 Text(copy("Открыть бронирование", "Open booking", "Bronni ochish", "Бронни очиш", "عرض الحجز"))
             }

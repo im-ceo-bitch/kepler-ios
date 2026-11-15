@@ -71,7 +71,7 @@ struct LegacyFinalPackageView: View {
         Group {
             if let createdSession {
                 IumrahBookingCelebrationView(session: createdSession,
-                    onOpenBooking: { showCreatedBooking = true },
+                    onOpenBooking: { chrome.shouldStartTripBuilder = false; chrome.shouldStartFlightFirstBuilder = false; chrome.openBooking(id: createdSession.id) },
                     onHome: {
                         chrome.shouldStartTripBuilder = false
                         journey.resetAfterTripChange()

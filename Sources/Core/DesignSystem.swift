@@ -288,7 +288,8 @@ struct IumrahIconBadge: View {
 
     @ViewBuilder
     var body: some View {
-        let symbol = Image(systemName: systemName)
+        let safeName = UIImage(systemName: systemName) == nil ? (resolvedRole == .document ? "doc.text.fill" : "checkmark.circle.fill") : systemName
+        let symbol = Image(systemName: safeName)
             .font(.system(size: symbolSize, weight: .semibold))
             .symbolRenderingMode(.monochrome)
             .foregroundStyle(symbolColor)

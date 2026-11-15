@@ -132,7 +132,7 @@ struct IumrahBookingPassportsView: View {
     private func travelerRow(_ traveler: IumrahTravelerForm) -> some View {
         HStack(spacing: 14) {
             IumrahIconBadge(
-                systemName: traveler.hasPassport ? "checkmark.circle.fill" : "passport.fill",
+                systemName: traveler.hasPassport ? "checkmark.circle.fill" : "person.text.rectangle.fill",
                 role: traveler.hasPassport ? .success : .document,
                 size: 52,
                 symbolSize: 21,

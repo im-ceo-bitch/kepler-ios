@@ -45,6 +45,7 @@ struct IumrahLanguageSelectionSheet: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea())
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Image(systemName: "xmark") } } }
         .safeAreaInset(edge: .bottom) {
             confirmBar
         }
@@ -56,15 +57,13 @@ struct IumrahLanguageSelectionSheet: View {
 
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Image("LanguageSelectionHero")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
-                }
+            HStack {
+                Spacer(minLength: 0)
+                IumrahOrbitV5(services: [.init(id: "language", symbol: "globe")], diameter: 210, logo: Image("IumrahOrbitAccountLogo"), accessibilityTitle: "iumrah", pinnedSymbol: "globe")
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26))
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(pageTitle)
@@ -114,9 +113,9 @@ struct IumrahLanguageSelectionSheet: View {
             HStack(spacing: 13) {
                 Text(option.flag)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.white)
                     .frame(width: 42, height: 42)
-                    .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .background(languageColor(option.language), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(option.nativeName)
@@ -152,6 +151,19 @@ struct IumrahLanguageSelectionSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func languageColor(_ language: AppSettingsStore.Language) -> Color {
+        switch language {
+        case .english: return .indigo
+        case .arabic: return Color(red: 0.12, green: 0.48, blue: 0.35)
+        case .russian: return .blue
+        case .turkish: return .red
+        case .indonesian: return Color(red: 0.65, green: 0.18, blue: 0.23)
+        case .malay: return .purple
+        case .uzbek: return Color(red: 0.03, green: 0.48, blue: 0.65)
+        case .uzbekCyrillic: return Color(red: 0.04, green: 0.39, blue: 0.52)
+        }
     }
 
     private var helperFootnote: some View {
@@ -190,18 +202,17 @@ struct IumrahLanguageSelectionSheet: View {
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 12)
             .padding(.bottom, 10)
-            .disabled(pendingLanguage == settings.language)
-            .opacity(pendingLanguage == settings.language ? 0.72 : 1)
+            
         }
         .background(.ultraThinMaterial)
     }
 
     private var buttonBackground: Color {
-        pendingLanguage == settings.language ? Color.primary.opacity(0.055) : Color.primary
+        Color.iumrahPrimaryButtonBackground
     }
 
     private var buttonForeground: Color {
-        pendingLanguage == settings.language ? .primary : .white
+        Color.iumrahPrimaryButtonText
     }
 
     private var navigationTitle: String {
@@ -267,11 +278,11 @@ struct IumrahLanguageSelectionSheet: View {
     private var confirmButtonTitle: String {
         guard pendingLanguage != settings.language else {
             return localized(
-                ru: "Текущий язык уже выбран",
-                en: "Current language already selected",
-                tr: "Geçerli dil zaten seçili",
-                uz: "Joriy til allaqachon tanlangan",
-                uzCy: "Жорий тил аллақачон танланган"
+                ru: "Готово",
+                en: "Done",
+                tr: "Tamam",
+                uz: "Tayyor",
+                uzCy: "Тайёр"
             )
         }
 

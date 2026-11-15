@@ -39,6 +39,10 @@ final class BookingStore: ObservableObject {
     private var chatCursors: [String: String] = [:]
     private var chatScopeVersions: [String: String] = [:]
     var hasCareAccount: Bool { accountToken?.isEmpty == false }
+    var canUseCareChat: Bool {
+        hasCareAccount && sessions.contains { !["COMPLETED", "CANCELLED"].contains($0.effectiveStatus.uppercased()) }
+    }
+    private var bookingScopeGeneration = UUID()
     func careChatKey(for bookingID: String) -> String { hasCareAccount ? "account" : bookingID }
     private var chatLoads: [String: Task<[ChatMessage], Error>] = [:]
     private var chatAuthGeneration = UUID()
@@ -74,6 +78,7 @@ final class BookingStore: ObservableObject {
             throw BookingStoreError.authoritativeQuoteRequired
         }
 
+        let generation = bookingScopeGeneration
         let payload = BookingDraftBuilder.make(
             trip: trip,
             hotel: hotel,
@@ -118,6 +123,7 @@ final class BookingStore: ObservableObject {
         // response so an app termination during Business/profile synchronization cannot
         // lose the reconciliation job. No supplier pricing is readable here.
         session.pendingGeneratorQuoteProof = quote.quoteProof
+        guard generation == bookingScopeGeneration else { throw CancellationError() }
         upsert(session)
 
         // Hand the confidential report to PackageEngine immediately after the
@@ -133,6 +139,7 @@ final class BookingStore: ObservableObject {
             )
             if pricingReportCommitted {
                 session.pendingGeneratorQuoteProof = nil
+                guard generation == bookingScopeGeneration else { throw CancellationError() }
                 upsert(session)
             }
         }
@@ -182,6 +189,7 @@ final class BookingStore: ObservableObject {
         if pricingReportCommitted {
             session.pendingGeneratorQuoteProof = nil
         }
+        guard generation == bookingScopeGeneration else { throw CancellationError() }
         upsert(session)
         if let makkahSelection = session.hotelSelection {
             _ = try? await bookingService.updateHotelSelection(
@@ -199,6 +207,7 @@ final class BookingStore: ObservableObject {
                 snapshot: madinahSelection
             )
         }
+        guard generation == bookingScopeGeneration else { throw CancellationError() }
         return session
     }
 
@@ -260,11 +269,13 @@ final class BookingStore: ObservableObject {
 
     /// Reconcile a committed booking without issuing another create request.
     func resolveBookingIdentity(_ saved: StoredBookingSession) async throws -> StoredBookingSession {
-        var session = booking(id: saved.id) ?? saved
+        guard var session = booking(id: saved.id) else { throw APIError.missingBookingToken }
+        let generation = bookingScopeGeneration
         if session.hasServerIdentity { return session }
         let operational = try await bookingService.fetchOperationalTrip(
             id: session.id, headers: ["x-booking-token": session.accessToken]
         )
+        guard generation == bookingScopeGeneration else { throw CancellationError() }
         guard operational.trip.bookingID == session.id else { throw BookingStoreError.identityPending }
         session.mergeOperationalTrip(operational.trip, statusHistory: operational.statusHistory)
         session.guide = operational.assignment?.guide ?? session.guide
@@ -287,9 +298,11 @@ final class BookingStore: ObservableObject {
     }
 
     func refreshAll() async {
+        let generation = bookingScopeGeneration
         var staleBookingIDs = Set<String>()
 
         for session in sessions {
+            guard generation == bookingScopeGeneration else { return }
             let bookingToken = session.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
             do {
                 if !bookingToken.isEmpty {
@@ -355,6 +368,7 @@ final class BookingStore: ObservableObject {
             }
         }
 
+        guard generation == bookingScopeGeneration else { return }
         for id in staleBookingIDs { purgeLocalBooking(id: id) }
         persist()
     }
@@ -362,6 +376,15 @@ final class BookingStore: ObservableObject {
     func setAccountToken(_ token: String?) {
         let next = token?.trimmingCharacters(in: .whitespacesAndNewlines)
         if next != accountToken {
+            bookingScopeGeneration = UUID()
+            if accountToken != nil {
+                sessions.removeAll()
+                itineraries.removeAll()
+                pushRegistrationReady = nil
+                pushRegistrationError = nil
+                UserDefaults.standard.removeObject(forKey: legacyStorageKey)
+                persist()
+            }
             chatAuthGeneration = UUID()
             for task in chatLoads.values { task.cancel() }
             chatLoads.removeAll()
@@ -376,10 +399,12 @@ final class BookingStore: ObservableObject {
     }
 
     func restoreAccountTrips(token: String) async {
-        setAccountToken(token)
-        guard let trips = try? await accountService.trips(token: token) else { return }
+        guard accountToken == token else { return }
+        let generation = bookingScopeGeneration
+        guard let trips = try? await accountService.trips(token: token), generation == bookingScopeGeneration else { return }
         for trip in trips {
             guard let detail = try? await accountService.tripDetail(bookingID: trip.bookingID, token: token) else { continue }
+            guard generation == bookingScopeGeneration, accountToken == token else { return }
             if let index = sessions.firstIndex(where: { $0.id == trip.bookingID }) {
                 sessions[index].booking = detail.booking
                 sessions[index].mergeOperationalTrip(detail.trip, statusHistory: detail.statusHistory)
@@ -481,6 +506,7 @@ final class BookingStore: ObservableObject {
         let (items, _) = try await performWithClientAuthorization(for: session) { headers in
             try await bookingService.fetchItinerary(id: bookingID, headers: headers, language: language)
         }
+        guard booking(id: bookingID) != nil else { throw CancellationError() }
         itineraries[bookingID] = items
         return items
     }
@@ -497,6 +523,7 @@ final class BookingStore: ObservableObject {
     }
 
     private func careHeaders(for bookingID: String) -> [String: String]? {
+        guard canUseCareChat else { return nil }
         if bookingID == "account", let token = accountToken, !token.isEmpty { return ["Authorization": "Bearer \(token)"] }
         guard bookingID != "account", let session = booking(id: bookingID), !session.accessToken.isEmpty else { return nil }
         return ["x-booking-token": session.accessToken]

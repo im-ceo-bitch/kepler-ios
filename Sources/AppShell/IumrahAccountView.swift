@@ -185,8 +185,8 @@ struct IumrahAccountView: View {
         .sheet(isPresented: $showProfileEditor) {
             profileEditorSheet
         }
-        .sheet(isPresented: $showLanguageSheet) {
-            IumrahLanguageSelectionSheet()
+        .fullScreenCover(isPresented: $showLanguageSheet) {
+            NavigationStack { IumrahLanguageSelectionSheet(currentLanguage: settings.language) }
                 .environmentObject(settings)
         }
         .sheet(isPresented: $showIdentityUnlockSheet) {
@@ -227,8 +227,8 @@ struct IumrahAccountView: View {
                 confirmColor: .red
             ) {
                 Task {
-                    await account.logout()
                     bookings.setAccountToken(nil)
+                    await account.logout()
                     IumrahHaptics.soft()
                 }
             }
@@ -594,9 +594,7 @@ struct IumrahAccountView: View {
     }
 
     private func activeTripCard(_ session: StoredBookingSession) -> some View {
-        NavigationLink {
-            BookingDetailView(bookingID: session.id)
-        } label: {
+        Button { chrome.openBooking(id: session.id) } label: {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 12) {
                     IumrahIconBadge(
@@ -702,9 +700,7 @@ struct IumrahAccountView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(scopedAccountTrips.prefix(3).enumerated()), id: \.element.id) { index, session in
-                        NavigationLink {
-                            BookingDetailView(bookingID: session.id)
-                        } label: {
+                        Button { chrome.openBooking(id: session.id) } label: {
                             tripRow(session)
                         }
                         .buttonStyle(.plain)
@@ -2266,6 +2262,7 @@ struct IumrahAccountView: View {
 
     @MainActor
     private func refreshAccountContent() async {
+        bookings.setAccountToken(account.bearerToken)
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)
             await bookings.refreshAll()

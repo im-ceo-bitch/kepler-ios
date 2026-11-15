@@ -9,8 +9,10 @@ struct BookingDetailView: View {
     @Environment(\.openURL) private var openURL
 
     let bookingID: String
+    let embedded: Bool
 
-    init(bookingID: String, initialPage: BookingPrimaryPage = .booking) {
+    init(bookingID: String, initialPage: BookingPrimaryPage = .booking, embedded: Bool = false) {
+        self.embedded = embedded
         self.bookingID = bookingID
         _selectedPrimaryPage = State(initialValue: initialPage)
     }
@@ -43,147 +45,73 @@ struct BookingDetailView: View {
 
     var body: some View {
         Group {
-            if let session {
-                GeometryReader { viewport in
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 16) {
-                            BookingPageSwitcher(
-                                selection: selectedPrimaryPage,
-                                onBooking: { withAnimation(.snappy(duration: 0.24)) { selectedPrimaryPage = .booking } },
-                                onStatus: { withAnimation(.snappy(duration: 0.24)) { selectedPrimaryPage = .status } },
-                                onSchedule: { withAnimation(.snappy(duration: 0.24)) { selectedPrimaryPage = .schedule } }
-                            )
-
-                            if selectedPrimaryPage == .booking {
-                                bookingIdentityStrip(session)
-
-                                IumrahBookingDomeCard(
-                                    bookingNumber: session.displayBookingNumber,
-                                    travelerName: bookingTravelerName(session),
-                                    language: settings.language,
-                                    isFlipped: $bookingCardFlipped
-                                )
-                                statusHero(session)
-                                if shouldShowCheckoutEntry(for: session) {
-                                    IumrahManualPaymentNotice()
-                                    IumrahRefundPolicyCard(component: .package, compact: true)
-                                    IumrahInvoiceShareCard(session: session, compact: true)
-                                }
-                                bookingMetaCard(session.booking)
-                                BookingItineraryCalendarView(
-                                    bookingID: session.id,
-                                    startDate: session.booking.input.startDate,
-                                    endDate: session.booking.input.endDate,
-                                    booking: session.booking,
-                                    presentation: .preview,
-                                    onOpenFullSchedule: {
-                                        withAnimation(.snappy(duration: 0.24)) { selectedPrimaryPage = .schedule }
-                                    }
-                                )
-
-                                BookingFlightFirstComponentsView(
-                                    session: session,
-                                    onChangeMakkahHotel: { showMakkahHotelChange = true },
-                                    onChangeMadinahHotel: { showMadinahHotelChange = true }
-                                )
-
-                                contactCard(session)
-
-                                if session.pendingChangeConfirmation == true || confirmationSent {
-                                    confirmationCard(session)
-                                }
-
-                                destructiveActions
-
-                                bookingCareBalanceCard
-
-                                IumrahTelegramConnectCard(
-                                    session: session,
-                                    accountToken: account.bearerToken,
-                                    style: .compact
-                                )
-                                .padding(.top, 8)
-                            } else if selectedPrimaryPage == .status {
-                                PilgrimCheckoutView(bookingID: bookingID, presentation: .bookingStatus)
-                                    .transition(.opacity)
-                            } else {
-                                BookingItineraryCalendarView(
-                                    bookingID: session.id,
-                                    startDate: session.booking.input.startDate,
-                                    endDate: session.booking.input.endDate,
-                                    booking: session.booking,
-                                    presentation: .fullScreen
-                                )
-                                .transition(.opacity)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, IumrahDesign.pagePadding)
-                        .padding(.top, 12)
-                        .padding(.bottom, 56)
-                    }
-                    .background(Color.iumrahPageBackground)
-                    .task {
-                        await bookings.refreshAll()
-                        await bookings.syncHotelSelectionIfNeeded(bookingID: bookingID)
-                        await loadSecurityConfirmation()
-                        loadZiyaratDraft()
-                        loadESIMDraft()
-                        await loadCareProfile()
-                    }
-                    .sheet(isPresented: $showMakkahHotelChange) {
-                        BookingHotelChangeView(bookingID: bookingID, role: .makkah)
-                            .environmentObject(settings)
-                            .environmentObject(bookings)
-                    }
-                    .sheet(isPresented: $showMadinahHotelChange) {
-                        BookingHotelChangeView(bookingID: bookingID, role: .madinah)
-                            .environmentObject(settings)
-                            .environmentObject(bookings)
-                    }
-                    .sheet(isPresented: $showContactEdit) {
-                        BookingContactEditSheet(
-                            bookingID: bookingID,
-                            telegram: session.telegram ?? "",
-                            whatsapp: session.whatsapp ?? ""
-                        )
-                        .environmentObject(settings)
-                        .environmentObject(bookings)
-                    }
-                }
-
+            if embedded {
+                content
             } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.largeTitle)
-                    Text(L10n.text("detail_not_found", settings.language))
-                        .font(.headline)
+                ScrollView(showsIndicators: false) {
+                    content
+                        .padding(.horizontal, IumrahDesign.pagePadding)
+                        .padding(.vertical, 12)
+                        .padding(.bottom, 44)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.iumrahPageBackground)
+                .navigationTitle(selectedPrimaryPage == .status ? localizedDetail("Документы", "Documents", "Hujjatlar", "Ҳужжатлар") : localizedDetail("Пакет Умры", "Umrah package", "Umra paketi", "Умра пакети"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar(.hidden, for: .tabBar)
             }
         }
-        .navigationTitle(L10n.text("booking_detail_title", settings.language))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.visible, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
-        .confirmationDialog(
-            L10n.text("booking_delete_confirm_title", settings.language),
-            isPresented: $showDeleteConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(L10n.text("booking_delete_confirm_action", settings.language), role: .destructive) {
-                Task { await deleteBooking() }
+        .background(Color.iumrahPageBackground)
+        .task(id: bookingID) {
+            await bookings.syncHotelSelectionIfNeeded(bookingID: bookingID)
+            loadZiyaratDraft()
+            loadESIMDraft()
+        }
+        .sheet(isPresented: $showMakkahHotelChange) {
+            BookingHotelChangeView(bookingID: bookingID, role: .makkah)
+                .environmentObject(settings).environmentObject(bookings)
+        }
+        .sheet(isPresented: $showMadinahHotelChange) {
+            BookingHotelChangeView(bookingID: bookingID, role: .madinah)
+                .environmentObject(settings).environmentObject(bookings)
+        }
+        .sheet(isPresented: $showContactEdit) {
+            if let session {
+                BookingContactEditSheet(bookingID: bookingID, telegram: session.telegram ?? "", whatsapp: session.whatsapp ?? "")
+                    .environmentObject(settings).environmentObject(bookings)
             }
-            Button(L10n.text("cancel", settings.language), role: .cancel) {}
-        } message: {
-            Text(L10n.text("booking_delete_confirm_body", settings.language))
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        if let session {
+            if !embedded && selectedPrimaryPage == .status {
+                PilgrimCheckoutView(bookingID: bookingID, presentation: .bookingStatus)
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    IumrahBookingDomeCard(
+                        bookingNumber: session.displayBookingNumber,
+                        travelerName: bookingTravelerName(session),
+                        language: settings.language,
+                        isFlipped: $bookingCardFlipped
+                    )
+                    bookingMetaCard(session.booking)
+                    BookingFlightFirstComponentsView(
+                        session: session,
+                        onChangeMakkahHotel: { showMakkahHotelChange = true },
+                        onChangeMadinahHotel: { showMadinahHotelChange = true }
+                    )
+                    contactCard(session)
+                    if session.pendingChangeConfirmation == true || confirmationSent { confirmationCard(session) }
+                    IumrahTelegramConnectCard(session: session, accountToken: account.bearerToken, style: .compact)
+                }
+            }
+        } else {
+            ContentUnavailableView(L10n.text("detail_not_found", settings.language), systemImage: "suitcase")
         }
     }
 
     private func bookingTravelerName(_ session: StoredBookingSession) -> String {
         let value = session.travelerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return value.isEmpty ? settings.displayName : value
+        return value.isEmpty ? L10n.text("booking_your_trip", settings.language) : value
     }
 
     private var topBar: some View {
@@ -1473,6 +1401,7 @@ private struct BookingContactEditSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let bookingID: String
+    let embedded: Bool
     @State private var telegram: String
     @State private var whatsapp: String
     @State private var isSaving = false

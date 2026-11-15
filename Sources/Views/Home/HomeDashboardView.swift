@@ -277,9 +277,7 @@ struct HomeDashboardView: View {
                 }
             }
 
-            NavigationLink {
-                BookingDetailView(bookingID: session.id)
-            } label: {
+            Button { chrome.openBooking(id: session.id) } label: {
                 HStack {
                     Text(L10n.text("open_booking", settings.language))
                     Spacer()

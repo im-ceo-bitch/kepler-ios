@@ -189,14 +189,6 @@ struct PilgrimCheckoutView: View {
     private var embeddedStatusBody: some View {
         VStack(spacing: 18) {
             checkoutContent(includeProgress: false)
-            if let session {
-                IumrahTelegramConnectCard(
-                    session: session,
-                    accountToken: account.bearerToken,
-                    style: .compact
-                )
-                .padding(.top, 8)
-            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -252,7 +244,7 @@ struct PilgrimCheckoutView: View {
     private var availabilityPaymentLockedCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                IumrahIconBadge(systemName: "lock.clock.fill", role: .payment, size: 44, symbolSize: 17, cornerRadius: 15)
+                IumrahIconBadge(systemName: "creditcard", role: .payment, size: 44, symbolSize: 17, cornerRadius: 15)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(tr("Payment opens after confirmation", "Оплата откроется после подтверждения", "To‘lov tasdiqdan keyin ochiladi", "Тўлов тасдиқдан кейин очилади"))
                         .font(.subheadline.weight(.semibold))
@@ -297,7 +289,7 @@ struct PilgrimCheckoutView: View {
         }
         .padding(16)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .opacity(0.72)
+
     }
 
     @ViewBuilder
@@ -337,7 +329,7 @@ struct PilgrimCheckoutView: View {
             }
             .padding(16)
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .opacity(0.72)
+    
         }
     }
 
@@ -398,6 +390,15 @@ struct PilgrimCheckoutView: View {
 
     private func activationCard(_ value: IumrahCheckoutResponse) -> some View {
         VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                IumrahOrbitV5(services: [.init(id: "passport", symbol: "person.text.rectangle.fill")], diameter: 78, accessibilityTitle: "Passport", pinnedSymbol: "person.text.rectangle.fill")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Passports", "Паспорта", "Pasportlar", "Паспортлар")).font(.title3.bold())
+                    Text("\(attached) / \(total)").font(.subheadline.monospacedDigit().weight(.semibold)).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            ProgressView(value: Double(attached), total: Double(max(1, total))).tint(Color.iumrahCareDark)
             stageHeader(
                 number: "01",
                 icon: "person.badge.key.fill",
@@ -923,7 +924,7 @@ struct PilgrimCheckoutView: View {
         return VStack(alignment: .leading, spacing: 15) {
             stageHeader(
                 number: "01",
-                icon: ready ? "checkmark.circle.fill" : "passport.fill",
+                icon: ready ? "checkmark.circle.fill" : "person.text.rectangle.fill",
                 title: tr("Attach passports", "Прикрепить паспорта", "Pasportlarni biriktirish", "Паспортларни бириктириш")
             )
 
@@ -944,7 +945,7 @@ struct PilgrimCheckoutView: View {
                 } label: {
                     HStack(spacing: 13) {
                         IumrahIconBadge(
-                            systemName: traveler.hasPassport ? "checkmark.circle.fill" : "passport.fill",
+                            systemName: traveler.hasPassport ? "checkmark.circle.fill" : "person.text.rectangle.fill",
                             role: traveler.hasPassport ? .success : .document,
                             size: 48,
                             symbolSize: 19,
@@ -999,7 +1000,7 @@ struct PilgrimCheckoutView: View {
 
             if isAvailabilityChecking {
                 VStack(alignment: .leading, spacing: 12) {
-                    Label(tr("Payment will open after availability is confirmed", "Оплата откроется после подтверждения наличия", "To‘lov mavjudlik tasdiqlangach ochiladi", "Тўлов мавжудлик тасдиқлангач очилади"), systemImage: "lock.clock.fill")
+                    Label(tr("Payment will open after availability is confirmed", "Оплата откроется после подтверждения наличия", "To‘lov mavjudlik tasdiqlangach ochiladi", "Тўлов мавжудлик тасдиқлангач очилади"), systemImage: "creditcard")
                         .font(.headline)
                     Text(tr(
                         "Nothing needs to be paid now. Complete the pilgrim forms above — the entered details will remain saved.",
@@ -1514,6 +1515,7 @@ struct PilgrimCheckoutView: View {
                 bookingToken: session.accessToken,
                 accountToken: account.bearerToken
             )
+            guard bookings.booking(id: bookingID) != nil, !Task.isCancelled else { return }
             checkout = loaded
             errorMessage = nil
             let options = paymentOptions(loaded)
@@ -1932,7 +1934,7 @@ private struct TravelerFormEditorSheet: View {
                         countryRow(target: .nationality, title: tr("Citizenship", "Гражданство", "Fuqarolik", "Фуқаролик"), value: form.nationality)
                     }
 
-                    section(tr("Passport", "Паспорт", "Pasport", "Паспорт"), icon: "passport.fill") {
+                    section(tr("Passport", "Паспорт", "Pasport", "Паспорт"), icon: "person.text.rectangle.fill") {
                         field(
                             tr("Passport number", "Номер паспорта", "Pasport raqami", "Паспорт рақами"),
                             $form.passportNumber,

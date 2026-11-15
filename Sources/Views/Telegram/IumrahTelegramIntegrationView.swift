@@ -111,7 +111,6 @@ struct IumrahTelegramConnectCard: View {
             }
 
             Button {
-                guard !isLinked else { return }
                 Task { await connect() }
             } label: {
                 HStack(spacing: 9) {
@@ -121,7 +120,7 @@ struct IumrahTelegramConnectCard: View {
                     } else {
                         IumrahTelegramMark(size: 21)
                     }
-                    Text(isLinked ? connectedTitle : (isConnecting ? connectingTitle : connectTitle))
+                    Text(isConnecting ? connectingTitle : (isLinked ? tr("Open Telegram", "Открыть Telegram", "Telegram’ni ochish", "Telegram’ни очиш") : connectTitle))
                     Spacer(minLength: 8)
                     if isLinked {
                         Image(systemName: "checkmark.circle.fill")
@@ -139,7 +138,13 @@ struct IumrahTelegramConnectCard: View {
                 .background(isLinked ? linkedGreen : telegramBlue, in: RoundedRectangle(cornerRadius: style == .compact ? 16 : 18, style: .continuous))
             }
             .buttonStyle(.plain)
-            .disabled(isConnecting || isLinked)
+            .disabled(isConnecting)
+            if errorMessage != nil, let support = URL(string: "https://t.me/saudiclub966") {
+                Link(destination: support) {
+                    Label(tr("Open Telegram support", "Открыть поддержку в Telegram", "Telegram yordam", "Telegram ёрдам"), systemImage: "paperplane")
+                        .font(.subheadline.weight(.medium))
+                }
+            }
         }
         .padding(style == .compact ? 15 : 18)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -22,13 +22,19 @@ struct BookingFlightFirstComponentsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
+            SectionHeader(flightsTitle, eyebrow: "iumrah Flights", subtitle: nil)
             if let outbound = session.outboundFlight {
-                SectionHeader(flightsTitle, eyebrow: "iumrah Flights", subtitle: nil)
                 BookingFlightFirstLegCard(
                     flight: outbound,
                     direction: outboundTitle,
                     language: settings.language
                 )
+            }
+
+            else if let trace = session.booking.generatorTrace?.outbound {
+                traceFlightCard(trace, direction: outboundTitle)
+            } else if !session.booking.flight.isEmpty {
+                Text(session.booking.flight).font(.headline).iumrahCard()
             }
 
             if let inbound = session.inboundFlight {
@@ -39,7 +45,11 @@ struct BookingFlightFirstComponentsView: View {
                 )
             }
 
-            if session.hotelSelection != nil || session.madinahHotelSelection != nil {
+            else if let trace = session.booking.generatorTrace?.inbound {
+                traceFlightCard(trace, direction: returnTitle)
+            }
+
+            if session.hotelSelection != nil || session.madinahHotelSelection != nil || !session.booking.hotelNames.makkah.isEmpty || !session.booking.hotelNames.madinah.isEmpty {
                 SectionHeader(hotelsTitle, eyebrow: "iumrah Hotels", subtitle: nil)
 
                 if let makkah = session.hotelSelection {
@@ -51,6 +61,9 @@ struct BookingFlightFirstComponentsView: View {
                     )
                 }
 
+                if session.hotelSelection == nil, !session.booking.hotelNames.makkah.isEmpty {
+                    Label(session.booking.hotelNames.makkah, systemImage: "building.2.fill").font(.headline).frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
+                }
                 if let madinah = session.madinahHotelSelection {
                     BookingFlightFirstHotelCard(
                         hotel: madinah,
@@ -58,6 +71,8 @@ struct BookingFlightFirstComponentsView: View {
                         language: settings.language,
                         onOpen: onChangeMadinahHotel
                     )
+                } else if !session.booking.hotelNames.madinah.isEmpty {
+                    Label(session.booking.hotelNames.madinah, systemImage: "building.2.fill").font(.headline).frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
                 }
             }
 
@@ -76,6 +91,22 @@ struct BookingFlightFirstComponentsView: View {
                 )
             }
         }
+    }
+
+    private func traceFlightCard(_ flight: BookingGeneratorFlightSnapshot, direction: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(direction, systemImage: "airplane").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text("\(flight.origin) → \(flight.destination)").font(.title2.bold())
+            Text("\(flight.airline) · \(flight.flightNumbers)").font(.subheadline.weight(.medium))
+            Text("\(flight.departureAt) — \(flight.arrivalAt)").font(.caption).foregroundStyle(.secondary)
+            if let stops = flight.stops { Text(stops == 0 ? localized("Прямой рейс", "Direct flight", "To‘g‘ridan-to‘g‘ri", "Тўғридан-тўғри") : "\(stops) · " + localized("Пересадки", "Stops", "Ulanishlar", "Уланишлар")).font(.caption) }
+            if let segments = flight.segments {
+                ForEach(Array(segments.enumerated()), id: \.offset) { item in
+                    Divider()
+                    Text("\(item.element.origin) → \(item.element.destination) · \(item.element.flightNumber)").font(.caption.weight(.medium))
+                }
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
     }
 
     private var includedServicesCard: some View {

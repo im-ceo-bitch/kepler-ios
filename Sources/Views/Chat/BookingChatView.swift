@@ -48,7 +48,10 @@ struct BookingChatView: View {
     private var session: StoredBookingSession? { bookingID == "account" ? nil : bookings.booking(id: requestedBookingID) }
 
     var body: some View {
-        chatScreen
+        Group {
+            if bookings.canUseCareChat { chatScreen }
+            else { ContentUnavailableView(tr("Chat available after booking", "Чат доступен после бронирования", "Chat brondan keyin", "Чат брондан кейин"), systemImage: "lock.fill") }
+        }
             .navigationDestination(isPresented: $showCareProfile) { careProfileScreen }
             .navigationBarBackButtonHidden(false)
             .navigationBarTitleDisplayMode(.inline)
@@ -59,7 +62,10 @@ struct BookingChatView: View {
             .statusBarHidden(false)
             .toolbar(.visible, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
-            .onAppear(perform: chatDidAppear)
+            .onAppear { if bookings.canUseCareChat { chatDidAppear() } }
+            .onChange(of: bookings.canUseCareChat) { _, allowed in
+                if !allowed { messages = []; draft = ""; failedDraft = nil; pendingOutgoing = nil; launchingOutgoing = nil; composerFocused = false; errorMessage = nil }
+            }
             .onChange(of: bookingID) { _, newValue in push.activeChatBookingID = newValue }
             .onDisappear(perform: chatDidDisappear)
     }
@@ -366,10 +372,10 @@ struct BookingChatView: View {
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(2)
             }
-            .foregroundStyle(conversationPrimary.opacity(0.82))
+            .foregroundStyle(Color.white)
             .padding(.horizontal, 15)
             .padding(.vertical, 11)
-            .iumrahGlass(in: Capsule())
+            .background(Color.black.opacity(0.82), in: Capsule())
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
@@ -642,7 +648,7 @@ struct BookingChatView: View {
 
             Text(message)
                 .font(.system(size: 13.5))
-                .foregroundStyle(conversationPrimary)
+                .foregroundStyle(Color.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 4)
@@ -657,7 +663,7 @@ struct BookingChatView: View {
                 }
             }
             .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(conversationPrimary)
+            .foregroundStyle(Color.primary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -1009,7 +1015,7 @@ struct BookingChatView: View {
     }
 
     private var conversationSecondary: Color {
-        appearance.wallpaper.isVisual ? .white.opacity(0.68) : .secondary
+        appearance.wallpaper.isVisual ? .white.opacity(0.92) : .secondary
     }
 
     private var headerPrimary: Color { .white }

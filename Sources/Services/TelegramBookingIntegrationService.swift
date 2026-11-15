@@ -14,6 +14,7 @@ struct IumrahTelegramLinkResponse: Decodable {
 }
 
 private struct IumrahTelegramLinkRequest: Encodable {
+    let bookingId: String
     let language: String
 }
 
@@ -31,8 +32,8 @@ struct TelegramBookingIntegrationService {
         language: AppSettingsStore.Language
     ) async throws -> URL {
         let response: IumrahTelegramLinkResponse = try await api.post(
-            "/api/package/booking/\(bookingID)/telegram-link",
-            body: IumrahTelegramLinkRequest(language: language.rawValue),
+            "/api/telegram/link",
+            body: IumrahTelegramLinkRequest(bookingId: bookingID, language: language.rawValue),
             headers: authorizationHeaders,
             timeoutInterval: 15
         )
@@ -52,7 +53,8 @@ struct TelegramBookingIntegrationService {
         authorizationHeaders: [String: String]
     ) async throws -> Bool {
         let response: IumrahTelegramStatusResponse = try await api.get(
-            "/api/package/booking/\(bookingID)/telegram-status",
+            "/api/telegram/link",
+            query: [URLQueryItem(name: "bookingId", value: bookingID)],
             headers: authorizationHeaders,
             timeoutInterval: 12
         )

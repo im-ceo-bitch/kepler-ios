@@ -101,7 +101,11 @@ struct RootView: View {
                 syncLocalProfileFromAccount()
                 syncWidgets()
                 Task { await syncClientNotifications() }
-                guard newAccount != nil, let token = account.bearerToken else { return }
+                guard newAccount != nil, let token = account.bearerToken else {
+                    chrome.requestedBookingID = nil
+                    chrome.requestedChatBookingID = nil
+                    return
+                }
                 Task {
                     await bookings.restoreAccountTrips(token: token)
                     await linkLocalBookingsToAccount()
@@ -378,6 +382,7 @@ struct RootView: View {
 
         // Keep the cinematic first launch independent from account/network restoration.
         // This prevents stale sessions or slow network calls from competing with the intro.
+        bookings.setAccountToken(account.bearerToken)
         await account.restore()
         syncLocalProfileFromAccount()
         bookings.setAccountToken(account.bearerToken)

@@ -38,11 +38,13 @@ final class IumrahAccountStore: ObservableObject {
         defer { isRestoring = false }
         do {
             let profile = try await service.session(token: token)
+            guard self.token == token else { return }
             account = profile
             IumrahAccountVault.save(.init(token: token, account: profile))
             _ = try? await service.registerCurrentSession(token: token, locale: Locale.current.identifier)
             lastError = nil
         } catch {
+            guard self.token == token else { return }
             self.token = nil
             account = nil
             IumrahAccountVault.clear()
@@ -218,12 +220,13 @@ final class IumrahAccountStore: ObservableObject {
     }
 
     func logout() async {
-        if let token { await service.logout(token: token) }
+        let previousToken = token
         IumrahGoogleSignInSupport.signOutProviderSession()
         token = nil
         account = nil
         lastError = nil
         IumrahAccountVault.clear()
+        if let previousToken { await service.logout(token: previousToken) }
     }
 
     func walletPassData() async throws -> Data {

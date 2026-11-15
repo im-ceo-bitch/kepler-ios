@@ -48,7 +48,7 @@ struct FamilyWelcome: View {
             Button(second ? familyCopy(l,"Подобрать поездку","Plan my trip","Safarni tanlash","Сафарни танлаш") : familyCopy(l,"Далее","Next","Keyingi","Кейинги")) {
                 if second { finish(true) } else { second = true }
             }.buttonStyle(IumrahPrimaryButtonStyle())
-        }.padding(20).sheet(isPresented: $languages) { IumrahLanguageSelectionSheet(currentLanguage: l) }
+        }.padding(20).fullScreenCover(isPresented: $languages) { NavigationStack { IumrahLanguageSelectionSheet(currentLanguage: l) } }
     }
 }
 

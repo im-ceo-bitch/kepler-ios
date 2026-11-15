@@ -6,6 +6,7 @@ struct BookingsHomeView: View {
     private enum BookingPanel: String, CaseIterable, Identifiable {
         case booking
         case status
+        case package
         case schedule
         var id: String { rawValue }
     }
@@ -21,6 +22,7 @@ struct BookingsHomeView: View {
     @State private var showZiyarats = false
     @State private var showCareRequestBuilder = false
     @State private var bookingPanel: BookingPanel = .booking
+    @State private var selectedBookingID: String?
     @State private var activeCheckout: IumrahCheckoutResponse?
     @State private var activeGuideProfile: IumrahPublicProfile?
 
@@ -40,7 +42,7 @@ struct BookingsHomeView: View {
     }
 
     private var activeSession: StoredBookingSession? {
-        activeSessions.first
+        bookings.sessions.first(where: { $0.id == selectedBookingID }) ?? activeSessions.first
     }
 
     private var bookingTabContent: some View {
@@ -50,7 +52,7 @@ struct BookingsHomeView: View {
         }
     }
     private var bookingScrollRoot: AnyView {
-        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : "bookings.schedule", header: {
+        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : bookingPanel == .package ? "bookings.active" : "bookings.schedule", header: {
             AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
         }, content: { AnyView(bookingTabContent) })
         .modifier(IumrahPrimaryTabScrollChrome()))
@@ -67,6 +69,7 @@ struct BookingsHomeView: View {
                 await loadActiveCheckout()
             }
         }
+        .task(id: activeSession?.id) { await loadActiveCheckout() }
         .task(id: activeSession?.guide?.id) {
             await loadActiveGuideProfile()
         }
@@ -93,15 +96,11 @@ struct BookingsHomeView: View {
         .navigationDestination(isPresented: $chrome.shouldStartFlightFirstBuilder) {
             FlightFirstPackageFlowView()
         }
-        .navigationDestination(isPresented: Binding(
-            get: { chrome.requestedBookingID != nil },
-            set: { if !$0 { chrome.requestedBookingID = nil } }
-        )) {
-            if let bookingID = chrome.requestedBookingID, bookings.booking(id: bookingID) != nil {
-                BookingDetailView(bookingID: bookingID)
-            } else {
-                EmptyView()
-            }
+        .onAppear { openRequestedPackage() }
+        .onChange(of: chrome.requestedBookingID) { _, _ in openRequestedPackage() }
+        .onChange(of: bookings.sessions) { _, _ in
+            if activeSession == nil { bookingPanel = .booking; selectedBookingID = nil }
+            openRequestedPackage()
         }
         .navigationDestination(isPresented: $showZiyarats) {
             ZiyaratJourneyView()
@@ -113,6 +112,14 @@ struct BookingsHomeView: View {
         }
     }
 
+    private func openRequestedPackage() {
+        guard chrome.currentTab == .booking, let id = chrome.requestedBookingID,
+              bookings.booking(id: id) != nil else { return }
+        selectedBookingID = id
+        bookingPanel = .package
+        chrome.requestedBookingID = nil
+    }
+
     private func refreshBookings() async {
         await bookings.refreshAll()
         await loadActiveCheckout()
@@ -122,40 +129,25 @@ struct BookingsHomeView: View {
 
     private func bookingPanelContent(_ session: StoredBookingSession) -> AnyView {
         switch bookingPanel {
-        case .booking: return AnyView(bookingProgress(session).padding(.bottom, 38))
+        case .booking: return AnyView(VStack(spacing: 24) { bookingProgress(session); tripManagement(session) }.padding(.bottom, 38))
         case .status: return AnyView(bookingStatusPanel(session))
+        case .package: return AnyView(BookingDetailView(bookingID: session.id, embedded: true).id(session.id))
         case .schedule: return AnyView(BookingItineraryCalendarView(bookingID: session.id,
             startDate: session.booking.input.startDate, endDate: session.booking.input.endDate,
             booking: session.booking, presentation: .fullScreen).padding(.bottom, 28))
         }
     }
     private func bookingStatusPanel(_ session: StoredBookingSession) -> some View {
-        VStack(spacing: 0) {
-
-                    bookingTimerOverview(session)
-                        .padding(.bottom, 28)
-
-                    bookingFulfillmentCenter(session, checkout: activeCheckout)
-                        .padding(.bottom, 34)
-
-                    if shouldShowTravelReadyFlights(session) {
-                        bookingStatusFlights(session)
-                            .padding(.bottom, 34)
-                    }
-
-                    tripPlanPreview(session)
-                        .padding(.bottom, 34)
-
-                    tripManagement(session)
-                        .padding(.bottom, activeSessions.count > 1 ? 36 : 12)
-                        }
+        VStack(spacing: 18) {
+            PilgrimCheckoutView(bookingID: session.id, presentation: .bookingStatus).id(session.id)
+        }
+        .padding(.bottom, 24)
     }
 
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 0) {
             LazyVStack(spacing: 0) {
-                bookingIdentity(session)
-                    .padding(.bottom, 18)
+                if bookingPanel == .booking { bookingIdentity(session).padding(.bottom, 18) }
 
                 bookingPanelContent(session)
 
@@ -174,12 +166,7 @@ struct BookingsHomeView: View {
                         .padding(.top, 8)
                 }
 
-                IumrahTelegramConnectCard(
-                    session: session,
-                    accountToken: account.bearerToken,
-                    style: .compact
-                )
-                .padding(.top, 28)
+
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 10)
@@ -243,15 +230,17 @@ struct BookingsHomeView: View {
         IumrahPrimaryTabHeader(
             title: localized("Бронирование", "Bookings", "Bronlar", "Бронлар"),
             footer: hasActiveBooking ? AnyView(
-                IumrahHeaderTripleTabs(
+                IumrahHeaderPills(
                     labels: [
                         localized("Статус брони", "Booking status", "Bron holati", "Брон ҳолати"),
                         localized("Документы", "Documents", "Hujjatlar", "Ҳужжатлар"),
+                        localized("Пакет Умры", "Umrah package", "Umra paketi", "Умра пакети"),
                         localized("Расписание", "Schedule", "Jadval", "Жадвал")
                     ],
-                    selection: bookingPanel == .booking ? 0 : (bookingPanel == .status ? 1 : 2),
+                    symbols: ["suitcase", "doc.text", "shippingbox", "calendar"],
+                    selection: bookingPanel == .booking ? 0 : (bookingPanel == .status ? 1 : (bookingPanel == .package ? 2 : 3)),
                     onSelect: { index in
-                        bookingPanel = index == 0 ? .booking : (index == 1 ? .status : .schedule)
+                        bookingPanel = index == 0 ? .booking : (index == 1 ? .status : (index == 2 ? .package : .schedule))
                     }
                 )
             ) : nil
@@ -313,7 +302,7 @@ struct BookingsHomeView: View {
                 IumrahBookingPassportsView(bookingID: session.id)
             } label: {
                 bookingActionCard(
-                    icon: "passport.fill",
+                    icon: "person.text.rectangle.fill",
                     role: .document,
                     title: localized("Прикрепить паспорт", "Attach passports", "Pasportlarni biriktirish", "Паспортларни бириктириш"),
                     body: passportsReady
@@ -1054,16 +1043,12 @@ struct BookingsHomeView: View {
 
     private func statusCardActions(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 10) {
-            NavigationLink {
-                PilgrimCheckoutView(bookingID: session.id, presentation: .screen)
-            } label: {
+            Button { selectedBookingID = session.id; bookingPanel = .status } label: {
                 statusCardButtonLabel(title: openStatusTitle, isPrimary: true)
             }
             .buttonStyle(.plain)
 
-            NavigationLink {
-                BookingDetailView(bookingID: session.id)
-            } label: {
+            Button { selectedBookingID = session.id; bookingPanel = .package } label: {
                 statusCardButtonLabel(title: openBookingTitle, isPrimary: false)
             }
             .buttonStyle(.plain)
@@ -1440,21 +1425,24 @@ struct BookingsHomeView: View {
             sectionHeader(title: manageSectionTitle, trailing: nil)
 
             VStack(spacing: 0) {
-                NavigationLink {
-                    BookingDetailView(bookingID: session.id)
-                } label: {
+                Button { selectedBookingID = session.id; bookingPanel = .package } label: {
                     managementRow(icon: "slider.horizontal.3", title: manageTitle, subtitle: manageSubtitle)
                 }
                 .buttonStyle(.plain)
 
                 managementDivider
 
-                NavigationLink {
-                    BookingChatView(bookingID: session.id)
-                } label: {
-                    managementRow(icon: "person.badge.plus", title: addPilgrimTitle, subtitle: addPilgrimSubtitle)
+                if bookings.canUseCareChat {
+                    NavigationLink {
+                        BookingChatView(bookingID: session.id)
+                    } label: {
+                        managementRow(icon: "person.badge.plus", title: addPilgrimTitle, subtitle: addPilgrimSubtitle)
+                    }.buttonStyle(.plain)
+                } else {
+                    Button { chrome.navigate(to: .care) } label: {
+                        managementRow(icon: "lock.fill", title: addPilgrimTitle, subtitle: localized("Свяжитесь с поддержкой", "Contact support", "Yordam bilan bog‘laning", "Ёрдам билан боғланинг"))
+                    }.buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 managementDivider
 
@@ -1479,6 +1467,9 @@ struct BookingsHomeView: View {
                 RoundedRectangle(cornerRadius: 25, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
             }
+            Button(role: .destructive) { pendingDeleteID = session.id } label: {
+                Label(L10n.text("booking_cancel_and_delete", settings.language), systemImage: "trash").font(.subheadline.weight(.semibold)).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            }.buttonStyle(.plain)
         }
     }
 
@@ -1526,9 +1517,7 @@ struct BookingsHomeView: View {
 
             VStack(spacing: 10) {
                 ForEach(activeSessions.filter { $0.id != bookingID }) { session in
-                    NavigationLink {
-                        BookingDetailView(bookingID: session.id)
-                    } label: {
+                    Button { selectedBookingID = session.id; bookingPanel = .package } label: {
                         compactBookingCard(session)
                     }
                     .buttonStyle(.plain)
@@ -1824,11 +1813,14 @@ struct BookingsHomeView: View {
             activeCheckout = nil
             return
         }
-        activeCheckout = try? await accountService.checkout(
+        let token = account.bearerToken
+        let result = try? await accountService.checkout(
             bookingID: session.id,
             bookingToken: session.accessToken,
-            accountToken: account.bearerToken
+            accountToken: token
         )
+        guard activeSession?.id == session.id, account.bearerToken == token else { return }
+        activeCheckout = result
     }
 
     @MainActor

@@ -22,7 +22,7 @@ struct CareHomeView: View {
         } ?? bookings.sessions.first
     }
 
-    private var chatAvailable: Bool { bookings.hasCareAccount || activeSession != nil }
+    private var chatAvailable: Bool { bookings.canUseCareChat }
 
     private var fixedHeader: some View {
         IumrahPrimaryTabHeader(
@@ -85,10 +85,8 @@ struct CareHomeView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
         .navigationDestination(isPresented: $showHeaderChat) {
-            if bookings.hasCareAccount {
+            if chatAvailable {
                 BookingChatView(bookingID: "account").id("account")
-            } else if let session = openedChatBookingID.flatMap({ bookings.booking(id: $0) }) ?? activeSession {
-                BookingChatView(bookingID: session.id).id(session.id)
             } else {
                 ContentUnavailableView("Чат будет доступен после бронирования", systemImage: "message")
             }
@@ -97,7 +95,10 @@ struct CareHomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: chrome.requestedChatBookingID) { _, _ in openRequestedChat() }
         .onAppear { openRequestedChat() }
-        .onChange(of: bookings.sessions) { _, _ in openRequestedChat() }
+        .onChange(of: bookings.sessions) { _, _ in
+            if !chatAvailable { showHeaderChat = false; openedChatBookingID = nil; chrome.requestedChatBookingID = nil }
+            else { openRequestedChat() }
+        }
         .onChange(of: showHeaderChat) { _, shown in if !shown { openedChatBookingID = nil } }
         .task {
             await refreshCare()
@@ -105,7 +106,7 @@ struct CareHomeView: View {
     }
 
     private func openRequestedChat() {
-        guard let id = chrome.requestedChatBookingID, (id == "account" && bookings.hasCareAccount) || bookings.booking(id: id) != nil else { return }
+        guard chatAvailable, let id = chrome.requestedChatBookingID, (id == "account" && bookings.canUseCareChat) || bookings.booking(id: id) != nil else { return }
         openedChatBookingID = id
         chrome.requestedChatBookingID = nil
         showHeaderChat = true
@@ -164,14 +165,12 @@ struct CareHomeView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                if bookings.hasCareAccount {
+                if bookings.canUseCareChat {
                     Label(tr("Your personal Care chat is available", "Ваш личный чат Care доступен", "Shaxsiy Care chatingiz mavjud", "Шахсий Care чатингиз мавжуд"), systemImage: "checkmark.circle")
                         .font(.system(size: 14.5, weight: .semibold, design: .rounded))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(13)
                         .background(neutralTileBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                } else if let activeSession {
-                    activeBookingContext(activeSession)
                 } else {
                     lockedChatNote
                 }
@@ -192,7 +191,7 @@ struct CareHomeView: View {
         HStack(alignment: .top, spacing: 9) {
             if chatAvailable {
                 NavigationLink {
-                    BookingChatView(bookingID: bookings.hasCareAccount ? "account" : (activeSession?.id ?? "account"))
+                    BookingChatView(bookingID: bookings.canUseCareChat ? "account" : (activeSession?.id ?? "account"))
                 } label: {
                     careActionTile(
                         icon: "message.fill",
@@ -509,8 +508,8 @@ struct CareHomeView: View {
 
     private var telegramURL: URL? {
         let live = careProfile?.telegram.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let raw = live.isEmpty ? cachedTelegram.trimmingCharacters(in: .whitespacesAndNewlines) : live
-        guard !raw.isEmpty else { return nil }
+        let cached = cachedTelegram.trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = live.isEmpty ? (cached.isEmpty ? "@saudiclub966" : cached) : live
 
         if raw.lowercased().hasPrefix("http") {
             return URL(string: raw)

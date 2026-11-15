@@ -412,13 +412,14 @@ struct NuiteeHotelListingCard: View {
     let favorite: Bool
     let onOpen: () -> Void
     let onFavorite: () -> Void
+    @State private var additionalPhotos: [String] = []
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width * 0.43
             HStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    NuiteeCatalogPreviewCollage(hotel: hotel)
+                    NuiteeCatalogPreviewCollage(hotel: hotel, additionalPhotos: additionalPhotos)
                         .frame(width: width, height: 232)
                     HStack(spacing: 5) {
                         Button(action: onFavorite) {
@@ -488,6 +489,14 @@ struct NuiteeHotelListingCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .onTapGesture(perform: onOpen)
+        .task(id: hotel.id) {
+            additionalPhotos = []
+            let existing = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 })
+            guard existing.count < 3 else { return }
+            let result = await NuiteePreviewPhotoLoader.shared.photos(hotelID: hotel.id)
+            guard !Task.isCancelled else { return }
+            additionalPhotos = result
+        }
     }
 }
 
@@ -550,16 +559,21 @@ struct NuiteeHotelDetailView: View {
     @State private var showSaveConfirmation = false
     @State private var chosenOffer: NuiteeRoomRate?
     @State private var expandedRoomRate: NuiteeRoomRate?
+    @State private var galleryScrollToRooms = false
     private let service = NuiteeHotelService()
 
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
     private var reloadID: String { "\(hotel.id):\(checkin.timeIntervalSince1970):\(nights):\(adults):\(settings.language.rawValue)" }
     private var photos: [String] {
-        let list = detail?.images ?? []
-        return list.isEmpty ? [hotel.coverImageURL].compactMap { $0 } : list
+        let hotelPhotos = detail?.images ?? []
+        let roomPhotos = detail?.rooms.flatMap(\.images) ?? []
+        let preview = hotel.previewImages ?? []
+        let cover = [hotel.coverImageURL].compactMap { $0 }
+        return IumrahHotelPhotoIdentity.unique(hotelPhotos + roomPhotos + preview + cover)
     }
 
     var body: some View {
+        ScrollViewReader { scrollProxy in
         ScrollView(showsIndicators: false) {
             LazyVStack(alignment: .leading, spacing: 24) {
                 collage
@@ -608,7 +622,7 @@ struct NuiteeHotelDetailView: View {
                 }
                 IumrahHotelReviewsSection(hotelID: hotel.id, rating: detail?.rating ?? hotel.rating,
                                           reviewCount: detail?.reviewCount ?? hotel.reviewCount)
-                sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language))
+                sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language)).id("nuitee.rooms")
                 if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
                 else if ratesError != nil {
                     Label(NuiteeCopy.text("Не удалось загрузить цены", "Narxlarni yuklab bo‘lmadi", "Could not load prices", settings.language), systemImage: "exclamationmark.circle")
@@ -623,7 +637,6 @@ struct NuiteeHotelDetailView: View {
                     }
                     ForEach(rates) { rate in
                         rateCard(rate)
-                        rateSelectionButton(rate)
                     }
                 }
                 cancellationAndPrivacy
@@ -661,6 +674,10 @@ struct NuiteeHotelDetailView: View {
             .padding(.top, 14)
             .padding(.bottom, 70)
         }
+        .onChange(of: galleryScrollToRooms) { _, value in
+            if value { withAnimation(.snappy) { scrollProxy.scrollTo("nuitee.rooms", anchor: .top) }; galleryScrollToRooms = false }
+        }
+        }
         .background(Color.iumrahPageBackground.ignoresSafeArea())
         .navigationTitle(hotel.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -680,7 +697,7 @@ struct NuiteeHotelDetailView: View {
         .task(id: settings.language.rawValue) { await refreshDetail() }
         .task(id: reloadID) { await refreshRates() }
         .fullScreenCover(isPresented: $isGalleryPresented) {
-            NuiteeHotelGallery(images: photos, hotelName: hotel.name)
+            NuiteeHotelGallery(images: photos, hotelName: hotel.name, rooms: detail?.rooms ?? [], onChooseRooms: { isGalleryPresented = false; galleryScrollToRooms = true })
         }
         .navigationDestination(item: $expandedRoomRate) { rate in
             NuiteeRoomDetailsPage(
@@ -810,7 +827,7 @@ struct NuiteeHotelDetailView: View {
                 }.font(.subheadline.weight(.semibold)).padding(.vertical, 8)
             }
             .buttonStyle(.plain)
-
+            rateSelectionButton(rate)
         }
         .padding(16)
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
@@ -818,7 +835,7 @@ struct NuiteeHotelDetailView: View {
 
     private func rateSelectionButton(_ rate: NuiteeRoomRate) -> some View {
             Button { saveRate(rate) } label: {
-                Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
+                Text(NuiteeCopy.text("Добавить в пакет Умры", "Umra paketiga qo‘shish", "Add to Umrah package", settings.language))
                     .font(.subheadline.weight(.bold))
                     .frame(maxWidth: .infinity).frame(height: 48)
             }
@@ -928,42 +945,119 @@ struct NuiteeHotelDetailView: View {
 
 private struct NuiteeHotelGallery: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: AppSettingsStore
     let images: [String]
     let hotelName: String
-    @State private var index = 0
+    var rooms: [NuiteeRoomDescription] = []
+    var onChooseRooms: (() -> Void)? = nil
+    @State private var selection = "all"
+    @State private var viewer: PhotoSelection?
+    private struct PhotoSelection: Identifiable { let id = UUID(); let index: Int }
+    private struct Album: Identifiable { let id: String; let title: String; let images: [String] }
+    private var albums: [Album] {
+        [Album(id: "all", title: NuiteeCopy.text("Все фотографии", "Barcha suratlar", "All photos", settings.language), images: IumrahHotelPhotoIdentity.unique(images + rooms.flatMap(\.images)))] + rooms.filter { !$0.images.isEmpty }.map { Album(id: $0.id, title: $0.name, images: IumrahHotelPhotoIdentity.unique($0.images)) }
+    }
+    private var current: [String] { (albums.first(where: { $0.id == selection }) ?? albums[0]).images }
     var body: some View {
         NavigationStack {
-            TabView(selection: $index) {
-                ForEach(images.indices, id: \.self) { i in
-                    HotelCachedImage(rawURL: images[i], contentMode: .fit)
-                        .background(.black)
-                        .tag(i)
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(albums) { album in
+                                Button { selection = album.id } label: {
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        HotelCachedImage(rawURL: album.images.first, thumbnailPixelDimension: 320)
+                                            .frame(width: 108, height: 82).clipped().clipShape(RoundedRectangle(cornerRadius: 9))
+                                        Text(album.title).font(.caption.weight(.semibold)).lineLimit(2).frame(width: 108, alignment: .leading)
+                                        Text("\(album.images.count)").font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                    .padding(8).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 15))
+                                    .overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(selection == album.id ? Color.primary : Color.clear, lineWidth: 2))
+                                }.buttonStyle(.plain).accessibilityAddTraits(selection == album.id ? .isSelected : [])
+                            }
+                        }.padding(2)
+                    }
+                    Text("\(current.count) · " + (albums.first(where: { $0.id == selection })?.title ?? "")).font(.headline)
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+                        ForEach(current.indices, id: \.self) { index in
+                            Button { viewer = PhotoSelection(index: index) } label: {
+                                Color.clear.aspectRatio(1, contentMode: .fit).overlay {
+                                    HotelCachedImage(rawURL: current[index], thumbnailPixelDimension: 640)
+                                }.clipped().clipShape(RoundedRectangle(cornerRadius: 10))
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }.padding(16)
             }
-            .tabViewStyle(.page(indexDisplayMode: .automatic))
-            .background(.black)
-            .navigationTitle(hotelName)
+            .background(Color.iumrahPageBackground)
+            .navigationTitle(NuiteeCopy.text("Фотографии", "Suratlar", "Photos", settings.language))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Готово") { dismiss() }
+            .toolbarBackground(Color.iumrahSignatureBlack, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Image(systemName: "xmark") } }; ToolbarItem(placement: .topBarTrailing) { ShareLink(item: hotelName) { Image(systemName: "square.and.arrow.up") } } }
+            .safeAreaInset(edge: .bottom) {
+                if let onChooseRooms {
+                    Button(action: onChooseRooms) { Text(NuiteeCopy.text("Выбрать номера", "Xonalarni tanlash", "Choose rooms", settings.language)).font(.headline).frame(maxWidth: .infinity).frame(height: 50) }
+                        .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground).padding(16).background(.regularMaterial)
                 }
             }
-            .overlay(alignment: .bottom) {
-                Text("\(index + 1) / \(images.count)")
-                    .font(.caption.weight(.semibold)).foregroundStyle(.white)
-                    .padding().background(.black.opacity(0.45), in: Capsule()).padding(.bottom, 22)
-            }
+            .fullScreenCover(item: $viewer) { value in NuiteePhotoViewer(images: current, initialIndex: value.index) }
         }
     }
 }
 
-// Catalogue rows use only already returned media. Full hotel details and photo
-// galleries are fetched when the user opens the hotel, not while scrolling.
+private struct NuiteePhotoViewer: View {
+    @Environment(\.dismiss) private var dismiss
+    let images: [String]
+    @State private var index: Int
+    init(images: [String], initialIndex: Int) { self.images = images; _index = State(initialValue: initialIndex) }
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            TabView(selection: $index) {
+                ForEach(images.indices, id: \.self) { i in
+                    HotelCachedImage(rawURL: images[i], contentMode: .fit).tag(i)
+                }
+            }.tabViewStyle(.page(indexDisplayMode: .never))
+            Button { dismiss() } label: { Image(systemName: "xmark").font(.headline).padding(14).foregroundStyle(.white).background(.white.opacity(0.18), in: Circle()) }.padding()
+        }.overlay(alignment: .bottom) { Text("\(index + 1) / \(images.count)").foregroundStyle(.white).padding() }
+    }
+}
+
+// Only missing catalogue media triggers a bounded, shared hotel-detail request.
+private actor NuiteePreviewPhotoLoader {
+    static let shared = NuiteePreviewPhotoLoader()
+    private var cache: [String: [String]] = [:]
+    private var inFlight: [String: Task<[String], Never>] = [:]
+    func photos(hotelID: String) async -> [String] {
+        if let cached = cache[hotelID] { return cached }
+        if let pending = inFlight[hotelID] { return await pending.value }
+        while inFlight.count >= 3 {
+            try? await Task.sleep(for: .milliseconds(180))
+            if Task.isCancelled { return [] }
+            if let cached = cache[hotelID] { return cached }
+            if let pending = inFlight[hotelID] { return await pending.value }
+        }
+        guard !Task.isCancelled else { return [] }
+        let task = Task<[String], Never> {
+            guard let detail = try? await NuiteeHotelService().detail(hotelID: hotelID) else { return [] }
+            return Array(IumrahHotelPhotoIdentity.unique(detail.images + detail.rooms.flatMap(\.images)).prefix(3))
+        }
+        inFlight[hotelID] = task
+        let result = await task.value
+        inFlight[hotelID] = nil
+        if !result.isEmpty { cache[hotelID] = result }
+        return result
+    }
+}
+
 private struct NuiteeCatalogPreviewCollage: View {
     let hotel: NuiteeHotel
+    var additionalPhotos: [String] = []
     var body: some View {
-        let source = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 })
+        let source = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 } + additionalPhotos)
         NuiteeHotelCollage(images: Array(source.prefix(3)))
     }
 }
@@ -971,27 +1065,28 @@ private struct NuiteeCatalogPreviewCollage: View {
 private struct NuiteeRoomPhotoCarousel: View {
     let images: [String]
     let height: CGFloat
-    @State private var selected = 0
+    @State private var showGallery = false
+    private var photos: [String] { IumrahHotelPhotoIdentity.unique(images) }
     var body: some View {
-        Group {
-            if !images.isEmpty {
-                TabView(selection: $selected) {
-                    ForEach(images.indices, id: \.self) { index in
-                        HotelCachedImage(rawURL: images[index])
-                            .tag(index)
+        if !photos.isEmpty {
+            Button { showGallery = true } label: {
+                GeometryReader { proxy in
+                    HStack(spacing: 3) {
+                        HotelCachedImage(rawURL: photos[0]).frame(width: photos.count > 1 ? proxy.size.width * 0.64 : proxy.size.width, height: height).clipped()
+                        if photos.count > 1 {
+                            VStack(spacing: 3) {
+                                HotelCachedImage(rawURL: photos[1]).frame(height: photos.count > 2 ? (height - 3) / 2 : height).clipped()
+                                if photos.count > 2 {
+                                    HotelCachedImage(rawURL: photos[2]).frame(height: (height - 3) / 2).clipped().overlay {
+                                        if photos.count > 3 { Color.black.opacity(0.45); Text("+\(photos.count - 3)").font(.title3.bold()).foregroundStyle(.white) }
+                                    }
+                                }
+                            }.frame(width: max(1, proxy.size.width * 0.36 - 3))
+                        }
                     }
-                }
-                .tabViewStyle(.page(indexDisplayMode: images.count > 1 ? .always : .never))
-                .frame(height: height)
-                .clipShape(RoundedRectangle(cornerRadius: 17))
-                .overlay(alignment: .topTrailing) {
-                    Text("\(selected + 1)/\(images.count)")
-                        .font(.caption2.weight(.semibold))
-                        .padding(8)
-                        .background(.regularMaterial, in: Capsule())
-                        .padding(9)
-                }
-            }
+                }.frame(height: height).clipShape(RoundedRectangle(cornerRadius: 17))
+            }.buttonStyle(.plain)
+            .fullScreenCover(isPresented: $showGallery) { NuiteeHotelGallery(images: photos, hotelName: "") }
         }
     }
 }
@@ -1052,7 +1147,7 @@ private struct NuiteeRoomDetailsPage: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button(action: onAdd) {
-                    Text(NuiteeCopy.text("Добавить в план умры", "Umra rejasiga qo‘shish", "Add to Umrah plan", settings.language))
+                    Text(NuiteeCopy.text("Добавить в пакет Умры", "Umra paketiga qo‘shish", "Add to Umrah package", settings.language))
                         .frame(maxWidth: .infinity).frame(height: 48)
                 }
                 .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)

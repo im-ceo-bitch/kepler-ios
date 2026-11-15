@@ -58,7 +58,7 @@ struct LegacyFinalPackageView: View {
         guard journey.hasFinalGeneratorQuote, !isCalculatingPrice, let quote = journey.quote else {
             return isCalculatingPrice ? tr("Расчёт…", "Calculating…", "Hisoblanmoqda…", "Ҳисобланмоқда…") : "—"
         }
-        return money(quote.totalPackagePrice, quote.currency)
+        return IumrahPackageDisplayPrices.money(quote.totalPackagePrice, currency: quote.currency, language: settings.language)
     }
     private var partyText: String {
         tr("\(journey.trip.adults) взр. · \(journey.trip.children) дет. · \(journey.trip.infants) млад. · \(journey.trip.rooms) ном.",
@@ -87,10 +87,20 @@ struct LegacyFinalPackageView: View {
                             if !journey.hasFinalGeneratorQuote { pricingStatus }
                             Text(tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")).font(.title2.bold())
                             if let outbound = journey.selectedOutbound {
-                                PackageFlightLegDetailCard(leg: flightLeg(outbound), direction: tr("Туда", "Outbound", "Borish", "Бориш"), language: settings.language)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    PackageFlightLegDetailCard(leg: flightLeg(outbound), direction: tr("Туда", "Outbound", "Borish", "Бориш"), language: settings.language)
+                                    IumrahPackageFlightPriceLine(offer: outbound, outbound: journey.selectedOutbound,
+                                        inbound: journey.trip.isRoundTripFlight ? journey.selectedInbound : nil,
+                                        travelers: journey.trip.travelerCount, language: settings.language)
+                                }
                             }
                             if journey.trip.isRoundTripFlight, let inbound = journey.selectedInbound {
-                                PackageFlightLegDetailCard(leg: flightLeg(inbound), direction: tr("Обратно", "Return", "Qaytish", "Қайтиш"), language: settings.language)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    PackageFlightLegDetailCard(leg: flightLeg(inbound), direction: tr("Обратно", "Return", "Qaytish", "Қайтиш"), language: settings.language)
+                                    IumrahPackageFlightPriceLine(offer: inbound, outbound: journey.selectedOutbound,
+                                        inbound: journey.trip.isRoundTripFlight ? journey.selectedInbound : nil,
+                                        travelers: journey.trip.travelerCount, language: settings.language)
+                                }
                             }
                             Text(tr("Отели и номера", "Hotels and rooms", "Mehmonxonalar va xonalar", "Меҳмонхоналар ва хоналар")).font(.title2.bold())
                             if journey.usesLocalJourney {
@@ -217,7 +227,7 @@ struct LegacyFinalPackageView: View {
                 if needsMadinah && journey.haramainTrainSelected { Label(trainText, systemImage: "tram") }
                 if let quote = journey.quote, journey.hasFinalGeneratorQuote, !isCalculatingPrice {
                     Divider()
-                    Text(money(quote.pricePerPerson, quote.currency) + " · " + tr("на человека", "per traveler", "kishi uchun", "киши учун"))
+                    Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language) + " · " + tr("на одного паломника", "per pilgrim", "bir ziyoratchi uchun", "бир зиёратчи учун"))
                         .font(.subheadline.weight(.semibold))
                 }
             }
@@ -237,6 +247,10 @@ struct LegacyFinalPackageView: View {
                     stars: hotel.stars, coverImageURL: hotel.coverImageURL, nights: window.nights),
                 selectedRoomName: roomName(role), chooseRoomText: chooseRoomTitle,
                 language: settings.language, onOpen: { hotelForDetails = hotel })
+            if let catalog = hotel.price, catalog.isUsableForPackage, let nightly = catalog.nightlyUSD {
+                IumrahPackageUnitPriceLine(amount: Decimal(nightly), currency: "USD",
+                    caption: tr("Тариф каталога · за номер / ночь", "Catalog rate · per room / night", "Katalog tarifi · xona / tun", "Каталог тарифи · хона / тун"), language: settings.language)
+            }
         }
     }
     private var chooseRoomTitle: String { tr("Выбрать номер", "Choose room", "Xona tanlash", "Хона танлаш") }
@@ -262,6 +276,10 @@ struct LegacyFinalPackageView: View {
             }
             IumrahHotelStaySummary(checkin: room.checkin, checkout: room.checkout,
                 nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights)
+            if let nightly = IumrahPackageDisplayPrices.nightly(room) {
+                IumrahPackageUnitPriceLine(amount: nightly, currency: room.rate.currency,
+                    caption: tr("В среднем за номер / ночь", "Average per room / night", "Xona / tun uchun o‘rtacha", "Хона / тун учун ўртача"), language: settings.language)
+            }
             Button(tr("Изменить номер", "Change room", "Xonani o‘zgartirish", "Хонани ўзгартириш")) { localHotelForDetails = room }
                 .buttonStyle(IumrahSecondaryButtonStyle())
             Divider()
@@ -344,7 +362,7 @@ struct LegacyFinalPackageView: View {
     }
     private var ziyaratDetail: String {
         let included = FlowCopy.text(.included, settings.language)
-        return journey.trip.packageTier == .economy || journey.trip.packageTier == .standard ? included + " · $0" : included
+        return included
     }
     private var trainText: String {
         "\(journey.haramainTicketCount) · " + (journey.haramainFareClass == .business ? tr("Бизнес", "Business", "Biznes", "Бизнес") : tr("Стандарт", "Standard", "Standart", "Стандарт"))
@@ -381,6 +399,14 @@ struct LegacyFinalPackageView: View {
                 Text(tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Text(totalText).font(.title3.bold()).monospacedDigit()
+            }
+            if let quote = journey.quote, journey.hasFinalGeneratorQuote, !isCalculatingPrice {
+                HStack {
+                    Text(tr("На одного паломника", "Per pilgrim", "Bir ziyoratchi uchun", "Бир зиёратчи учун")).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language))
+                        .font(.subheadline.weight(.semibold)).monospacedDigit()
+                }
             }
             if let reason = bookingBlockedReason {
                 Text(reason).font(.caption).foregroundStyle(.secondary)
@@ -518,4 +544,94 @@ struct LegacyFinalPackageView: View {
 private enum ConfiguratorBookingError: LocalizedError {
     case priceChanged(String)
     var errorDescription: String? { if case .priceChanged(let message) = self { return message }; return nil }
+}
+
+
+/// Display-only fare normalization. Never used for package pricing or booking.
+/// A published round trip carries the same complete fare on both legs.
+enum IumrahPackageDisplayPrices {
+    struct FlightPrice {
+        let amount: Decimal
+        let currency: String
+        let average: Bool
+        let roundTrip: Bool
+    }
+
+    static func flight(_ offer: FlightOffer, outbound: FlightOffer?, inbound: FlightOffer?, travelers: Int) -> FlightPrice? {
+        guard let amount = offer.fareAmount, amount > 0,
+              NSDecimalNumber(decimal: amount).doubleValue.isFinite,
+              !offer.currency.isEmpty, let scope = offer.fareScope, scope != .unknown else { return nil }
+        var roundTrip = false
+        if let out = outbound, let back = inbound {
+            if let identity = out.providerItineraryID, !identity.isEmpty, identity == back.providerItineraryID,
+               !identity.hasPrefix("aviasales:pair:"), !identity.hasPrefix("mixed:") {
+                // No invented leg split: both cards describe one complete fare.
+                guard out.fareAmount == back.fareAmount, out.currency == back.currency,
+                      out.fareScope == back.fareScope, offer.direction == .inbound else { return nil }
+                roundTrip = true
+            } else if out.pairedLeg != nil || back.pairedLeg != nil {
+                // Inconsistent paired fare identity; do not disclose a misleading amount.
+                return nil
+            }
+        } else if offer.pairedLeg != nil || offer.providerItineraryID?.hasPrefix("aviasales:rt:") == true {
+            roundTrip = true
+        }
+        guard scope != .totalParty || travelers > 0 else { return nil }
+        return FlightPrice(amount: scope == .totalParty ? amount / Decimal(travelers) : amount,
+                           currency: offer.currency, average: scope == .totalParty, roundTrip: roundTrip)
+    }
+
+    static func nightly(_ room: LocalJourneyRoom) -> Decimal? {
+        guard room.checkout > room.checkin, room.rate.price.isFinite, room.rate.price > 0,
+              !room.rate.currency.isEmpty else { return nil }
+        let nights = TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights
+        return Decimal(room.rate.price) / Decimal(nights)
+    }
+
+    static func money(_ value: Decimal, currency: String, language: AppSettingsStore.Language) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: language.localeIdentifier)
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currency
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSDecimalNumber(decimal: value)) ?? "\(currency) \(value)"
+    }
+}
+
+struct IumrahPackageFlightPriceLine: View {
+    let offer: FlightOffer
+    let outbound: FlightOffer?
+    let inbound: FlightOffer?
+    let travelers: Int
+    let language: AppSettingsStore.Language
+
+    var body: some View {
+        if let fare = IumrahPackageDisplayPrices.flight(offer, outbound: outbound, inbound: inbound, travelers: travelers) {
+            let unit = fare.average
+                ? IumrahFlightCopy.text(language, "в среднем на паломника", "average per pilgrim", "ziyoratchiga o‘rtacha", "зиёратчига ўртача")
+                : IumrahFlightCopy.text(language, "на человека", "per person", "kishi uchun", "киши учун")
+            let direction = fare.roundTrip ? IumrahFlightCopy.text(language, "Туда и обратно", "Round trip", "Borish va qaytish", "Бориш ва қайтиш") + " · " : ""
+            IumrahPackageUnitPriceLine(amount: fare.amount, currency: fare.currency, caption: direction + unit, language: language)
+        }
+    }
+}
+
+struct IumrahPackageUnitPriceLine: View {
+    let amount: Decimal
+    let currency: String
+    let caption: String
+    let language: AppSettingsStore.Language
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(IumrahPackageDisplayPrices.money(amount, currency: currency, language: language))
+                .font(.title3.weight(.bold)).monospacedDigit()
+            Text(caption).font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .combine)
+    }
 }

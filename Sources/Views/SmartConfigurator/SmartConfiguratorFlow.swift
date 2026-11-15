@@ -361,8 +361,10 @@ struct SmartConfiguratorFlow: View {
                     Text("\(journey.trip.originCode) → \(journey.trip.outboundDestinationCode) · \(journey.trip.returnOriginCode) → \(journey.trip.originCode)").font(.headline)
                     Text(journey.trip.departureDate.formatted(date: .abbreviated, time: .omitted) + " — " + journey.trip.returnDate.formatted(date: .abbreviated, time: .omitted)).font(.subheadline)
                     Text(store.connecting ? t("Есть пересадка", "Includes a connection", "Ulanish reysi bor", "Уланиш рейси бор") : t("Прямые рейсы", "Nonstop flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар")).font(.subheadline.weight(.semibold))
-                    Text(NSDecimalNumber(decimal: quote.totalPackagePrice).doubleValue.formatted(.currency(code: quote.currency))).font(.largeTitle.bold())
+                    Text(IumrahPackageDisplayPrices.money(quote.totalPackagePrice, currency: quote.currency, language: settings.language)).font(.largeTitle.bold())
                     Text(t("Итого за всех путешественников", "Total for all travelers", "Barcha sayohatchilar uchun jami", "Барча саёҳатчилар учун жами")).font(.caption).foregroundStyle(.secondary)
+                    Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language) + " · " + t("на одного паломника", "per pilgrim", "bir ziyoratchi uchun", "бир зиёратчи учун"))
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                 }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
             }
             if let error = store.error {
@@ -408,6 +410,10 @@ struct SmartConfiguratorFlow: View {
                     Text(localFlightTime(flight.arrivalAt, airport: flight.destination)).fontWeight(.semibold)
                 }
             }.font(.caption).padding(.horizontal, 12)
+            IumrahPackageFlightPriceLine(offer: flight,
+                outbound: store.flightPreview.first { $0.direction == .outbound },
+                inbound: store.flightPreview.first { $0.direction == .inbound },
+                travelers: store.preferences.adults + store.preferences.childAges.count, language: settings.language)
             if let baggage = flight.baggage {
                 HStack(spacing: 14) {
                     if let checked = baggage.checked { Label("\(checked) kg", systemImage: "suitcase.rolling") }
@@ -441,6 +447,10 @@ struct SmartConfiguratorFlow: View {
             }
             Label(room.checkin.formatted(date: .abbreviated, time: .omitted) + " – " + room.checkout.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
                 .font(.subheadline).foregroundStyle(.secondary)
+            if let nightly = IumrahPackageDisplayPrices.nightly(room) {
+                IumrahPackageUnitPriceLine(amount: nightly, currency: room.rate.currency,
+                    caption: t("В среднем за номер / ночь", "Average per room / night", "Xona / tun uchun o‘rtacha", "Хона / тун учун ўртача"), language: settings.language)
+            }
             if store.result != nil && room.id.hasSuffix(":0") {
                 Button { replacementRequest = room.city; replacementRevision += 1 } label: {
                     HStack { Text(t("Подобрать другой отель", "Find another hotel", "Boshqa mehmonxona topish", "Бошқа меҳмонхона топиш")); Spacer(); if store.replacingCity == room.city { ProgressView() } else { glassIcon("arrow.clockwise", size: 30) } }
@@ -484,7 +494,12 @@ struct SmartConfiguratorFlow: View {
                 HStack {
                     Text(t("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")).font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Text(NSDecimalNumber(decimal: quote.totalPackagePrice).doubleValue.formatted(.currency(code: quote.currency))).font(.title3.bold()).monospacedDigit()
+                    Text(IumrahPackageDisplayPrices.money(quote.totalPackagePrice, currency: quote.currency, language: settings.language)).font(.title3.bold()).monospacedDigit()
+                }
+                HStack {
+                    Text(t("На одного паломника", "Per pilgrim", "Bir ziyoratchi uchun", "Бир зиёратчи учун")).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language)).font(.subheadline.weight(.semibold)).monospacedDigit()
                 }
             }
             Button {

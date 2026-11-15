@@ -78,6 +78,13 @@ enum IumrahOrbitV5Geometry {
         return 1 - reveal.expansion * (1 - space)
     }
 
+    /// Real selected services converge from the middle of the annulus.
+    static func assemblyPoint(index: Int, count: Int, rotation: Double, progress: Double) -> Point {
+        let angle = -Double.pi / 2 + Double(index) * tau / Double(max(1, count)) + rotation
+        let r = middleRadius * (1 - min(1, max(0, progress)))
+        return Point(x: 180 + r * cos(angle), y: 180 + r * sin(angle), angle: angle)
+    }
+
     static func huePosition(_ angle: Double) -> Double {
         let f = (angle + Double.pi / 2) / tau
         return f - floor(f)

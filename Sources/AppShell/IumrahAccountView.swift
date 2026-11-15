@@ -135,11 +135,12 @@ struct IumrahAccountView: View {
                         settingsSection
                         signOutButton
                     } else {
+                        guestOrbitHero
+                        loginCard
+                            .id("account-login")
                         IumrahLockedIdentityCard(language: settings.language) {
                             showIdentityUnlockSheet = true
                         }
-                        loginCard
-                            .id("account-login")
                         telegramIntegrationSection
                         paymentSecuritySection
                         guestSettingsSection
@@ -1268,6 +1269,48 @@ struct IumrahAccountView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .iumrahCard()
+    }
+
+    private var guestOrbitHero: some View {
+        VStack(spacing: 12) {
+            IumrahOrbitAdaptive(maxDiameter: 310, logo: Image("IumrahOrbitAccountLogo"),
+                               accessibilityTitle: "iumrah Account", isActive: chrome.currentTab == .account)
+                .accessibilityIdentifier("iumrah.orbit.account.v5")
+            Text(tr("One account for all iumrah services", "Один аккаунт для всех сервисов iumrah", "Barcha iumrah xizmatlari uchun bitta akkaunt", "Барча iumrah хизматлари учун битта аккаунт"))
+                .font(.system(size: 25, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(tr("Manage your trips, documents and bookings in one place.", "Управляйте поездками, документами и бронированиями в одном месте.", "Safarlar, hujjatlar va bronlarni bir joyda boshqaring.", "Сафарлар, ҳужжатлар ва бронларни бир жойда бошқаринг."))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Button {
+                guestAccountMode = .signIn
+                loginScrollNonce += 1
+            } label: {
+                Text(tr("Sign in", "Войти", "Kirish", "Кириш"))
+                    .font(.headline).frame(maxWidth: .infinity).frame(minHeight: 52)
+                    .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+                    .background(colorScheme == .dark ? Color.white : Color.black, in: RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("iumrah.account.orbit.signin")
+            Button {
+                guestAccountMode = .register
+                loginScrollNonce += 1
+            } label: {
+                Text(tr("Create account", "Создать аккаунт", "Akkaunt yaratish", "Аккаунт яратиш"))
+                    .font(.headline).frame(maxWidth: .infinity).frame(minHeight: 52)
+                    .foregroundStyle(Color.primary)
+                    .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.primary.opacity(0.18)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("iumrah.account.orbit.register")
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
         .iumrahCard()
     }
 

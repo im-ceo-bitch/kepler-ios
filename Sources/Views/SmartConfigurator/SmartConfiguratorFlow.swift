@@ -132,7 +132,8 @@ struct SmartConfiguratorFlow: View {
     private func orbitHeader(width: CGFloat) -> some View {
         let layout = largeOrbit ? AnyLayout(VStackLayout(alignment: .center, spacing: 6)) : AnyLayout(HStackLayout(alignment: .center, spacing: 12))
         return layout {
-            IumrahOrbitV5(diameter: largeOrbit ? min(330, max(200, width - 48)) : 128,
+            IumrahOrbitV5(services: store.result.map { IumrahOrbitV5Service.selectedForJourney($0) } ?? IumrahOrbitV5Service.showcase,
+                          diameter: largeOrbit ? min(330, max(200, width - 48)) : 128,
                           logo: Image("HeaderWordmarkLight"), logoWidthFraction: 0.38,
                           accessibilityTitle: "iumrah Smart", pinnedSymbol: step.symbol, mergeToCenter: step == .assembly && store.result != nil)
             VStack(alignment: largeOrbit ? .center : .leading, spacing: 9) {

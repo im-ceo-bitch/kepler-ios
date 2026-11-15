@@ -946,7 +946,10 @@ struct HomeDashboardView: View {
 
                 VStack(alignment: .leading, spacing: 15) {
                     HStack(spacing: 8) {
-                        IumrahOrbitIconRing(diameter: 44, lightOnDark: false)
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.75))
+                            .frame(width: 44, height: 44)
                             .accessibilityIdentifier("iumrah.orbit.home.configurator")
                         Label("Iumrah Configurator", systemImage: "slider.horizontal.3")
                             .font(.caption.weight(.bold))

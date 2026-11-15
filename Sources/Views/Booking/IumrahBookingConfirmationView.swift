@@ -99,9 +99,10 @@ struct IumrahBookingConfirmationView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(.black)
-            LoopingVideoView(resource: "iumrah-security-identity", gravity: .resizeAspect)
-                .allowsHitTesting(false)
-                .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
+            IumrahOrbitAdaptive(maxDiameter: 190, logo: Image("HeaderWordmarkDark"),
+                               lightOnDark: true, accessibilityTitle: "iumrah",
+                               pinnedSymbol: verificationProof != nil ? "checkmark.shield.fill" : (channel == .sms ? "iphone" : "envelope.fill"),
+                               isActive: activeField == nil)
         }
         .frame(height: 208)
         .accessibilityHidden(true)

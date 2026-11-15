@@ -1303,6 +1303,7 @@ struct StorefrontUmrahPackageDetailView: View {
             VStack(alignment: .leading, spacing: 22) {
                 packageHero
                 overviewCard
+                IumrahClientPackageMoment(services: orbitServices)
 
                 SectionHeader(flightsTitle, eyebrow: "iumrah Flights Scanner", subtitle: nil)
                 PackageFlightLegDetailCard(
@@ -1459,6 +1460,14 @@ struct StorefrontUmrahPackageDetailView: View {
         } message: {
             Text(firstCityQuestionBody)
         }
+    }
+
+    private var orbitServices: [IumrahOrbitV5Service] {
+        var result: [IumrahOrbitV5Service] = [.init(id: "flight", symbol: "airplane")]
+        if !displayPackageHotels.isEmpty { result.append(.init(id: "hotel", symbol: "building.2.fill")) }
+        if isPrepared && journey.transferSelectionConfirmed { result.append(.init(id: "transfer", symbol: "car.side.fill")) }
+        if isPrepared && journey.haramainTrainSelected { result.append(.init(id: "train", symbol: "tram.fill")) }
+        return result
     }
 
     private var packageHero: some View {

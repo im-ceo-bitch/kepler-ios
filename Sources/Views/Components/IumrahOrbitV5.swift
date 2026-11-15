@@ -79,12 +79,13 @@ struct IumrahOrbitV5: View {
     private var scale: CGFloat { side / 360 }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !shouldRun || (pinnedSymbol != nil && pinSettled) || mergeSettled)) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !shouldRun || (pinnedSymbol != nil && pinSettled && !mergeToCenter) || (mergeToCenter && mergeSettled))) { timeline in
             let time = elapsed + (resumedAt.map { max(0, timeline.date.timeIntervalSince($0)) } ?? 0)
             let motionTime = reduceMotion ? 0 : (frozenTime ?? time)
-            let merge = mergeToCenter ? (reduceMotion || mergeSettled ? 1.0 : IumrahOrbitV5Geometry.ease(mergeStarted.map { timeline.date.timeIntervalSince($0) / 1.15 } ?? 0)) : 0
+            let assemblyTime = mergeToCenter ? (reduceMotion || mergeSettled ? 1.0 : min(1, max(0, mergeStarted.map { timeline.date.timeIntervalSince($0) / 1.8 } ?? 0))) : 0
+            let merge = IumrahOrbitV5Geometry.ease((assemblyTime - 0.32) / 0.68)
             let rotation = IumrahOrbitV5Geometry.rotation(motionTime, duration: rotationDuration)
-            let reveal = pinnedSymbol != nil ? IumrahOrbitV5Geometry.pinnedReveal(
+            let reveal: IumrahOrbitV5Geometry.Reveal? = mergeToCenter ? nil : pinnedSymbol != nil ? IumrahOrbitV5Geometry.pinnedReveal(
                 rotation: rotation, expansion: reduceMotion || pinSettled ? 1 : IumrahOrbitV5Geometry.ease(timeline.date.timeIntervalSince(pinStarted) / 0.55)
             ) : (services.isEmpty ? nil : IumrahOrbitV5Geometry.reveal(
                 time: motionTime, rotation: rotation, duration: revealDuration, still: reduceMotion
@@ -95,7 +96,7 @@ struct IumrahOrbitV5: View {
                     for row in IumrahOrbitV5Geometry.radii.indices {
                         for dot in 0..<IumrahOrbitV5Geometry.pointsPerRing {
                             let p = IumrahOrbitV5Geometry.point(row: row, dot: dot, rotation: rotation)
-                            let v = IumrahOrbitV5Geometry.visibility(row: row, dot: dot, point: p, reveal: reveal)
+                            let v = IumrahOrbitV5Geometry.visibility(row: row, dot: dot, point: p, reveal: reveal) * (1 - 0.65 * IumrahOrbitV5Geometry.ease(assemblyTime / 0.28))
                             if v > 0.001 {
                                 let r = CGFloat(IumrahOrbitV5Geometry.dotRadii[row] * v * (1 - 0.8 * merge)) * scale
                                 let x = CGFloat(180 + (p.x - 180) * (1 - merge)) * scale
@@ -125,6 +126,27 @@ struct IumrahOrbitV5: View {
                         .accessibilityHidden(true)
                 }
 
+                if mergeToCenter && !services.isEmpty && assemblyTime < 1 && !reduceMotion {
+                    ForEach(Array(services.prefix(12).enumerated()), id: \.offset) { index, service in
+                        let point = IumrahOrbitV5Geometry.assemblyPoint(index: index, count: min(12, services.count), rotation: rotation, progress: merge)
+                        let appear = IumrahOrbitV5Geometry.ease(assemblyTime / 0.28)
+                        let disappear = 1 - IumrahOrbitV5Geometry.ease((merge - 0.58) / 0.42)
+                        let bubble = 2 * CGFloat(18 * appear * (1 - 0.55 * merge)) * scale
+                        Circle()
+                            .fill(Self.color(at: point.angle))
+                            .frame(width: bubble, height: bubble)
+                            .overlay {
+                                Image(systemName: service.symbol)
+                                    .font(.system(size: 21 * scale * CGFloat(1 - 0.55 * merge), weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .opacity(appear)
+                            }
+                            .opacity(appear * disappear)
+                            .position(x: CGFloat(point.x) * scale, y: CGFloat(point.y) * scale)
+                            .accessibilityHidden(true)
+                    }
+                }
+
                 logo
                     .renderingMode(.template)
                     .resizable()
@@ -146,7 +168,7 @@ struct IumrahOrbitV5: View {
             mergeSettled = false
             mergeStarted = mergeToCenter ? Date() : nil
             if mergeToCenter {
-                try? await Task.sleep(for: .milliseconds(1180))
+                try? await Task.sleep(for: .milliseconds(1820))
                 if !Task.isCancelled { mergeSettled = true }
             }
         }
@@ -210,16 +232,52 @@ struct IumrahOrbitV5: View {
     }
 }
 
-#Preview("Orbit V5 — Light") {
-    IumrahOrbitV5(diameter: 340)
-        .padding(12)
-        .background(Color.white)
-        .preferredColorScheme(.light)
+/// Responsive brand ring for cards and authentication screens.
+struct IumrahOrbitAdaptive: View {
+    let maxDiameter: CGFloat
+    let logo: Image
+    var services: [IumrahOrbitV5Service] = IumrahOrbitV5Service.showcase
+    var lightOnDark: Bool? = nil
+    var accessibilityTitle: String = "iumrah"
+    var pinnedSymbol: String? = nil
+    var isActive = true
+    var mergeToCenter = false
+
+    var body: some View {
+        GeometryReader { proxy in
+            IumrahOrbitV5(services: services, diameter: min(maxDiameter, proxy.size.width),
+                          isActive: isActive, lightOnDark: lightOnDark, logo: logo,
+                          accessibilityTitle: accessibilityTitle, pinnedSymbol: pinnedSymbol,
+                          mergeToCenter: mergeToCenter)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(height: maxDiameter)
+    }
 }
 
-#Preview("Orbit V5 — Dark") {
-    IumrahOrbitV5(diameter: 300, lightOnDark: true)
-        .padding(16)
-        .background(Color.black)
-        .preferredColorScheme(.dark)
+/// One-shot, visual-only assembly. Does not issue a quote or create a booking.
+struct IumrahOrbitAssemblyMoment: View {
+    let services: [IumrahOrbitV5Service]
+    let logo: Image
+    var maxDiameter: CGFloat = 220
+    var accessibilityTitle: String = "iumrah"
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var merging = false
+
+    var body: some View {
+        IumrahOrbitAdaptive(maxDiameter: maxDiameter, logo: logo, services: services,
+                           accessibilityTitle: accessibilityTitle, mergeToCenter: merging)
+            .task(id: services) {
+                merging = reduceMotion
+                guard !reduceMotion, !services.isEmpty else { return }
+                do { try await Task.sleep(for: .milliseconds(700)) } catch { return }
+                guard !Task.isCancelled else { return }
+                merging = true
+            }
+    }
+}
+
+#Preview("Orbit V5 — Light") {
+    IumrahOrbitV5(diameter: 340, logo: Image(systemName: "circle.hexagongrid.fill"))
+        .padding(12).background(Color.white).preferredColorScheme(.light)
 }

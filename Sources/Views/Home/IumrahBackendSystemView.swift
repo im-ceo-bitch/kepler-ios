@@ -256,13 +256,8 @@ struct IumrahBackendSystemHomeCard: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
 
-                IumrahOrbitIconRing(
-                    mode: .showcase,
-                    diameter: 214,
-                    lightOnDark: true,
-                    rotationDuration: IumrahFoundation.Motion.orbitRevolution,
-                    revealDuration: 1.3
-                )
+                IumrahOrbitV5(diameter: 214, lightOnDark: true,
+                              logo: Image("HeaderWordmarkDark"), accessibilityTitle: "iumrah Configurator")
                 .frame(maxWidth: .infinity)
                 .frame(height: 220)
                 .padding(.horizontal, 2)

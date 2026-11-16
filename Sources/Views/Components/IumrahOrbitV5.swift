@@ -22,6 +22,8 @@ struct IumrahOrbitV5: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.iumrahTabIsActive) private var activeTab
+    @Environment(\.iumrahPerformanceProfile) private var performanceProfile
 
     var services: [IumrahOrbitV5Service] = IumrahOrbitV5Service.showcase
     var diameter: CGFloat = 320
@@ -72,14 +74,14 @@ struct IumrahOrbitV5: View {
     @State private var mergeSettled = false
 
     private var shouldRun: Bool {
-        visible && isActive && scenePhase == .active && !reduceMotion && !services.isEmpty
+        visible && isActive && activeTab && scenePhase == .active && !reduceMotion && !services.isEmpty
     }
     private var foreground: Color { (lightOnDark ?? (colorScheme == .dark)) ? .white : .black }
     private var side: CGFloat { max(1, diameter) }
     private var scale: CGFloat { side / 360 }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !shouldRun || (pinnedSymbol != nil && pinSettled && !mergeToCenter) || (mergeToCenter && mergeSettled))) { timeline in
+        TimelineView(.animation(minimumInterval: 1.0 / (diameter <= 160 ? performanceProfile.decorativeFPS : 60.0), paused: !shouldRun || (pinnedSymbol != nil && pinSettled && !mergeToCenter) || (mergeToCenter && mergeSettled))) { timeline in
             let time = elapsed + (resumedAt.map { max(0, timeline.date.timeIntervalSince($0)) } ?? 0)
             let motionTime = reduceMotion ? 0 : (frozenTime ?? time)
             let assemblyTime = mergeToCenter ? (reduceMotion || mergeSettled ? 1.0 : min(1, max(0, mergeStarted.map { timeline.date.timeIntervalSince($0) / 1.8 } ?? 0))) : 0

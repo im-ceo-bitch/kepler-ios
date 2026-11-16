@@ -16,6 +16,8 @@ struct BookingsHomeView: View {
     @EnvironmentObject private var chrome: AppChromeStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var account: IumrahAccountStore
+    @Environment(\.iumrahTabIsActive) private var activeTab
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var pendingDeleteID: String?
     @State private var deleteError: String?
@@ -23,10 +25,8 @@ struct BookingsHomeView: View {
     @State private var showCareRequestBuilder = false
     @State private var bookingPanel: BookingPanel = .booking
     @State private var selectedBookingID: String?
-    @State private var activeCheckout: IumrahCheckoutResponse?
     @State private var activeGuideProfile: IumrahPublicProfile?
 
-    private let accountService = IumrahAccountService()
     private let chatService = ChatService()
 
     private var activeSessions: [StoredBookingSession] {
@@ -52,24 +52,22 @@ struct BookingsHomeView: View {
         }
     }
     private var bookingScrollRoot: AnyView {
-        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : bookingPanel == .package ? "bookings.active" : "bookings.schedule", header: {
+        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : bookingPanel == .package ? "bookings.active" : "bookings.schedule", fixedRefreshHeader: true, header: {
             AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
         }, content: { AnyView(bookingTabContent) })
         .modifier(IumrahPrimaryTabScrollChrome()))
     }
     var body: some View {
         bookingScrollRoot
-        .task {
+        .task(id: activeTab && scenePhase == .active) {
+            guard activeTab, scenePhase == .active else { return }
             await bookings.refreshAll()
-            await loadActiveCheckout()
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
                 guard !Task.isCancelled else { break }
                 await bookings.refreshAll()
-                await loadActiveCheckout()
             }
         }
-        .task(id: activeSession?.id) { await loadActiveCheckout() }
         .task(id: activeSession?.guide?.id) {
             await loadActiveGuideProfile()
         }
@@ -120,9 +118,20 @@ struct BookingsHomeView: View {
         chrome.requestedBookingID = nil
     }
 
-    private func refreshBookings() async {
+    @MainActor private func refreshBookings() async {
+        let owner = account.bearerToken
+        let id = activeSession?.id
+        let panel = bookingPanel
         await bookings.refreshAll()
-        await loadActiveCheckout()
+        guard !Task.isCancelled, owner == account.bearerToken, let id, bookings.booking(id: id) != nil else { return }
+        switch panel {
+        case .status:
+            _ = try? await bookings.loadCheckout(id: id, token: owner, force: true)
+            if let owner { _ = try? await bookings.loadCheckoutFriends(id: id, token: owner, force: true) }
+        case .schedule:
+            _ = try? await bookings.loadItinerary(for: id, language: settings.language)
+        case .booking, .package: break
+        }
     }
 
     // MARK: - Active booking
@@ -1805,22 +1814,6 @@ struct BookingsHomeView: View {
     private func startNewTrip() {
         journey.resetAfterTripChange()
         chrome.startNewTrip()
-    }
-
-    @MainActor
-    private func loadActiveCheckout() async {
-        guard let session = activeSession else {
-            activeCheckout = nil
-            return
-        }
-        let token = account.bearerToken
-        let result = try? await accountService.checkout(
-            bookingID: session.id,
-            bookingToken: session.accessToken,
-            accountToken: token
-        )
-        guard activeSession?.id == session.id, account.bearerToken == token else { return }
-        activeCheckout = result
     }
 
     @MainActor

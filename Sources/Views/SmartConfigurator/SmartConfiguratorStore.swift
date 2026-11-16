@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-struct SmartConfiguratorPreferences: Hashable {
+struct SmartConfiguratorPreferences: Codable, Hashable {
     var origin = "TAS"
     var airport: Airport?
     var month: Date = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()

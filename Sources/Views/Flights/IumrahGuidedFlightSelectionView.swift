@@ -4,6 +4,7 @@ import SwiftUI
 /// All published and Data API rows are normalized into one visible list, then ranked.
 struct IumrahGuidedFlightSelectionView: View {
     @EnvironmentObject private var journey: JourneyStore
+    @EnvironmentObject private var account: IumrahAccountStore
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
 
@@ -611,6 +612,7 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private func loadFlights(preserveCalendar: Bool = false) async {
+        HomePersonalizationStore.shared.saveFlight(journey.trip, owner: HomePersonalizationStore.owner(account))
         let trace = IumrahPerformanceTrace.begin("Guided flight load")
         defer { IumrahPerformanceTrace.end("Guided flight load", trace) }
         visibleCount = 20

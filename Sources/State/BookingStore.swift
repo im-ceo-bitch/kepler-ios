@@ -39,10 +39,104 @@ final class BookingStore: ObservableObject {
     private var chatCursors: [String: String] = [:]
     private var chatScopeVersions: [String: String] = [:]
     var hasCareAccount: Bool { accountToken?.isEmpty == false }
+    // Home must never expose a cached booking from a different session while
+    // account restoration is still in progress.
+    func homeSessions(accountToken token: String?) -> [StoredBookingSession] {
+        guard let token, !token.isEmpty, accountToken == token else { return [] }
+        return sessions
+    }
     var canUseCareChat: Bool {
         hasCareAccount && sessions.contains { !["COMPLETED", "CANCELLED"].contains($0.effectiveStatus.uppercased()) }
     }
     private var bookingScopeGeneration = UUID()
+    private struct CheckoutCacheEntry {
+        let value: IumrahCheckoutResponse
+        let status: String
+        let accessToken: String
+        let date: Date
+    }
+    @Published private var checkoutCache: [String: CheckoutCacheEntry] = [:]
+    private struct CheckoutRequest {
+        let id: UUID
+        let status: String
+        let accessToken: String
+        let task: Task<IumrahCheckoutResponse, Error>
+    }
+    private var checkoutRequests: [String: CheckoutRequest] = [:]
+    private struct FriendsCacheEntry {
+        let value: IumrahFriendsBookingSummary
+        let accessToken: String
+        let date: Date
+    }
+    @Published private var checkoutFriendsCache: [String: FriendsCacheEntry] = [:]
+
+    // Private in-memory cache only. Every read is scoped to the current session.
+    func cachedCheckout(id: String, token: String?) -> IumrahCheckoutResponse? {
+        guard token == accountToken, let session = booking(id: id),
+              let entry = checkoutCache[id], entry.accessToken == session.accessToken else { return nil }
+        return entry.value
+    }
+
+    func loadCheckout(id: String, token: String?, force: Bool = false) async throws -> IumrahCheckoutResponse {
+        guard token == accountToken, let session = booking(id: id) else { throw APIError.missingBookingToken }
+        let status = session.effectiveStatus
+        let access = session.accessToken
+        let generation = bookingScopeGeneration
+        if !force, let entry = checkoutCache[id], entry.accessToken == access,
+           entry.status == status, Date().timeIntervalSince(entry.date) < 60 { return entry.value }
+        if let running = checkoutRequests[id], running.status == status, running.accessToken == access {
+            return try await running.task.value
+        }
+        checkoutRequests[id]?.task.cancel()
+        let requestID = UUID()
+        let service = accountService
+        let task = Task { @MainActor [weak self] () throws -> IumrahCheckoutResponse in
+            guard let self else { throw CancellationError() }
+            defer {
+                if self.checkoutRequests[id]?.id == requestID { self.checkoutRequests[id] = nil }
+            }
+            do {
+                let value = try await service.checkout(bookingID: id, bookingToken: access, accountToken: token)
+                guard !Task.isCancelled, self.bookingScopeGeneration == generation, self.accountToken == token,
+                      self.booking(id: id)?.accessToken == access, self.checkoutRequests[id]?.id == requestID else { throw CancellationError() }
+                self.checkoutCache[id] = CheckoutCacheEntry(value: value, status: status, accessToken: access, date: Date())
+                return value
+            } catch {
+                // Never retain a protected snapshot after authorization is rejected.
+                if self.bookingScopeGeneration == generation, self.checkoutRequests[id]?.id == requestID {
+                    switch error {
+                    case APIError.status(let code) where [401, 403, 404].contains(code): self.checkoutCache[id] = nil; self.checkoutFriendsCache[id] = nil
+                    case APIError.server(let code, _) where [401, 403, 404].contains(code): self.checkoutCache[id] = nil; self.checkoutFriendsCache[id] = nil
+                    default: break
+                    }
+                }
+                throw error
+            }
+        }
+        checkoutRequests[id] = CheckoutRequest(id: requestID, status: status, accessToken: access, task: task)
+        return try await task.value
+    }
+
+    func cachedCheckoutFriends(id: String, token: String?) -> IumrahFriendsBookingSummary? {
+        guard token != nil, token == accountToken, let session = booking(id: id),
+              let entry = checkoutFriendsCache[id], entry.accessToken == session.accessToken else { return nil }
+        return entry.value
+    }
+
+    func loadCheckoutFriends(id: String, token: String, force: Bool = false) async throws -> IumrahFriendsBookingSummary {
+        guard token == accountToken, let session = booking(id: id) else { throw APIError.missingBookingToken }
+        if !force, let entry = checkoutFriendsCache[id], entry.accessToken == session.accessToken,
+           Date().timeIntervalSince(entry.date) < 60 { return entry.value }
+        let generation = bookingScopeGeneration
+        var headers = ["Authorization": "Bearer \(token)"]
+        if !session.accessToken.isEmpty { headers["x-booking-token"] = session.accessToken }
+        let value = try await bookingService.friendsSummary(id: id, headers: headers)
+        guard !Task.isCancelled, generation == bookingScopeGeneration, token == accountToken,
+              booking(id: id)?.accessToken == session.accessToken else { throw CancellationError() }
+        checkoutFriendsCache[id] = FriendsCacheEntry(value: value, accessToken: session.accessToken, date: Date())
+        return value
+    }
+
     func careChatKey(for bookingID: String) -> String { hasCareAccount ? "account" : bookingID }
     private var chatLoads: [String: Task<[ChatMessage], Error>] = [:]
     private var chatAuthGeneration = UUID()
@@ -377,6 +471,10 @@ final class BookingStore: ObservableObject {
         let next = token?.trimmingCharacters(in: .whitespacesAndNewlines)
         if next != accountToken {
             bookingScopeGeneration = UUID()
+            for request in checkoutRequests.values { request.task.cancel() }
+            checkoutRequests.removeAll()
+            checkoutCache.removeAll()
+            checkoutFriendsCache.removeAll()
             if accountToken != nil {
                 sessions.removeAll()
                 itineraries.removeAll()
@@ -395,7 +493,7 @@ final class BookingStore: ObservableObject {
             // Disk caches are credential-scoped; remove on account transition to avoid retaining private chat history.
             if accountToken != nil { try? FileManager.default.removeItem(at: chatCacheDirectory) }
         }
-        accountToken = next
+        if accountToken != next { accountToken = next }
     }
 
     func restoreAccountTrips(token: String) async {
@@ -503,10 +601,11 @@ final class BookingStore: ObservableObject {
 
     func loadItinerary(for bookingID: String, language: AppSettingsStore.Language) async throws -> [BookingItineraryItem] {
         guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
+        let generation = bookingScopeGeneration
         let (items, _) = try await performWithClientAuthorization(for: session) { headers in
             try await bookingService.fetchItinerary(id: bookingID, headers: headers, language: language)
         }
-        guard booking(id: bookingID) != nil else { throw CancellationError() }
+        guard !Task.isCancelled, generation == bookingScopeGeneration, booking(id: bookingID)?.accessToken == session.accessToken else { throw CancellationError() }
         itineraries[bookingID] = items
         return items
     }
@@ -959,6 +1058,10 @@ final class BookingStore: ObservableObject {
         }
     }
     private func purgeLocalBooking(id: String) {
+        checkoutRequests[id]?.task.cancel()
+        checkoutRequests[id] = nil
+        checkoutCache[id] = nil
+        checkoutFriendsCache[id] = nil
         sessions.removeAll(where: { $0.id == id })
         chatLoads[id]?.cancel()
         chatLoads[id] = nil

@@ -31,6 +31,8 @@ struct PilgrimCheckoutView: View {
     @EnvironmentObject private var account: IumrahAccountStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.iumrahTabIsActive) private var activeTab
+    @Environment(\.scenePhase) private var scenePhase
 
     let bookingID: String
     let presentation: PilgrimCheckoutPresentation
@@ -40,7 +42,19 @@ struct PilgrimCheckoutView: View {
         self.presentation = presentation
     }
 
-    @State private var checkout: IumrahCheckoutResponse?
+    private var checkout: IumrahCheckoutResponse? {
+        bookings.cachedCheckout(id: bookingID, token: account.bearerToken)
+    }
+    private struct CheckoutTaskKey: Hashable {
+        let bookingID: String
+        let status: String?
+        let accountToken: String?
+        let accessToken: String?
+        let visible: Bool
+    }
+    private var checkoutTaskKey: CheckoutTaskKey {
+        .init(bookingID: bookingID, status: session?.effectiveStatus, accountToken: account.bearerToken, accessToken: session?.accessToken, visible: activeTab && scenePhase == .active)
+    }
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var activationMethod: IumrahActivationMethod = .email
@@ -70,7 +84,12 @@ struct PilgrimCheckoutView: View {
     @State private var paymeQRImage: UIImage?
     @State private var previewFile: IumrahPreviewFile?
     @State private var isLoadingDocument = false
-    @State private var friendsSummary: IumrahFriendsBookingSummary?
+    @State private var friendsSummaryLocal: IumrahFriendsBookingSummary?
+    @State private var friendsSummaryOwner: String?
+    private var friendsSummary: IumrahFriendsBookingSummary? {
+        guard accountMatchesTrip else { return nil }
+        return friendsSummaryOwner == account.bearerToken ? (bookings.cachedCheckoutFriends(id: bookingID, token: account.bearerToken) ?? friendsSummaryLocal) : bookings.cachedCheckoutFriends(id: bookingID, token: account.bearerToken)
+    }
     @State private var giftCode = ""
     @State private var isApplyingFriendBenefit = false
     @State private var confirmCreditAmount: Int? = nil
@@ -102,9 +121,14 @@ struct PilgrimCheckoutView: View {
                 embeddedStatusBody
             }
         }
-        .task { await loadCheckout() }
-        .onAppear {
-            if account.isAuthenticated { Task { await loadFriendsSummary() } }
+        .task(id: checkoutTaskKey) {
+            guard presentation == .bookingStatus, activeTab, scenePhase == .active else { return }
+            await loadCheckout()
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
+                guard !Task.isCancelled else { break }
+                await loadCheckout()
+            }
         }
         .sheet(item: $travelerEditor) { traveler in
             TravelerFormEditorSheet(
@@ -198,7 +222,7 @@ struct PilgrimCheckoutView: View {
 
     @ViewBuilder
     private func checkoutContent(includeProgress: Bool) -> some View {
-        if isLoading {
+        if isLoading && checkout == nil {
             loadingCard
         } else if let checkout {
             if accountMatchesTrip {
@@ -241,6 +265,9 @@ struct PilgrimCheckoutView: View {
                 .foregroundStyle(.red)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 4)
+            Button(tr("Retry", "Повторить", "Qayta urinish", "Қайта уриниш")) {
+                Task { await loadCheckout(showLoader: false) }
+            }.buttonStyle(.bordered)
         }
     }
 
@@ -1275,36 +1302,35 @@ struct PilgrimCheckoutView: View {
     }
 
     @MainActor
-    private func loadFriendsSummary() async {
-        guard let session, accountMatchesTrip else {
-            friendsSummary = nil
-            return
-        }
+    private func loadFriendsSummary(force: Bool = false) async {
+        guard accountMatchesTrip, let token = account.bearerToken else { return }
         do {
-            let headers = account.authorizationHeaders(bookingToken: session.accessToken)
-            friendsSummary = try await bookingService.friendsSummary(id: bookingID, headers: headers)
-        } catch APIError.status(let code) where code == 404 {
-            friendsSummary = nil
-        } catch APIError.server(_, let message) where message == "FRIENDS_UNAVAILABLE" {
-            friendsSummary = nil
+            let value = try await bookings.loadCheckoutFriends(id: bookingID, token: token, force: force)
+            guard !Task.isCancelled, account.bearerToken == token else { return }
+            friendsSummaryLocal = value
+            friendsSummaryOwner = token
         } catch {
-            // Friends is supplemental to checkout. Do not block payment if the service is temporarily unavailable.
+            // Supplemental benefit data never blocks checkout.
         }
     }
 
     @MainActor
     private func redeemFriendGift() async {
-        guard let session else { return }
+        guard let session, let token = account.bearerToken, accountMatchesTrip else { return }
         isApplyingFriendBenefit = true
         friendsMessage = nil
         defer { isApplyingFriendBenefit = false }
         do {
             let headers = account.authorizationHeaders(bookingToken: session.accessToken)
-            friendsSummary = try await bookingService.redeemFriendGift(
+            let result = try await bookingService.redeemFriendGift(
                 id: bookingID,
                 headers: headers,
                 code: normalizedGiftCode
             )
+            guard account.bearerToken == token, bookings.booking(id: bookingID) != nil else { return }
+            friendsSummaryLocal = result
+            friendsSummaryOwner = token
+            await loadCheckout(showLoader: false)
             giftCode = ""
             friendsMessage = tr("$100 Gift Card applied.", "Gift Card на $100 применён.", "$100 Gift Card qo‘llandi.", "$100 Gift Card қўлланди.")
             IumrahHaptics.success()
@@ -1319,17 +1345,20 @@ struct PilgrimCheckoutView: View {
 
     @MainActor
     private func applyFriendCredit(amountUsd: Int) async {
-        guard let session, accountMatchesTrip, !isApplyingFriendBenefit, !isUploadingReceipt else { return }
+        guard let session, let token = account.bearerToken, accountMatchesTrip, !isApplyingFriendBenefit, !isUploadingReceipt else { return }
         isApplyingFriendBenefit = true
         friendsMessage = nil
         defer { isApplyingFriendBenefit = false }
         do {
             let headers = account.authorizationHeaders(bookingToken: session.accessToken)
-            friendsSummary = try await bookingService.applyFriendCredit(
+            let result = try await bookingService.applyFriendCredit(
                 id: bookingID,
                 headers: headers,
                 amountUsd: amountUsd
             )
+            guard account.bearerToken == token, bookings.booking(id: bookingID) != nil else { return }
+            friendsSummaryLocal = result
+            friendsSummaryOwner = token
             await loadCheckout(showLoader: false)
             friendsMessage = tr("Iumrah Balance applied.", "Iumrah Balance применён.", "Iumrah Balance qo‘llandi.", "Iumrah Balance қўлланди.")
             IumrahHaptics.success()
@@ -1509,24 +1538,22 @@ struct PilgrimCheckoutView: View {
 
     @MainActor
     private func loadCheckout(showLoader: Bool = true) async {
-        guard let session else { return }
-        if showLoader { isLoading = true }
+        guard session != nil else { isLoading = false; return }
+        let token = account.bearerToken
+        let key = checkoutTaskKey
+        if showLoader && checkout == nil { isLoading = true }
         defer { isLoading = false }
         do {
-            let loaded = try await service.checkout(
-                bookingID: bookingID,
-                bookingToken: session.accessToken,
-                accountToken: account.bearerToken
-            )
-            guard bookings.booking(id: bookingID) != nil, !Task.isCancelled else { return }
-            checkout = loaded
+            let loaded = try await bookings.loadCheckout(id: bookingID, token: token, force: !showLoader)
+            guard checkoutTaskKey == key, !Task.isCancelled else { return }
             errorMessage = nil
             let options = paymentOptions(loaded)
-            if let first = options.first, !options.contains(paymentMethod) {
-                paymentMethod = first
+            if let first = options.first, !options.contains(paymentMethod) { paymentMethod = first }
+            if account.isAuthenticated && loaded.status.lowercased() == "payment_pending" {
+                await loadFriendsSummary(force: !showLoader)
             }
-            if account.isAuthenticated { await loadFriendsSummary() }
         } catch {
+            guard checkoutTaskKey == key, !Task.isCancelled, !(error is CancellationError) else { return }
             errorMessage = L10n.error(error, settings.language)
         }
     }

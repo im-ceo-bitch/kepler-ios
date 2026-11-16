@@ -11,11 +11,9 @@ struct IumrahBookingPassportsView: View {
 
     let bookingID: String
 
-    @State private var checkout: IumrahCheckoutResponse?
+    private var checkout: IumrahCheckoutResponse? { bookings.cachedCheckout(id: bookingID, token: account.bearerToken) }
     @State private var isLoading = true
     @State private var errorMessage: String?
-
-    private let service = IumrahAccountService()
 
     private var session: StoredBookingSession? { bookings.booking(id: bookingID) }
 
@@ -161,23 +159,20 @@ struct IumrahBookingPassportsView: View {
 
     @MainActor
     private func loadCheckout(showLoader: Bool) async {
-        guard let session else {
+        guard session != nil else {
             errorMessage = tr("Booking not found.", "Бронирование не найдено.", "Bron topilmadi.", "Брон топилмади.")
             isLoading = false
             return
         }
 
-        if showLoader { isLoading = true }
+        if showLoader && checkout == nil { isLoading = true }
         errorMessage = nil
         defer { isLoading = false }
 
         do {
-            checkout = try await service.checkout(
-                bookingID: bookingID,
-                bookingToken: session.accessToken,
-                accountToken: account.bearerToken
-            )
+            _ = try await bookings.loadCheckout(id: bookingID, token: account.bearerToken, force: !showLoader)
         } catch {
+            guard !Task.isCancelled, !(error is CancellationError) else { return }
             errorMessage = error.localizedDescription
         }
     }

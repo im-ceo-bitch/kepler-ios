@@ -16,7 +16,6 @@ private struct AccountRewardsCopy {
     var available: String { t("Available for your next trip", "Доступно для следующей поездки", "Keyingi safar uchun mavjud", "Кейинги сафар учун мавжуд") }
     var bonuses: String { t("Bonuses and rewards", "Бонусы и вознаграждения", "Bonuslar va mukofotlar", "Бонуслар ва мукофотлар") }
     var invite: String { t("Invite a friend", "Пригласить друга", "Do‘stni taklif qilish", "Дўстни таклиф қилиш") }
-    var giftCards: String { t("Existing Gift Cards", "Ваши Gift Cards", "Mavjud Gift Cards", "Мавжуд Gift Cards") }
 }
 
 private struct AccountRewardsGlassIcon: View {
@@ -82,22 +81,31 @@ private struct AccountRewardsCTA: View {
 
 struct IumrahAccountBalanceEntry: View {
     @EnvironmentObject private var account: IumrahAccountStore
+    @Environment(\.iumrahTabIsActive) private var activeTab
+    @State private var loadedAt: Date?
     @State private var dashboard: IumrahFriendsDashboard?
     @State private var dashboardOwner: String?
-    private var live: IumrahFriendsDashboard? { dashboardOwner == account.iumrahID && account.isAuthenticated ? dashboard : nil }
-    @MainActor private func reload() async {
-        guard let owner = account.iumrahID, account.isAuthenticated else { dashboard = nil; dashboardOwner = nil; return }
-        if dashboardOwner != owner { dashboard = nil; dashboardOwner = owner }
+    @State private var lastRefreshRevision = 0
+    private var live: IumrahFriendsDashboard? { dashboardOwner == account.bearerToken && account.isAuthenticated ? dashboard : nil }
+    @MainActor private func reload(force: Bool = false) async {
+        guard let owner = account.bearerToken, account.isAuthenticated else { dashboard = nil; dashboardOwner = nil; return }
+        if dashboardOwner != owner { dashboard = nil; dashboardOwner = owner; loadedAt = nil }
+        if !force, let loadedAt, Date().timeIntervalSince(loadedAt) < 60 { return }
         do {
             let data = try await account.rewardsDashboard()
-            guard !Task.isCancelled, account.iumrahID == owner, account.isAuthenticated else { return }
-            dashboard = data; dashboardOwner = owner
+            guard !Task.isCancelled, account.bearerToken == owner, account.isAuthenticated else { return }
+            if dashboard != data { dashboard = data }; dashboardOwner = owner; loadedAt = Date()
         } catch {
-            guard !Task.isCancelled, account.iumrahID == owner else { return }
-            dashboard = nil
+            guard !Task.isCancelled, account.bearerToken == owner else { return }
+            switch error {
+            case APIError.status(let code) where [401, 403].contains(code): dashboard = nil; loadedAt = nil
+            case APIError.server(let code, _) where [401, 403].contains(code): dashboard = nil; loadedAt = nil
+            default: break // Keep last verified value during a transient error.
+            }
         }
     }
     let language: AppSettingsStore.Language
+    var refreshRevision = 0
     private var c: AccountRewardsCopy { .init(language: language) }
     var body: some View {
         NavigationLink {
@@ -125,16 +133,21 @@ struct IumrahAccountBalanceEntry: View {
             .iumrahCard()
         }
         .buttonStyle(.plain)
-        .task(id: account.iumrahID) {
+        .task(id: "\(account.bearerToken ?? "")-\(activeTab)-\(refreshRevision)") {
+            guard activeTab else { return }
+            let force = lastRefreshRevision != refreshRevision
+            lastRefreshRevision = refreshRevision
+            await reload(force: force)
             while !Task.isCancelled && account.isAuthenticated {
                 await reload()
-                do { try await Task.sleep(for: .seconds(30)) } catch { break }
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
             }
         }
     }
 }
 
 struct IumrahAccountRewardsCarousel<Identity: View>: View {
+    @Environment(\.iumrahTabIsActive) private var activeTab
     let language: AppSettingsStore.Language
     @ViewBuilder let identity: Identity
     @State private var selected = 0
@@ -142,7 +155,7 @@ struct IumrahAccountRewardsCarousel<Identity: View>: View {
     var body: some View {
         VStack(spacing: 10) {
             TabView(selection: $selected) {
-                identity.padding(1).tag(0)
+                identity.environment(\.iumrahTabIsActive, activeTab && selected == 0).padding(1).tag(0)
                 NavigationLink {
                     IumrahRewardsVisualPage(language: language)
                 } label: {
@@ -209,10 +222,11 @@ struct IumrahAccountFriendsEntry: View {
             HStack(spacing: 14) {
                 AccountRewardsGlassIcon(symbol: "gift.fill", color: .purple, size: 50)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(c.t("Invite loved ones", "Пригласите близких", "Yaqinlaringizni taklif qiling", "Яқинларингизни таклиф қилинг"))
-                        .font(.system(.title3, design: .rounded, weight: .bold))
-                    Text(c.t("iumrah Friends · rewards for referrals", "iumrah Friends · вознаграждения за рекомендации", "iumrah Friends · tavsiyalar uchun mukofotlar", "iumrah Friends · тавсиялар учун мукофотлар"))
-                        .font(.subheadline).foregroundStyle(.secondary)
+                    Text("+$100").font(.system(.title2, design: .rounded, weight: .bold)).foregroundStyle(.green)
+                    Text(c.t("Invite a friend", "Пригласите друга", "Do‘stingizni taklif qiling", "Дўстингизни таклиф қилинг"))
+                        .font(.system(.headline, design: .rounded, weight: .bold))
+                    Text(c.t("After your friend pays for an eligible first Umrah", "После оплаты первой подходящей Умры другом", "Do‘stingiz birinchi mos Umrasini to‘lagach", "Дўстингиз биринчи мос Умрасини тўлагач"))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
                 Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
@@ -289,9 +303,6 @@ struct IumrahBalanceVisualPage: View {
             } else if live?.transactions != nil {
                 Text(c.t("No transactions yet", "Пока нет операций", "Hali amallar yo‘q", "Ҳали амаллар йўқ")).foregroundStyle(.secondary).iumrahCard()
             }
-            NavigationLink { IumrahGiftCardsView().toolbar(.visible, for: .navigationBar) } label: {
-                AccountRewardsCTA(title: c.giftCards)
-            }.buttonStyle(.plain)
         }
         .task(id: account.iumrahID) { await reload() }
         .refreshable { await reload() }
@@ -320,7 +331,7 @@ private struct IumrahCouponVisualPage: View {
                 Button {} label: {
                     AccountRewardsCTA(title: c.t("Apply coupon", "Применить купон", "Kuponni qo‘llash", "Купонни қўллаш"))
                 }.buttonStyle(.plain).disabled(true).opacity(0.4)
-                Text(c.t("Existing Gift Cards are applied during booking payment. New coupon redemption is not yet available.", "Действующие Gift Cards применяются при оплате бронирования. Новые купоны пока недоступны.", "Gift Cards bron to‘lovida qo‘llanadi.", "Gift Cards брон тўловида қўлланади.")).font(.footnote).foregroundStyle(.secondary)
+                Text(c.t("Previously issued codes can be used at booking payment. New coupon redemption is not yet available.", "Ранее выданные коды можно использовать при оплате бронирования. Новые купоны пока недоступны.", "Avval berilgan kodlardan bron to‘lovida foydalanish mumkin. Yangi kuponlar hali mavjud emas.", "Аввал берилган кодлардан брон тўловида фойдаланиш мумкин. Янги купонлар ҳали мавжуд эмас.")).font(.footnote).foregroundStyle(.secondary)
             }.iumrahCard()
         }
     }
@@ -423,7 +434,7 @@ struct IumrahFriendsVisualPage: View {
                 Text(c.t("A good journey starts with an invitation.", "Доброе путешествие начинается с приглашения.", "Yaxshi safar taklifdan boshlanadi.", "Яхши сафар таклифдан бошланади.")).font(.system(.title2, design: .rounded, weight: .bold)).multilineTextAlignment(.center)
                 Text(c.t("Invite loved ones and earn rewards after confirmed payment.", "Приглашайте близких и получайте вознаграждения после подтверждения оплаты.", "Yaqinlaringizni taklif qiling va to‘lov tasdiqlangach mukofot oling.", "Яқинларингизни таклиф қилинг ва тўлов тасдиқлангач мукофот олинг.")).font(.subheadline).foregroundStyle(.white.opacity(0.72)).multilineTextAlignment(.center)
                 if let link = live?.invitation?.url, let url = URL(string: link) {
-                    ShareLink(item: url) {
+                    ShareLink(item: url, message: Text(c.t("Join me on iumrah — organize your private Umrah.", "Приглашаю вас в iumrah — организуйте свою индивидуальную Умру.", "Sizni iumrah’ga taklif qilaman.", "Сизни iumrah’га таклиф қиламан."))) {
                         Text(c.invite).font(.system(.body, design: .rounded, weight: .semibold))
                             .foregroundStyle(.black).frame(maxWidth: .infinity, minHeight: 52)
                             .background(.white, in: RoundedRectangle(cornerRadius: 16))
@@ -448,7 +459,6 @@ struct IumrahFriendsVisualPage: View {
                 explanation("airplane", c.t("Your friend pays for an eligible trip", "Друг оплачивает подходящую поездку", "Do‘stingiz safar uchun to‘lov qiladi", "Дўстингиз сафар учун тўлов қилади"))
                 explanation("wallet.bifold.fill", c.t("Rewards appear in your balance", "Вознаграждение поступает на баланс", "Mukofot balansingizga tushadi", "Мукофот балансингизга тушади"))
             }.iumrahCard()
-            NavigationLink { IumrahGiftCardsView().toolbar(.visible, for: .navigationBar) } label: { AccountRewardsCTA(title: c.giftCards) }.buttonStyle(.plain)
         }
         .task(id: account.iumrahID) {
             while !Task.isCancelled && account.isAuthenticated {

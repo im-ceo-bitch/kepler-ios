@@ -8,7 +8,11 @@ struct HomeDashboardView: View {
     @EnvironmentObject private var journey: JourneyStore
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @State private var showZiyarats = false
-    @State private var showSmartConfigurator = false
+    private struct SmartPresentation: Identifiable {
+        let id = UUID()
+        let draft: HomeSmartDraft?
+    }
+    @State private var smartPresentation: SmartPresentation?
     @State private var showFlightsService = false
     @State private var showTransferService = false
     @State private var productsCarouselID: String? = "iumrah-system"
@@ -36,8 +40,8 @@ struct HomeDashboardView: View {
                     try? await Task.sleep(nanoseconds: 120_000_000_000)
                 }
             }
-            .fullScreenCover(isPresented: $showSmartConfigurator) {
-                SmartConfiguratorFlow { showSmartConfigurator = false }
+            .fullScreenCover(item: $smartPresentation) { presentation in
+                SmartConfiguratorFlow(resumeDraft: presentation.draft) { smartPresentation = nil }
             }
             .navigationDestination(isPresented: $showZiyarats) {
                 ZiyaratJourneyView()
@@ -71,6 +75,16 @@ struct HomeDashboardView: View {
                     IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
+                HomeRecentActivitySection(resumeSmart: { draft in
+                    smartPresentation = SmartPresentation(draft: draft)
+                }, repeatFlight: { trip in
+                    journey.resetAfterTripChange()
+                    journey.clearStagedUmrahFlights()
+                    journey.trip = trip
+                    journey.trip.saudiArrivalDate = nil
+                    journey.packageFlightPath = .publishedDirect
+                    showGuidedFlightSelection = true
+                })
                 if !clientNotifications.homeNotifications.isEmpty {
                     SystemNotificationsCarouselView(
                         notifications: Array(clientNotifications.homeNotifications.prefix(5)),
@@ -89,10 +103,14 @@ struct HomeDashboardView: View {
                     onZiyarats: { showZiyarats = true }
                 )
 
-                SmartConfiguratorHomeCard { showSmartConfigurator = true }
+                SmartConfiguratorHomeCard { startNewSmart() }
+                HomeDestinationsSection()
+                HomeAvailablePackagesSection(startSmart: { startNewSmart() })
                 JourneyTravelInfoView(showsPageSelector: true)
                 IumrahHomeAudienceSection(language: settings.language)
                 homeIntegrationsSection
+                HomeRewardsOffersSection()
+                HomeRecommendedHotelsSection()
 
                 VStack(alignment: .leading, spacing: 15) {
                     IumrahHomeSectionHeader(title: homeProductsTitle)
@@ -105,6 +123,7 @@ struct HomeDashboardView: View {
                 connectedTripCard
                 personalUmrahFAQ
                 homeAboutFooter
+                HomeWhyAndPreferencesSection()
             }
             // Same adaptive page-column rule as Account/Gear. Padding is part of
             // the column first; the outer frame then clamps the whole tree to the viewport.
@@ -127,6 +146,10 @@ struct HomeDashboardView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea())
     }
 
+
+    private func startNewSmart() {
+        smartPresentation = SmartPresentation(draft: nil)
+    }
 
     private func consumeHeaderBuildRequest() {
         guard chrome.shouldOpenUmrahPlan, chrome.currentTab == .home else { return }

@@ -152,6 +152,7 @@ struct IumrahPageHelpCard: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.iumrahHelpInHeader) private var headerMode
+    @AppStorage("iumrah.autoPageHelp") private var automaticPageHelp = true
     @State private var expanded = true
     let key: String
     var extraKey: String? = nil
@@ -178,6 +179,8 @@ struct IumrahPageHelpCard: View {
                 }
             }.foregroundStyle(Color.iumrahInk).padding(18)
                 .modifier(IumrahAnimatedSearchBorder(guidance: true))
+                .onAppear { expanded = automaticPageHelp }
+                .onChange(of: automaticPageHelp) { _, enabled in if !enabled { expanded = false } }
         }
     }
 }
@@ -188,6 +191,7 @@ struct IumrahHelpOverlayHost: ViewModifier {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @AppStorage("iumrah.autoPageHelp") private var automaticPageHelp = true
     @State private var context: IumrahHelpContext?
     @State private var showing = false
     @State private var automaticShown = false
@@ -232,7 +236,10 @@ struct IumrahHelpOverlayHost: ViewModifier {
             .onChange(of: enabled) { _, active in
                 automaticShown = false
                 dismiss()
-                if active && context != nil { automaticShown = true; present() }
+                if active && context != nil && automaticPageHelp { automaticShown = true; present() }
+            }
+            .onChange(of: automaticPageHelp) { _, enabled in
+                if !enabled { automaticShown = true; dismiss() }
             }
             .onDisappear { closeTask?.cancel(); showing = false; automaticShown = false }
     }
@@ -240,7 +247,7 @@ struct IumrahHelpOverlayHost: ViewModifier {
         let changed = context?.key != value?.key || context?.extraKey != value?.extraKey
         context = value
         guard enabled, value != nil else { dismiss(); return }
-        if !automaticShown || (changed && autoOnContextChange) {
+        if automaticPageHelp && (!automaticShown || (changed && autoOnContextChange)) {
             automaticShown = true
             present()
         } else if changed && showing {

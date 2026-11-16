@@ -15,6 +15,9 @@ struct AccountNotificationsView: View {
     }
 
     @State private var selectedPage: SignalPage = .signal
+    @ObservedObject private var push = PushNotificationManager.shared
+    @State private var pushTesting = false
+    @State private var pushTestResult: String?
 
     private static let isoFractionalFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -133,6 +136,7 @@ struct AccountNotificationsView: View {
     private var signalPage: some View {
         VStack(spacing: 22) {
             hero
+            if account.isAuthenticated { pushDiagnosticCard }
 
             if clientNotifications.inboxNotifications.isEmpty {
                 emptyState
@@ -156,6 +160,44 @@ struct AccountNotificationsView: View {
                 }
             }
         }
+    }
+
+    private var pushDiagnosticCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(tr("Push delivery", "Доставка push", "Push yetkazilishi", "Push етказилиши"), systemImage: "bell.badge")
+                .font(.headline)
+            Text(pushTestResult ?? tr("Test this device with Apple Push Notification service.", "Проверить доставку на это устройство через Apple APNs.", "Ushbu qurilmada pushni tekshiring.", "Ушбу қурилмада pushни текширинг."))
+                .font(.footnote).foregroundStyle(.secondary)
+            Button {
+                Task { @MainActor in
+                    guard !pushTesting, let owner = account.bearerToken else { return }
+                    pushTesting = true
+                    defer { pushTesting = false }
+                    await push.ensureAuthorizationForClientNotifications()
+                    guard push.isAuthorized else {
+                        pushTestResult = tr("Notifications are disabled in iOS.", "Уведомления выключены в iOS.", "iOS bildirishnomalari o‘chirilgan.", "iOS билдиришномалари ўчирилган.")
+                        return
+                    }
+                    for _ in 0..<20 {
+                        if push.deviceToken != nil { break }
+                        try? await Task.sleep(for: .milliseconds(250))
+                    }
+                    guard let device = push.deviceToken, owner == account.bearerToken else {
+                        pushTestResult = push.lastError ?? "APNs: DEVICE_NOT_REGISTERED"
+                        return
+                    }
+                    await clientNotifications.sync(deviceToken: device, accountToken: owner, hasTrip: !bookings.sessions.isEmpty, locale: settings.language.rawValue)
+                    guard owner == account.bearerToken else { return }
+                    do { pushTestResult = try await clientNotifications.testPush(accountToken: owner) }
+                    catch { pushTestResult = error.localizedDescription }
+                }
+            } label: {
+                HStack {
+                    if pushTesting { ProgressView() }
+                    Text(tr("Send test push", "Отправить тестовый push", "Sinov pushini yuborish", "Синов pushини юбориш"))
+                }.frame(maxWidth: .infinity)
+            }.buttonStyle(.bordered).disabled(pushTesting)
+        }.iumrahCard()
     }
 
     private var remindersPage: some View {

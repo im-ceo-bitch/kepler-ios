@@ -4,6 +4,7 @@ import SwiftUI
 /// deliberately isolated from any partially assembled manual configurator.
 struct SmartConfiguratorFlow: View {
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var account: IumrahAccountStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var store = SmartConfiguratorStore()
     @State private var step: Step = .welcome
@@ -13,7 +14,11 @@ struct SmartConfiguratorFlow: View {
     @State private var replacementRequest: String?
     @State private var replacementRevision = 0
     @State private var categoryScroll: String? = PackageTier.standard.rawValue
+    @State private var historyInitialized = false
+    @State private var historyOwner: String?
+    @State private var suppressHistory = false
     var firstLaunch: Bool = false
+    var resumeDraft: HomeSmartDraft? = nil
     let onExit: () -> Void
 
     private enum Step: Int, CaseIterable {
@@ -100,7 +105,27 @@ struct SmartConfiguratorFlow: View {
             }
         }
         .statusBarHidden(false)
-        .environment(\.smartBookingDone, onExit)
+        .environment(\.smartBookingDone, {
+            suppressHistory = true
+            HomePersonalizationStore.shared.saveSmart(nil, owner: historyOwner)
+            onExit()
+        })
+        .task {
+            guard !historyInitialized else { return }
+            historyOwner = HomePersonalizationStore.owner(account)
+            if let resumeDraft, HomePersonalizationStore.shared.enabled {
+                store.preferences = resumeDraft.preferences
+                let resumed = Step(rawValue: resumeDraft.step) ?? .origin
+                step = steps.contains(resumed) ? resumed : .route
+                categoryScroll = store.preferences.tier.rawValue
+                // A previously assembled package must get a fresh quote.
+                if step == .assembly { runID += 1 }
+            }
+            historyInitialized = true
+        }
+        .onChange(of: step) { _, _ in saveActivity() }
+        .onChange(of: store.preferences) { _, _ in saveActivity() }
+        .onChange(of: store.result != nil) { _, _ in saveActivity() }
         .onChange(of: showReview) { _, presented in if !presented { store.syncReview() } }
         .sheet(isPresented: $airportPicker) {
             AirportPickerView(selection: $store.preferences.airport, fallbackCode: $store.preferences.origin)
@@ -513,6 +538,12 @@ struct SmartConfiguratorFlow: View {
             }.buttonStyle(.plain).disabled(step == .assembly ? (store.busy || store.replacingCity != nil) : !canContinue).opacity((step == .assembly ? (store.busy || store.replacingCity != nil) : !canContinue) ? 0.45 : 1)
         }.padding(.horizontal, 20).padding(.vertical, 12).frame(maxWidth: 570).frame(maxWidth: .infinity)
             .background(Color(uiColor: .systemBackground))
+    }
+    private func saveActivity() {
+        guard historyInitialized, !suppressHistory, step != .welcome,
+              historyOwner == HomePersonalizationStore.owner(account) else { return }
+        HomePersonalizationStore.shared.saveSmart(.init(preferences: store.preferences, step: step.rawValue,
+            wasAssembled: store.result?.hasFinalGeneratorQuote == true), owner: historyOwner)
     }
     private func move(_ value: Step) {
         withAnimation(reduceMotion ? nil : .spring(response: 0.48, dampingFraction: 0.86)) { step = value }

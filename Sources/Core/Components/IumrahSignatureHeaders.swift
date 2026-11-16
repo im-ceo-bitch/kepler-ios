@@ -170,6 +170,8 @@ struct IumrahPrimaryTabHeader: View {
     var subtitle: String? = nil
     var footer: AnyView? = nil
     var discovery = false
+    var flexibleFooter = false
+    var animateMap = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -192,14 +194,15 @@ struct IumrahPrimaryTabHeader: View {
                     footer.padding(.top, max(0, (IumrahSignatureHeaderGeometry.contentHeight + 52 - IumrahSignatureHeaderGeometry.topInset - IumrahSignatureHeaderGeometry.logoHeight - 40 - 46) / 2))
                 } else { footer.padding(.top, 12) }
             }
-            Spacer(minLength: 0)
+            if !flexibleFooter { Spacer(minLength: 0) }
         }
         .foregroundStyle(.white)
         .padding(.top, IumrahSignatureHeaderGeometry.topInset)
+        .padding(.bottom, flexibleFooter ? 18 : 0)
         .frame(maxWidth: .infinity)
-        .frame(height: discovery ? IumrahSignatureHeaderGeometry.contentHeight + 52 : IumrahSignatureHeaderGeometry.contentHeight + (footer == nil ? 0 : 34), alignment: .top)
+        .frame(height: flexibleFooter ? nil : (discovery ? IumrahSignatureHeaderGeometry.contentHeight + 52 : IumrahSignatureHeaderGeometry.contentHeight + (footer == nil ? 0 : 34)), alignment: .top)
         .background {
-            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33, isAnimating: !discovery)
+            IumrahWorldDotsHeaderBackground(mapOpacity: 0.33, isAnimating: animateMap && !discovery)
                 .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: discovery ? IumrahSignatureHeaderGeometry.bottomRadius : 0, bottomTrailingRadius: discovery ? IumrahSignatureHeaderGeometry.bottomRadius : 0))
         }
         .accessibilityElement(children: .contain)

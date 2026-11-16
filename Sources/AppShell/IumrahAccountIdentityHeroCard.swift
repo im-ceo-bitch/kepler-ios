@@ -15,6 +15,9 @@ struct IumrahIdentityCardData: Hashable {
 /// living dome. Personal data lives on the back after the native-feeling flip.
 struct IumrahIdentityDomeCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.iumrahTabIsActive) private var activeTab
+    @State private var qrImage: UIImage?
+    @State private var qrValue: String?
 
     let data: IumrahIdentityCardData
     let language: AppSettingsStore.Language
@@ -55,6 +58,10 @@ struct IumrahIdentityDomeCard: View {
                 isFlipped.toggle()
             }
         }
+        .task(id: isFlipped ? (publicIdentityURL ?? fallbackPublicIdentityURL) : nil) {
+            guard isFlipped, let value = publicIdentityURL ?? fallbackPublicIdentityURL else { return }
+            if qrValue != value { qrImage = makeQRCode(value); qrValue = value }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isFlipped ? "\(data.displayName), iumrah ID \(normalizedID(data.iumrahID))" : "iumrah ID")
         .accessibilityHint(allowsFlip ? tapToFlip : "")
@@ -71,7 +78,7 @@ struct IumrahIdentityDomeCard: View {
     }
 
     private var frontFace: some View {
-        IumrahDecorativeTimeline(paused: isFlipped) { date in
+        IumrahDecorativeTimeline(maxFPS: 20, paused: isFlipped || !activeTab) { date in
             GeometryReader { proxy in
                 ZStack(alignment: .topLeading) {
                     cardBackground
@@ -206,7 +213,7 @@ struct IumrahIdentityDomeCard: View {
     @ViewBuilder
     private var publicIdentityQRCode: some View {
         if let value = publicIdentityURL ?? fallbackPublicIdentityURL,
-           let image = makeQRCode(value) {
+           qrValue == value, let image = qrImage {
             Image(uiImage: image)
                 .interpolation(.none)
                 .resizable()

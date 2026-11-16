@@ -5,11 +5,11 @@ enum IumrahReferralLink {
     static let consentKey = "iumrah.referral.consent"
     static func normalized(_ raw: String) -> String? {
         let code = raw.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        return code.range(of: "^IUMR-[A-F0-9]{24}$", options: .regularExpression) != nil ? code : nil
+        return code.range(of: "^(IUMR-[A-F0-9]{24}|[A-F0-9]{16})$", options: .regularExpression) != nil ? code : nil
     }
     static func capture(_ url: URL) -> Bool {
         let parts = url.pathComponents.filter { $0 != "/" }
-        let isWeb = url.scheme == "https" && ["iumrah.app", "iumrah-backend.helloiumrah.workers.dev"].contains(url.host ?? "") && parts.count == 2 && parts.first == "ref"
+        let isWeb = url.scheme == "https" && ["iumrah.app", "iumrah.uz", "go.iumrah.app", "go.iumrah.uz", "iumrah-backend.helloiumrah.workers.dev"].contains(url.host ?? "") && parts.count == 2 && ["ref", "r"].contains(parts.first ?? "")
         let isApp = url.scheme == "iumrahapp" && url.host == "referral" && parts.count == 1
         guard (isWeb || isApp), let raw = parts.last, let code = normalized(raw) else { return false }
         let defaults = UserDefaults.standard

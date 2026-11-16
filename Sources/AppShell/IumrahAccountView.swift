@@ -47,6 +47,10 @@ struct IumrahAccountView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.iumrahTabIsActive) private var activeTab
+    @AppStorage("iumrah.autoPageHelp") private var automaticPageHelp = true
+    @State private var identityLinkOwner: String?
+    @State private var identityLinkDate: Date?
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
     @ObservedObject private var push = PushNotificationManager.shared
 
@@ -105,28 +109,29 @@ struct IumrahAccountView: View {
     @State private var walletAlertMessage: String?
     @State private var identityPublicURL: String?
     @State private var identityCopyMessage: String?
+    @State private var balanceRefreshRevision = 0
     @State private var tripScope: IumrahAccountTripScope = .active
 
     var body: some View {
         ScrollViewReader { proxy in
-            IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, helpContext: account.account == nil ? "account.guest" : "account.signed_in", header: {
+            IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, helpContext: account.account == nil ? "account.guest" : "account.signed_in", fixedRefreshHeader: true, header: {
                 accountHeader
             }, content: {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
 
                     if let profile = account.account {
-                        userDataEntryCard(profile)
-                        IumrahAccountBalanceEntry(language: settings.language)
+                        IumrahAccountBalanceEntry(language: settings.language, refreshRevision: balanceRefreshRevision)
+                        IumrahAccountFriendsEntry(language: settings.language)
+                        automaticHelpCard
                         IumrahAccountRewardsCarousel(language: settings.language) {
                             IumrahAccountIdentityHeroCard(
                                 profile: profile,
                                 language: settings.language,
-                                publicIdentityURL: identityPublicURL ?? fallbackIdentityURL(profile.iumrahID),
+                                publicIdentityURL: (identityLinkOwner == account.bearerToken ? identityPublicURL : nil) ?? fallbackIdentityURL(profile.iumrahID),
                                 copyMessage: identityCopyMessage,
                                 onCopy: { copyIdentityID(profile) }
                             )
                         }
-                        IumrahAccountFriendsEntry(language: settings.language)
                         travelCompanionsEntryCard
                         walletSection(profile)
 
@@ -142,6 +147,7 @@ struct IumrahAccountView: View {
                         signOutButton
                     } else {
                         guestOrbitHero
+                        automaticHelpCard
                         loginCard
                             .id("account-login")
                         IumrahLockedIdentityCard(language: settings.language) {
@@ -174,15 +180,18 @@ struct IumrahAccountView: View {
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
+        .modifier(IumrahPerformanceHost())
         .onChange(of: pendingReferralCode) { _, value in
             if !account.isAuthenticated, IumrahReferralLink.normalized(value) != nil, guestAccountMode != .register { guestAccountMode = .register }
         }
-        .task {
+        .task(id: activeTab) {
+            guard activeTab else { return }
             if !account.isAuthenticated, IumrahReferralLink.normalized(pendingReferralCode) != nil { guestAccountMode = .register }
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
             await refreshNotificationStatus()
-            await refreshAccountContent()
+            // RootView owns trip restoration, push registration and synchronization.
+            // Opening Account must not repeat that work.
             await refreshPublicIdentityLink()
         }
         .onChange(of: account.iumrahID) { oldValue, newValue in
@@ -248,12 +257,34 @@ struct IumrahAccountView: View {
     private var accountHeader: some View {
         IumrahPrimaryTabHeader(
             title: tr("Account", "Аккаунт", "Akkaunt", "Аккаунт"),
-            subtitle: account.account == nil ? nil : tr("Your profile, iumrah ID and journeys", "Ваш профиль, iumrah ID и поездки", "Profilingiz, iumrah ID va safarlar", "Профилингиз, iumrah ID ва сафарлар"),
-            footer: account.account == nil ? AnyView(IumrahHeaderPills(
+            footer: account.account.map { profile in
+                AnyView(userDataEntryCard(profile).padding(.horizontal, IumrahDesign.pagePadding))
+            } ?? AnyView(IumrahHeaderPills(
                 labels: [tr("Register", "Зарегистрироваться", "Ro‘yxatdan o‘tish", "Рўйхатдан ўтиш"), tr("Sign in", "Войти", "Kirish", "Кириш")],
                 symbols: ["person.badge.plus", "key"], selection: guestAccountMode == .register ? 0 : 1,
-                onSelect: { index in guestAccountMode = index == 0 ? .register : .signIn; loginScrollNonce += 1 })) : nil
+                onSelect: { index in guestAccountMode = index == 0 ? .register : .signIn; loginScrollNonce += 1 })),
+            flexibleFooter: account.account != nil,
+            animateMap: false
         )
+    }
+
+    private var automaticHelpCard: some View {
+        Toggle(isOn: $automaticPageHelp) {
+            HStack(spacing: 12) {
+                Image(systemName: "questionmark.bubble.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .iumrahGlass(in: Circle(), allowsStaticGlass: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Automatic tips", "Автоматические подсказки", "Avtomatik maslahatlar", "Автоматик маслаҳатлар")).font(.headline)
+                    Text(tr("Show guidance when opening a page", "Показывать советы при открытии страниц", "Sahifa ochilganda maslahatlar", "Саҳифа очилганда маслаҳатлар")).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .toggleStyle(.switch)
+        .tint(.green)
+        .iumrahCard()
     }
 
     private func identityCard(_ profile: IumrahAccountProfile) -> some View {
@@ -789,24 +820,10 @@ struct IumrahAccountView: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white.opacity(0.52))
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 19)
-            .background(
-                LinearGradient(
-                    colors: [Color.black, Color(red: 0.08, green: 0.08, blue: 0.09)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 28, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.8)
-            }
-            .shadow(color: .black.opacity(0.12), radius: 20, y: 10)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .padding(.horizontal, -4)
     }
 
     private var travelCompanionsEntryCard: some View {
@@ -1147,23 +1164,7 @@ struct IumrahAccountView: View {
             }
             .buttonStyle(.plain)
 
-            Divider().padding(.leading, 54)
 
-            NavigationLink {
-                IumrahGiftCardsView()
-            } label: {
-                settingsRow(
-                    icon: "giftcard.fill",
-                    title: tr("Gift Cards & Balance", "Gift Cards и баланс", "Gift Cards va balans", "Gift Cards ва баланс"),
-                    value: tr(
-                        "Gifts, referrals and iumrah Balance",
-                        "Подарки, приглашения и iumrah Balance",
-                        "Sovg‘alar, takliflar va iumrah Balance",
-                        "Совғалар, таклифлар ва iumrah Balance"
-                    )
-                )
-            }
-            .buttonStyle(.plain)
         }
         .iumrahCard()
     }
@@ -2240,14 +2241,22 @@ struct IumrahAccountView: View {
 
     @MainActor
     private func refreshPublicIdentityLink() async {
-        guard account.isAuthenticated, let profile = account.account else {
+        guard account.isAuthenticated, let profile = account.account, let token = account.bearerToken else {
             identityPublicURL = nil
+            identityLinkOwner = nil
+            identityLinkDate = nil
             return
         }
+        if identityLinkOwner == token, let date = identityLinkDate, Date().timeIntervalSince(date) < 60 { return }
+        if identityLinkOwner != token { identityPublicURL = nil }
         do {
             let link = try await account.publicIdentityLink()
+            guard account.bearerToken == token, !Task.isCancelled else { return }
             identityPublicURL = link.url
+            identityLinkOwner = token
+            identityLinkDate = Date()
         } catch {
+            guard account.bearerToken == token, !Task.isCancelled else { return }
             // The signed link is a convenience layer. Keep the identity card usable even
             // if this endpoint is temporarily unavailable; the fallback page itself does
             // not expose private trip data without a valid signature.
@@ -2281,6 +2290,7 @@ struct IumrahAccountView: View {
 
     @MainActor
     private func refreshAccountContent() async {
+        balanceRefreshRevision &+= 1
         bookings.setAccountToken(account.bearerToken)
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)
@@ -2361,7 +2371,7 @@ struct IumrahAccountView: View {
             if bookings.pushRegistrationReady == false || clientNotifications.pushProviderReady == false {
                 return tr("Push service is not ready", "Push-сервис не готов", "Push xizmati tayyor emas", "Push хизмати тайёр эмас")
             }
-            return tr("Enabled · delivery connected", "Включены · доставка подключена", "Yoqilgan · yetkazish ulangan", "Ёқилган · етказиш уланган")
+            return tr("Enabled · test delivery in Signal", "Включены · проверка доставки в Signal", "Yoqilgan · Signalda tekshiring", "Ёқилган · Signalда текширинг")
         case .denied:
             return tr("Disabled in iOS Settings", "Выключены в настройках iOS", "iOS sozlamalarida o‘chirilgan", "iOS созламаларида ўчирилган")
         default:

@@ -41,6 +41,7 @@ struct AppNavigationContainer<Content: View>: View {
             // after the language picker and occasionally resetting other routes.
             navigationStack
                 .iumrahAdaptiveReadableWidth(unconstrained: chrome.isImmersiveMode)
+                .environment(\.iumrahTabIsActive, tab == nil || chrome.currentTab == tab)
         }
     }
 

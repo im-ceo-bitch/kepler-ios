@@ -30,7 +30,8 @@ final class PushNotificationManager: ObservableObject {
     private let tokenDefaultsKey = "iumrah.app.apns.device-token"
 
     private init() {
-        deviceToken = UserDefaults.standard.string(forKey: tokenDefaultsKey)
+        // APNs tokens may change after reinstall/restore. Wait for the current callback.
+        deviceToken = nil
     }
 
     var isAuthorized: Bool {
@@ -67,6 +68,9 @@ final class PushNotificationManager: ObservableObject {
 
         if isAuthorized {
             UIApplication.shared.registerForRemoteNotifications()
+        } else if authorizationStatus == .denied {
+            deviceToken = nil
+            UserDefaults.standard.removeObject(forKey: tokenDefaultsKey)
         }
     }
 

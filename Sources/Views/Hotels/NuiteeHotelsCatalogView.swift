@@ -540,6 +540,7 @@ private struct NuiteeHotelCollage: View {
 
 struct NuiteeHotelDetailView: View {
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var account: IumrahAccountStore
     @Environment(\.dismiss) private var dismiss
     let hotel: NuiteeHotel
     @State var checkin: Date
@@ -699,6 +700,9 @@ struct NuiteeHotelDetailView: View {
             }
         }
         .modifier(IumrahHelpOverlayHost(enabled: true, explicitContext: IumrahHelpContext(key: ratesLoading || !ratesCompleted ? "hotel.loading" : ratesError != nil ? "hotel.rates_error" : rates.isEmpty ? (onSelectRate == nil ? "hotel.no_rates" : "hotel.package_no_rates") : chosenOffer != nil ? "hotel.saved" : "hotel.details")))
+        .onAppear {
+            HomePersonalizationStore.shared.visitHotel(.init(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: sandbox), owner: HomePersonalizationStore.owner(account))
+        }
         .task(id: settings.language.rawValue) { await refreshDetail() }
         .task(id: reloadID) { await refreshRates() }
         .fullScreenCover(isPresented: $isGalleryPresented) {

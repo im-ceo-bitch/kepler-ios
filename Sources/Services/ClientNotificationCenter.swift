@@ -56,6 +56,8 @@ final class ClientNotificationCenter: ObservableObject {
     @Published private(set) var dismissedHomeIDs: Set<String> = []
     @Published private(set) var pushProviderReady: Bool?
 
+    private var registrationTask: Task<Void, Never>?
+    private var registrationRevision = 0
     private let api = APIClient.shared
     private let installationKey = "iumrah.app.client-notification-installation.v1"
     private let cacheKey = "iumrah.app.client-notification-cache.v1"
@@ -86,6 +88,20 @@ final class ClientNotificationCenter: ObservableObject {
     }
 
     func sync(deviceToken: String?, accountToken: String?, hasTrip: Bool, locale: String) async {
+        registrationRevision &+= 1
+        let revision = registrationRevision
+        let previous = registrationTask
+        let task = Task { @MainActor [weak self] in
+            await previous?.value
+            guard let self, self.registrationRevision == revision else { return }
+            await self.performSync(deviceToken: deviceToken, accountToken: accountToken, hasTrip: hasTrip, locale: locale, revision: revision)
+        }
+        registrationTask = task
+        await task.value
+        if registrationRevision == revision { registrationTask = nil }
+    }
+
+    private func performSync(deviceToken: String?, accountToken: String?, hasTrip: Bool, locale: String, revision: Int) async {
         let headers = authorizationHeaders(accountToken)
         let request = ClientNotificationDeviceRegistration(
             installationID: installationID,
@@ -98,15 +114,17 @@ final class ClientNotificationCenter: ObservableObject {
 
         var lastRegistrationError: Error?
         for attempt in 0..<3 {
+            guard registrationRevision == revision else { return }
             do {
                 let response: ClientNotificationDeviceResponse = try await api.post(
                     "/api/catalog/hotels/client/notifications/devices",
                     body: request,
                     headers: headers
                 )
+                guard registrationRevision == revision else { return }
                 pushProviderReady = response.ready
-                await refresh(accountToken: accountToken)
-                lastError = nil
+                await refresh(accountToken: accountToken, expectedRevision: revision)
+                guard registrationRevision == revision else { return }
                 return
             } catch {
                 lastRegistrationError = error
@@ -116,16 +134,24 @@ final class ClientNotificationCenter: ObservableObject {
             }
         }
 
-        lastError = lastRegistrationError?.localizedDescription
+        if registrationRevision == revision { lastError = lastRegistrationError?.localizedDescription }
     }
 
-    func refresh(accountToken: String?) async {
+    func testPush(accountToken: String) async throws -> String {
+        struct Body: Encodable { let installationID: String }
+        struct Result: Decodable { let ok: Bool; let sent: Int; let errors: [String]? }
+        let result: Result = try await api.post("/api/catalog/hotels/client/notifications/test", body: Body(installationID: installationID), headers: authorizationHeaders(accountToken), timeoutInterval: 25)
+        return result.sent == 1 ? "APNs accepted · 1" : (result.errors?.joined(separator: ", ") ?? "APNs: 0")
+    }
+
+    func refresh(accountToken: String?, expectedRevision: Int? = nil) async {
         do {
             let response: ClientNotificationFeedResponse = try await api.get(
                 "/api/catalog/hotels/client/notifications/feed",
                 query: [URLQueryItem(name: "installationID", value: installationID)],
                 headers: authorizationHeaders(accountToken)
             )
+            guard expectedRevision == nil || expectedRevision == registrationRevision else { return }
             let next = response.notifications.sorted(by: notificationSort)
             if notifications != next {
                 notifications = next
@@ -135,6 +161,7 @@ final class ClientNotificationCenter: ObservableObject {
             }
             if lastError != nil { lastError = nil }
         } catch {
+            guard expectedRevision == nil || expectedRevision == registrationRevision else { return }
             lastError = error.localizedDescription
         }
     }

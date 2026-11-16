@@ -13,7 +13,6 @@ struct SmartConfiguratorFlow: View {
     @State private var runID = 0
     @State private var replacementRequest: String?
     @State private var replacementRevision = 0
-    @State private var categoryScroll: String? = PackageTier.standard.rawValue
     @State private var historyInitialized = false
     @State private var historyOwner: String?
     @State private var suppressHistory = false
@@ -36,12 +35,11 @@ struct SmartConfiguratorFlow: View {
             }
         }
     }
-    private var largeOrbit: Bool { step == .welcome || step == .assembly }
     private var steps: [Step] { Step.allCases.filter { $0 != .firstCity || store.preferences.scope == .makkahAndMadinah } }
     private var canContinue: Bool {
         switch step {
         case .origin: return !["JED", "MED"].contains(store.preferences.origin) && store.preferences.origin.count == 3
-        case .party: return store.preferences.infants <= store.preferences.adults && store.preferences.adults + store.preferences.childAges.count <= 6
+        case .party: return store.preferences.childAges.allSatisfy { (0..<12).contains($0) } && store.preferences.infants <= store.preferences.adults && store.preferences.adults + store.preferences.childAges.count <= 6
         case .assembly: return store.result != nil
         default: return true
         }
@@ -52,13 +50,13 @@ struct SmartConfiguratorFlow: View {
     private var title: String {
         switch step {
         case .welcome: return t("Ваша Умра. Ваш выбор.", "Your Umrah. Your choice.", "Sizning Umrangiz. Sizning tanlovingiz.", "Сизнинг Умрангиз. Сизнинг танловингиз.")
-        case .origin: return t("Из какого города вы хотите вылететь?", "Where will you depart from?", "Qaysi shahardan uchmoqchisiz?", "Қайси шаҳардан учмоқчисиз?")
-        case .month: return t("В каком месяце вы планируете совершить Умру?", "Which month would you like to travel?", "Qaysi oyda Umra safarini rejalashtiryapsiz?", "Қайси ойда Умра сафарини режалаштиряпсиз?")
-        case .duration: return t("На сколько дней вы планируете поездку?", "How long would you like to travel?", "Safarni necha kunga rejalashtiryapsiz?", "Сафарни неча кунга режалаштиряпсиз?")
-        case .route: return t("Какие города вы хотите посетить?", "Which cities would you like to visit?", "Qaysi shaharlarga bormoqchisiz?", "Қайси шаҳарларга бормоқчисиз?")
-        case .firstCity: return t("С какого города начнём путешествие?", "Which city shall we visit first?", "Safarni qaysi shahardan boshlaymiz?", "Сафарни қайси шаҳардан бошлаймиз?")
-        case .party: return t("Сколько человек отправляется на Умру?", "Who is traveling with you?", "Umraga necha kishi boradi?", "Умрага неча киши боради?")
-        case .category: return t("Какой уровень комфорта вы предпочитаете?", "Choose your comfort level", "Qaysi qulaylik darajasini tanlaysiz?", "Қайси қулайлик даражасини танлайсиз?")
+        case .origin: return t("Город вылета", "Departure city", "Uchish shahri", "Учиш шаҳри")
+        case .month: return t("Когда поедем?", "When shall we travel?", "Qachon boramiz?", "Қачон борамиз?")
+        case .duration: return t("Длительность поездки", "Trip duration", "Safar davomiyligi", "Сафар давомийлиги")
+        case .route: return t("Маршрут поездки", "Journey route", "Safar yo‘nalishi", "Сафар йўналиши")
+        case .firstCity: return t("Первый город", "First city", "Birinchi shahar", "Биринчи шаҳар")
+        case .party: return t("Кто едет на Умру?", "Who is traveling with you?", "Umraga necha kishi boradi?", "Умрага неча киши боради?")
+        case .category: return t("Уровень комфорта", "Comfort level", "Qulaylik darajasi", "Қулайлик даражаси")
         case .assembly: return store.result == nil ? t("Собираем вашу Умру", "Building your Umrah", "Umrangizni tayyorlayapmiz", "Умрангизни тайёрлаяпмиз") : t("Ваша Умра собрана", "Your Umrah is ready", "Umrangiz tayyor", "Умрангиз тайёр")
         }
     }
@@ -71,7 +69,7 @@ struct SmartConfiguratorFlow: View {
         case .route: return t("Выберите маршрут вашей поездки.", "Choose your journey route.", "Safaringiz yo‘nalishini tanlang.", "Сафарингиз йўналишини танланг.")
         case .firstCity: return t("В Мекку — через Джидду. В Медину — через аэропорт Медины.", "Makkah via Jeddah, Madinah via Madinah airport.", "Makkaga Jidda, Madinaga Madina aeroporti orqali.", "Маккага Жидда, Мадинага Мадина аэропорти орқали.")
         case .party: return t("Возраст детей нужен для корректного тарифа.", "Children's ages help determine the right fare.", "To‘g‘ri tarif uchun bolalarning yoshi kerak.", "Тўғри тариф учун болаларнинг ёши керак.")
-        case .category: return t("Прокрутите карточки, чтобы сравнить категории.", "Swipe to compare travel categories.", "Toifalarni solishtirish uchun kartalarni suring.", "Тоифаларни солиштириш учун карталарни суринг.")
+        case .category: return t("Выберите категорию отелей для вашей поездки.", "Choose the hotel category for your trip.", "Safaringiz uchun mehmonxona toifasini tanlang.", "Сафарингиз учун меҳмонхона тоифасини танланг.")
         case .assembly: return store.result == nil ? t("Проверяем компоненты и рассчитываем стоимость на сервере.", "Checking components and calculating the server price.", "Qismlarni tekshirib, serverda narxni hisoblayapmiz.", "Қисмларни текшириб, серверда нархни ҳисоблаяпмиз.") : t("Проверьте все детали перед бронированием.", "Review every detail before booking.", "Bron qilishdan oldin barcha tafsilotlarni tekshiring.", "Брон қилишдан олдин барча тафсилотларни текширинг.")
         }
     }
@@ -94,7 +92,6 @@ struct SmartConfiguratorFlow: View {
                 store.preferences = resumeDraft.preferences
                 let resumed = Step(rawValue: resumeDraft.step) ?? .origin
                 step = steps.contains(resumed) ? resumed : .route
-                categoryScroll = store.preferences.tier.rawValue
                 // A previously assembled package must get a fresh quote.
                 if step == .assembly { runID += 1 }
             }
@@ -114,84 +111,86 @@ struct SmartConfiguratorFlow: View {
             replacementRequest = nil
         }
         .task(id: runID) {
-            guard runID > 0, step == .assembly else { return }
+            guard runID > 0, step == .assembly, store.result == nil else { return }
             await store.assemble()
         }
     }
     private var flowContent: some View {
-            GeometryReader { proxy in
-                VStack(spacing: 0) {
-                    topBar
+        GeometryReader { proxy in
+            VStack(spacing: 0) {
+                topBar
+                ScrollViewReader { scroll in
                     ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 22) {
-                            orbitHeader(width: proxy.size.width)
+                        VStack(alignment: .leading, spacing: 16) {
+                            orbitHeader(width: proxy.size.width, height: proxy.size.height)
+                                .id("smart-top")
                             stepContent
-                                .id(step)
-                                .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 10)))
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 16)
                         .frame(maxWidth: 570)
                         .frame(maxWidth: .infinity)
                     }
-                    footer
+                    .defaultScrollAnchor(.top)
+                    .onChange(of: step) { _, _ in scroll.scrollTo("smart-top", anchor: .top) }
                 }
-            }
-            .background(Color.iumrahPageBackground)
-            .statusBarHidden(false)
-            .toolbar(firstLaunch ? .hidden : .visible, for: .navigationBar)
-            .toolbar(.hidden, for: .tabBar)
-            .navigationTitle("iumrah Smart")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.black, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .navigationDestination(isPresented: $showReview) {
-                if let journey = store.result { FinalPackageView().environmentObject(journey) }
-            }
-    }
-    private var topBar: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 12) {
-                if step != .welcome {
-                    Button { previous() } label: { glassIcon("chevron.left", size: 44, interactive: true) }
-                        .buttonStyle(.plain).disabled(store.busy || store.replacingCity != nil)
-                        .accessibilityLabel(t("Назад", "Back", "Orqaga", "Орқага"))
-                } else {
-                    Menu {
-                        ForEach(AppSettingsStore.Language.allCases) { language in
-                            Button { settings.language = language } label: { Text(language.title) }
-                        }
-                    } label: { glassIcon("globe", size: 44, interactive: true) }
-                    .accessibilityLabel(t("Язык", "Language", "Til", "Тил"))
-                }
-                Spacer(minLength: 0)
-                VStack(spacing: 3) {
-                    if firstLaunch { Text("iumrah Smart").font(.headline) }
-                    Text(t("Персональная поездка", "Personal journey", "Shaxsiy safar", "Шахсий сафар"))
-                        .font(.caption2).foregroundStyle(.white.opacity(0.7))
-                }
-                Spacer(minLength: 0)
-                if firstLaunch {
-                    Button { onExit() } label: { glassIcon("xmark", size: 44, interactive: true) }
-                        .buttonStyle(.plain).accessibilityLabel(t("Пропустить", "Skip", "O‘tkazish", "Ўтказиш"))
-                }
-            }
-            HStack(spacing: 4) {
-                ForEach(steps, id: \.rawValue) { item in
-                    Capsule().fill(item.rawValue <= step.rawValue ? Color.white : Color.white.opacity(0.23)).frame(height: 3)
-                }
-                Text("\((steps.firstIndex(of: step) ?? 0) + 1)/\(steps.count)")
-                    .font(.caption2.monospacedDigit()).padding(.leading, 5)
+                footer
             }
         }
-        .padding(.horizontal, 20).padding(.top, 5).padding(.bottom, 13)
+        .background(Color.iumrahPageBackground)
+        .statusBarHidden(false)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        .navigationDestination(isPresented: $showReview) {
+            if let journey = store.result { FinalPackageView().environmentObject(journey) }
+        }
+    }
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            if step == .welcome {
+                Menu {
+                    ForEach(AppSettingsStore.Language.allCases) { language in
+                        Button { settings.language = language } label: { Text(language.title) }
+                    }
+                } label: { glassIcon("globe", size: 44, interactive: true) }
+                .accessibilityLabel(t("Язык", "Language", "Til", "Тил"))
+            } else {
+                Button { if step == .welcome { onExit() } else { previous() } } label: {
+                    glassIcon("chevron.left", size: 44, interactive: true)
+                }
+                .buttonStyle(.plain).disabled(store.busy || store.replacingCity != nil)
+                .accessibilityLabel(t("Назад", "Back", "Orqaga", "Орқага"))
+            }
+            Spacer(minLength: 0)
+            VStack(spacing: 2) {
+                Text("iumrah Smart").font(.headline)
+                Text(t("Персональная поездка", "Personal journey", "Shaxsiy safar", "Шахсий сафар"))
+                    .font(.caption2).foregroundStyle(.white.opacity(0.7))
+            }
+            Spacer(minLength: 0)
+            Button { onExit() } label: { glassIcon("xmark", size: 44, interactive: true) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(t("Закрыть", "Close", "Yopish", "Ёпиш"))
+        }
+        .padding(.horizontal, 20).padding(.vertical, 8)
         .foregroundStyle(.white)
-        // The app's Info.plist uses white status-bar content; this real safe-area
-        // surface ensures contrast without drawing a fake status bar.
         .background(Color.black.ignoresSafeArea(edges: .top))
         .environment(\.colorScheme, .dark)
+    }
+
+    private var stepProgress: some View {
+        HStack(spacing: 5) {
+            ForEach(steps, id: \.rawValue) { item in
+                Capsule().fill(item.rawValue <= step.rawValue ? Color.primary : Color.primary.opacity(0.14))
+                    .frame(height: 4)
+            }
+            Text("\((steps.firstIndex(of: step) ?? 0) + 1)/\(steps.count)")
+                .font(.caption.weight(.semibold).monospacedDigit()).padding(.leading, 5)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(t("Шаг", "Step", "Qadam", "Қадам") + " \((steps.firstIndex(of: step) ?? 0) + 1)/\(steps.count)")
     }
 
     private func glassIcon(_ symbol: String, size: CGFloat = 48, interactive: Bool = false) -> some View {
@@ -213,26 +212,26 @@ struct SmartConfiguratorFlow: View {
         }
     }
 
-    private func orbitHeader(width: CGFloat) -> some View {
-        let isWide = width >= 520 && !largeOrbit
-        let size = step == .assembly && store.result != nil ? min(190, max(120, width - 44)) : largeOrbit ? min(340, max(160, width - 44)) : min(260, max(160, width - 64))
-        let layout = isWide ? AnyLayout(HStackLayout(alignment: .center, spacing: 20)) : AnyLayout(VStackLayout(alignment: .center, spacing: 12))
-        return layout {
+    private func orbitHeader(width: CGFloat, height: CGFloat) -> some View {
+        // Diameter is constrained by BOTH dimensions; the ring never consumes half a phone.
+        let side = min(148, max(76, height * 0.22), max(76, width * 0.36))
+        return HStack(alignment: .center, spacing: 14) {
             IumrahOrbitV5(services: store.result.map { IumrahOrbitV5Service.selectedForJourney($0) } ?? IumrahOrbitV5Service.showcase,
-                          diameter: isWide ? 220 : size,
+                          diameter: side,
                           logo: Image("HeaderWordmarkLight"), logoWidthFraction: 0.38,
                           accessibilityTitle: "iumrah Smart", pinnedSymbol: orbitSymbol,
                           mergeToCenter: step == .assembly && store.result != nil)
-                .frame(maxWidth: isWide ? nil : .infinity)
-            VStack(alignment: isWide ? .leading : .center, spacing: 9) {
-                Text(title).font(.system(size: largeOrbit ? 30 : 27, weight: .bold, design: .rounded))
-                    .fixedSize(horizontal: false, vertical: true).contentTransition(.opacity)
+                .frame(width: side, height: side)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).font(.system(.title2, design: .rounded).weight(.bold))
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true).contentTransition(.opacity)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .multilineTextAlignment(isWide ? .leading : .center)
-            .frame(maxWidth: .infinity, alignment: isWide ? .leading : .center)
-        }.animation(reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.85), value: store.progress)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     @ViewBuilder private var stepContent: some View {
         switch step {
@@ -262,11 +261,11 @@ struct SmartConfiguratorFlow: View {
                         Text(store.preferences.origin).font(.subheadline.monospaced()).foregroundStyle(.secondary)
                     }
                     Spacer(); Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
             }.buttonStyle(.plain)
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(["TAS", "SKD", "FEG", "NMA", "BHK", "UGC", "KSQ", "TMJ"], id: \.self) { code in
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+                ForEach(["TAS", "SKD", "FEG", "NMA", "BHK", "UGC", "KSQ", "TMJ", "AZN"], id: \.self) { code in
                     choice(title: FlightReferenceCatalog.airport(code)?.city ?? code, subtitle: code, selected: store.preferences.origin == code) {
                         store.preferences.origin = code; store.preferences.airport = nil
                     }
@@ -278,26 +277,15 @@ struct SmartConfiguratorFlow: View {
         let calendar = Calendar.current
         let start = calendar.dateInterval(of: .month, for: Date())?.start ?? Date()
         let months = (0..<12).compactMap { calendar.date(byAdding: .month, value: $0, to: start) }
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(months, id: \.self) { month in
-                    let selected = calendar.isDate(month, equalTo: store.preferences.month, toGranularity: .month)
-                    Button {
-                        store.preferences.month = month; IumrahHaptics.selection()
-                    } label: {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack { glassIcon("calendar", size: 42); Spacer(); if selected { Image(systemName: "checkmark.circle.fill") } }
-                            Spacer()
-                            Text(month.formatted(.dateTime.month(.wide).locale(Locale(identifier: settings.language.localeIdentifier))).capitalized).font(.headline)
-                            Text(month.formatted(.dateTime.year())).font(.subheadline).opacity(0.7)
-                        }
-                        .padding(15).frame(width: 146, height: 146, alignment: .leading)
-                        .foregroundStyle(selected ? Color(uiColor: .systemBackground) : .primary)
-                        .background(selected ? Color.primary : Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 23))
-                    }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
+            ForEach(months, id: \.self) { month in
+                choice(title: month.formatted(.dateTime.month(.abbreviated).locale(Locale(identifier: settings.language.localeIdentifier))).capitalized,
+                       subtitle: month.formatted(.dateTime.year()),
+                       selected: calendar.isDate(month, equalTo: store.preferences.month, toGranularity: .month)) {
+                    store.preferences.month = month
                 }
-            }.scrollTargetLayout()
-        }.scrollTargetBehavior(.viewAligned)
+            }
+        }
     }
     private var durationContent: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
@@ -308,9 +296,6 @@ struct SmartConfiguratorFlow: View {
     }
     private var routeContent: some View {
         VStack(spacing: 14) {
-            Picker(title, selection: $store.preferences.scope) {
-                ForEach(JourneyScope.allCases) { scope in Text(scope.title(settings.language)).tag(scope) }
-            }.pickerStyle(.segmented)
             choice(title: JourneyScope.makkahOnly.title(settings.language), subtitle: "JED → JED", selected: store.preferences.scope == .makkahOnly) { store.preferences.scope = .makkahOnly }
             choice(title: JourneyScope.makkahAndMadinah.title(settings.language), subtitle: "JED ↔ MED", selected: store.preferences.scope == .makkahAndMadinah) { store.preferences.scope = .makkahAndMadinah }
         }
@@ -322,54 +307,77 @@ struct SmartConfiguratorFlow: View {
         }
     }
     private var partyContent: some View {
-        VStack(spacing: 15) {
-            Stepper(value: $store.preferences.adults, in: 1...max(1, 6 - store.preferences.childAges.count)) {
-                Text(t("Взрослые", "Adults", "Kattalar", "Катталар") + " · \(store.preferences.adults)").font(.headline)
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(t("Взрослые", "Adults", "Kattalar", "Катталар")).font(.headline)
+                    Text(t("От 12 лет", "Ages 12+", "12 yoshdan", "12 ёшдан")).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                counter(value: store.preferences.adults, canMinus: store.preferences.adults > 1,
+                        canPlus: store.preferences.adults + store.preferences.childAges.count < 6,
+                        label: t("Взрослые", "Adults", "Kattalar", "Катталар"),
+                        minus: { store.preferences.adults -= 1 }, plus: { store.preferences.adults += 1 })
             }
             Divider()
             HStack {
-                Text(t("Дети", "Children", "Bolalar", "Болалар") + " · \(store.preferences.childAges.count)").font(.headline)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(t("Дети", "Children", "Bolalar", "Болалар")).font(.headline)
+                    Text(t("До 12 лет", "Under 12", "12 yoshgacha", "12 ёшгача")).font(.caption).foregroundStyle(.secondary)
+                }
                 Spacer()
-                Button { if !store.preferences.childAges.isEmpty { store.preferences.childAges.removeLast() } } label: { glassIcon("minus", size: 44, interactive: true) }.accessibilityLabel(t("Убрать ребёнка", "Remove child", "Bolani olib tashlash", "Болани олиб ташлаш")).disabled(store.preferences.childAges.isEmpty)
-                Button { if store.preferences.adults + store.preferences.childAges.count < 6 { store.preferences.childAges.append(6) } } label: { glassIcon("plus", size: 44, interactive: true) }.accessibilityLabel(t("Добавить ребёнка", "Add child", "Bola qo‘shish", "Бола қўшиш")).disabled(store.preferences.adults + store.preferences.childAges.count >= 6)
+                counter(value: store.preferences.childAges.count, canMinus: !store.preferences.childAges.isEmpty,
+                        canPlus: store.preferences.adults + store.preferences.childAges.count < 6,
+                        label: t("Дети", "Children", "Bolalar", "Болалар"),
+                        minus: { store.preferences.childAges.removeLast() }, plus: { store.preferences.childAges.append(-1) })
             }
             ForEach(store.preferences.childAges.indices, id: \.self) { i in
-                Picker(t("Возраст ребёнка", "Child age", "Bolaning yoshi", "Боланинг ёши") + " \(i+1)", selection: Binding(get: { store.preferences.childAges.indices.contains(i) ? store.preferences.childAges[i] : 0 }, set: { age in if store.preferences.childAges.indices.contains(i) { store.preferences.childAges[i] = age } })) {
-                    ForEach(0..<12, id: \.self) { age in Text("\(age)").tag(age) }
+                Divider()
+                HStack {
+                    Text(t("Возраст ребёнка", "Child age", "Bolaning yoshi", "Боланинг ёши") + " \(i + 1)").font(.subheadline)
+                    Spacer()
+                    Picker(t("Возраст ребёнка", "Child age", "Bolaning yoshi", "Боланинг ёши"), selection: Binding(get: { store.preferences.childAges.indices.contains(i) ? store.preferences.childAges[i] : 0 }, set: { age in if store.preferences.childAges.indices.contains(i) { store.preferences.childAges[i] = age } })) {
+                        Text(t("Укажите возраст", "Select age", "Yoshini tanlang", "Ёшини танланг")).tag(-1)
+                        ForEach(0..<12, id: \.self) { age in
+                            Text(age == 0 ? t("До 1 года", "Under 1", "1 yoshgacha", "1 ёшгача") : "\(age) " + t("г.", "yr", "yosh", "ёш")).tag(age)
+                        }
+                    }.pickerStyle(.menu).tint(.primary)
                 }
             }
-            if !canContinue { Text(t("На каждого младенца нужен взрослый.", "Each infant needs an adult.", "Har bir chaqaloqqa katta hamroh kerak.", "Ҳар бир чақалоққа катта ҳамроҳ керак.")).font(.footnote).foregroundStyle(.red) }
-        }.padding(18).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22)).tint(.primary)
+            if store.preferences.childAges.contains(-1) {
+                Text(t("Укажите возраст каждого ребёнка.", "Select each child’s age.", "Har bir bolaning yoshini tanlang.", "Ҳар бир боланинг ёшини танланг.")).font(.footnote).foregroundStyle(.secondary)
+            } else if !canContinue { Text(t("На каждого младенца нужен взрослый.", "Each infant needs an adult.", "Har bir chaqaloqqa katta hamroh kerak.", "Ҳар бир чақалоққа катта ҳамроҳ керак.")).font(.footnote).foregroundStyle(.red) }
+        }.padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20)).tint(.primary)
+    }
+    private func counter(value: Int, canMinus: Bool, canPlus: Bool, label: String, minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
+        HStack(spacing: 4) {
+            Button { minus(); IumrahHaptics.selection() } label: {
+                Image(systemName: "minus").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44)
+            }.disabled(!canMinus).opacity(canMinus ? 1 : 0.3).accessibilityLabel(label + " −")
+            Text("\(value)").font(.headline.monospacedDigit()).frame(minWidth: 24)
+            Button { plus(); IumrahHaptics.selection() } label: {
+                Image(systemName: "plus").font(.system(size: 17, weight: .semibold)).frame(width: 44, height: 44)
+            }.disabled(!canPlus).opacity(canPlus ? 1 : 0.3).accessibilityLabel(label + " +")
+        }.buttonStyle(.plain).background(Color.iumrahRaisedBackground, in: Capsule())
     }
     private var categoryContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(PackageTier.allCases) { tier in
-                        Button { categoryScroll = tier.rawValue; store.preferences.tier = tier; IumrahHaptics.selection() } label: {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(spacing: 10) { glassIcon("star.fill", size: 44); Text(tier.selectableHotelStars.sorted().map(String.init).joined(separator: "–") + " ★").font(.caption.weight(.semibold)); Spacer() }
-                                Spacer()
-                                Text(tier.title(settings.language)).font(.title2.bold())
-                                Text(tier.subtitle(settings.language)).font(.subheadline).lineLimit(3)
-                            }
-                            .padding(18).frame(width: 222, height: 180)
-                            .foregroundStyle(store.preferences.tier == tier ? Color(uiColor: .systemBackground) : .primary)
-                            .background(store.preferences.tier == tier ? Color.primary : Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 24))
-                        }.buttonStyle(.plain).id(tier.rawValue)
+        VStack(alignment: .leading, spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                ForEach(PackageTier.allCases) { tier in
+                    choice(title: tier.title(settings.language), subtitle: tier.selectableHotelStars.sorted().map(String.init).joined(separator: "–") + " ★", selected: store.preferences.tier == tier) {
+                        store.preferences.tier = tier
                     }
-                }.scrollTargetLayout()
-            }.scrollTargetBehavior(.viewAligned)
-                .scrollPosition(id: $categoryScroll)
-                .onChange(of: categoryScroll) { _, id in if let id, let tier = PackageTier(rawValue: id) { store.preferences.tier = tier } }
-            VStack(alignment: .leading, spacing: 10) {
-                Text(store.preferences.tier.title(settings.language)).font(.title2.bold())
-                Text(store.preferences.tier.subtitle(settings.language)).foregroundStyle(.secondary)
-                Label(t("Категория отелей", "Hotel category", "Mehmonxona toifasi", "Меҳмонхона тоифаси") + " · " + store.preferences.tier.selectableHotelStars.map(String.init).joined(separator: " / ") + " ★", systemImage: "building.2.fill")
-
-                Label(t("Рейсы и услуги по правилам iumrah", "Flights and services under existing iumrah rules", "Reyslar va xizmatlar iumrah qoidalari bo‘yicha", "Рейслар ва хизматлар iumrah қоидалари бўйича"), systemImage: "checkmark.seal")
-            }.font(.subheadline).id(store.preferences.tier).transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 8)))
-        }.animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: store.preferences.tier)
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text(store.preferences.tier.title(settings.language)).font(.title3.bold())
+                Text(store.preferences.tier.subtitle(settings.language)).font(.subheadline).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Label(t("Категория отелей", "Hotel category", "Mehmonxona toifasi", "Меҳмонхона тоифаси") + " · " + store.preferences.tier.selectableHotelStars.sorted().map(String.init).joined(separator: " / ") + " ★", systemImage: "building.2.fill")
+                    .font(.subheadline.weight(.medium))
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(14)
+                .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 18))
+        }
     }
     private var assemblyContent: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -411,11 +419,11 @@ struct SmartConfiguratorFlow: View {
                     if error.contains("CORE_CUTOVER_PENDING") {
                         Text(t("Сервер бронирований ещё не готов. Попробуйте позже.", "The booking server is not ready yet. Try again later.", "Bronlash serveri hali tayyor emas. Keyinroq urinib ko‘ring.", "Бронлаш сервери ҳали тайёр эмас. Кейинроқ уриниб кўринг.")).font(.subheadline).foregroundStyle(.secondary)
                     } else if error.contains("SMART_AVIASALES_PARTY_FARE_UNAVAILABLE") {
-                        Text(t("Для поездки с детьми пока нет подходящих опубликованных рейсов. Выберите другой месяц или длительность.", "No suitable published flights for your family yet. Try another month or duration.", "Oilaviy safar uchun mos e’lon qilingan reyslar topilmadi. Boshqa oy yoki muddatni tanlang.", "Оилавий сафар учун мос эълон қилинган рейслар топилмади. Бошқа ой ёки муддатни танланг.")).font(.subheadline).foregroundStyle(.secondary)
+                        Text(t("Не удалось подтвердить тарифы для всей семьи. Попробуйте другой месяц или длительность.", "We could not verify fares for the whole family. Try another month or duration.", "Oilaviy safar uchun tariflarni tasdiqlab bo‘lmadi. Boshqa oy yoki muddatni tanlang.", "Оилавий сафар учун тарифларни тасдиқлаб бўлмади. Бошқа ой ёки муддатни танланг.")).font(.subheadline).foregroundStyle(.secondary)
                     } else {
                     Text(errorText(error)).font(.subheadline).foregroundStyle(.secondary)
                     }
-                    Button(t("Изменить параметры", "Edit preferences", "Parametrlarni o‘zgartirish", "Параметрларни ўзгартириш")) { move(.month); store.clear() }.buttonStyle(.bordered)
+                    Button(t("Изменить параметры", "Edit preferences", "Parametrlarni o‘zgartirish", "Параметрларни ўзгартириш")) { move(.month); store.clear() }.buttonStyle(.bordered).tint(.primary)
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
             }
         }.animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: store.progress)
@@ -516,14 +524,28 @@ struct SmartConfiguratorFlow: View {
     }
     private func choice(title: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button { action(); IumrahHaptics.selection() } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack { Spacer(); if selected { Image(systemName: "checkmark.circle.fill") } else { Image(systemName: "circle").opacity(0.35) } }
-                Text(title).font(.headline).fixedSize(horizontal: false, vertical: true)
-                Text(subtitle).font(.subheadline).opacity(0.7)
-            }.padding(14).frame(maxWidth: .infinity, minHeight: 100, alignment: .leading)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle").font(.caption).opacity(selected ? 1 : 0.4)
+                }
+                Text(subtitle).font(.caption).opacity(0.72).fixedSize(horizontal: false, vertical: true)
+            }.padding(11).frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
                 .foregroundStyle(selected ? Color(uiColor: .systemBackground) : .primary)
-                .background(selected ? Color.primary : Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+                .background(selected ? Color.primary : Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 16))
         }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+    }
+    private var footerTitle: String {
+        switch step {
+        case .welcome: return t("Начать", "Get started", "Boshlash", "Бошлаш")
+        case .category: return t("Собрать мою Умру", "Build my Umrah", "Umramni tayyorlash", "Умрамни тайёрлаш")
+        case .assembly:
+            if store.busy || store.replacingCity != nil { return t("Собираем поездку…", "Building your trip…", "Safarni tayyorlayapmiz…", "Сафарни тайёрлаяпмиз…") }
+            if store.result != nil { return t("Посмотреть пакет", "Review package", "Paketni ko‘rish", "Пакетни кўриш") }
+            return t("Повторить поиск", "Retry search", "Qayta qidirish", "Қайта қидириш")
+        default: return t("Продолжить", "Continue", "Davom etish", "Давом этиш")
+        }
     }
     private var footer: some View {
         VStack(spacing: 12) {
@@ -539,11 +561,12 @@ struct SmartConfiguratorFlow: View {
                     Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language)).font(.subheadline.weight(.semibold)).monospacedDigit()
                 }
             }
+            stepProgress
             Button {
                 if step == .assembly { if store.result != nil { showReview = true } else if !store.busy { runID += 1 } }
                 else { next() }
             } label: {
-                Text(step == .welcome ? t("Начать", "Get started", "Boshlash", "Бошлаш") : step == .assembly ? (store.result != nil ? t("Посмотреть пакет", "Review package", "Paketni ko‘rish", "Пакетни кўриш") : t("Повторить поиск", "Retry search", "Qayta qidirish", "Қайта қидириш")) : step == .category ? t("Собрать мою Умру", "Build my Umrah", "Umramni tayyorlash", "Умрамни тайёрлаш") : t("Продолжить", "Continue", "Davom etish", "Давом этиш"))
+                Text(footerTitle)
                     .font(.headline).frame(maxWidth: .infinity).frame(minHeight: 54)
                     .foregroundStyle(Color(uiColor: .systemBackground))
                     .background(Color.primary, in: RoundedRectangle(cornerRadius: 18))
@@ -558,7 +581,7 @@ struct SmartConfiguratorFlow: View {
             wasAssembled: store.result?.hasFinalGeneratorQuote == true), owner: historyOwner)
     }
     private func move(_ value: Step) {
-        withAnimation(reduceMotion ? nil : .spring(response: 0.48, dampingFraction: 0.86)) { step = value }
+        step = value
         IumrahHaptics.selection()
     }
     private func next() {

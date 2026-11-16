@@ -370,6 +370,9 @@ struct StoredBookingSession: Codable, Identifiable, Hashable {
     /// Opaque encrypted server quote retained only until the Business pricing report
     /// has been committed. It contains no client-readable supplier pricing.
     var pendingGeneratorQuoteProof: String? = nil
+    // Verified notification contact, persisted only in the existing Keychain booking vault.
+    var verifiedBookingEmail: String? = nil
+    var verifiedBookingPhone: String? = nil
 
     mutating func mergeOperationalTrip(_ trip: ClientTripSnapshot, statusHistory: [BookingStatusHistoryEntry]? = nil) {
         operationStatus = trip.status

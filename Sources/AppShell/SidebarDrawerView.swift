@@ -158,7 +158,7 @@ struct SidebarDrawerView: View {
         case (.russian, .subtitle): return "Ваша умра — в одном месте"
         case (.russian, .home): return "Главная"
         case (.russian, .bookings): return "Поездки"
-        case (.russian, .account): return "Аккаунт"
+        case (.russian, .account): return "Профиль"
         case (.russian, .esimBody): return "Активация и остаток интернета прямо в приложении."
         case (.russian, .insidePackage): return "В СОСТАВЕ ПАКЕТА"
         case (.russian, .footer): return "Independent Umrah · iumrah"
@@ -171,9 +171,10 @@ struct SidebarDrawerView: View {
         case (.turkish, .bookings): return TurkishLocalization.phrase("Trips")
         case (.arabic, .bookings): return ArabicLocalization.phrase("Trips")
         case (.indonesian, .bookings), (.malay, .bookings), (.english, .bookings): return "Trips"
-        case (.turkish, .account): return TurkishLocalization.phrase("Account")
-        case (.arabic, .account): return ArabicLocalization.phrase("Account")
-        case (.indonesian, .account), (.malay, .account), (.english, .account): return "Account"
+        case (.turkish, .account): return "Profil"
+        case (.arabic, .account): return "الملف الشخصي"
+        case (.indonesian, .account), (.malay, .account): return "Profil"
+        case (.english, .account): return "Profile"
         case (.turkish, .esimBody): return TurkishLocalization.phrase("Activation and data balance directly in the app.")
         case (.arabic, .esimBody): return ArabicLocalization.phrase("Activation and data balance directly in the app.")
         case (.indonesian, .esimBody), (.malay, .esimBody), (.english, .esimBody): return "Activation and data balance directly in the app."
@@ -186,14 +187,14 @@ struct SidebarDrawerView: View {
         case (.uzbek, .subtitle): return "Umrangiz — bir joyda"
         case (.uzbek, .home): return "Bosh sahifa"
         case (.uzbek, .bookings): return "Safarlar"
-        case (.uzbek, .account): return "Akkaunt"
+        case (.uzbek, .account): return "Profil"
         case (.uzbek, .esimBody): return "Faollashtirish va internet qoldig‘i ilovaning o‘zida."
         case (.uzbek, .insidePackage): return "PAKET TARKIBIDA"
         case (.uzbek, .footer): return "Independent Umrah · iumrah"
         case (.uzbekCyrillic, .subtitle): return "Умрангиз — бир жойда"
         case (.uzbekCyrillic, .home): return "Бош саҳифа"
         case (.uzbekCyrillic, .bookings): return "Сафарлар"
-        case (.uzbekCyrillic, .account): return "Аккаунт"
+        case (.uzbekCyrillic, .account): return "Профиль"
         case (.uzbekCyrillic, .esimBody): return "Фаоллаштириш ва интернет қолдиғи илованинг ўзида."
         case (.uzbekCyrillic, .insidePackage): return "ПАКЕТ ТАРКИБИДА"
         case (.uzbekCyrillic, .footer): return "Independent Umrah · iumrah"

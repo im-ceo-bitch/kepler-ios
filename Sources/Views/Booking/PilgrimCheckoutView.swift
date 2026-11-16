@@ -110,7 +110,7 @@ struct PilgrimCheckoutView: View {
     }
     private var accountMatchesTrip: Bool {
         guard let checkout, let id = account.iumrahID else { return false }
-        return normalizedID(id) == normalizedID(checkout.iumrahID)
+        return IumrahSeamlessBookingPolicy.sameIdentity(id, checkout.iumrahID)
     }
 
     var body: some View {
@@ -252,11 +252,15 @@ struct PilgrimCheckoutView: View {
                     documentsLockedCard
                     guideTransferCheckoutCard(enabled: false)
                 }
-            } else if showExistingAccountLogin {
-                loginCard(checkout)
+            } else if isAvailabilityChecking {
+                if includeProgress { progressCard(checkout) }
+                availabilityPaymentLockedCard
+                documentsLockedCard
             } else {
-                activationCard(checkout)
+                IumrahBookingAccessCard(bookingID: bookingID)
             }
+        } else if session != nil {
+            IumrahBookingAccessCard(bookingID: bookingID)
         }
 
         if let errorMessage {
@@ -939,7 +943,7 @@ struct PilgrimCheckoutView: View {
             ProgressView(value: Double(complete + (value.receipts.isEmpty ? 0 : 1)), total: Double(max(1, value.travelers.count + 1)))
                 .tint(Color.iumrahCareDark)
             HStack(spacing: 8) {
-                readinessChip(tr("Account", "Аккаунт", "Akkaunt", "Аккаунт"), ready: accountMatchesTrip)
+                readinessChip(tr("Access", "Доступ", "Kirish", "Кириш"), ready: accountMatchesTrip)
                 readinessChip(tr("Pilgrims", "Анкеты", "Anketalar", "Анкеталар"), ready: complete == value.travelers.count)
                 readinessChip(tr("Receipt", "Чек", "Chek", "Чек"), ready: !value.receipts.isEmpty)
             }

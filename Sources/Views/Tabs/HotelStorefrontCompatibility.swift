@@ -1427,7 +1427,7 @@ struct StorefrontUmrahPackageDetailView: View {
             )
         }
         .navigationDestination(isPresented: $isProfileSheetPresented) {
-            IumrahBookingConfirmationView(createBooking: { profile in
+            IumrahBookingConfirmationView(quote: currentQuote, createBooking: { profile in
                 try await createBooking(profile: profile)
             })
             .environmentObject(settings)

@@ -55,9 +55,11 @@ final class NuiteeCatalogModel: ObservableObject {
     func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, stars: Int = 0,
                 query: String = "", favorites: Set<String>? = nil, forceRefresh: Bool = false) async {
         let version = UUID(); generation = version
-        activeKey = key(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites)
+        let requestedKey = key(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites)
+        let sameSearch = activeKey == requestedKey
+        activeKey = requestedKey
         busy = true; loadingMore = false; pageError = false; errorMessage = nil; rateError = nil
-        hotels = []; nextOffset = nil; total = 0
+        if !sameSearch { hotels = []; nextOffset = nil; total = 0 }
         defer { if generation == version { busy = false } }
         do {
             let page = try await service.hotelPage(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites)
@@ -65,7 +67,11 @@ final class NuiteeCatalogModel: ObservableObject {
             apply(page, append: false)
         } catch {
             guard generation == version, !Task.isCancelled else { return }
-            errorMessage = "HOTEL_CATALOG_UNAVAILABLE"
+            if hotels.isEmpty { errorMessage = "HOTEL_CATALOG_UNAVAILABLE" }
+            else {
+                hotels = hotels.map { hotel in var row = hotel; row.minimumRate = nil; row.rateStatus = "provider_error"; return row }
+                rateError = "RATES_UNAVAILABLE"
+            }
         }
     }
 
@@ -284,6 +290,13 @@ struct NuiteeHotelsCatalogView: View {
                 if !normalizedQuery.isEmpty {
                     Text(NuiteeCopy.text("Результаты поиска", "Qidiruv natijalari", "Search results", settings.language))
                         .font(.headline)
+                }
+                if model.rateError != nil {
+                    HStack {
+                        Text(NuiteeCopy.text("Не удалось проверить наличие", "Mavjudlikni tekshirib bo‘lmadi", "Could not check availability", settings.language)).font(.footnote).foregroundStyle(.secondary)
+                        Spacer()
+                        Button(NuiteeCopy.text("Повторить", "Qayta", "Retry", settings.language)) { Task { await reload() } }.font(.footnote.weight(.semibold)).tint(.primary)
+                    }
                 }
                 HStack {
                     Text("\(model.total) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))

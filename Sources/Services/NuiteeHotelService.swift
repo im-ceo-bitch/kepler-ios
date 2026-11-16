@@ -41,16 +41,31 @@ struct NuiteeHotelService {
 
     func hotelPage(city: String, checkin: Date, checkout: Date, adults: Int, stars: Int = 0,
                    offset: Int = 0, pageSize: Int = 10, query: String = "", favorites: Set<String>? = nil,
-                   catalogOnly: Bool = false) async throws -> NuiteeHotelListEnvelope {
+                   catalogOnly: Bool = false, allowCatalogFallback: Bool = true) async throws -> NuiteeHotelListEnvelope {
         var params = [URLQueryItem(name: "city", value: city), URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
                       URLQueryItem(name: "checkout", value: Self.dateText(checkout)), URLQueryItem(name: "adults", value: String(adults)),
                       URLQueryItem(name: "stars", value: String(stars)), URLQueryItem(name: "offset", value: String(offset)),
                       URLQueryItem(name: "pageSize", value: String(pageSize)), URLQueryItem(name: "query", value: query),
                       URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")]
         if let favorites { params.append(URLQueryItem(name: "hotelIds", value: favorites.sorted().joined(separator: ","))) }
-        let result: NuiteeHotelListEnvelope = try await api.get("/api/package/nuitee/hotels", query: params, timeoutInterval: 90)
-        guard result.ok, result.total != nil else { throw APIError.invalidResponse }
-        return result
+        do {
+            let result: NuiteeHotelListEnvelope = try await api.get("/api/package/nuitee/hotels", query: params, timeoutInterval: 45)
+            guard result.ok else { throw APIError.invalidResponse }
+            return NuiteeHotelListEnvelope.normalizedPage(result, stars: stars, offset: offset, pageSize: pageSize, query: query, favorites: favorites)
+        } catch {
+            try Task.checkCancellation()
+            guard !catalogOnly, allowCatalogFallback else { throw error }
+            // A provider outage must not remove the independently available catalogue.
+            let fallback = try await hotelPage(city: city, checkin: checkin, checkout: checkout, adults: adults,
+                stars: stars, offset: offset, pageSize: pageSize, query: query, favorites: favorites, catalogOnly: true, allowCatalogFallback: false)
+            let rows = fallback.hotels.map { hotel -> NuiteeHotel in
+                var row = hotel; row.minimumRate = nil; row.rateStatus = "provider_error"; return row
+            }
+            return NuiteeHotelListEnvelope(ok: fallback.ok, sandbox: fallback.sandbox, city: fallback.city,
+                checkin: fallback.checkin, checkout: fallback.checkout, adults: fallback.adults,
+                hotelCatalogStale: fallback.hotelCatalogStale, pricesStale: false, pricesUpdatedAt: nil,
+                rateError: "RATES_UNAVAILABLE", hotels: rows, total: fallback.total, nextOffset: fallback.nextOffset)
+        }
     }
 
     func detail(hotelID: String, language: String = "en") async throws -> NuiteeHotelDetail {

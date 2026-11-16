@@ -146,15 +146,9 @@ struct IumrahAccountView: View {
                         settingsSection
                         signOutButton
                     } else {
-                        guestOrbitHero
+                        seamlessGuestProfile
                         automaticHelpCard
-                        loginCard
-                            .id("account-login")
-                        IumrahLockedIdentityCard(language: settings.language) {
-                            showIdentityUnlockSheet = true
-                        }
-                        telegramIntegrationSection
-                        paymentSecuritySection
+                        IumrahBookingAccessCard(bookingID: nil)
                         guestSettingsSection
                     }
                 }
@@ -181,12 +175,8 @@ struct IumrahAccountView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
         .modifier(IumrahPerformanceHost())
-        .onChange(of: pendingReferralCode) { _, value in
-            if !account.isAuthenticated, IumrahReferralLink.normalized(value) != nil, guestAccountMode != .register { guestAccountMode = .register }
-        }
         .task(id: activeTab) {
             guard activeTab else { return }
-            if !account.isAuthenticated, IumrahReferralLink.normalized(pendingReferralCode) != nil { guestAccountMode = .register }
             loadProfileDraftIfNeeded(force: false)
             prepareIdentityRevealIfNeeded(account.iumrahID)
             await refreshNotificationStatus()
@@ -256,16 +246,38 @@ struct IumrahAccountView: View {
 
     private var accountHeader: some View {
         IumrahPrimaryTabHeader(
-            title: tr("Account", "Аккаунт", "Akkaunt", "Аккаунт"),
+            title: tr("Profile", "Профиль", "Profil", "Профиль"),
             footer: account.account.map { profile in
                 AnyView(userDataEntryCard(profile).padding(.horizontal, IumrahDesign.pagePadding))
-            } ?? AnyView(IumrahHeaderPills(
-                labels: [tr("Register", "Зарегистрироваться", "Ro‘yxatdan o‘tish", "Рўйхатдан ўтиш"), tr("Sign in", "Войти", "Kirish", "Кириш")],
-                symbols: ["person.badge.plus", "key"], selection: guestAccountMode == .register ? 0 : 1,
-                onSelect: { index in guestAccountMode = index == 0 ? .register : .signIn; loginScrollNonce += 1 })),
+            },
             flexibleFooter: account.account != nil,
             animateMap: false
         )
+    }
+
+    private var seamlessGuestProfile: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                Image(systemName: "person.crop.circle.fill").font(.system(size: 48)).foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(bookings.sessions.first?.travelerName ?? tr("Welcome to iumrah", "Добро пожаловать в iumrah", "iumrah’ga xush kelibsiz", "iumrah’га хуш келибсиз"))
+                        .font(.title3.weight(.bold))
+                    if let id = bookings.sessions.first?.displayPilgrimID {
+                        Text("iumrah ID " + id).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                    } else {
+                        Text(tr("Your profile appears with your first booking.", "Ваш профиль появится после первого бронирования.", "Profilingiz birinchi brondan keyin paydo bo‘ladi.", "Профилингиз биринчи брондан кейин пайдо бўлади.")).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Button { chrome.navigate(to: .booking) } label: {
+                HStack {
+                    Image(systemName: "ticket")
+                    Text(tr("My bookings", "Мои бронирования", "Bronlarim", "Бронларим"))
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                }.font(.headline)
+            }.buttonStyle(.plain)
+        }.frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
     }
 
     private var automaticHelpCard: some View {
@@ -1250,7 +1262,7 @@ struct IumrahAccountView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                Text(tr("Sign out", "Выйти из аккаунта", "Akkauntdan chiqish", "Аккаунтдан чиқиш"))
+                Text(tr("Disconnect this device", "Отключить профиль на устройстве", "Profilni qurilmadan uzish", "Профилни қурилмадан узиш"))
                 Spacer()
             }
             .padding(.horizontal, 18)

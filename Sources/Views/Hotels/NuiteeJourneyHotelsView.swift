@@ -110,7 +110,6 @@ struct NuiteeJourneyHotelsView: View {
             }
         }
         .onChange(of: key) { _, _ in proxy.scrollTo("hotels-top", anchor: .top) }
-        .onAppear { proxy.scrollTo("hotels-top", anchor: .top) }
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .toolbar(.hidden, for: .navigationBar)
@@ -184,12 +183,13 @@ struct NuiteeJourneyHotelsView: View {
         journey.transferSelectionConfirmed = false
     }
     @MainActor private func load(forceRefresh: Bool = false) async {
+        if !forceRefresh, loadedSearchID == searchID, error == nil { return }
         let trace = IumrahPerformanceTrace.begin("Journey hotel load")
         defer { IumrahPerformanceTrace.end("Journey hotel load", trace) }
         let token = UUID(); requestID = token
         let requestedSearchID = searchID
-        loading = true; loadingMore = false; pageError = false; error = nil; nextOffset = nil; total = 0
-        if loadedSearchID != requestedSearchID { hotels = []; hotelRevision &+= 1; loadedSearchID = nil }
+        loading = true; loadingMore = false; pageError = false; error = nil
+        if loadedSearchID != requestedSearchID { hotels = []; nextOffset = nil; total = 0; hotelRevision &+= 1; loadedSearchID = nil }
         defer { if requestID == token { loading = false } }
         do {
             let response = try await service.hotelPage(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: max(1, roomAdults), stars: stars)
@@ -198,7 +198,10 @@ struct NuiteeJourneyHotelsView: View {
             error = response.rateError
         } catch {
             guard requestID == token, searchID == requestedSearchID, !Task.isCancelled else { return }
-            hotels = []; hotelRevision &+= 1; loadedSearchID = nil; self.error = error.localizedDescription
+            self.error = error.localizedDescription
+            if loadedSearchID == requestedSearchID {
+                hotels = hotels.map { hotel in var row = hotel; row.minimumRate = nil; row.rateStatus = "provider_error"; return row }; hotelRevision &+= 1
+            }
         }
     }
     @MainActor private func loadMore() async {

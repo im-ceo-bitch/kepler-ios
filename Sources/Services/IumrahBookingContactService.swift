@@ -27,9 +27,24 @@ enum IumrahBookingContactError: LocalizedError {
     }
 }
 
-/// Guest booking verification. Does not authenticate or register an iumrah account.
+/// Guest booking verification and exchange of a server-confirmed contact for a profile session.
+private struct BookingProfileExchangeRequest: Encodable {
+    let bookingID: String
+    let verificationToken: String
+    let channel: String
+    let device: IumrahClientDevice
+}
+
 struct IumrahBookingContactService {
     private let api = APIClient.shared
+
+    // A verified, booking-bound proof is exchanged for an ordinary server session.
+    // No client-generated token, password or automatic account lookup is allowed.
+    func exchangeProfile(bookingID: String, bookingToken: String, verificationToken: String, channel: String, locale: String) async throws -> IumrahAccountAuthResponse {
+        try await api.post("/api/package/client/account/booking-session", body: BookingProfileExchangeRequest(
+            bookingID: bookingID, verificationToken: verificationToken, channel: channel,
+            device: IumrahAccountDeviceIdentity.current(locale: locale)), headers: ["x-booking-token": bookingToken])
+    }
 
     func requestCode(phone: String) async throws -> BookingContactStartResponse {
         try await api.post(

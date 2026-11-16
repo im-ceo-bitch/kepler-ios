@@ -45,10 +45,20 @@ final class IumrahAccountStore: ObservableObject {
             lastError = nil
         } catch {
             guard self.token == token else { return }
-            self.token = nil
-            account = nil
-            IumrahAccountVault.clear()
-            lastError = nil
+            // A transient network error must not erase the saved trip profile.
+            // Protected server requests still require a valid bearer session.
+            let rejected: Bool
+            switch error {
+            case APIError.status(let status): rejected = status == 401 || status == 403
+            case APIError.server(let status, _): rejected = status == 401 || status == 403
+            default: rejected = false
+            }
+            if rejected {
+                self.token = nil
+                account = nil
+                IumrahAccountVault.clear()
+            }
+            lastError = rejected ? nil : error.localizedDescription
         }
     }
 

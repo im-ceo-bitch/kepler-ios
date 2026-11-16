@@ -140,7 +140,7 @@ struct LegacyFinalPackageView: View {
         }
         .task { await push.refreshAndRegisterIfAllowed() }
         .navigationDestination(isPresented: $isProfileSheetPresented) {
-            IumrahBookingConfirmationView(createBooking: { profile in
+            IumrahBookingConfirmationView(quote: journey.quote, createBooking: { profile in
                 try await createBooking(profile: profile)
             }).environmentObject(settings)
         }

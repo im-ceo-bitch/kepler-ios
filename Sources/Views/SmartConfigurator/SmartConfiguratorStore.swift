@@ -247,7 +247,7 @@ final class SmartConfiguratorStore: ObservableObject {
             repeat {
                 try Task.checkCancellation()
                 let catalog: NuiteeHotelListEnvelope
-                do { catalog = try await service.hotelPage(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: adults.max() ?? 1, stars: star, offset: offset) }
+                do { catalog = try await service.hotelPage(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: adults.max() ?? 1, stars: star, offset: offset, allowCatalogFallback: false) }
                 catch { try Task.checkCancellation(); throw Failure.hotelNetwork }
                 if catalog.rateError != nil { hadRequestError = true }
                 // Strict Smart-only star filter. Prices are planning estimates; room offers must still be server-observed.

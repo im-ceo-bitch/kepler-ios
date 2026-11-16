@@ -44,6 +44,28 @@ struct NuiteeHotelListEnvelope: Codable {
     var nextOffset: Int? = nil
 }
 
+extension NuiteeHotelListEnvelope {
+    /// Older unified Worker contracts return the entire city without pagination.
+    /// Apply the exact same filters locally only for that response shape.
+    static func normalizedPage(_ result: NuiteeHotelListEnvelope, stars: Int, offset: Int, pageSize: Int,
+                               query: String, favorites: Set<String>?) -> NuiteeHotelListEnvelope {
+        guard result.total == nil else { return result }
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filtered = result.hotels.filter { hotel in
+            (stars == 0 || hotel.roundedStars == stars) &&
+            (favorites == nil || favorites?.contains(hotel.id) == true) &&
+            (term.isEmpty || hotel.name.localizedCaseInsensitiveContains(term) || (hotel.address?.localizedCaseInsensitiveContains(term) ?? false))
+        }
+        let start = min(max(0, offset), filtered.count)
+        let end = start + min(max(1, pageSize), filtered.count - start)
+        return NuiteeHotelListEnvelope(ok: result.ok, sandbox: result.sandbox, city: result.city,
+            checkin: result.checkin, checkout: result.checkout, adults: result.adults,
+            hotelCatalogStale: result.hotelCatalogStale, pricesStale: result.pricesStale, pricesUpdatedAt: result.pricesUpdatedAt,
+            rateError: result.rateError, hotels: Array(filtered[start..<end]), total: filtered.count,
+            nextOffset: end < filtered.count ? end : nil)
+    }
+}
+
 struct NuiteeHotelPolicy: Codable, Hashable, Identifiable {
     let title: String
     let description: String

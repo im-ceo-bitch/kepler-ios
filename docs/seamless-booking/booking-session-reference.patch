@@ -1,0 +1,99 @@
+--- a/src/client-account-security.ts
++++ b/src/client-account-security.ts
+@@ -3156,10 +3156,96 @@
+   });
+ }
+ 
++/** Exchange an already verified, booking-bound contact proof for an ordinary
++ * authenticated profile session. This endpoint never trusts an email/phone sent
++ * by a client, and never changes an established owner's credentials. */
++async function exchangeVerifiedBookingSession(request: Request, env: Env, db: D1Like) {
++  const input = await request.json().catch(() => null) as { bookingID?: unknown; verificationToken?: unknown; channel?: unknown; device?: unknown } | null;
++  const context = await bookingActivationContext(request, env, db, input?.bookingID);
++  const device = parseDevice(input?.device);
++  const token = cleanText(input?.verificationToken, 80);
++  const channel = input?.channel;
++  if (!/^[a-f0-9]{64}$/.test(token) || (channel !== "email" && channel !== "sms")) throw new RouteError("PROOF_INVALID", 400);
++  const now = new Date().toISOString();
++  const table = channel === "email" ? "iumrah_guest_booking_email_challenges" : "iumrah_guest_booking_phone_challenges";
++  const column = channel === "email" ? "email" : "phone";
++  const proof = await db.prepare(`SELECT ${column} AS contact FROM ${table}
++    WHERE verification_token_hash=?1 AND booking_id=?2 AND verified_at IS NOT NULL
++      AND consumed_at IS NOT NULL AND proof_expires_at>?3 LIMIT 1`)
++    .bind(await sha256Hex(token), context.bookingID, now).first<{ contact: string }>();
++  if (!proof) throw new RouteError("PROOF_EXPIRED_OR_INVALID", 403);
++  const contact = channel === "email" ? normalizeEmail(proof.contact) : normalizePhone(proof.contact);
++  if (channel === "email" ? !validEmail(contact) : !validUzbekPhone(contact)) throw new RouteError("PROOF_INVALID", 400);
++  // Also check the exact contact stored on the authorized booking. A proof
++  // consumed for a different booking/contact must never issue a session.
++  const booking = await env.BOOKINGS_DB!.prepare("SELECT payload_json FROM bookings WHERE id=?1 LIMIT 1")
++    .bind(context.bookingID).first<{ payload_json: string }>();
++  let profile: Record<string, unknown> = {};
++  try { profile = (JSON.parse(booking?.payload_json ?? "{}").pilgrimProfile ?? {}) as Record<string, unknown>; } catch { throw new RouteError("BOOKING_PROOF_INVALID", 403); }
++  const attached = channel === "email" ? normalizeEmail(profile.email) : normalizePhone(profile.phone);
++  const verifiedAt = channel === "email" ? profile.emailVerifiedAt : profile.phoneVerifiedAt;
++  if (attached !== contact || !verifiedAt) throw new RouteError("BOOKING_CONTACT_NOT_VERIFIED", 403);
++
++  const identityTable = channel === "email" ? "iumrah_client_account_emails" : "iumrah_client_account_phones";
++  const normalizedColumn = channel === "email" ? "email_normalized" : "phone_normalized";
++  const displayColumn = channel === "email" ? "email_display" : "phone_display";
++  const linked = await db.prepare(`SELECT pilgrim_id FROM ${identityTable} WHERE ${normalizedColumn}=?1 AND verified_at IS NOT NULL LIMIT 1`)
++    .bind(contact).first<{ pilgrim_id: number }>();
++  let owner = Number(linked?.pilgrim_id ?? 0);
++  // Never move a booking away from an established profile based solely on a
++  // notification contact. An authenticated current owner must resolve conflicts.
++  const established = await accountHasEstablishedCredentials(db, context.pilgrimID);
++  const existingPhone = await db.prepare("SELECT pilgrim_id FROM iumrah_client_account_phones WHERE pilgrim_id=?1 AND verified_at IS NOT NULL LIMIT 1")
++    .bind(context.pilgrimID).first<{ pilgrim_id: number }>();
++  if ((established || existingPhone) && owner !== context.pilgrimID) throw new RouteError("BOOKING_PROFILE_CONFLICT", 409);
++
++  if (!owner) {
++    // D1 batch is transactional. Both unique contact and account constraints
++    // protect simultaneous requests. Never overwrite an existing credential.
++    const atomic = db as D1Like & { batch?: (statements: ReturnType<D1Like["prepare"]>[]) => Promise<unknown[]> };
++    if (!atomic.batch) throw new RouteError("ATOMIC_PROFILE_CREATION_UNAVAILABLE", 503);
++    const salt = randomToken(18);
++    const hash = await passwordDigest(randomToken(48), salt, PASSWORD_ITERATIONS);
++    try {
++      await atomic.batch([
++        db.prepare(`INSERT INTO iumrah_accounts(pilgrim_id,password_salt,password_hash,password_iterations,activated_at,password_updated_at,failed_attempts,locked_until,last_login_at)
++          VALUES(?1,?2,?3,?4,?5,?5,0,NULL,NULL)`).bind(context.pilgrimID, salt, hash, PASSWORD_ITERATIONS, now),
++        db.prepare(`INSERT INTO ${identityTable}(pilgrim_id,${normalizedColumn},${displayColumn},verified_at,updated_at)
++          VALUES(?1,?2,?2,?3,?3)`).bind(context.pilgrimID, contact, now),
++        db.prepare(`UPDATE pilgrims SET ${column}=?1,updated_at=?2 WHERE id=?3`).bind(contact, now, context.pilgrimID),
++      ]);
++      owner = context.pilgrimID;
++    } catch {
++      // A concurrent request may have won. Never issue a session for a different
++      // owner here: the caller can retry the verified request or restore access.
++      throw new RouteError("BOOKING_PROFILE_RETRY", 409);
++    }
++  }
++  const pilgrim = await accountRow(db, owner);
++  if (!pilgrim) throw new RouteError("BOOKING_PROFILE_NOT_READY", 409);
++  // A verified existing owner can authenticate, but the normal link-booking
++  // ownership endpoint must commit the trip link before the client adopts it.
++  // This preserves the canonical ID and does not delete any provisional rows.
++  const session = await createAccountSession(db, owner);
++  let sessionID: string;
++  try {
++    sessionID = await bindCurrentSession(db, { pilgrimID: owner, tokenHash: session.tokenHash, pilgrim }, device, request);
++    await db.prepare("UPDATE iumrah_accounts SET last_login_at=?1 WHERE pilgrim_id=?2").bind(now, owner).run();
++    await audit(db, owner, "verified_booking_session", sessionID, sessionID);
++  } catch (error) {
++    await db.prepare("UPDATE iumrah_account_sessions SET revoked_at=?1 WHERE token_hash=?2").bind(now, session.tokenHash).run();
++    throw error;
++  }
++  return json({ ok: true, account: accountProfile(pilgrim), session: { token: session.token, expiresAt: session.expiresAt } });
++}
++
+ export async function handleClientAccountSecurity(request: Request, env: Env, url: URL) {
+   if (!env.HOTELS_DB) return json({ ok: false, error: "HOTELS_DB_NOT_CONFIGURED" }, 503);
+   const db = env.HOTELS_DB;
+   try {
++    if (request.method === "POST" && url.pathname === "/api/package/client/account/booking-session") {
++      return await exchangeVerifiedBookingSession(request, env, db);
++    }
+     if (request.method === "POST" && url.pathname === "/api/package/client/account/activate") {
+       return await activateWithBookingPassword(request, env, db);
+     }

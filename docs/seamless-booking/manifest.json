@@ -1,0 +1,127 @@
+{
+  "base": "kepler-ios-main 7.zip",
+  "cumulative_previous": "iumrah-beta-update-20261116-smart-compact-ux-v1.zip",
+  "scope": "iOS client + non-deployable server reference",
+  "files": [
+    {
+      "path": "SMART-COMPACT-UX-20261116.md",
+      "sha256": "07b8e2280fefd54956fde589f74bf4c9e5031c4b7d228238966b896707ab671a"
+    },
+    {
+      "path": "Sources/AppShell/IumrahAccountView.swift",
+      "sha256": "4b76850d903ab62bf9ecf5e86d810abd6521fe76c6fdf23f1462b6ac7c6f317a"
+    },
+    {
+      "path": "Sources/AppShell/IumrahAdaptiveAppShell.swift",
+      "sha256": "493f2354043f07cfb8066378a040fcb969cda79f1bbc99d0f32757c9fb5127df"
+    },
+    {
+      "path": "Sources/AppShell/SidebarDrawerView.swift",
+      "sha256": "744b0c5e4ed2d502256c8a9f9daa1ff288e9189b06f793cd6eaaeef76b25280a"
+    },
+    {
+      "path": "Sources/Core/Components/IumrahPageHelpCard.swift",
+      "sha256": "202946b3fc0344c9ff68f1e1efe5e818dda44eda488285f231d32f67fbd128f7"
+    },
+    {
+      "path": "Sources/Core/IumrahSeamlessBookingPolicy.swift",
+      "sha256": "de7503f66f713171a4596678524d19c4d40ac41a24f0a4cdcb0c0d8f4cce3b94"
+    },
+    {
+      "path": "Sources/Models/BookingModels.swift",
+      "sha256": "35833f4b66653b65171c10ed3739f2d2adc2de9bdd61cbbf0133cdf08e6b95d6"
+    },
+    {
+      "path": "Sources/Models/NuiteeHotelModels.swift",
+      "sha256": "3f8170c46b1b2631daba1850d1a6cfe820f52cecf652bed05510ea486a3bd7ef"
+    },
+    {
+      "path": "Sources/Services/IumrahBookingContactService.swift",
+      "sha256": "410947c299dc60e82111b9f249290676d0e777fcaac3316521b4918d96814ce1"
+    },
+    {
+      "path": "Sources/Services/NuiteeHotelService.swift",
+      "sha256": "07300f5809cc3d04d2a71c9d847649e6b123bdd73df1a86df7abc2e30bc5bf06"
+    },
+    {
+      "path": "Sources/State/BookingStore.swift",
+      "sha256": "20d69b28d6e35ad73f51fab8bf841d931ce5e8322964a2c274a8e530de0f82bf"
+    },
+    {
+      "path": "Sources/State/IumrahAccountStore.swift",
+      "sha256": "3cefcde4a0babb1f81c6e9388c099f52f7414eb534c0b17515476cf22259edcd"
+    },
+    {
+      "path": "Sources/Views/Booking/BookingCheckoutView.swift",
+      "sha256": "99e9e6157dd1bb2848ec37e21d8d7bb973262c0e5388c0dd970bc3de4e10b3d7"
+    },
+    {
+      "path": "Sources/Views/Booking/IumrahBookingAccessCard.swift",
+      "sha256": "953d6cce6cc9b926c38be10119e1438b088cefdbbafeae5742f38efabcbc0afe"
+    },
+    {
+      "path": "Sources/Views/Booking/IumrahBookingConfirmationView.swift",
+      "sha256": "58469ad9e3b0d5adbe65a0a42e1a8a1536a18a016dc48115567c9be54c678752"
+    },
+    {
+      "path": "Sources/Views/Booking/PilgrimCheckoutView.swift",
+      "sha256": "9c41712c2ae9c6dbe19cb897dc65e4e62dbf65ddca85d3c0f475b261adbf9903"
+    },
+    {
+      "path": "Sources/Views/Flights/IumrahGuidedFlightSelectionView.swift",
+      "sha256": "b2049d30a0c76fabcb1391153c74b4a840deea2915c14955ec3df667eac01c87"
+    },
+    {
+      "path": "Sources/Views/Hotels/NuiteeHotelsCatalogView.swift",
+      "sha256": "766be4cab2a1071e6ca9e9e7e9dd1d1ec9c9893c16da98b9d2aa33df200c1a4e"
+    },
+    {
+      "path": "Sources/Views/Hotels/NuiteeJourneyHotelsView.swift",
+      "sha256": "54a7c3a6f3e8dc5e6eadd70d934d91456fa9a8e1d8f4e4ec2d0cc9b1e2b38e00"
+    },
+    {
+      "path": "Sources/Views/Package/FinalPackageView.swift",
+      "sha256": "8540172bb815f4b6699ad3192e0b94fb3b320c631e009b98f3fe9cccb53b2d00"
+    },
+    {
+      "path": "Sources/Views/RootView.swift",
+      "sha256": "89dbfc269c9ed5a72d6f00ff36686aeeaa5939fb512cde6c3c4324fed66969bd"
+    },
+    {
+      "path": "Sources/Views/SmartConfigurator/SmartConfiguratorFlow.swift",
+      "sha256": "5d679426bbed996ca64373649a41be65fa5fca71c38afa92109dab5c4bb92b9e"
+    },
+    {
+      "path": "Sources/Views/SmartConfigurator/SmartConfiguratorStore.swift",
+      "sha256": "2c6d36d7d11fa4149e75f4c06744f470ba0f0bb08d5a14b7d0efab38a13030c3"
+    },
+    {
+      "path": "Sources/Views/Tabs/HotelStorefrontCompatibility.swift",
+      "sha256": "7bc1fdc2f2a7eb5dea414c7cee038e1d2f24c020aa457691eb2b17ba5841e489"
+    },
+    {
+      "path": "Tests/IumrahSeamlessBookingPolicySmoke.swift",
+      "sha256": "e1ad9a145a63b636e27e83c28b735dd75ac50e49a46b13e1dc237ea73b3fdde2"
+    },
+    {
+      "path": "Tests/NuiteeHotelPageCompatibilitySmoke.swift",
+      "sha256": "9849ca0fe1b839b8879e4ca37968c1aa05f168f62e1d1a6a8a1078167d23be05"
+    },
+    {
+      "path": "docs/seamless-booking/README.md",
+      "sha256": "3101ba746f1c43b7de2ab2da32ee50518614d0aeb80647037eddc56f40e49f60"
+    },
+    {
+      "path": "docs/seamless-booking/booking-session-reference.patch",
+      "sha256": "7ef25be85444bd7cd6baf8055cf6c18ac7fd8c232b262a606fcbcdff4c9b24da"
+    },
+    {
+      "path": "scripts/test_nuitee_page_compatibility.sh",
+      "sha256": "f1c2741c9298da8c23793c2ff9d71ed91298649f0f9fbe823efa30ab104f0b0c"
+    },
+    {
+      "path": "scripts/test_seamless_booking.sh",
+      "sha256": "8d5944a66a715eba7d2bfbe02d747868575cdc534f52dd706b48a622146059ae"
+    }
+  ]
+}

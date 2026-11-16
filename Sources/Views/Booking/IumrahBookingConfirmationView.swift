@@ -1,15 +1,17 @@
 import SwiftUI
 
 /// The same guest checkout is used by Hotel First, Flight First and Configurator.
-/// It does not sign the visitor into an account or create an account.
+/// No account form is shown; a verified contact can establish an internal profile session.
 struct IumrahBookingConfirmationView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
+    @EnvironmentObject private var account: IumrahAccountStore
     @EnvironmentObject private var chrome: AppChromeStore
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.smartBookingDone) private var smartBookingDone
 
+    var quote: PackageQuote? = nil
     let createBooking: @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession
 
     @State private var firstName = ""
@@ -27,6 +29,7 @@ struct IumrahBookingConfirmationView: View {
     @State private var errorMessage: String?
     @State private var isCodeStep = false
     @State private var isFinished = false
+    @State private var profileAccessPending = false
     @FocusState private var activeField: IdentityField?
 
     private let verificationService = IumrahBookingContactService()
@@ -56,9 +59,9 @@ struct IumrahBookingConfirmationView: View {
                 } else {
                     identityAnimation
                     introduction
-                    passportWarning
-                    noPaymentNotice
                     identityFields
+                    if let quote, quote.bookingAllowed != false, !quote.isEstimated { priceSummary(quote) }
+                    noPaymentNotice
                     if isCodeStep { verificationFields }
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -67,12 +70,19 @@ struct IumrahBookingConfirmationView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    nextButton
                 }
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 14)
             .padding(.bottom, 42)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !isFinished {
+                nextButton
+                    .padding(.horizontal, IumrahDesign.pagePadding)
+                    .padding(.vertical, 10)
+                    .background(Color.iumrahPageBackground)
+            }
         }
         .scrollDismissesKeyboard(.interactively)
         .background(isFinished ? Color(uiColor: .systemBackground) : Color.iumrahPageBackground)
@@ -89,6 +99,8 @@ struct IumrahBookingConfirmationView: View {
             if firstName.isEmpty { firstName = settings.firstName }
             if lastName.isEmpty { lastName = settings.lastName }
             if phone == "+998", !settings.phone.isEmpty { phone = settings.phone }
+            if email.isEmpty, let profile = account.account { email = profile.email }
+            if let profile = account.account, !profile.email.isEmpty, profile.phone.isEmpty { channel = .email }
         }
         .onChange(of: channel) { _, _ in resetVerification() }
         .onChange(of: phone) { _, _ in if channel == .sms && !isWorking { resetVerification() } }
@@ -99,24 +111,24 @@ struct IumrahBookingConfirmationView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 30, style: .continuous)
                 .fill(.black)
-            IumrahOrbitAdaptive(maxDiameter: 190, logo: Image("HeaderWordmarkDark"),
+            IumrahOrbitAdaptive(maxDiameter: 104, logo: Image("HeaderWordmarkDark"),
                                lightOnDark: true, accessibilityTitle: "iumrah",
                                pinnedSymbol: verificationProof != nil ? "checkmark.shield.fill" : (channel == .sms ? "iphone" : "envelope.fill"),
                                isActive: activeField == nil)
         }
-        .frame(height: 208)
+        .frame(height: 120)
         .accessibilityHidden(true)
     }
 
     private var introduction: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(copy("Подтвердите данные паломника", "Confirm the pilgrim's details", "Ziyoratchi ma’lumotlarini tasdiqlang", "Зиёратчи маълумотларини тасдиқланг", "تأكيد بيانات المعتمر"))
+            Text(copy("Подтвердите бронирование", "Confirm your booking", "Ziyoratchi ma’lumotlarini tasdiqlang", "Зиёратчи маълумотларини тасдиқланг", "تأكيد بيانات المعتمر"))
                 .font(.system(size: 25, weight: .bold, design: .rounded))
-            Text(copy("Это подтверждение бронирования, а не регистрация и не вход в аккаунт.",
-                      "Confirm your booking without registering or signing in.",
-                      "Bu bronni tasdiqlash — ro‘yxatdan o‘tish yoki akkauntga kirish emas.",
-                      "Бу бронни тасдиқлаш — рўйхатдан ўтиш ёки аккаунтга кириш эмас.",
-                      "هذا لتأكيد الحجز، وليس لتسجيل حساب أو تسجيل الدخول."))
+            Text(copy("Укажите имя и фамилию как в загранпаспорте и контакт для уведомлений.",
+                      "Enter your passport name and a contact for booking updates.",
+                      "Pasportdagi ism va familiyangizni hamda aloqa ma’lumotini kiriting.",
+                      "Паспортдаги исм ва фамилиянгизни ҳамда алоқа маълумотини киритинг.",
+                      "أدخل اسمك كما في جواز السفر وبيانات الاتصال للإشعارات."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -144,6 +156,15 @@ struct IumrahBookingConfirmationView: View {
         .padding(16)
         .background(Color.red.opacity(0.075), in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).strokeBorder(Color.red.opacity(0.24)))
+    }
+
+    private func priceSummary(_ quote: PackageQuote) -> some View {
+        HStack(alignment: .center) {
+            Text(copy("Стоимость поездки", "Trip total", "Safar narxi", "Сафар нархи", "إجمالي الرحلة"))
+                .font(.subheadline.weight(.medium))
+            Spacer()
+            PackagePriceView(amount: quote.totalPackagePrice, currency: quote.currency, showsPerPerson: false)
+        }.padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var noPaymentNotice: some View {
@@ -190,8 +211,8 @@ struct IumrahBookingConfirmationView: View {
                 .bookingInputStyle()
                 .disabled(isCodeStep || firstName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
 
-            fieldLabel("03", copy("Способ подтверждения", "Verification method", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"))
-            Picker(copy("Способ подтверждения", "Verification method", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"), selection: $channel) {
+            fieldLabel("03", copy("Куда отправлять уведомления?", "Booking updates", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"))
+            Picker(copy("Куда отправлять уведомления?", "Booking updates", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"), selection: $channel) {
                 Label("SMS", systemImage: "iphone.gen3").tag(ContactChannel.sms)
                 Label("Email", systemImage: "envelope.fill").tag(ContactChannel.email)
             }
@@ -275,15 +296,13 @@ struct IumrahBookingConfirmationView: View {
                      ? copy("Проверяем…", "Checking…", "Tekshirilmoqda…", "Текширилмоқда…", "جارٍ التحقق…")
                      : isCodeStep
                      ? copy("Подтвердить и забронировать", "Confirm booking", "Tasdiqlash va bron qilish", "Тасдиқлаш ва брон қилиш", "تأكيد الحجز")
-                     : channel == .sms
-                     ? copy("Получить SMS-код", "Send SMS code", "SMS kodini olish", "SMS кодини олиш", "إرسال رمز التحقق")
-                     : copy("Получить код на email", "Send email code", "Emailga kod yuborish", "Emailга код юбориш", "إرسال رمز البريد"))
-                Spacer(minLength: 8)
-                Image(systemName: "arrow.right")
+                     : copy("Забронировать Умру", "Book Umrah", "Umrani bron qilish", "Умрани брон қилиш", "احجز العمرة"))
+
             }
             .font(.headline)
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity)
             .frame(height: 58)
             .background(Color.black, in: RoundedRectangle(cornerRadius: 19))
         }
@@ -369,6 +388,33 @@ struct IumrahBookingConfirmationView: View {
                     locale: settings.language.rawValue
                 )
             }
+            bookings.recordVerifiedContact(id: session.id, email: confirmedEmail, phone: confirmedPhone)
+            // Attaching the verified notification contact is already a successful booking.
+            // Exchange failure never rolls it back and never creates a second trip.
+            if !account.isAuthenticated {
+                do {
+                    let auth = try await verificationService.exchangeProfile(bookingID: session.id, bookingToken: session.accessToken, verificationToken: verificationProof, channel: channel.rawValue, locale: settings.language.rawValue)
+                    let linked = try await IumrahAccountService().linkBooking(bookingID: session.id, bookingToken: session.accessToken, token: auth.session.token)
+                    guard IumrahSeamlessBookingPolicy.sameIdentity(linked.pilgrimID, auth.account.iumrahID) else { throw APIError.invalidResponse }
+                    let local = bookings.booking(id: session.id) ?? session
+                    _ = await account.acceptVerifiedSession(auth, locale: settings.language.rawValue)
+                    bookings.setAccountToken(account.bearerToken)
+                    bookings.adoptVerifiedBooking(local, link: linked)
+                    savedBooking = bookings.booking(id: session.id) ?? local
+                } catch {
+                    profileAccessPending = true
+                }
+            }
+            if let current = account.bearerToken, !profileAccessPending, let identity = account.iumrahID {
+                if let existing = bookings.booking(id: session.id), !IumrahSeamlessBookingPolicy.sameIdentity(existing.displayPilgrimID, identity) {
+                    do {
+                        let link = try await IumrahAccountService().linkBooking(bookingID: session.id, bookingToken: session.accessToken, token: current)
+                        guard IumrahSeamlessBookingPolicy.sameIdentity(link.pilgrimID, identity) else { throw APIError.invalidResponse }
+                        bookings.adoptVerifiedBooking(existing, link: link)
+                    } catch { profileAccessPending = true }
+                }
+            }
+            savedBooking = bookings.booking(id: session.id) ?? savedBooking
             settings.firstName = profile.firstName
             settings.lastName = profile.lastName
             if let confirmedPhone { settings.phone = confirmedPhone }
@@ -404,6 +450,10 @@ struct IumrahBookingConfirmationView: View {
                 session: session,
                 contact: channel == .sms ? confirmedPhone.map { .sms($0) } : confirmedEmail.map { .email($0) }
             )
+            if profileAccessPending {
+                Text(copy("Бронирование сохранено. При необходимости подтвердите доступ к поездке по тому же контакту.", "Booking saved. If needed, confirm access using the same contact.", "Bron saqlandi. Zarur bo‘lsa, shu aloqa orqali kirishni tasdiqlang.", "Брон сақланди. Зарур бўлса, шу алоқа орқали киришни тасдиқланг.", "تم حفظ الحجز. أكد الوصول بنفس وسيلة الاتصال عند الحاجة."))
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
             Button {
                 if let smartBookingDone { smartBookingDone() } else { dismiss() }
                 chrome.openBooking(id: session.id)

@@ -23,6 +23,8 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var inbound: FlightChoice?
     @State private var isLoading = false
     @State private var loadingRequestID = UUID()
+    @State private var loadedTrip: TripDraft?
+    @State private var requestedTrip: TripDraft?
     @State private var loadError: String?
     @State private var pendingChoice: FlightChoice?
     @State private var advanceAfterFlightDetail = false
@@ -178,7 +180,7 @@ struct IumrahGuidedFlightSelectionView: View {
         }
         ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 0) {
+                VStack(spacing: 0) {
                     blackHero
                         .id("flight-header")
                         .background {
@@ -187,7 +189,7 @@ struct IumrahGuidedFlightSelectionView: View {
                                     value: geo.frame(in: .named("flightFirstScroll")).maxY)
                             }
                         }
-                    LazyVStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 16) {
                         stepSelector.id("flight-step-selector")
                         searchControls(snapshot)
                         resultsSection(snapshot)
@@ -241,7 +243,10 @@ struct IumrahGuidedFlightSelectionView: View {
         .navigationDestination(isPresented: $showHotelPicker) {
             NuiteeJourneyHotelsView()
         }
-        .task { await loadFlights() }
+        .task {
+            guard loadedTrip != journey.trip, !isLoading else { return }
+            await loadFlights(preserveCalendar: requestedTrip == journey.trip)
+        }
         .onChange(of: filters) { _, _ in visibleCount = 20; pendingChoice = nil }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
             Button(tr("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
@@ -310,7 +315,7 @@ struct IumrahGuidedFlightSelectionView: View {
 
     private func resultsSection(_ snapshot: Snapshot) -> some View {
         LazyVStack(alignment: .leading, spacing: 15) {
-            if isLoading { ProgressView().frame(maxWidth: .infinity) }
+            if isLoading && snapshot.available.isEmpty { ProgressView().frame(maxWidth: .infinity) }
 
             if step == .inbound && outbound != nil && snapshot.available.isEmpty && !isLoading {
                 Text(tr("Для выбранного рейса туда пока нет совместимых обратных вариантов. Выберите другой рейс туда или измените даты.",
@@ -587,15 +592,21 @@ struct IumrahGuidedFlightSelectionView: View {
         HomePersonalizationStore.shared.saveFlight(journey.trip, owner: HomePersonalizationStore.owner(account))
         let trace = IumrahPerformanceTrace.begin("Guided flight load")
         defer { IumrahPerformanceTrace.end("Guided flight load", trace) }
-        visibleCount = 20
+        let trip = journey.trip
+        let sameSearch = requestedTrip == trip
+        if !sameSearch { visibleCount = 20 }
         editingSearch = false
         let requestID = UUID()
         loadingRequestID = requestID
-        if !preserveCalendar { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = []; dataRevision &+= 1 }
+        requestedTrip = trip
+        if !sameSearch {
+            published = []; dataOutbound = []; dataReturn = []
+            if !preserveCalendar { outboundCalendar = []; returnCalendar = [] }
+            dataRevision &+= 1
+        }
         isLoading = true
         loadError = nil
         defer { if loadingRequestID == requestID { isLoading = false } }
-        let trip = journey.trip
         let curatedService = CuratedFlightRecommendationService.shared
         let service = AviasalesFlightDiscoveryService()
         do {
@@ -603,11 +614,11 @@ struct IumrahGuidedFlightSelectionView: View {
             guard !Task.isCancelled, loadingRequestID == requestID else { return }
             published = result; dataRevision &+= 1
         } catch {
-            guard loadingRequestID == requestID else { return }
-            published = []; dataRevision &+= 1
+            guard !Task.isCancelled, loadingRequestID == requestID else { return }
+            if !sameSearch { published = []; dataRevision &+= 1 }
             loadError = error.localizedDescription
         }
-        if selectedCabin != .economy { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = []; dataRevision &+= 1; return }
+        if selectedCabin != .economy { dataOutbound = []; dataReturn = []; outboundCalendar = []; returnCalendar = []; dataRevision &+= 1; loadedTrip = trip; return }
         let legs: [(String, String, Date)] = [(outboundCode, destinationCode, trip.departureDate),
                                               (returnCode, outboundCode, trip.returnDate)]
         let orderedLegs = step == .outbound ? [0, 1] : [1, 0]
@@ -622,7 +633,9 @@ struct IumrahGuidedFlightSelectionView: View {
             if let value = try? await service.offers(origin: origin, destination: destination, departure: selected, direct: false, limit: 100) {
                 collected += value.offers.filter { $0.origin.uppercased() == origin && $0.destination.uppercased() == destination }
                 guard !Task.isCancelled, loadingRequestID == requestID else { return }
-                if index == 0 { dataOutbound = collected } else { dataReturn = collected }; dataRevision &+= 1
+                if !sameSearch || (index == 0 ? dataOutbound.isEmpty : dataReturn.isEmpty) {
+                    if index == 0 { dataOutbound = collected } else { dataReturn = collected }; dataRevision &+= 1
+                }
             }
             guard !Task.isCancelled, loadingRequestID == requestID else { return }
             var calendar: [FlightDiscoveryCalendarDay] = []
@@ -645,10 +658,19 @@ struct IumrahGuidedFlightSelectionView: View {
                     // Keep the exact date version if both endpoints returned the same offer ID.
                     var seen = Set<String>()
                     let unique = collected.filter { seen.insert($0.id).inserted }
-                    if index == 0 { dataOutbound = unique } else { dataReturn = unique }; dataRevision &+= 1
+                    if !sameSearch {
+                        if index == 0 { dataOutbound = unique } else { dataReturn = unique }; dataRevision &+= 1
+                    }
                 }
             }
+            guard !Task.isCancelled, loadingRequestID == requestID else { return }
+            var seen = Set<String>()
+            let unique = collected.filter { seen.insert($0.id).inserted }
+            if !unique.isEmpty || !sameSearch {
+                if index == 0 { dataOutbound = unique } else { dataReturn = unique }; dataRevision &+= 1
+            }
         }
+        if !Task.isCancelled && loadingRequestID == requestID { loadedTrip = trip }
     }
 
     private func commitSelection() {

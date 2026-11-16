@@ -420,7 +420,11 @@ struct RootView: View {
     @MainActor
     private func handleOpenedPushIfNeeded() {
         guard let event = push.lastOpenedEvent else { return }
-        guard event.pilgrimID == nil || event.pilgrimID == account.account?.iumrahID else { return }
+        if let pilgrimID = event.pilgrimID, pilgrimID != account.account?.iumrahID {
+            guard let bookingID = event.bookingID, let local = bookings.booking(id: bookingID),
+                  !local.accessToken.isEmpty, let owner = local.displayPilgrimID,
+                  IumrahSeamlessBookingPolicy.sameIdentity(owner, pilgrimID) else { return }
+        }
         if event.type == "system_notification" {
             routeNotification(destination: event.destination, bookingID: event.destinationBookingID)
             if let id = event.notificationID, let notification = clientNotifications.notification(id: id) {
@@ -456,6 +460,10 @@ struct RootView: View {
     private func linkLocalBookingsToAccount() async {
         guard account.isAuthenticated else { return }
         for session in bookings.sessions {
+            // A restored profile may coexist with older guest bookings on this device.
+            // Never attach those to a different person merely because they are local.
+            guard let owner = session.displayPilgrimID, let current = account.iumrahID,
+                  IumrahSeamlessBookingPolicy.sameIdentity(owner, current) else { continue }
             let bookingToken = session.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !bookingToken.isEmpty else { continue }
             if let linked = try? await account.linkBooking(bookingID: session.id, bookingToken: bookingToken) {
@@ -523,6 +531,15 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.28), value: hasCompletedOnboarding)
     }
 
+    private var profileTabTitle: String {
+        switch settings.language {
+        case .russian, .uzbekCyrillic: return "Профиль"
+        case .uzbek, .turkish, .indonesian, .malay: return "Profil"
+        case .arabic: return "الملف الشخصي"
+        case .english: return "Profile"
+        }
+    }
+
     private var tabs: some View {
         TabView(selection: $chrome.currentTab) {
             tabScreen(for: .home) { HomeDashboardView() }
@@ -542,7 +559,7 @@ struct RootView: View {
                 .tag(AppTab.care)
 
             tabScreen(for: .account) { IumrahAccountView() }
-                .tabItem { Label("Account", systemImage: "person.crop.circle") }
+                .tabItem { Label(profileTabTitle, systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
         // Navigation chrome uses one restrained app accent; content icons carry

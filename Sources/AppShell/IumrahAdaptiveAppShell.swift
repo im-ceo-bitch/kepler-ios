@@ -220,10 +220,12 @@ extension AppTab {
             return L10n.text("tab_care", language)
         case .account:
             switch language {
-            case .russian: return "Аккаунт"
-            case .english, .turkish, .indonesian, .malay, .arabic: return "Account"
-            case .uzbek: return "Akkaunt"
-            case .uzbekCyrillic: return "Аккаунт"
+            case .russian: return "Профиль"
+            case .english: return "Profile"
+            case .turkish, .indonesian, .malay: return "Profil"
+            case .arabic: return "الملف الشخصي"
+            case .uzbek: return "Profil"
+            case .uzbekCyrillic: return "Профиль"
             }
         }
     }

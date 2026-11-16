@@ -42,7 +42,8 @@ final class BookingStore: ObservableObject {
     // Home must never expose a cached booking from a different session while
     // account restoration is still in progress.
     func homeSessions(accountToken token: String?) -> [StoredBookingSession] {
-        guard let token, !token.isEmpty, accountToken == token else { return [] }
+        guard accountToken == token else { return [] }
+        if token == nil { return sessions.filter { !$0.accessToken.isEmpty } }
         return sessions
     }
     var canUseCareChat: Bool {
@@ -530,6 +531,22 @@ final class BookingStore: ObservableObject {
         }
         sessions.sort { $0.booking.createdAt > $1.booking.createdAt }
         persist()
+    }
+
+    func recordVerifiedContact(id: String, email: String?, phone: String?) {
+        guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+        if let email { sessions[index].verifiedBookingEmail = email }
+        if let phone { sessions[index].verifiedBookingPhone = phone }
+        persist()
+    }
+
+    // Only called after the server has authorized the link using BOTH proofs.
+    func adoptVerifiedBooking(_ original: StoredBookingSession, link: IumrahAccountLinkBookingResponse) {
+        var session = booking(id: original.id) ?? original
+        session.pilgrimID = link.pilgrimID
+        session.bookingNumber = link.bookingNumber ?? session.bookingNumber
+        session.bookingDisplayNumber = link.bookingDisplayNumber ?? session.bookingDisplayNumber
+        upsert(session)
     }
 
     func applyCanonicalLink(_ value: IumrahAccountLinkBookingResponse, to bookingID: String) {

@@ -38,7 +38,7 @@ struct BookingCheckoutView: View {
             BookingDetailView(bookingID: session.id)
         }
         .navigationDestination(isPresented: $showProfileSheet) {
-            IumrahBookingConfirmationView(createBooking: { profile in
+            IumrahBookingConfirmationView(quote: journey.quote, createBooking: { profile in
                 try await submitBooking(profile: profile)
             })
         }

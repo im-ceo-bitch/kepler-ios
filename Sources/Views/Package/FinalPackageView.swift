@@ -6,8 +6,7 @@ struct FinalPackageView: View {
     var familyFlow = false
     @EnvironmentObject private var journey: JourneyStore
     var body: some View {
-        if journey.usesLocalJourney { LocalJourneyReviewView() }
-        else { LegacyFinalPackageView(familyFlow: familyFlow) }
+        LegacyFinalPackageView(familyFlow: familyFlow)
     }
 }
 
@@ -205,7 +204,7 @@ struct LegacyFinalPackageView: View {
         IumrahJourneyDisclosureCard(
             title: tr("Ваша умра", "Your Umrah", "Sizning Umrangiz", "Сизнинг Умрангиз"),
             total: totalText, subtitle: partyText,
-            priceCaption: tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")
+            priceCaption: journey.usesLocalJourney ? tr("Предварительно за всех", "Estimated total", "Taxminiy jami", "Тахминий жами") : tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(journey.trip.packageTier.title(settings.language)).font(.headline)
@@ -278,7 +277,7 @@ struct LegacyFinalPackageView: View {
                 nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights)
             if let nightly = IumrahPackageDisplayPrices.nightly(room) {
                 IumrahPackageUnitPriceLine(amount: nightly, currency: room.rate.currency,
-                    caption: tr("В среднем за номер / ночь", "Average per room / night", "Xona / tun uchun o‘rtacha", "Хона / тун учун ўртача"), language: settings.language)
+                    caption: tr("Ориентировочно за номер / ночь", "Estimated per room / night", "Xona / tun uchun taxminan", "Хона / тун учун тахминан"), language: settings.language)
             }
             Button(tr("Изменить номер", "Change room", "Xonani o‘zgartirish", "Хонани ўзгартириш")) { localHotelForDetails = room }
                 .buttonStyle(IumrahSecondaryButtonStyle())
@@ -396,7 +395,7 @@ struct LegacyFinalPackageView: View {
     private var bookingBar: some View {
         VStack(spacing: 10) {
             HStack {
-                Text(tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")).font(.caption).foregroundStyle(.secondary)
+                Text(journey.usesLocalJourney ? tr("Предварительно за всех", "Estimated total", "Taxminiy jami", "Тахминий жами") : tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Text(totalText).font(.title3.bold()).monospacedDigit()
             }
@@ -407,6 +406,9 @@ struct LegacyFinalPackageView: View {
                     Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language))
                         .font(.subheadline.weight(.semibold)).monospacedDigit()
                 }
+            }
+            if journey.usesLocalJourney {
+                Text(tr("Наличие и окончательная стоимость подтверждаются перед оплатой.", "Availability and final price will be confirmed before payment.", "Mavjudlik va yakuniy narx to‘lovdan oldin tasdiqlanadi.", "Мавжудлик ва якуний нарх тўловдан олдин тасдиқланади.")).font(.caption).foregroundStyle(.secondary)
             }
             if let reason = bookingBlockedReason {
                 Text(reason).font(.caption).foregroundStyle(.secondary)
@@ -421,7 +423,7 @@ struct LegacyFinalPackageView: View {
                     isProfileSheetPresented = true
                 } label: {
                     HStack {
-                        Text(tr("Забронировать поездку", "Book this trip", "Safarni bron qilish", "Сафарни брон қилиш"))
+                        Text(tr("Забронировать пакет", "Book package", "Paketni bron qilish", "Пакетни брон қилиш"))
                     }.frame(minHeight: 52)
                 }
                 .buttonStyle(IumrahPrimaryButtonStyle())

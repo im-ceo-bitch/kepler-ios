@@ -66,7 +66,7 @@ final class SmartConfiguratorStore: ObservableObject {
 
 
     private enum Failure: LocalizedError {
-        case noFlights, partyFare, hotel, room, quote, hotelNetwork, sandboxHotel
+        case noFlights, partyFare, hotel, room, quote, hotelNetwork
         var errorDescription: String? {
             switch self {
             case .noFlights: return "SMART_NO_MATCHING_FLIGHTS"
@@ -75,7 +75,6 @@ final class SmartConfiguratorStore: ObservableObject {
             case .room: return "SMART_ROOM_UNAVAILABLE"
             case .quote: return "SMART_QUOTE_UNAVAILABLE"
             case .hotelNetwork: return "SMART_HOTEL_NETWORK_UNAVAILABLE"
-            case .sandboxHotel: return "SMART_HOTEL_SANDBOX"
             }
         }
     }
@@ -238,44 +237,53 @@ final class SmartConfiguratorStore: ObservableObject {
         let adults = (0..<count).map { p.adults / count + ($0 < p.adults % count ? 1 : 0) }
         var ages = Array(repeating: [Int](), count: count)
         for (i, age) in p.childAges.enumerated() { ages[i % count].append(age) }
-        let catalog = try await service.hotels(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: adults.max() ?? 1, smartTimeout: true)
-        guard !catalog.sandbox else { throw Failure.sandboxHotel }
-        guard catalog.ok else { throw Failure.hotelNetwork }
         func price(_ hotel: NuiteeHotel) -> Double {
             hotel.minimumRate.flatMap { $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 ? $0.price : nil } ?? .infinity
         }
-        // Strict Smart-only star filter. Catalog minimum rates are hints, not bookable offers.
-        let eligible = catalog.hotels.filter { hotel in
-            guard let stars = hotel.stars, stars.isFinite, (0...5).contains(stars) else { return false }
-            return !excluding.contains(hotel.id) && p.tier.selectableHotelStars.contains(hotel.roundedStars)
-        }.sorted { a, b in
-            let pa = price(a), pb = price(b)
-            return pa == pb ? (a.rating ?? 0) > (b.rating ?? 0) : pa < pb
-        }
         var hadRequestError = false
         var consecutiveErrors = 0
-        // Bound supplier work; priced candidates first, then verify actual room offers.
-        for hotel in eligible.prefix(12) {
-            try Task.checkCancellation()
-            var rooms: [String: LocalJourneyRoom] = [:]
-            do {
-                for i in 0..<count {
-                    try Task.checkCancellation()
-                    let response = try await service.rates(hotelID: hotel.id, checkin: window.checkIn, checkout: window.checkOut, adults: adults[i], childrenAges: ages[i], smartTimeout: true)
-                    guard response.ok, !response.sandbox, let rate = response.rates.filter({ $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty && !$0.roomId.isEmpty }).min(by: { $0.price < $1.price }) else { break }
-                    let key = "\(city):\(i)"
-                    rooms[key] = .init(id: key, city: city, hotel: hotel, rate: rate, checkin: window.checkIn, checkout: window.checkOut, adults: adults[i], childrenAges: ages[i])
-                }
-                consecutiveErrors = 0
-                if rooms.count == count { return rooms }
-            } catch is CancellationError { throw CancellationError() }
-            catch {
+        for star in p.tier.selectableHotelStars.sorted() {
+            var offset = 0
+            repeat {
                 try Task.checkCancellation()
-                hadRequestError = true; consecutiveErrors += 1
-                if consecutiveErrors >= 3 { break }
-            }
+                let catalog: NuiteeHotelListEnvelope
+                do { catalog = try await service.hotelPage(city: city, checkin: window.checkIn, checkout: window.checkOut, adults: adults.max() ?? 1, stars: star, offset: offset) }
+                catch { try Task.checkCancellation(); throw Failure.hotelNetwork }
+                if catalog.rateError != nil { hadRequestError = true }
+                // Strict Smart-only star filter. Prices are planning estimates; room offers must still be server-observed.
+                let eligible = catalog.hotels.filter { hotel in
+                    guard let stars = hotel.stars, stars.isFinite, (0...5).contains(stars) else { return false }
+                    return !excluding.contains(hotel.id) && p.tier.selectableHotelStars.contains(hotel.roundedStars) && (price(hotel).isFinite || catalog.sandbox || !p.childAges.isEmpty || catalog.rateError != nil)
+                }.sorted { a, b in
+                    let pa = price(a), pb = price(b)
+                    return pa == pb ? (a.rating ?? 0) > (b.rating ?? 0) : pa < pb
+                }
+                // Priced candidates first; select a positive, matching room estimate for manual review.
+                for hotel in eligible {
+                    try Task.checkCancellation()
+                    var rooms: [String: LocalJourneyRoom] = [:]
+                    do {
+                        for i in 0..<count {
+                            try Task.checkCancellation()
+                            let response = try await service.rates(hotelID: hotel.id, checkin: window.checkIn, checkout: window.checkOut, adults: adults[i], childrenAges: ages[i], smartTimeout: true)
+                            guard response.ok, let rate = response.rates.filter({ $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty && !$0.roomId.isEmpty }).min(by: { $0.price < $1.price }) else { break }
+                            let key = "\(city):\(i)"
+                            rooms[key] = .init(id: key, city: city, hotel: hotel, rate: rate, checkin: window.checkIn, checkout: window.checkOut, adults: adults[i], childrenAges: ages[i])
+                        }
+                        consecutiveErrors = 0
+                        if rooms.count == count { return rooms }
+                    } catch is CancellationError { throw CancellationError() }
+                    catch {
+                        try Task.checkCancellation()
+                        hadRequestError = true; consecutiveErrors += 1
+                        if consecutiveErrors >= 3 { throw Failure.hotelNetwork }
+                    }
+                }
+                guard let next = catalog.nextOffset, next > offset else { break }
+                offset = next
+            } while true
         }
-        if hadRequestError || catalog.rateError != nil { throw Failure.hotelNetwork }
+        if hadRequestError { throw Failure.hotelNetwork }
         throw Failure.room
     }
 

@@ -39,6 +39,20 @@ struct NuiteeHotelService {
         return response
     }
 
+    func hotelPage(city: String, checkin: Date, checkout: Date, adults: Int, stars: Int = 0,
+                   offset: Int = 0, pageSize: Int = 10, query: String = "", favorites: Set<String>? = nil,
+                   catalogOnly: Bool = false) async throws -> NuiteeHotelListEnvelope {
+        var params = [URLQueryItem(name: "city", value: city), URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
+                      URLQueryItem(name: "checkout", value: Self.dateText(checkout)), URLQueryItem(name: "adults", value: String(adults)),
+                      URLQueryItem(name: "stars", value: String(stars)), URLQueryItem(name: "offset", value: String(offset)),
+                      URLQueryItem(name: "pageSize", value: String(pageSize)), URLQueryItem(name: "query", value: query),
+                      URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")]
+        if let favorites { params.append(URLQueryItem(name: "hotelIds", value: favorites.sorted().joined(separator: ","))) }
+        let result: NuiteeHotelListEnvelope = try await api.get("/api/package/nuitee/hotels", query: params, timeoutInterval: 90)
+        guard result.ok, result.total != nil else { throw APIError.invalidResponse }
+        return result
+    }
+
     func detail(hotelID: String, language: String = "en") async throws -> NuiteeHotelDetail {
         let response: NuiteeHotelDetailEnvelope = try await api.get(
             "/api/package/nuitee/hotel", query: [URLQueryItem(name: "hotelId", value: hotelID), URLQueryItem(name: "language", value: language)], timeoutInterval: 35

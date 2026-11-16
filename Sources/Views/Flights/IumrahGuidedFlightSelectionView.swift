@@ -27,7 +27,7 @@ struct IumrahGuidedFlightSelectionView: View {
     @State private var pendingChoice: FlightChoice?
     @State private var advanceAfterFlightDetail = false
     @State private var selectedDetail: FlightChoice?
-    @State private var showTransferPicker = false
+    @State private var showHotelPicker = false
     @State private var isFlightHeaderVisible = true
     @State private var isShowingSourceHelp = false
     @State private var dataRevision = 0
@@ -238,15 +238,15 @@ struct IumrahGuidedFlightSelectionView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $showTransferPicker) {
-            TransferSelectionView(selectBeforeHotels: true)
+        .navigationDestination(isPresented: $showHotelPicker) {
+            NuiteeJourneyHotelsView()
         }
         .task { await loadFlights() }
         .onChange(of: filters) { _, _ in visibleCount = 20; pendingChoice = nil }
         .alert(tr("Совместимость тарифов", "Fare compatibility", "Tarif mosligi", "Тариф мослиги"), isPresented: $isShowingSourceHelp) {
             Button(tr("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
         } message: {
-            Text(tr("Для одной заявки оба рейса должны быть из совместимого источника. Выберите другую пару.",
+            Text(tr("Для одного пакета оба рейса должны быть из совместимого источника. Выберите другую пару.",
                     "Both legs must use a compatible source for one package. Please select another pair.",
                     "Bir paketda ikkala reys ham mos manbadan bo‘lishi kerak. Boshqa juftlik tanlang.",
                     "Бир пакетда иккала рейс ҳам мос манбадан бўлиши керак. Бошқа жуфтлик танланг."))
@@ -276,48 +276,20 @@ struct IumrahGuidedFlightSelectionView: View {
     }
 
     private var searchSummary: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Button { withAnimation { editingSearch.toggle() } } label: {
-            VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text("\(dayText(journey.trip.departureDate)) – \(dayText(journey.trip.returnDate))")
-                    .font(IumrahType.bold(17)).monospacedDigit()
-                Spacer()
-                Image(systemName: editingSearch ? "chevron.up" : "chevron.down")
-                    .font(.caption.weight(.bold))
-                    .padding(.horizontal, 10)
-                    .frame(height: 30)
-
-            }
-            HStack {
-                Text(tr("\(journey.trip.travelerCount) чел.", "\(journey.trip.travelerCount) travelers", "\(journey.trip.travelerCount) kishi", "\(journey.trip.travelerCount) киши"))
-                    .font(.caption)
-                Text("·")
-                Text(cabinTitle)
-                    .font(.caption)
-                Spacer()
-            }
-            .foregroundStyle(.secondary)
-            }.contentShape(Rectangle())
-            }.buttonStyle(.plain)
-            if editingSearch {
-                Divider()
-                IumrahCompactSearchFields {
-                    IumrahFlightSearchEditor {
-                        pendingChoice = nil
-                        outbound = nil
-                        inbound = nil
-                        step = .outbound
-                        editingSearch = false
-                        Task { await loadFlights() }
-                    }
+        IumrahGraphiteSearchSurface(isExpanded: $editingSearch,
+            summary: "\(currentOrigin) → \(currentDestination)",
+            subtitle: "\(dayText(journey.trip.departureDate)) – \(dayText(journey.trip.returnDate)) · \(journey.trip.travelerCount) · \(cabinTitle)") {
+            IumrahCompactSearchFields {
+                IumrahFlightSearchEditor {
+                    pendingChoice = nil
+                    outbound = nil
+                    inbound = nil
+                    step = .outbound
+                    editingSearch = false
+                    Task { await loadFlights() }
                 }
             }
         }
-        .padding(12)
-        .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22))
-        .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(Color.primary.opacity(0.09), lineWidth: 1) }
-        .modifier(IumrahCollapseSearchOnPull { editingSearch = false })
     }
 
     private var cabinTitle: String {
@@ -745,7 +717,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 arrivalAt: flight.arrivalAt, displayedPrice: flight.price)
         }
         IumrahHaptics.success()
-        showTransferPicker = true
+        showHotelPicker = true
     }
 
     private func independentIdentity(_ flight: FlightChoice) -> String {

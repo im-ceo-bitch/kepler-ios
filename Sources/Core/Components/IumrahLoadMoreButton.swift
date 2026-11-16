@@ -19,3 +19,25 @@ struct IumrahLoadMoreButton: View {
         }
     }
 }
+
+/// Requests the next server page; preserves previously loaded rows on failure.
+struct IumrahHotelPageButton: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    let remaining: Int
+    let loading: Bool
+    let failed: Bool
+    let hasMore: Bool
+    let action: () -> Void
+    var body: some View {
+        if hasMore {
+            Button(action: action) {
+                HStack {
+                    Spacer()
+                    if loading { ProgressView().controlSize(.small) }
+                    Text(failed ? NuiteeCopy.text("Повторить загрузку", "Qayta yuklash", "Retry loading", settings.language) : NuiteeCopy.text("Показать ещё \(min(10, max(1, remaining))) отелей", "Yana \(min(10, max(1, remaining))) ta mehmonxona", "Show \(min(10, max(1, remaining))) more hotels", settings.language))
+                    Spacer()
+                }
+            }.buttonStyle(IumrahSecondaryButtonStyle()).disabled(loading).padding(.vertical, 6)
+        }
+    }
+}

@@ -77,7 +77,7 @@ struct L10n {
                 return text("booking_authoritative_quote_required", language)
             case .identityPending:
                 switch language {
-                case .russian: return "Не удалось получить номер бронирования и iumrah ID. Повторите синхронизацию, не создавая новую заявку."
+                case .russian: return "Не удалось получить номер бронирования и iumrah ID. Повторите синхронизацию, не создавая новое бронирование."
                 case .english: return "The booking number and iumrah ID are not available yet. Retry syncing without creating another booking."
                 case .uzbek: return "Bron raqami va iumrah ID hali olinmadi. Yangi bron yaratmasdan sinxronlashni qayta urinib ko‘ring."
                 case .uzbekCyrillic: return "Брон рақами ва iumrah ID ҳали олинмади. Янги брон яратмасдан синхронлашни қайта уриниб кўринг."
@@ -242,7 +242,7 @@ struct L10n {
             "hotel_storefront_flights_hero_body": "iumrah Flights Scanner finds current direct routes from Uzbekistan to Saudi Arabia and combines compatible legs into ready Umrah packages.",
             "hotel_storefront_flights_hero_note": "Jeddah routes can form 2–3 day Makkah-only Comfort packages. Trips of 4–15 days form Makkah + Madinah Standard packages, returning to the same city when possible or Tashkent as fallback.",
             "hotel_storefront_weekend_body": "Umrah that fits into your weekend. Sunday Umrah Club will collect short ready-to-go journeys here.",
-            "hotel_storefront_weekend_note": "Weekend packages will appear here as published departures. No placeholder offers are shown.",
+            "hotel_storefront_weekend_note": "Weekend packages will appear here as published departures.",
             "hotel_storefront_loading": "Preparing hotels and package prices…",
             "hotel_storefront_package_baseline": "Package flight",
             "hotel_storefront_published_flights": "Find us with iumrah Flights Scanner",
@@ -796,7 +796,7 @@ struct L10n {
             "hotel_storefront_flights_hero_body": "iumrah Flights Scanner находит актуальные прямые рейсы из городов Узбекистана в Саудовскую Аравию и собирает совместимые рейсы в готовые пакеты Умры.",
             "hotel_storefront_flights_hero_note": "Маршруты через Джидду могут стать Comfort-пакетом только Мекка на 2–3 дня. Поездки на 4–15 дней становятся Standard-пакетом Мекка + Медина с возвратом в исходный город или, если пары нет, в Ташкент.",
             "hotel_storefront_weekend_body": "Умра, которая помещается в ваши выходные. Здесь Sunday Umrah Club соберёт короткие готовые поездки.",
-            "hotel_storefront_weekend_note": "Weekend-пакеты появятся здесь как опубликованные готовые вылеты. Тестовые предложения не показываются.",
+            "hotel_storefront_weekend_note": "Weekend-пакеты появятся здесь как опубликованные готовые вылеты.",
             "hotel_storefront_loading": "Готовим отели и цены пакетов…",
             "hotel_storefront_package_baseline": "Рейс для пакета",
             "hotel_storefront_published_flights": "Найдите нас с помощью iumrah Flights Scanner",
@@ -1350,7 +1350,7 @@ struct L10n {
             "hotel_storefront_flights_hero_body": "iumrah Flights Scanner O‘zbekiston shaharlaridan Saudiya Arabistoniga dolzarb to‘g‘ridan-to‘g‘ri reyslarni topadi va mos reyslarni tayyor Umra paketlariga birlashtiradi.",
             "hotel_storefront_flights_hero_note": "Jidda yo‘nalishlari 2–3 kunlik faqat Makka Comfort paketiga aylanishi mumkin. 4–15 kunlik safarlar Makka + Madina Standard paketiga aylanadi; qaytish imkon qadar boshlang‘ich shaharga, aks holda Toshkentga.",
             "hotel_storefront_weekend_body": "Dam olish kunlariga sig‘adigan Umra. Sunday Umrah Club bu yerda qisqa va tayyor safarlarni jamlaydi.",
-            "hotel_storefront_weekend_note": "Weekend paketlar bu yerda e’lon qilingan tayyor jo‘nashlar sifatida paydo bo‘ladi. Sinov takliflari ko‘rsatilmaydi.",
+            "hotel_storefront_weekend_note": "Weekend paketlar bu yerda e’lon qilingan tayyor jo‘nashlar sifatida paydo bo‘ladi.",
             "hotel_storefront_loading": "Mehmonxonalar va paket narxlari tayyorlanmoqda…",
             "hotel_storefront_package_baseline": "Paket uchun reys",
             "hotel_storefront_published_flights": "iumrah Flights Scanner yordamida bizni toping",
@@ -1904,7 +1904,7 @@ struct L10n {
             "hotel_storefront_flights_hero_body": "iumrah Flights Scanner Ўзбекистон шаҳарларидан Саудия Арабистонига долзарб тўғридан-тўғри рейсларни топади ва мос рейсларни тайёр Умра пакетларига бирлаштиради.",
             "hotel_storefront_flights_hero_note": "Жидда йўналишлари 2–3 кунлик фақат Макка Comfort пакетига айланиши мумкин. 4–15 кунлик сафарлар Макка + Мадина Standard пакетига айланади; қайтиш имкон қадар бошланғич шаҳарга, акс ҳолда Тошкентга.",
             "hotel_storefront_weekend_body": "Дам олиш кунларига сиғадиган Умра. Sunday Umrah Club бу ерда қисқа ва тайёр сафарларни жамлайди.",
-            "hotel_storefront_weekend_note": "Weekend пакетлар бу ерда эълон қилинган тайёр жўнашлар сифатида пайдо бўлади. Синов таклифлари кўрсатилмайди.",
+            "hotel_storefront_weekend_note": "Weekend пакетлар бу ерда эълон қилинган тайёр жўнашлар сифатида пайдо бўлади.",
             "hotel_storefront_loading": "Меҳмонхоналар ва пакет нархлари тайёрланмоқда…",
             "hotel_storefront_package_baseline": "Пакет учун рейс",
             "hotel_storefront_published_flights": "iumrah Flights Scanner ёрдамида бизни топинг",

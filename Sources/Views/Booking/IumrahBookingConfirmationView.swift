@@ -274,7 +274,7 @@ struct IumrahBookingConfirmationView: View {
                 Text(isWorking
                      ? copy("Проверяем…", "Checking…", "Tekshirilmoqda…", "Текширилмоқда…", "جارٍ التحقق…")
                      : isCodeStep
-                     ? copy("Подтвердить и забронировать", "Confirm booking", "Tasdiqlash va bron qilish", "Тасдиқлаш ва брон қилиш", "تأكيد وطلب الحجز")
+                     ? copy("Подтвердить и забронировать", "Confirm booking", "Tasdiqlash va bron qilish", "Тасдиқлаш ва брон қилиш", "تأكيد الحجز")
                      : channel == .sms
                      ? copy("Получить SMS-код", "Send SMS code", "SMS kodini olish", "SMS кодини олиш", "إرسال رمز التحقق")
                      : copy("Получить код на email", "Send email code", "Emailga kod yuborish", "Emailга код юбориш", "إرسال رمز البريد"))
@@ -426,7 +426,7 @@ struct IumrahBookingConfirmationView: View {
     private static let turkish: [String: String] = [
         "Booking confirmation": "Rezervasyon onayı",
         "Confirm the pilgrim's details": "Umre yolcusunun bilgilerini doğrulayın",
-        "This is a booking request, not account registration or sign-in.": "Bu, hesap açma veya giriş işlemi değil, rezervasyon talebidir.",
+        "This is a booking request, not account registration or sign-in.": "Bu, hesap açma veya giriş işlemi değil, rezervasyon onayıdır.",
         "IMPORTANT: match your passport": "ÖNEMLİ: Pasaportunuzla aynı olmalı",
         "Enter your first and last name exactly as in your passport. Errors may affect tickets and documents.": "Adınızı ve soyadınızı pasaportunuzda yazdığı gibi girin. Hatalar biletleri ve belgeleri etkileyebilir.",
         "No payment is required now": "Şimdi ödeme yapmanız gerekmiyor",
@@ -451,7 +451,7 @@ struct IumrahBookingConfirmationView: View {
     private static let indonesian: [String: String] = [
         "Booking confirmation": "Konfirmasi pemesanan",
         "Confirm the pilgrim's details": "Konfirmasi data jemaah",
-        "This is a booking request, not account registration or sign-in.": "Ini adalah permintaan pemesanan, bukan pendaftaran atau masuk akun.",
+        "This is a booking request, not account registration or sign-in.": "Ini adalah konfirmasi pemesanan, bukan pendaftaran atau masuk akun.",
         "IMPORTANT: match your passport": "PENTING: sesuai paspor",
         "Enter your first and last name exactly as in your passport. Errors may affect tickets and documents.": "Masukkan nama depan dan belakang persis seperti di paspor. Kesalahan dapat memengaruhi tiket dan dokumen.",
         "No payment is required now": "Belum perlu membayar sekarang",
@@ -476,7 +476,7 @@ struct IumrahBookingConfirmationView: View {
     private static let malay: [String: String] = [
         "Booking confirmation": "Pengesahan tempahan",
         "Confirm the pilgrim's details": "Sahkan maklumat jemaah",
-        "This is a booking request, not account registration or sign-in.": "Ini permintaan tempahan, bukan pendaftaran atau log masuk akaun.",
+        "This is a booking request, not account registration or sign-in.": "Ini pengesahan tempahan, bukan pendaftaran atau log masuk akaun.",
         "IMPORTANT: match your passport": "PENTING: ikut pasport anda",
         "Enter your first and last name exactly as in your passport. Errors may affect tickets and documents.": "Masukkan nama pertama dan nama keluarga sama seperti dalam pasport. Kesilapan boleh menjejaskan tiket dan dokumen.",
         "No payment is required now": "Tiada bayaran diperlukan sekarang",

@@ -48,7 +48,7 @@ struct IumrahFlightResultCard: View {
                         Text(airline).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(2)
                         HStack(spacing: 6) {
                             if let number { Text(number).font(IumrahType.bold(12, relativeTo: .caption)).monospacedDigit().lineLimit(1) }
-                            Text(isAviasales ? "Aviasales" : "iumrah Direct")
+                            Text(isAviasales ? tr("Цена уточняется", "Fare subject to confirmation", "Narx tasdiqlanadi", "Нарх тасдиқланади") : "iumrah Direct")
                                 .font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }

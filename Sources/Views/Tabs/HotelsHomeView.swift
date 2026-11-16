@@ -147,10 +147,10 @@ struct HotelsHomeView: View {
                     discoveryPrompt(
                         icon: "building.2.crop.circle",
                         title: copy("Ваш отель в Саудовской Аравии", "Find your Saudi stay", "Saudiya mehmonxonangiz", "Саудия меҳмонхонангиз"),
-                        detail: copy("Выберите город, даты, состав гостей и нажмите «Найти отели». Результаты загружаются через Nuitee.",
-                                     "Choose a city, dates and guests. Hotel results come from Nuitee.",
-                                     "Shahar, sana va mehmonlarni tanlang. Natijalar Nuitee’dan keladi.",
-                                     "Шаҳар, сана ва меҳмонларни танланг. Натижалар Nuitee’дан келади.")
+                        detail: copy("Выберите город, даты, состав гостей и нажмите «Найти отели».",
+                                     "Choose a city, dates and guests.",
+                                     "Shahar, sana va mehmonlarni tanlang.",
+                                     "Шаҳар, сана ва меҳмонларни танланг.")
                     )
                 } else {
                     IumrahFlightBrowseCatalog(direction: flightDirection, refreshSignal: flightSearchRevision, model: flightCatalog,
@@ -281,8 +281,8 @@ struct HotelsHomeView: View {
                 }
             }
             if hotelRooms > 1 || hotelChildren > 0 || hotelAdults > 6 {
-                Label(copy("Для нескольких номеров или детей требуется отдельное подтверждение цены Nuitee. Не показываем взрослый тариф как семейный.",
-                           "Multiple rooms or children require a separately verified Nuitee quote.",
+                Label(copy("Для нескольких номеров или детей требуется отдельное подтверждение цены. Не показываем взрослый тариф как семейный.",
+                           "Multiple rooms or children require a separately verified quote.",
                            "Ko‘p xona yoki bolalar uchun narx alohida tasdiqlanishi kerak.",
                            "Кўп хона ёки болалар учун нарх алоҳида тасдиқланиши керак."), systemImage: "info.circle")
                     .font(.caption).foregroundStyle(.secondary)

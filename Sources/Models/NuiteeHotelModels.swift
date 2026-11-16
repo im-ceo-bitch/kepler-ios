@@ -40,6 +40,8 @@ struct NuiteeHotelListEnvelope: Codable {
     let pricesUpdatedAt: Double?
     let rateError: String?
     let hotels: [NuiteeHotel]
+    var total: Int? = nil
+    var nextOffset: Int? = nil
 }
 
 struct NuiteeHotelPolicy: Codable, Hashable, Identifiable {

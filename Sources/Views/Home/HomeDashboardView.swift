@@ -40,8 +40,8 @@ struct HomeDashboardView: View {
                     try? await Task.sleep(nanoseconds: 120_000_000_000)
                 }
             }
-            .fullScreenCover(item: $smartPresentation) { presentation in
-                SmartConfiguratorFlow(resumeDraft: presentation.draft) { smartPresentation = nil }
+            .navigationDestination(isPresented: Binding(get: { smartPresentation != nil }, set: { if !$0 { smartPresentation = nil } })) {
+                SmartConfiguratorFlow(resumeDraft: smartPresentation?.draft) { smartPresentation = nil }
             }
             .navigationDestination(isPresented: $showZiyarats) {
                 ZiyaratJourneyView()
@@ -92,9 +92,11 @@ struct HomeDashboardView: View {
                         onDismiss: { dismissSystemNotification($0) }
                     )
                 }
+                SmartConfiguratorHomeCard { startNewSmart() }
                 HomeEmotionalJourneyPrompt()
+                HomeWhyAndPreferencesSection(showsPreferences: false)
                 HomeVideoCarousel()
-
+                HomeDestinationsSection()
                 IumrahHomeServicesSection(
                     language: settings.language,
                     onTransfer: { showTransferService = true },
@@ -102,28 +104,24 @@ struct HomeDashboardView: View {
                     onFlights: { showFlightsService = true },
                     onZiyarats: { showZiyarats = true }
                 )
-
-                SmartConfiguratorHomeCard { startNewSmart() }
-                HomeDestinationsSection()
                 HomeAvailablePackagesSection(startSmart: { startNewSmart() })
                 JourneyTravelInfoView(showsPageSelector: true)
                 IumrahHomeAudienceSection(language: settings.language)
+                HomeRewardsOffersSection(showsOffers: false)
                 homeIntegrationsSection
-                HomeRewardsOffersSection()
                 HomeRecommendedHotelsSection()
-
+                HomeRewardsOffersSection(showsRewards: false)
+                confidenceStrip
+                philosophyCard
                 VStack(alignment: .leading, spacing: 15) {
                     IumrahHomeSectionHeader(title: homeProductsTitle)
                     productsCarousel()
                     IumrahHomeCarouselDots(count: 3, selectedIndex: productsCarouselIndex)
                 }
-
-                confidenceStrip
-                philosophyCard
                 connectedTripCard
                 personalUmrahFAQ
                 homeAboutFooter
-                HomeWhyAndPreferencesSection()
+                HomeWhyAndPreferencesSection(showsWhy: false)
             }
             // Same adaptive page-column rule as Account/Gear. Padding is part of
             // the column first; the outer frame then clamps the whole tree to the viewport.
@@ -2054,7 +2052,7 @@ private struct IumrahHomeJourneyPassengersSheet: View {
                 }
                 .padding(16)
                 .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
-                Text(tr("Максимум 9 путешественников в одной заявке.",
+                Text(tr("Максимум 9 путешественников в одном поиске.",
                         "Maximum 9 travelers per search.",
                         "Bir qidiruvda ko‘pi bilan 9 nafar yo‘lovchi.",
                         "Бир қидирувда кўпи билан 9 нафар йўловчи."))

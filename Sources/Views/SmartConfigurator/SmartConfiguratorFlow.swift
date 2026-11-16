@@ -77,32 +77,9 @@ struct SmartConfiguratorFlow: View {
     }
 
     var body: some View {
-        NavigationStack {
-            GeometryReader { proxy in
-                VStack(spacing: 0) {
-                    topBar
-                    ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 22) {
-                            orbitHeader(width: proxy.size.width)
-                            stepContent
-                                .id(step)
-                                .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 10)))
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-                        .padding(.bottom, 24)
-                        .frame(maxWidth: 570)
-                        .frame(maxWidth: .infinity)
-                    }
-                    footer
-                }
-            }
-            .background(Color.iumrahPageBackground)
-            .statusBarHidden(false)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(isPresented: $showReview) {
-                if let journey = store.result { FinalPackageView().environmentObject(journey) }
-            }
+        Group {
+            if firstLaunch { NavigationStack { flowContent } }
+            else { flowContent }
         }
         .statusBarHidden(false)
         .environment(\.smartBookingDone, {
@@ -141,6 +118,39 @@ struct SmartConfiguratorFlow: View {
             await store.assemble()
         }
     }
+    private var flowContent: some View {
+            GeometryReader { proxy in
+                VStack(spacing: 0) {
+                    topBar
+                    ScrollView(showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 22) {
+                            orbitHeader(width: proxy.size.width)
+                            stepContent
+                                .id(step)
+                                .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 10)))
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .padding(.bottom, 24)
+                        .frame(maxWidth: 570)
+                        .frame(maxWidth: .infinity)
+                    }
+                    footer
+                }
+            }
+            .background(Color.iumrahPageBackground)
+            .statusBarHidden(false)
+            .toolbar(firstLaunch ? .hidden : .visible, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .navigationTitle("iumrah Smart")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .navigationDestination(isPresented: $showReview) {
+                if let journey = store.result { FinalPackageView().environmentObject(journey) }
+            }
+    }
     private var topBar: some View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
@@ -158,13 +168,15 @@ struct SmartConfiguratorFlow: View {
                 }
                 Spacer(minLength: 0)
                 VStack(spacing: 3) {
-                    Text("iumrah Smart").font(.headline)
+                    if firstLaunch { Text("iumrah Smart").font(.headline) }
                     Text(t("Персональная поездка", "Personal journey", "Shaxsiy safar", "Шахсий сафар"))
                         .font(.caption2).foregroundStyle(.white.opacity(0.7))
                 }
                 Spacer(minLength: 0)
-                Button { onExit() } label: { glassIcon("xmark", size: 44, interactive: true) }
-                    .buttonStyle(.plain).accessibilityLabel(firstLaunch ? t("Пропустить", "Skip", "O‘tkazish", "Ўтказиш") : t("Закрыть", "Close", "Yopish", "Ёпиш"))
+                if firstLaunch {
+                    Button { onExit() } label: { glassIcon("xmark", size: 44, interactive: true) }
+                        .buttonStyle(.plain).accessibilityLabel(t("Пропустить", "Skip", "O‘tkazish", "Ўтказиш"))
+                }
             }
             HStack(spacing: 4) {
                 ForEach(steps, id: \.rawValue) { item in
@@ -372,7 +384,7 @@ struct SmartConfiguratorFlow: View {
                     .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 12)))
             }
             if let city = store.hotelSearchCity, store.busy {
-                Label(t("Проверяем доступные тарифы", "Checking available rates", "Tariflarni tekshiramiz", "Тарифларни текширамиз") + " · " + cityTitle(city), systemImage: "magnifyingglass")
+                Label(t("Подбираем варианты проживания", "Finding stay options", "Yashash variantlarini tanlaymiz", "Яшаш вариантларини танлаймиз") + " · " + cityTitle(city), systemImage: "magnifyingglass")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             if let replacementError = store.replacementError {
@@ -387,9 +399,10 @@ struct SmartConfiguratorFlow: View {
                     Text(journey.trip.departureDate.formatted(date: .abbreviated, time: .omitted) + " — " + journey.trip.returnDate.formatted(date: .abbreviated, time: .omitted)).font(.subheadline)
                     Text(store.connecting ? t("Есть пересадка", "Includes a connection", "Ulanish reysi bor", "Уланиш рейси бор") : t("Прямые рейсы", "Nonstop flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар")).font(.subheadline.weight(.semibold))
                     Text(IumrahPackageDisplayPrices.money(quote.totalPackagePrice, currency: quote.currency, language: settings.language)).font(.largeTitle.bold())
-                    Text(t("Итого за всех путешественников", "Total for all travelers", "Barcha sayohatchilar uchun jami", "Барча саёҳатчилар учун жами")).font(.caption).foregroundStyle(.secondary)
+                    Text(t("Предварительно за всех путешественников", "Estimated total for all travelers", "Barcha sayohatchilar uchun taxminiy jami", "Барча саёҳатчилар учун тахминий жами")).font(.caption).foregroundStyle(.secondary)
                     Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language) + " · " + t("на одного паломника", "per pilgrim", "bir ziyoratchi uchun", "бир зиёратчи учун"))
                         .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(t("Наличие и окончательную стоимость подтвердим вручную перед оплатой.", "Availability and final price will be confirmed manually before payment.", "Mavjudlik va yakuniy narx to‘lovdan oldin tasdiqlanadi.", "Мавжудлик ва якуний нарх тўловдан олдин тасдиқланади.")).font(.caption).foregroundStyle(.secondary)
                 }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
             }
             if let error = store.error {
@@ -474,7 +487,7 @@ struct SmartConfiguratorFlow: View {
                 .font(.subheadline).foregroundStyle(.secondary)
             if let nightly = IumrahPackageDisplayPrices.nightly(room) {
                 IumrahPackageUnitPriceLine(amount: nightly, currency: room.rate.currency,
-                    caption: t("В среднем за номер / ночь", "Average per room / night", "Xona / tun uchun o‘rtacha", "Хона / тун учун ўртача"), language: settings.language)
+                    caption: t("Ориентировочно за номер / ночь", "Estimated per room / night", "Xona / tun uchun taxminan", "Хона / тун учун тахминан"), language: settings.language)
             }
             if store.result != nil && room.id.hasSuffix(":0") {
                 Button { replacementRequest = room.city; replacementRevision += 1 } label: {
@@ -486,7 +499,6 @@ struct SmartConfiguratorFlow: View {
     }
     private func errorText(_ error: String, replacing: Bool = false) -> String {
         if replacing { return t("Не удалось подобрать и рассчитать другой отель. Текущий пакет сохранён.", "Could not price another hotel. Your current package is unchanged.", "Boshqa mehmonxona topilmadi. Joriy paket saqlandi.", "Бошқа меҳмонхона топилмади. Жорий пакет сақланди.") }
-        if error.contains("SMART_HOTEL_SANDBOX") { return t("Отельный сервис сейчас в тестовом режиме. Реальный пакет недоступен.", "Hotel service is in test mode. A real package is unavailable.", "Mehmonxona xizmati test rejimida. Haqiqiy paket mavjud emas.", "Меҳмонхона хизмати тест режимида. Ҳақиқий пакет мавжуд эмас.") }
         if error.contains("SMART_HOTEL_NETWORK") { return t("Сервис тарифов временно не отвечает. Повторите поиск.", "Hotel rates are temporarily unavailable. Retry the search.", "Tarif xizmati vaqtincha ishlamayapti. Qayta urinib ko‘ring.", "Тариф хизмати вақтинча ишламаяпти. Қайта уриниб кўринг.") }
         if error.contains("SMART_ROOM") || error.contains("SMART_HOTEL") { return t("Не найден подходящий номер с доступным тарифом. Измените месяц или категорию.", "No suitable room with an available rate was found. Change the month or category.", "Mos tarifli xona topilmadi. Oy yoki toifani o‘zgartiring.", "Мос тарифли хона топилмади. Ой ёки тоифани ўзгартиринг.") }
         return t("Попробуйте другой месяц, длительность или категорию. Можно повторить поиск.", "Try another month, duration or category, or retry the search.", "Boshqa oy, muddat yoki toifani tanlang yoki qayta qidiring.", "Бошқа ой, муддат ёки тоифани танланг ёки қайта қидиринг.")
@@ -517,7 +529,7 @@ struct SmartConfiguratorFlow: View {
         VStack(spacing: 12) {
             if step == .assembly, let journey = store.result, journey.hasFinalGeneratorQuote, let quote = journey.quote {
                 HStack {
-                    Text(t("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")).font(.caption).foregroundStyle(.secondary)
+                    Text(t("Предварительно за всех", "Estimated total", "Taxminiy jami", "Тахминий жами")).font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text(IumrahPackageDisplayPrices.money(quote.totalPackagePrice, currency: quote.currency, language: settings.language)).font(.title3.bold()).monospacedDigit()
                 }
@@ -531,7 +543,7 @@ struct SmartConfiguratorFlow: View {
                 if step == .assembly { if store.result != nil { showReview = true } else if !store.busy { runID += 1 } }
                 else { next() }
             } label: {
-                Text(step == .welcome ? t("Начать", "Get started", "Boshlash", "Бошлаш") : step == .assembly ? (store.result != nil ? t("Проверить и забронировать", "Review and book", "Tekshirish va bronlash", "Текшириш ва бронлаш") : t("Повторить поиск", "Retry search", "Qayta qidirish", "Қайта қидириш")) : step == .category ? t("Собрать мою Умру", "Build my Umrah", "Umramni tayyorlash", "Умрамни тайёрлаш") : t("Продолжить", "Continue", "Davom etish", "Давом этиш"))
+                Text(step == .welcome ? t("Начать", "Get started", "Boshlash", "Бошлаш") : step == .assembly ? (store.result != nil ? t("Посмотреть пакет", "Review package", "Paketni ko‘rish", "Пакетни кўриш") : t("Повторить поиск", "Retry search", "Qayta qidirish", "Қайта қидириш")) : step == .category ? t("Собрать мою Умру", "Build my Umrah", "Umramni tayyorlash", "Умрамни тайёрлаш") : t("Продолжить", "Continue", "Davom etish", "Давом этиш"))
                     .font(.headline).frame(maxWidth: .infinity).frame(minHeight: 54)
                     .foregroundStyle(Color(uiColor: .systemBackground))
                     .background(Color.primary, in: RoundedRectangle(cornerRadius: 18))

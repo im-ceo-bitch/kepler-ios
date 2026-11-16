@@ -161,6 +161,8 @@ struct HomeDestinationsSection: View {
 }
 
 struct HomeRewardsOffersSection: View {
+    var showsRewards = true
+    var showsOffers = true
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var account: IumrahAccountStore
     @EnvironmentObject private var chrome: AppChromeStore
@@ -176,6 +178,7 @@ struct HomeRewardsOffersSection: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            if showsRewards {
             VStack(alignment: .leading, spacing: 12) {
                 IumrahHomeSectionHeader(title: c.t("Путешествуйте с преимуществами", "Travel with benefits", "Imtiyozlar bilan sayohat qiling", "Имтиёзлар билан саёҳат қилинг"))
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -198,6 +201,8 @@ struct HomeRewardsOffersSection: View {
                     }
                 }
             }
+            }
+            if showsOffers {
             VStack(alignment: .leading, spacing: 12) {
                 IumrahHomeSectionHeader(title: c.t("Специальные предложения", "Special offers", "Maxsus takliflar", "Махсус таклифлар"))
                 if live?.invitation != nil {
@@ -207,6 +212,7 @@ struct HomeRewardsOffersSection: View {
                 } else {
                     Button { chrome.navigate(to: .account) } label: { offerCard }.buttonStyle(.plain)
                 }
+            }
             }
         }
         .task(id: "\(account.iumrahID ?? "guest")-\(activeTab)") {
@@ -369,6 +375,8 @@ struct HomeRecommendedHotelsSection: View {
 }
 
 struct HomeWhyAndPreferencesSection: View {
+    var showsWhy = true
+    var showsPreferences = true
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var account: IumrahAccountStore
     @ObservedObject private var history = HomePersonalizationStore.shared
@@ -376,6 +384,7 @@ struct HomeWhyAndPreferencesSection: View {
     private var c: HomeSectionCopy { .init(language: settings.language) }
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
+            if showsWhy {
             VStack(alignment: .leading, spacing: 12) {
                 IumrahHomeSectionHeader(title: c.t("Почему iumrah?", "Why iumrah?", "Nega iumrah?", "Нега iumrah?"))
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -387,6 +396,8 @@ struct HomeWhyAndPreferencesSection: View {
                     }
                 }
             }
+            }
+            if showsPreferences {
             DisclosureGroup(isExpanded: $expanded) {
                 VStack(alignment: .leading, spacing: 14) {
                     Toggle(c.t("Персональные рекомендации", "Personal recommendations", "Shaxsiy tavsiyalar", "Шахсий тавсиялар"), isOn: Binding(get: { history.enabled }, set: { history.setEnabled($0) }))
@@ -396,6 +407,7 @@ struct HomeWhyAndPreferencesSection: View {
             } label: {
                 Label(c.t("Управление рекомендациями", "Manage recommendations", "Tavsiyalarni boshqarish", "Тавсияларни бошқариш"), systemImage: "slider.horizontal.3").font(.subheadline.weight(.semibold))
             }.tint(.primary).padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+            }
         }
     }
     private func feature(_ icon: String, _ title: String, _ desc: String) -> some View {

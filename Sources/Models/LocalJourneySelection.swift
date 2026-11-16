@@ -102,6 +102,18 @@ extension LocalJourneyRoom {
     }
 }
 
+/// Legacy Care payload compatibility only; package checkout uses the OTP flow.
+struct LocalJourneyRequestSnapshot: Codable {
+    let version: Int
+    let trip: TripDraft
+    let flights: [LocalJourneyFlight]
+    let rooms: [LocalJourneyRoom]
+    let transfer: String
+    let trainTickets: Int
+    let trainClass: String
+    let estimatedTotalUSD: Decimal?
+}
+
 /// Supplier revalidation used by Hotels, Transfer and Review pull-to-refresh.
 /// A missing/expired/failed exact offer is removed rather than silently
 /// presenting a stale rate as today's amount.

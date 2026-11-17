@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// The same guest checkout is used by Hotel First, Flight First and Configurator.
 /// No account form is shown; a verified contact can establish an internal profile session.
@@ -12,6 +13,7 @@ struct IumrahBookingConfirmationView: View {
     @Environment(\.smartBookingDone) private var smartBookingDone
 
     var quote: PackageQuote? = nil
+    var createVerifiedBooking: (@MainActor (BookingPilgrimProfile, String, String) async throws -> StoredBookingSession)? = nil
     let createBooking: @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession
 
     @State private var firstName = ""
@@ -369,8 +371,10 @@ struct IumrahBookingConfirmationView: View {
             let committed: StoredBookingSession
             if let savedBooking { committed = savedBooking }
             else {
-                committed = try await createBooking(profile)
+                if let createVerifiedBooking { committed = try await createVerifiedBooking(profile, channel.rawValue, verificationProof) }
+                else { committed = try await createBooking(profile) }
                 savedBooking = committed // retries never create a duplicate booking
+                Task { await notifyBookingCreated(committed) }
             }
             let session = try await bookings.resolveBookingIdentity(committed)
             savedBooking = session
@@ -548,6 +552,20 @@ struct IumrahBookingConfirmationView: View {
         "Open booking": "Buka tempahan",
         "Done": "Selesai",
     ]
+    @MainActor private func notifyBookingCreated(_ session: StoredBookingSession) async {
+        let push = PushNotificationManager.shared
+        await push.ensureAuthorizationForBookedTrips(hasBookings: true)
+        guard push.isAuthorized else { return }
+        if let device = push.deviceToken,
+           (try? await ClientPushService().notifyCreated(deviceToken: device, bookingID: session.id, bookingToken: session.accessToken, locale: settings.language.rawValue)) == true { return }
+        let content = UNMutableNotificationContent()
+        content.title = copy("Бронирование создано", "Booking created", "Bron yaratildi", "Брон яратилди", "تم إنشاء الحجز")
+        content.body = copy("Проверяем наличие. Оплата пока не требуется.", "Checking availability. No payment is required yet.", "Mavjudlik tekshirilmoqda. Hozircha to‘lov talab etilmaydi.", "Мавжудлик текширилмоқда. Ҳозирча тўлов талаб этилмайди.", "نتحقق من التوفر. لا يلزم الدفع الآن.")
+        content.sound = .default
+        content.userInfo = ["type": "booking_created", "bookingID": session.id, "status": "availability_check"]
+        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "iumrah.booking.created." + session.id, content: content, trigger: nil))
+    }
+
     private func copy(_ ru: String, _ en: String, _ uz: String, _ uzCy: String, _ ar: String) -> String {
         switch settings.language {
         case .russian: return ru

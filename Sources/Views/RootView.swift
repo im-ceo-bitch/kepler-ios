@@ -18,6 +18,7 @@ struct RootView: View {
     @State private var hasBootstrappedAfterOnboarding = false
     @State private var isSupportQuickActionDialogPresented = false
     @State private var lastHandledLaunchLink: URL?
+    @State private var activeBusinessOffer: String?
 
     init(chrome: AppChromeStore, launchLink: URL? = nil) {
         self.chrome = chrome
@@ -34,6 +35,9 @@ struct RootView: View {
         IumrahAdaptiveLayoutHost {
             rootContent
         }
+            .sheet(isPresented: Binding(get: { activeBusinessOffer != nil }, set: { if !$0 { activeBusinessOffer = nil } })) {
+                if let token = activeBusinessOffer { NavigationStack { BusinessOfferView(token: token) }.environment(\.smartBookingDone, { activeBusinessOffer = nil }).environmentObject(settings).environmentObject(bookings).environmentObject(account).environmentObject(chrome) }
+            }
             .preferredColorScheme(settings.appearance.colorScheme)
             .environment(\.layoutDirection, settings.language.isRightToLeft ? .rightToLeft : .leftToRight)
             .environmentObject(settings)
@@ -267,6 +271,12 @@ struct RootView: View {
 
     @MainActor
     private func handleDeepLink(_ url: URL) {
+        let parts = url.pathComponents.filter { $0 != "/" }
+        let host = url.host?.lowercased() ?? ""
+        let allowedHosts = ["iumrah.app", "iumrah.uz", "iumrah.us", "go.iumrah.app", "go.iumrah.uz", "iumrah-backend.helloiumrah.workers.dev"]
+        let offerToken: String? = url.scheme?.lowercased() == "https" && allowedHosts.contains(host) && parts.count == 2 && parts[0] == "offer" ? parts[1] : (url.scheme?.lowercased() == "iumrahapp" && host == "offer" && parts.count == 1 ? parts[0] : nil)
+        if let offerToken, offerToken.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil { activeBusinessOffer = offerToken; return }
+
         if !account.isAuthenticated, IumrahReferralLink.capture(url) {
             chrome.navigate(to: .account)
             return
@@ -295,7 +305,7 @@ struct RootView: View {
         let hotelID: String?
 
         if url.scheme?.lowercased() == "https",
-           url.host?.lowercased() == "iumrah.app" {
+           allowedHosts.contains(host) {
             let components = url.pathComponents.filter { $0 != "/" }
             if components.count == 3,
                components[0] == "flights",

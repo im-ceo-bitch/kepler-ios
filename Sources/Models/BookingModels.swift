@@ -176,6 +176,7 @@ struct RemoteBooking: Codable, Identifiable, Hashable {
     let customization: BookingCustomization?
     let includedServices: [String]?
     let generatorTrace: BookingGeneratorTrace?
+    var offerPackageID: String? = nil
 }
 
 struct BookingInputRecord: Codable, Hashable {

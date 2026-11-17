@@ -1416,8 +1416,11 @@ struct PilgrimCheckoutView: View {
 
     @ViewBuilder
     private func documentStatusRow(kind: String, title: String, icon: String, documents: [IumrahTravelDocument]) -> some View {
-        if let document = documents.first(where: { $0.documentKind == kind }) {
-            readyDocumentButton(document, title: title, icon: icon)
+        let matching = documents.filter { $0.documentKind == kind }
+        if !matching.isEmpty {
+            ForEach(matching) { document in
+                readyDocumentButton(document, title: document.title.isEmpty ? title : document.title, icon: icon)
+            }
         } else {
             HStack(spacing: 13) {
                 IumrahIconBadge(systemName: icon, role: .document, size: 48, symbolSize: 18, cornerRadius: 16)

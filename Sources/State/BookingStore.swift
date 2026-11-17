@@ -533,6 +533,19 @@ final class BookingStore: ObservableObject {
         persist()
     }
 
+    func adoptOfferBooking(_ response: BookingCreateResponse) throws -> StoredBookingSession {
+        guard let token = response.accessToken, !token.isEmpty else { throw APIError.missingBookingToken }
+        let booking = response.booking
+        if let existing = self.booking(id: booking.id) { return existing }
+        var session = StoredBookingSession(id: booking.id, accessToken: token, booking: booking,
+            travelerName: booking.pilgrimProfile?.displayName, telegram: booking.pilgrimProfile?.telegram,
+            whatsapp: booking.pilgrimProfile?.whatsapp, outboundFlight: nil, inboundFlight: nil,
+            hotelSelection: booking.hotelSelection, madinahHotelSelection: booking.madinahHotelSelection)
+        if let trip = response.trip { session.mergeOperationalTrip(trip) }
+        upsert(session)
+        return session
+    }
+
     func recordVerifiedContact(id: String, email: String?, phone: String?) {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
         if let email { sessions[index].verifiedBookingEmail = email }

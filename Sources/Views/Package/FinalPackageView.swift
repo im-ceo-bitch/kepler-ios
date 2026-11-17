@@ -40,9 +40,14 @@ struct LegacyFinalPackageView: View {
         journey.hasFinalGeneratorQuote && journey.quote?.bookingAllowed != false && !isCalculatingPrice &&
         journey.transferSelectionConfirmed && roomsComplete &&
         journey.selectedHotel != nil &&
-        journey.selectedOutbound?.isVerifiedForBooking == true &&
-        (!journey.trip.isRoundTripFlight || journey.selectedInbound?.isVerifiedForBooking == true) &&
+        flightSelectionReady &&
         (!needsMadinah || journey.selectedMadinahHotel != nil)
+    }
+    private var flightSelectionReady: Bool {
+        FinalPackageFlightGate.ready(outbound: journey.selectedOutbound,
+            inbound: journey.selectedInbound, roundTrip: journey.trip.isRoundTripFlight,
+            usesLocalJourney: journey.usesLocalJourney, mixedIdentity: journey.mixedFlightIdentity,
+            localFlightIDs: journey.localJourneyFlights.map(\.id), quote: journey.quote)
     }
     private var quoteInputKey: String {
         if journey.usesLocalJourney { return journey.localBookingInputKey }
@@ -486,8 +491,7 @@ struct LegacyFinalPackageView: View {
               let outbound = journey.selectedOutbound,
               var quote = journey.quote else { throw BookingStoreError.authoritativeQuoteRequired }
         let inbound = journey.selectedInbound
-        guard outbound.isVerifiedForBooking,
-              (!journey.trip.isRoundTripFlight || inbound?.isVerifiedForBooking == true) else {
+        guard flightSelectionReady else {
             errorMessage = tr("Выберите актуальные авиабилеты", "Select current flights", "Joriy reyslarni tanlang", "Жорий рейсларни танланг")
             IumrahHaptics.error()
             throw BookingStoreError.authoritativeQuoteRequired
@@ -504,7 +508,7 @@ struct LegacyFinalPackageView: View {
                 let acceptedInput = journey.localBookingInputKey
                 await journey.buildQuote()
                 guard let fresh = journey.quote, journey.hasFinalGeneratorQuote,
-                      fresh.bookingAllowed == true, acceptedInput == journey.localBookingInputKey else {
+                      fresh.bookingAllowed == true, acceptedInput == journey.localBookingInputKey, canBook else {
                     throw BookingStoreError.authoritativeQuoteRequired
                 }
                 guard fresh.totalPackagePrice == acceptedTotal else {
@@ -542,6 +546,38 @@ struct LegacyFinalPackageView: View {
         }
     }
 
+}
+
+/// A mixed itinerary is represented by two discovery/display records, not by
+/// full provider segment models. PackageEngine resolves both exact one-way IDs,
+/// validates their route and issues the sealed quote. Do not apply the ordinary
+/// segment/fare gate a second time to those display records. The final create
+/// path still rebuilds the server quote and checks the input and accepted total.
+private enum FinalPackageFlightGate {
+    static func ready(outbound: FlightOffer?, inbound: FlightOffer?, roundTrip: Bool,
+                      usesLocalJourney: Bool, mixedIdentity: String?, localFlightIDs: [String],
+                      quote: PackageQuote?) -> Bool {
+        guard let outbound else { return false }
+        guard let identity = mixedIdentity else {
+            return outbound.isVerifiedForBooking && (!roundTrip || inbound?.isVerifiedForBooking == true)
+        }
+        guard usesLocalJourney, roundTrip, let inbound, let quote,
+              quote.bookingAllowed == true, quote.quoteId?.hasPrefix("server-") == true,
+              let proof = quote.quoteProof, !proof.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              quote.totalPackagePrice > 0, quote.pricePerPerson > 0,
+              identity.hasPrefix("mixed:"), outbound.providerItineraryID == identity,
+              inbound.providerItineraryID == identity,
+              localFlightIDs == [outbound.id, inbound.id], outbound.direction == .outbound,
+              inbound.direction == .inbound, outbound.origin == inbound.destination,
+              ["JED", "MED"].contains(outbound.destination), ["JED", "MED"].contains(inbound.origin),
+              inbound.departureAt > outbound.departureAt else { return false }
+        let ids = identity.dropFirst("mixed:".count).split(separator: "~", omittingEmptySubsequences: false)
+        guard ids.count == 2,
+              ids.filter({ $0.hasPrefix("curated:") && $0.count > "curated:".count }).count == 1,
+              ids.filter({ $0.hasPrefix("aviasales:ow:") && $0.count > "aviasales:ow:".count }).count == 1 else { return false }
+        return outbound.sourceLabel == (ids[0].hasPrefix("curated:") ? "iumrah Published" : "Aviasales Data") &&
+               inbound.sourceLabel == (ids[1].hasPrefix("curated:") ? "iumrah Published" : "Aviasales Data")
+    }
 }
 
 private enum ConfiguratorBookingError: LocalizedError {

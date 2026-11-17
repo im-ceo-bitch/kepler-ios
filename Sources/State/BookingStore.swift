@@ -23,6 +23,7 @@ enum BookingStoreError: LocalizedError {
 final class BookingStore: ObservableObject {
     @Published private(set) var sessions: [StoredBookingSession] = []
     @Published private(set) var chats: [String: [ChatMessage]] = [:]
+    @Published private var travelESIMs: [String: (proof: String, profiles: [ClientESIMProfile])] = [:]
     @Published private(set) var itineraries: [String: [BookingItineraryItem]] = [:]
     @Published private(set) var pushRegistrationReady: Bool?
     @Published private(set) var pushRegistrationError: String?
@@ -48,6 +49,11 @@ final class BookingStore: ObservableObject {
     }
     var canUseCareChat: Bool {
         hasCareAccount && sessions.contains { !["COMPLETED", "CANCELLED"].contains($0.effectiveStatus.uppercased()) }
+    }
+    func canUseBookingCare(_ bookingID: String) -> Bool {
+        if hasCareAccount { return canUseCareChat }
+        guard bookingID != "account", let session = booking(id: bookingID), !session.accessToken.isEmpty else { return false }
+        return !["COMPLETED", "CANCELLED"].contains(session.effectiveStatus.uppercased())
     }
     private var bookingScopeGeneration = UUID()
     private struct CheckoutCacheEntry {
@@ -100,14 +106,15 @@ final class BookingStore: ObservableObject {
                 let value = try await service.checkout(bookingID: id, bookingToken: access, accountToken: token)
                 guard !Task.isCancelled, self.bookingScopeGeneration == generation, self.accountToken == token,
                       self.booking(id: id)?.accessToken == access, self.checkoutRequests[id]?.id == requestID else { throw CancellationError() }
+                BookingOfflineDocuments.reconcile(bookingID: id, proof: access, published: value.documents)
                 self.checkoutCache[id] = CheckoutCacheEntry(value: value, status: status, accessToken: access, date: Date())
                 return value
             } catch {
                 // Never retain a protected snapshot after authorization is rejected.
                 if self.bookingScopeGeneration == generation, self.checkoutRequests[id]?.id == requestID {
                     switch error {
-                    case APIError.status(let code) where [401, 403, 404].contains(code): self.checkoutCache[id] = nil; self.checkoutFriendsCache[id] = nil
-                    case APIError.server(let code, _) where [401, 403, 404].contains(code): self.checkoutCache[id] = nil; self.checkoutFriendsCache[id] = nil
+                    case APIError.status(let code) where [401, 403, 404].contains(code): self.checkoutCache[id] = nil; self.checkoutFriendsCache[id] = nil; BookingOfflineDocuments.purge(bookingID: id, proof: access)
+                    case APIError.server(let code, _) where [401, 403, 404].contains(code): self.checkoutCache[id] = nil; self.checkoutFriendsCache[id] = nil; BookingOfflineDocuments.purge(bookingID: id, proof: access)
                     default: break
                     }
                 }
@@ -476,7 +483,10 @@ final class BookingStore: ObservableObject {
             checkoutRequests.removeAll()
             checkoutCache.removeAll()
             checkoutFriendsCache.removeAll()
+            travelESIMs.removeAll()
+            itineraries.removeAll()
             if accountToken != nil {
+                BookingOfflineDocuments.purgeAll()
                 sessions.removeAll()
                 itineraries.removeAll()
                 pushRegistrationReady = nil
@@ -542,6 +552,28 @@ final class BookingStore: ObservableObject {
             whatsapp: booking.pilgrimProfile?.whatsapp, outboundFlight: nil, inboundFlight: nil,
             hotelSelection: booking.hotelSelection, madinahHotelSelection: booking.madinahHotelSelection)
         if let trip = response.trip { session.mergeOperationalTrip(trip) }
+        upsert(session)
+        return session
+    }
+
+    func adoptRecoveredBooking(_ response: BookingCreateResponse, email: String?, phone: String?) throws -> StoredBookingSession {
+        guard let token = response.accessToken, !token.isEmpty else { throw APIError.missingBookingToken }
+        let booking = response.booking
+        if let existing = self.booking(id: booking.id) {
+            // The user explicitly recovered access; replace only this device's credential.
+            BookingOfflineDocuments.purge(bookingID: booking.id, proof: existing.accessToken)
+            checkoutRequests[booking.id]?.task.cancel(); checkoutRequests[booking.id] = nil
+            checkoutCache[booking.id] = nil; checkoutFriendsCache[booking.id] = nil
+            travelESIMs[booking.id] = nil; itineraries[booking.id] = nil
+            chatAuthGeneration = UUID(); for task in chatLoads.values { task.cancel() }; chatLoads.removeAll()
+            chats[booking.id] = nil; chatCacheKeys[booking.id] = nil; chatCursors[booking.id] = nil; chatScopeVersions[booking.id] = nil
+        }
+        var session = StoredBookingSession(id: booking.id, accessToken: token, booking: booking,
+            travelerName: booking.pilgrimProfile?.displayName, telegram: booking.pilgrimProfile?.telegram,
+            whatsapp: booking.pilgrimProfile?.whatsapp, outboundFlight: nil, inboundFlight: nil,
+            hotelSelection: booking.hotelSelection, madinahHotelSelection: booking.madinahHotelSelection)
+        if let trip = response.trip { session.mergeOperationalTrip(trip) }
+        session.verifiedBookingEmail = email; session.verifiedBookingPhone = phone
         upsert(session)
         return session
     }
@@ -629,6 +661,24 @@ final class BookingStore: ObservableObject {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    func loadTravelESIMs(for bookingID: String) async throws {
+        guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
+        let generation = bookingScopeGeneration
+        do {
+            let (result, _) = try await performWithClientAuthorization(for: session) { headers in
+                try await bookingService.fetchOperationalTrip(id: bookingID, headers: headers)
+            }
+            guard !Task.isCancelled, generation == bookingScopeGeneration, booking(id: bookingID)?.accessToken == session.accessToken else { throw CancellationError() }
+            travelESIMs[bookingID] = (session.accessToken, result.esims ?? [])
+        } catch {
+            if generation == bookingScopeGeneration && isAuthorizationFailure(error) { travelESIMs[bookingID] = nil }
+            throw error
+        }
+    }
+    func travelESIMProfiles(for bookingID: String) -> [ClientESIMProfile] {
+        guard let session = booking(id: bookingID), let entry = travelESIMs[bookingID], entry.proof == session.accessToken else { return [] }
+        return entry.profiles
+    }
     func loadItinerary(for bookingID: String, language: AppSettingsStore.Language) async throws -> [BookingItineraryItem] {
         guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
         let generation = bookingScopeGeneration
@@ -652,8 +702,8 @@ final class BookingStore: ObservableObject {
     }
 
     private func careHeaders(for bookingID: String) -> [String: String]? {
-        guard canUseCareChat else { return nil }
-        if bookingID == "account", let token = accountToken, !token.isEmpty { return ["Authorization": "Bearer \(token)"] }
+        if bookingID == "account", canUseCareChat, let token = accountToken, !token.isEmpty { return ["Authorization": "Bearer \(token)"] }
+        guard canUseBookingCare(bookingID) else { return nil }
         guard bookingID != "account", let session = booking(id: bookingID), !session.accessToken.isEmpty else { return nil }
         return ["x-booking-token": session.accessToken]
     }
@@ -962,6 +1012,24 @@ final class BookingStore: ObservableObject {
         }
     }
 
+    func submitTravelFeedback(id: String, rating: Int, comment: String) async throws -> IumrahTravelFeedback {
+        guard let session = booking(id: id) else { throw APIError.missingBookingToken }
+        let generation = bookingScopeGeneration
+        let (result, _) = try await performWithClientAuthorization(for: session) { headers in
+            try await bookingService.submitTravelFeedback(id: id, rating: rating, comment: comment, headers: headers)
+        }
+        guard generation == bookingScopeGeneration, booking(id: id)?.accessToken == session.accessToken else { throw CancellationError() }
+        _ = try? await loadCheckout(id: id, token: accountToken, force: true)
+        return result.feedback
+    }
+
+    func requestCancellation(id: String) async throws {
+        guard let session = booking(id: id) else { throw APIError.status(404) }
+        _ = try await performWithClientAuthorization(for: session) { headers in
+            try await bookingService.requestCancellation(id: id, headers: headers)
+        }
+    }
+
     func deleteBooking(id: String) async throws {
         guard let session = booking(id: id) else {
             purgeLocalBooking(id: id)
@@ -1088,6 +1156,7 @@ final class BookingStore: ObservableObject {
         }
     }
     private func purgeLocalBooking(id: String) {
+        if let session = booking(id: id) { BookingOfflineDocuments.purge(bookingID: id, proof: session.accessToken) }
         checkoutRequests[id]?.task.cancel()
         checkoutRequests[id] = nil
         checkoutCache[id] = nil
@@ -1102,6 +1171,7 @@ final class BookingStore: ObservableObject {
         chatCursors[id] = nil
         chats[id] = nil
         itineraries[id] = nil
+        travelESIMs[id] = nil
     }
 
     private func isRemoteMissing(code: Int, message: String) -> Bool {
@@ -1179,6 +1249,72 @@ final class BookingStore: ObservableObject {
                 migrated.hotelSelection = selection.migratedLegacyPrimaryRoom
             }
             return migrated
+        }
+    }
+}
+
+
+/// Explicitly downloaded copies only. Scoped to booking proof; no proof is written to disk.
+/// iOS data protection, excluded from backups, no access on a rejected authorization.
+@MainActor enum BookingOfflineDocuments {
+    private static let fm = FileManager.default
+    private static var root: URL { fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("IumrahOfflineTravelDocuments-v1", isDirectory: true) }
+    private static var previews: URL { fm.temporaryDirectory.appendingPathComponent("IumrahTravelPreviews-v1", isDirectory: true) }
+    private static func digest(_ value: String) -> String { SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined() }
+    private static func folder(_ id: String, _ proof: String) -> URL { root.appendingPathComponent(digest(id + "\u{0}" + proof), isDirectory: true) }
+    private static func file(_ doc: IumrahTravelDocument, in directory: URL) -> URL { directory.appendingPathComponent(digest(doc.id)).appendingPathExtension(ext(doc)) }
+    private static func ext(_ doc: IumrahTravelDocument) -> String { doc.contentType == "application/pdf" ? "pdf" : doc.contentType.contains("png") ? "png" : "jpg" }
+    private static func prepare(_ directory: URL) throws {
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.complete])
+        var url = directory; var values = URLResourceValues(); values.isExcludedFromBackup = true; try url.setResourceValues(values)
+    }
+    static func list(bookingID: String, proof: String) -> [IumrahTravelDocument] {
+        guard !proof.isEmpty else { return [] }
+        let dir = folder(bookingID, proof)
+        guard let data = try? Data(contentsOf: dir.appendingPathComponent("index.json")), let docs = try? JSONDecoder().decode([IumrahTravelDocument].self, from: data) else { return [] }
+        return docs.filter { fm.fileExists(atPath: file($0, in: dir).path) }
+    }
+    private static func writeIndex(_ docs: [IumrahTravelDocument], _ dir: URL) throws { try JSONEncoder().encode(docs).write(to: dir.appendingPathComponent("index.json"), options: [.atomic, .completeFileProtection]) }
+    static func save(_ data: Data, document: IumrahTravelDocument, bookingID: String, proof: String) throws {
+        guard !proof.isEmpty, !data.isEmpty, document.publicationStatus != "revoked" else { throw URLError(.cannotWriteToFile) }
+        let dir = folder(bookingID, proof); try prepare(root); try prepare(dir)
+        try data.write(to: file(document, in: dir), options: [.atomic, .completeFileProtection])
+        var docs = list(bookingID: bookingID, proof: proof).filter { $0.id != document.id }; docs.append(document)
+        try writeIndex(docs, dir)
+    }
+    static func data(_ document: IumrahTravelDocument, bookingID: String, proof: String) -> Data? {
+        guard list(bookingID: bookingID, proof: proof).contains(where: { $0.id == document.id }) else { return nil }
+        return try? Data(contentsOf: file(document, in: folder(bookingID, proof)))
+    }
+    static func reconcile(bookingID: String, proof: String, published: [IumrahTravelDocument]) {
+        guard !proof.isEmpty else { return }
+        let dir = folder(bookingID, proof)
+        let saved = list(bookingID: bookingID, proof: proof)
+        guard !saved.isEmpty else { return }
+        let current = published.filter { $0.publicationStatus != "revoked" }
+        var keep: [IumrahTravelDocument] = []
+        for old in saved {
+            if let new = current.first(where: { $0.id == old.id && $0.createdAt == old.createdAt && $0.contentType == old.contentType }) { keep.append(new) }
+            else { try? fm.removeItem(at: file(old, in: dir)) }
+        }
+        if keep.isEmpty { purge(bookingID: bookingID, proof: proof) } else { try? writeIndex(keep, dir) }
+    }
+    static func purge(bookingID: String, proof: String) { guard !proof.isEmpty else { return }; try? fm.removeItem(at: folder(bookingID, proof)); removePreviews() }
+    static func purgeAll() { try? fm.removeItem(at: root); removePreviews() }
+    static func preview(_ data: Data, document: IumrahTravelDocument) throws -> URL {
+        try prepare(previews)
+        let url = previews.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext(document)); try data.write(to: url, options: [.atomic, .completeFileProtection]); return url
+    }
+    static func removePreviews() { try? fm.removeItem(at: previews) }
+    static func isNetworkError(_ error: Error) -> Bool {
+        guard let e = error as? URLError else { return false }
+        return [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .dataNotAllowed].contains(e.code)
+    }
+    static func isAccessError(_ error: Error) -> Bool {
+        switch error {
+        case APIError.status(let code), APIError.server(let code, _): return [401,403,404,410].contains(code)
+        case APIError.missingBookingToken: return true
+        default: return false
         }
     }
 }

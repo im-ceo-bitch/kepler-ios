@@ -233,6 +233,7 @@ struct BookingItineraryItem: Codable, Identifiable, Hashable {
     let timeLocal: String?
     let endTimeLocal: String?
     let kind: String?
+    var executionState: String? = nil
 }
 
 struct BookingItineraryResponse: Decodable {
@@ -241,6 +242,7 @@ struct BookingItineraryResponse: Decodable {
     let timezone: String?
     let stayPlan: PackageStayPlan?
     let items: [BookingItineraryItem]
+    var managed: Bool? = nil
 }
 
 struct ClientTripResponse: Decodable {
@@ -356,6 +358,7 @@ struct StoredBookingSession: Codable, Identifiable, Hashable {
     var esimOverride: Bool? = nil
     var pendingChangeConfirmation: Bool? = nil
     var operationStatus: String? = nil
+    var operationPaymentStatus: String? = nil
     var pilgrimID: String? = nil
     var bookingNumber: Int? = nil
     var bookingDisplayNumber: String? = nil
@@ -377,6 +380,7 @@ struct StoredBookingSession: Codable, Identifiable, Hashable {
 
     mutating func mergeOperationalTrip(_ trip: ClientTripSnapshot, statusHistory: [BookingStatusHistoryEntry]? = nil) {
         operationStatus = trip.status
+        operationPaymentStatus = trip.paymentStatus
         pilgrimID = trip.pilgrimID ?? pilgrimID
         bookingNumber = trip.bookingNumber ?? bookingNumber
         bookingDisplayNumber = trip.bookingDisplayNumber ?? bookingDisplayNumber

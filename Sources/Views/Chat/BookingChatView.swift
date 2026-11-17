@@ -49,7 +49,7 @@ struct BookingChatView: View {
 
     var body: some View {
         Group {
-            if bookings.canUseCareChat { chatScreen }
+            if bookings.canUseBookingCare(requestedBookingID) { chatScreen }
             else { ContentUnavailableView(tr("Chat available after booking", "Чат доступен после бронирования", "Chat brondan keyin", "Чат брондан кейин"), systemImage: "lock.fill") }
         }
             .navigationDestination(isPresented: $showCareProfile) { careProfileScreen }
@@ -62,8 +62,8 @@ struct BookingChatView: View {
             .statusBarHidden(false)
             .toolbar(.visible, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
-            .onAppear { if bookings.canUseCareChat { chatDidAppear() } }
-            .onChange(of: bookings.canUseCareChat) { _, allowed in
+            .onAppear { if bookings.canUseBookingCare(requestedBookingID) { chatDidAppear() } }
+            .onChange(of: bookings.canUseBookingCare(requestedBookingID)) { _, allowed in
                 if !allowed { messages = []; draft = ""; failedDraft = nil; pendingOutgoing = nil; launchingOutgoing = nil; composerFocused = false; errorMessage = nil }
             }
             .onChange(of: bookingID) { _, newValue in push.activeChatBookingID = newValue }

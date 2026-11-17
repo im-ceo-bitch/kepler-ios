@@ -9,11 +9,13 @@ private struct BusinessOfferPayload: Decodable {
         let includedServices: [String]
     }
     let packageID: String
+    let revision: Int
     let status: String
     let expiresAt: String
     let package: Package
 }
 private struct BusinessOfferAccept: Encodable {
+    let revision: Int
     let firstName: String
     let lastName: String
     let channel: String
@@ -52,12 +54,12 @@ struct BusinessOfferView: View {
                     if offer.status == "available" {
                         NavigationLink {
                             IumrahBookingConfirmationView(createVerifiedBooking: { profile, channel, proof in
-                                let response: BookingCreateResponse = try await APIClient.shared.post(path + "/accept", body: BusinessOfferAccept(firstName: profile.firstName, lastName: profile.lastName, channel: channel, verificationToken: proof, requestSecret: requestSecret))
+                                let response: BookingCreateResponse = try await APIClient.shared.post(path + "/accept", body: BusinessOfferAccept(revision: offer.revision, firstName: profile.firstName, lastName: profile.lastName, channel: channel, verificationToken: proof, requestSecret: requestSecret))
                                 return try bookings.adoptOfferBooking(response)
                             }, createBooking: { _ in throw APIError.invalidResponse })
                         } label: { Text(copy("Забронировать умру", "Book Umrah", "Umrani bron qilish", "Умрани брон қилиш")).font(.headline).frame(maxWidth: .infinity).padding(16).foregroundStyle(.white).background(.black, in: Capsule()) }.buttonStyle(.plain)
                     } else if let session = bookings.sessions.first(where: { $0.booking.offerPackageID == offer.packageID }) {
-                        Button(copy("Открыть бронирование", "Open booking", "Bronni ochish", "Бронни очиш")) { dismiss(); chrome.openBooking(id: session.id) }.buttonStyle(.borderedProminent)
+                        Button(copy("Открыть бронирование", "Open booking", "Bronni ochish", "Бронни очиш")) { dismiss(); chrome.openBooking(id: session.id, showStatus: true) }.buttonStyle(.borderedProminent)
                     } else { Text(copy("Предложение больше недоступно", "Offer no longer available", "Taklif endi mavjud emas", "Таклиф энди мавжуд эмас")).foregroundStyle(.secondary) }
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(.red); Button(copy("Повторить", "Retry", "Qayta urinish", "Қайта уриниш")) { Task { await load() } } }

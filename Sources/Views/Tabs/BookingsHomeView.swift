@@ -21,11 +21,26 @@ struct BookingsHomeView: View {
 
     @State private var pendingDeleteID: String?
     @State private var deleteError: String?
+    @State private var cancellationSent = false
     @State private var showZiyarats = false
     @State private var showCareRequestBuilder = false
     @State private var bookingPanel: BookingPanel = .booking
     @State private var selectedBookingID: String?
     @State private var activeGuideProfile: IumrahPublicProfile?
+    @State private var travelScheduleError = false
+    @State private var travelScheduleLoaded = false
+    @State private var rating = 0
+    @State private var feedbackComment = ""
+    @State private var feedbackSending = false
+    @State private var feedbackError = false
+    @State private var feedbackSaved: IumrahTravelFeedback?
+    @State private var feedbackSavedBookingID: String?
+    @State private var showRecovery = false
+    @State private var showAdvisor = false
+    @State private var certificateShare: TravelCertificateFile?
+    @State private var certificateShareError = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var completionAppeared = false
 
     private let chatService = ChatService()
 
@@ -48,7 +63,13 @@ struct BookingsHomeView: View {
     private var bookingTabContent: some View {
         VStack(spacing: 12) {
             if let activeSession { AnyView(activeBookingHub(activeSession)) }
-            else { AnyView(emptyBookingHome) }
+            if !pastSessions.isEmpty { archiveList.padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 28) }
+            if activeSession == nil { AnyView(emptyBookingHome) }
+            Button { showRecovery = true } label: {
+                Label(localized("Восстановить бронирование", "Recover booking", "Bronni tiklash", "Бронни тиклаш"), systemImage: "lock.shield")
+                    .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(14)
+                    .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 16))
+            }.buttonStyle(.plain).padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 20)
         }
     }
     private var bookingScrollRoot: AnyView {
@@ -68,26 +89,61 @@ struct BookingsHomeView: View {
                 await bookings.refreshAll()
             }
         }
+        .task(id: activeTab && scenePhase == .active ? activeSession.map { "\($0.id):\($0.effectiveStatus)" } : nil) {
+            guard let id = activeSession?.id, activeTab, scenePhase == .active else { return }
+            while !Task.isCancelled {
+                _ = try? await bookings.loadCheckout(id: id, token: account.bearerToken, force: true)
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
+            }
+        }
+        .task(id: activeTab && scenePhase == .active ? activeSession.map { "\($0.id):\($0.effectiveStatus)" } : nil) {
+            travelScheduleError = false; travelScheduleLoaded = false
+            rating = 0; feedbackComment = ""; feedbackSaved = nil; feedbackError = false; certificateShareError = false; completionAppeared = false
+            guard let session = activeSession, activeTab, scenePhase == .active, ["IN_TRIP", "READY_TO_TRAVEL", "DOCUMENTS_READY"].contains(session.effectiveStatus.uppercased()) else { return }
+            while !Task.isCancelled {
+                do { _ = try await bookings.loadItinerary(for: session.id, language: settings.language); if !Task.isCancelled { travelScheduleLoaded = true; travelScheduleError = false } }
+                catch { if !Task.isCancelled { travelScheduleError = true } }
+                do { try await Task.sleep(for: .seconds(60)) } catch { break }
+            }
+        }
+        .sheet(isPresented: $showRecovery) {
+            BookingRecoverySheet(language: settings.language) { session in
+                selectedBookingID = session.id; bookingPanel = .status
+                Task { await bookings.refreshAll() }
+            }.environmentObject(bookings)
+        }
+        .sheet(item: $certificateShare, onDismiss: {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("iumrah-certificates", isDirectory: true)
+            try? FileManager.default.removeItem(at: directory)
+        }) { file in
+            IumrahFileShareSheet(url: file.url)
+        }
+        .fullScreenCover(isPresented: $showAdvisor) {
+            UmrahFlowRootView(guideLanguage: settings.language == .russian ? .russian : ([AppSettingsStore.Language.uzbek, .uzbekCyrillic].contains(settings.language) ? .uzbek : .english))
+        }
         .task(id: activeSession?.guide?.id) {
             await loadActiveGuideProfile()
         }
         .confirmationDialog(
-            L10n.text("booking_delete_confirm_title", settings.language),
+            localized("Запросить отмену?", "Request cancellation?", "Bekor qilishni so‘rash?", "Бекор қилишни сўраш?"),
             isPresented: Binding(
                 get: { pendingDeleteID != nil },
                 set: { if !$0 { pendingDeleteID = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button(L10n.text("booking_delete_confirm_action", settings.language), role: .destructive) {
+            Button(localized("Отправить запрос", "Send request", "So‘rov yuborish", "Сўров юбориш"), role: .destructive) {
                 guard let id = pendingDeleteID else { return }
                 pendingDeleteID = nil
                 Task { await deleteBooking(id) }
             }
             Button(L10n.text("cancel", settings.language), role: .cancel) { pendingDeleteID = nil }
         } message: {
-            Text(L10n.text("booking_delete_confirm_body", settings.language))
+            Text(localized("Менеджер рассмотрит запрос. Бронирование и документы сохранятся.", "A manager will review your request. Your booking and documents will remain available.", "Menejer so‘rovni ko‘rib chiqadi. Bron va hujjatlar saqlanadi.", "Менежер сўровни кўриб чиқади. Брон ва ҳужжатлар сақланади."))
         }
+        .alert(localized("Запрос отправлен", "Request sent", "So‘rov yuborildi", "Сўров юборилди"), isPresented: $cancellationSent) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(localized("Менеджер рассмотрит отмену.", "Your manager will review the cancellation.", "Menejer bekor qilishni ko‘rib chiqadi.", "Менежер бекор қилишни кўриб чиқади.")) }
         .navigationDestination(isPresented: $chrome.shouldStartTripBuilder) {
             TripBuilderView()
         }
@@ -114,7 +170,10 @@ struct BookingsHomeView: View {
         guard chrome.currentTab == .booking, let id = chrome.requestedBookingID,
               bookings.booking(id: id) != nil else { return }
         selectedBookingID = id
-        bookingPanel = .package
+        bookingPanel = chrome.requestedBookingSchedule ? .schedule : (chrome.requestedBookingStatus ? .status : (chrome.requestedBookingOverview ? .booking : .package))
+        chrome.requestedBookingStatus = false
+        chrome.requestedBookingSchedule = false
+        chrome.requestedBookingOverview = false
         chrome.requestedBookingID = nil
     }
 
@@ -130,7 +189,10 @@ struct BookingsHomeView: View {
             if let owner { _ = try? await bookings.loadCheckoutFriends(id: id, token: owner, force: true) }
         case .schedule:
             _ = try? await bookings.loadItinerary(for: id, language: settings.language)
-        case .booking, .package: break
+        case .booking:
+            _ = try? await bookings.loadCheckout(id: id, token: owner, force: true)
+            if ["IN_TRIP", "READY_TO_TRAVEL", "DOCUMENTS_READY"].contains(bookings.booking(id: id)?.effectiveStatus.uppercased() ?? "") { _ = try? await bookings.loadItinerary(for: id, language: settings.language) }
+        case .package: break
         }
     }
 
@@ -138,7 +200,11 @@ struct BookingsHomeView: View {
 
     private func bookingPanelContent(_ session: StoredBookingSession) -> AnyView {
         switch bookingPanel {
-        case .booking: return AnyView(VStack(spacing: 24) { bookingProgress(session); tripManagement(session) }.padding(.bottom, 38))
+        case .booking:
+            let status = session.effectiveStatus.uppercased()
+            if status == "COMPLETED" || status == "CANCELLED" { return AnyView(completedTrip(session).padding(.bottom, 28)) }
+            if ["IN_TRIP", "READY_TO_TRAVEL", "DOCUMENTS_READY"].contains(status) { return AnyView(travelCompanion(session).padding(.bottom, 38)) }
+            return AnyView(VStack(spacing: 20) { nextBookingAction(session); bookingProgress(session); tripManagement(session) }.padding(.bottom, 38))
         case .status: return AnyView(bookingStatusPanel(session))
         case .package: return AnyView(BookingDetailView(bookingID: session.id, embedded: true).id(session.id))
         case .schedule: return AnyView(BookingItineraryCalendarView(bookingID: session.id,
@@ -146,6 +212,48 @@ struct BookingsHomeView: View {
             booking: session.booking, presentation: .fullScreen).padding(.bottom, 28))
         }
     }
+    private func nextBookingAction(_ session: StoredBookingSession) -> some View {
+        let status = session.effectiveStatus.uppercased()
+        let title: String
+        let body: String
+        let icon: String
+        if bookings.cachedCheckout(id: session.id, token: account.bearerToken)?.cancellationRequestedAt != nil && status != "CANCELLED" {
+            title = localized("Запрос отмены отправлен", "Cancellation requested", "Bekor qilish so‘rovi yuborildi", "Бекор қилиш сўрови юборилди")
+            body = localized("Менеджер свяжется с вами. Бронирование пока активно.", "Your manager will contact you. The booking remains active.", "Menejer siz bilan bog‘lanadi. Bron hozircha faol.", "Менежер сиз билан боғланади. Брон ҳозирча фаол."); icon = "clock"
+        } else { switch status {
+        case "AVAILABILITY_CHECK":
+            title = localized("Данные паломников", "Pilgrim details", "Ziyoratchilar ma’lumotlari", "Зиёратчилар маълумотлари")
+            body = localized("Заполните анкеты, пока мы проверяем наличие.", "Complete the forms while we check availability.", "Mavjudlik tekshirilayotganda anketalarni to‘ldiring.", "Мавжудлик текширилаётганда анкеталарни тўлдиринг."); icon = "person.text.rectangle"
+        case "PAYMENT_PENDING":
+            let checkout = bookings.cachedCheckout(id: session.id, token: account.bearerToken)
+            if checkout?.paymentReview?.satisfied == true || session.operationPaymentStatus == "paid" {
+                title = localized("Оплата подтверждена", "Payment verified", "To‘lov tasdiqlandi", "Тўлов тасдиқланди")
+                body = localized("Проверьте данные паломников и статус бронирования.", "Review pilgrim details and booking status.", "Ziyoratchi ma’lumotlari va bron holatini tekshiring.", "Зиёратчи маълумотлари ва брон ҳолатини текширинг.")
+            } else if checkout?.receipts.contains(where: { $0.reviewStatus == "submitted" }) == true || session.operationPaymentStatus == "receipt_submitted" {
+                title = localized("Чек на проверке", "Receipt under review", "Chek tekshiruvda", "Чек текширувда")
+                body = localized("Ожидайте подтверждения поступления средств.", "Wait for payment verification.", "To‘lov tasdig‘ini kuting.", "Тўлов тасдиғини кутинг.")
+            } else {
+                title = localized("Данные и оплата", "Details and payment", "Ma’lumotlar va to‘lov", "Маълумотлар ва тўлов")
+                body = localized("Проверьте анкеты, реквизиты и остаток к оплате.", "Review forms, payment details and remaining balance.", "Anketalar, rekvizitlar va to‘lov qoldig‘ini tekshiring.", "Анкеталар, реквизитлар ва тўлов қолдиғини текширинг.")
+            }
+            icon = "creditcard"
+        default:
+            title = localized("Документы поездки", "Travel documents", "Safar hujjatlari", "Сафар ҳужжатлари")
+            body = localized("Готовые файлы, прогресс и сохранение офлайн.", "Published files, progress and offline saving.", "Tayyor fayllar, holat va oflayn saqlash.", "Тайёр файллар, ҳолат ва офлайн сақлаш."); icon = "doc.on.doc"
+        }
+        }
+        return Button { withAnimation(.snappy(duration: 0.24)) { bookingPanel = .status } } label: {
+            HStack(spacing: 13) {
+                Image(systemName: icon).font(.title2).frame(width: 44, height: 44)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.headline)
+                    Text(body).font(.caption).foregroundStyle(.white.opacity(0.75)).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(); Image(systemName: "chevron.right").font(.caption.bold())
+            }.foregroundStyle(.white).padding(16).background(Color.black, in: RoundedRectangle(cornerRadius: 22))
+        }.buttonStyle(.plain)
+    }
+
     private func bookingStatusPanel(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 18) {
             PilgrimCheckoutView(bookingID: session.id, presentation: .bookingStatus).id(session.id)
@@ -345,7 +453,8 @@ struct BookingsHomeView: View {
 
     private func paymentReceiptStatusCard(_ session: StoredBookingSession, checkout: IumrahCheckoutResponse?) -> some View {
         let locked = session.effectiveStatus.uppercased() == "AVAILABILITY_CHECK"
-        let receiptReady = !(checkout?.receipts.isEmpty ?? true)
+        let receiptReady = checkout?.paymentReview?.satisfied == true || checkout?.paymentReview?.historicalConfirmed == true
+        let reviewing = checkout?.receipts.contains { $0.reviewStatus == "submitted" } == true
 
         return NavigationLink {
             PilgrimCheckoutView(bookingID: session.id)
@@ -357,11 +466,12 @@ struct BookingsHomeView: View {
                 body: locked
                     ? localized("Оплата откроется после подтверждения наличия. Пока ничего оплачивать не нужно.", "Payment opens after availability is confirmed. Nothing needs to be paid yet.", "To‘lov mavjudlik tasdiqlangach ochiladi. Hozircha hech narsa to‘lash shart emas.", "Тўлов мавжудлик тасдиқлангач очилади. Ҳозирча ҳеч нарса тўлаш шарт эмас.")
                     : (receiptReady
-                       ? localized("Оплата получена. Чек сохранён в бронировании.", "Payment received. The receipt is saved with the booking.", "To‘lov qabul qilindi. Chek bronda saqlandi.", "Тўлов қабул қилинди. Чек бронда сақланди.")
+                       ? localized("Оплата подтверждена. Доплачивать не нужно.", "Payment verified. No further payment is required.", "To‘lov tasdiqlandi. Qo‘shimcha to‘lov kerak emas.", "Тўлов тасдиқланди. Қўшимча тўлов керак эмас.")
+                       : reviewing ? localized("Чек отправлен. Проверяем поступление средств.", "Receipt submitted. Checking the transfer.", "Chek yuborildi. Mablag‘ tekshirilmoqda.", "Чек юборилди. Маблағ текширилмоқда.")
                        : localized("Наличие подтверждено. Откройте реквизиты, оплатите и прикрепите чек.", "Availability is confirmed. Open payment details, pay and attach the receipt.", "Mavjudlik tasdiqlandi. Rekvizitlarni oching, to‘lang va chekni biriktiring.", "Мавжудлик тасдиқланди. Реквизитларни очинг, тўланг ва чекни бириктиринг.")),
                 action: locked
                     ? localized("Откроется после подтверждения", "Opens after confirmation", "Tasdiqdan keyin ochiladi", "Тасдиқдан кейин очилади")
-                    : (receiptReady ? localized("Открыть оплату", "Open payment", "To‘lovni ochish", "Тўловни очиш") : localized("Перейти к оплате", "Go to payment", "To‘lovga o‘tish", "Тўловга ўтиш")),
+                    : ((receiptReady || reviewing) ? localized("Открыть оплату", "Open payment", "To‘lovni ochish", "Тўловни очиш") : localized("Перейти к оплате", "Go to payment", "To‘lovga o‘tish", "Тўловга ўтиш")),
                 ready: receiptReady,
                 enabled: !locked
             )
@@ -375,7 +485,7 @@ struct BookingsHomeView: View {
         let paidOrLater = ["PAID", "BOOKING_CONFIRMED", "DOCUMENTS_READY", "READY_TO_TRAVEL", "IN_TRIP", "COMPLETED"]
             .contains(session.effectiveStatus.uppercased())
         let enabled = paidOrLater || !documents.isEmpty
-        let ready = !documents.isEmpty
+        let ready = checkout?.documentRequirements.map { !$0.isEmpty && $0.allSatisfy(\.ready) } ?? false
 
         return NavigationLink {
             PilgrimCheckoutView(bookingID: session.id)
@@ -417,7 +527,7 @@ struct BookingsHomeView: View {
                                 .accessibilityLabel(localized("Подтверждённый профиль", "Verified profile", "Tasdiqlangan profil", "Тасдиқланган профиль"))
                         }
 
-                        Text(localized("Главный гид iumrah · стаж 4 года", "Lead iumrah guide · 4 years experience", "iumrah bosh gidi · 4 yil tajriba", "iumrah бош гиди · 4 йил тажриба"))
+                        Text(guide.roleTitle.isEmpty ? localized("Персональный гид iumrah", "Personal iumrah guide", "iumrah shaxsiy gidi", "iumrah шахсий гиди") : guide.roleTitle)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -1094,7 +1204,8 @@ struct BookingsHomeView: View {
         case "NEW", "AVAILABILITY_CHECK":
             return .availability(session.availabilityEstimateDeadline)
         case "PAYMENT_PENDING":
-            if session.paymentReceivedAt != nil {
+            if session.operationPaymentStatus?.lowercased() == "paid" { return nil }
+            if session.operationPaymentStatus?.lowercased() == "receipt_submitted" || (session.operationPaymentStatus == nil && session.paymentReceivedAt != nil) {
                 let deadline = lifecycleDeadline(
                     explicit: session.paymentConfirmationDeadlineAt,
                     start: session.paymentReceivedAt,
@@ -1166,16 +1277,17 @@ struct BookingsHomeView: View {
                 ? localized("Перед подтверждением оплаты iumrah повторно проверит актуальную итоговую стоимость.", "Before confirming payment, iumrah will recheck the current total price.", "To‘lovni tasdiqlashdan oldin iumrah yakuniy narxning dolzarbligini qayta tekshiradi.", "Тўловни тасдиқлашдан олдин iumrah якуний нархнинг долзарблигини қайта текширади.")
                 : localized("Авиабилеты и некоторые другие компоненты имеют динамическую стоимость и после окончания периода могут потребовать повторной проверки.", "Flights and some other components have dynamic pricing and may require a fresh check after this period.", "Aviachiptalar va ayrim boshqa qismlar dinamik narxga ega, muddat tugagach qayta tekshiruv talab qilinishi mumkin.", "Авиачипталар ва айрим бошқа қисмлар динамик нархга эга, муддат тугагач қайта текширув талаб қилиниши мумкин.")
         case .paymentConfirmation:
-            return localized("Оплата получена. Обычно проверка и окончательная фиксация бронирования занимают до 10 минут.", "Payment received. Verification and final booking confirmation usually take up to 10 minutes.", "To‘lov qabul qilindi. Tekshiruv va bronni yakuniy tasdiqlash odatda 10 daqiqagacha davom etadi.", "Тўлов қабул қилинди. Текширув ва бронни якуний тасдиқлаш одатда 10 дақиқагача давом этади.")
+            return localized("Чек отправлен. Проверяем поступление средств; обычно это занимает около 10 минут.", "Receipt submitted. We are checking the transfer; this usually takes about 10 minutes.", "Chek yuborildi. Mablag‘ tushganini tekshiryapmiz; odatda 10 daqiqa.", "Чек юборилди. Маблағ тушганини текширяпмиз; одатда 10 дақиқа.")
         case .documents:
             return localized("Обычно доступные документы готовятся в течение 24 часов. Срок визы может зависеть от доступности официальных визовых систем Саудовской Аравии и внешних ограничений.", "Available travel documents are usually prepared within 24 hours. Visa timing can depend on the availability of Saudi Arabia’s official visa systems and external restrictions.", "Mavjud safar hujjatlari odatda 24 soat ichida tayyorlanadi. Viza muddati Saudiya Arabistonining rasmiy viza tizimlari mavjudligi va tashqi cheklovlarga bog‘liq bo‘lishi mumkin.", "Мавжуд сафар ҳужжатлари одатда 24 соат ичида тайёрланади. Виза муддати Саудия Арабистонининг расмий виза тизимлари мавжудлиги ва ташқи чекловларга боғлиқ бўлиши мумкин.")
         }
     }
 
     private func activeStageSubtitle(_ session: StoredBookingSession, fallback: String) -> String {
+        if session.effectiveStatus.uppercased() == "PAYMENT_PENDING", session.operationPaymentStatus == "paid" { return localized("Оплата подтверждена · проверяем данные", "Payment verified · checking details", "To‘lov tasdiqlandi · ma’lumotlar tekshirilmoqda", "Тўлов тасдиқланди · маълумотлар текширилмоқда") }
         switch lifecyclePhase(for: session) {
         case .paymentConfirmation:
-            return localized("Оплата получена · подтверждаем бронирование", "Payment received · confirming booking", "To‘lov qabul qilindi · bron tasdiqlanmoqda", "Тўлов қабул қилинди · брон тасдиқланмоқда")
+            return localized("Чек отправлен · проверяем оплату", "Receipt submitted · checking payment", "Chek yuborildi · to‘lov tekshirilmoqda", "Чек юборилди · тўлов текширилмоқда")
         case .documents:
             return localized("Бронирование подтверждено · готовим документы", "Booking confirmed · preparing documents", "Bron tasdiqlandi · hujjatlar tayyorlanmoqda", "Брон тасдиқланди · ҳужжатлар тайёрланмоқда")
         default:
@@ -1184,22 +1296,24 @@ struct BookingsHomeView: View {
     }
 
     private func activeCardTitle(_ session: StoredBookingSession, fallback: String) -> String {
+        if session.effectiveStatus.uppercased() == "PAYMENT_PENDING", session.operationPaymentStatus == "paid" { return localized("Оплата подтверждена", "Payment verified", "To‘lov tasdiqlandi", "Тўлов тасдиқланди") }
         switch lifecyclePhase(for: session) {
         case .priceLock: return localized("Цена зафиксирована", "Price held", "Narx saqlandi", "Нарх сақланди")
-        case .paymentConfirmation: return localized("Оплата получена", "Payment received", "To‘lov qabul qilindi", "Тўлов қабул қилинди")
+        case .paymentConfirmation: return localized("Чек отправлен", "Receipt submitted", "Chek yuborildi", "Чек юборилди")
         case .documents: return localized("Подготавливаем документы", "Preparing documents", "Hujjatlar tayyorlanmoqda", "Ҳужжатлар тайёрланмоқда")
         default: return fallback
         }
     }
 
     private func activeCardBody(_ session: StoredBookingSession, fallback: String) -> String {
+        if session.effectiveStatus.uppercased() == "PAYMENT_PENDING", session.operationPaymentStatus == "paid" { return localized("Доплачивать не нужно. Мы проверяем данные и подтверждаем бронирование.", "No further payment is needed. We are checking details and confirming the booking.", "Qo‘shimcha to‘lov kerak emas. Ma’lumotlarni tekshirib, bronni tasdiqlayapmiz.", "Қўшимча тўлов керак эмас. Маълумотларни текшириб, бронни тасдиқлаяпмиз.") }
         switch lifecyclePhase(for: session) {
         case .availability:
             return localized("iumrah подтверждает перелёт, отель и выбранные услуги. Обычно это занимает около 30 минут, иногда дольше.", "iumrah is confirming your flight, hotel and selected services. This usually takes about 30 minutes, sometimes longer.", "iumrah parvoz, mehmonxona va tanlangan xizmatlarni tasdiqlamoqda. Odatda 30 daqiqa, ba’zan uzoqroq.", "iumrah парвоз, меҳмонхона ва танланган хизматларни тасдиқламоқда. Одатда 30 дақиқа, баъзан узоқроқ.")
         case .priceLock:
             return localized("Итоговая цена пакета зафиксирована на время оплаты.", "Your package total is held during the payment window.", "Paketning yakuniy narxi to‘lov oynasi davomida saqlanadi.", "Пакетнинг якуний нархи тўлов ойнаси давомида сақланади.")
         case .paymentConfirmation:
-            return localized("Проверяем полученную оплату и окончательно фиксируем бронирование.", "We are verifying the payment and finalizing your booking.", "Qabul qilingan to‘lov tekshirilmoqda va bron yakuniy tasdiqlanmoqda.", "Қабул қилинган тўлов текширилмоқда ва брон якуний тасдиқланмоқда.")
+            return localized("Проверяем поступление средств. Отправленный чек не является подтверждением оплаты.", "We are checking the transfer. A submitted receipt is not payment confirmation.", "Mablag‘ tushganini tekshiryapmiz. Chek to‘lov tasdig‘i emas.", "Маблағ тушганини текширяпмиз. Чек тўлов тасдиғи эмас.")
         case .documents:
             return localized("Бронирование подтверждено. Теперь готовим доступные документы поездки.", "Your booking is confirmed. We are now preparing the available travel documents.", "Bron tasdiqlandi. Endi mavjud safar hujjatlari tayyorlanmoqda.", "Брон тасдиқланди. Энди мавжуд сафар ҳужжатлари тайёрланмоқда.")
         case nil:
@@ -1429,6 +1543,164 @@ struct BookingsHomeView: View {
 
     // MARK: - Management
 
+    private var archiveList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionHeader(title: localized("История поездок", "Trip history", "Safar tarixi", "Сафар тарихи"), trailing: nil)
+            ForEach(pastSessions) { session in
+                Button { selectedBookingID = session.id; bookingPanel = .booking } label: { compactBookingCard(session) }.buttonStyle(.plain)
+            }
+            if let selectedBookingID, pastSessions.contains(where: { $0.id == selectedBookingID }) {
+                Button(localized("К активным поездкам", "Back to active trips", "Faol safarlarga", "Фаол сафарларга")) { self.selectedBookingID = nil; bookingPanel = .booking }.font(.subheadline.weight(.semibold))
+            }
+        }
+    }
+
+    private func travelDate(_ value: String) -> Date? {
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(identifier: "Asia/Riyadh"); formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: String(value.prefix(10)))
+    }
+    private var saudiToday: String {
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX"); formatter.timeZone = TimeZone(identifier: "Asia/Riyadh"); formatter.dateFormat = "yyyy-MM-dd"; return formatter.string(from: Date())
+    }
+    private func travelDayLabel(_ session: StoredBookingSession) -> String {
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = TimeZone(identifier: "Asia/Riyadh") ?? .current
+        guard let start = travelDate(session.booking.input.startDate), let end = travelDate(session.booking.input.endDate), let today = travelDate(saudiToday) else { return "" }
+        let total = max(1, (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1)
+        let elapsed = (calendar.dateComponents([.day], from: start, to: today).day ?? 0) + 1
+        if elapsed < 1 { return localized("До вылета: \(1-elapsed) дн.", "Days to departure: \(1-elapsed)", "Uchishga \(1-elapsed) kun", "Учишга \(1-elapsed) кун") }
+        if elapsed > total { return localized("Ожидаем подтверждения завершения", "Awaiting trip completion", "Safar yakuni tasdiqlanmoqda", "Сафар якуни тасдиқланмоқда") }
+        return localized("День \(elapsed) из \(total)", "Day \(elapsed) of \(total)", "\(total) kundan \(elapsed)-kun", "\(total) кундан \(elapsed)-кун")
+    }
+    private func executionLabel(_ value: String?) -> String {
+        switch value {
+        case "completed": return localized("Выполнено", "Completed", "Bajarildi", "Бажарилди")
+        case "delayed": return localized("Задерживается", "Delayed", "Kechikmoqda", "Кечикмоқда")
+        case "rescheduled": return localized("Перенесено", "Rescheduled", "Ko‘chirildi", "Кўчирилди")
+        case "in_progress": return localized("Выполняется", "In progress", "Bajarilmoqda", "Бажарилмоқда")
+        default: return localized("Запланировано", "Planned", "Rejalashtirilgan", "Режалаштирилган")
+        }
+    }
+    private func travelCompanion(_ session: StoredBookingSession) -> some View {
+        let items = (bookings.itineraries[session.id] ?? []).sorted { $0.dateLocal == $1.dateLocal ? $0.sortOrder < $1.sortOrder : $0.dateLocal < $1.dateLocal }
+        let today = items.filter { $0.dateLocal == saudiToday }
+        let attention = items.first { $0.executionState == "in_progress" || $0.executionState == "delayed" || $0.executionState == "rescheduled" }
+        let next = attention ?? items.first { $0.dateLocal >= saudiToday && $0.executionState != "completed" }
+        let inTrip = session.effectiveStatus.uppercased() == "IN_TRIP"
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("iumrah", systemImage: "globe.europe.africa").font(.headline)
+                Text(inTrip ? localized("Ваша поездка", "Your journey", "Safaringiz", "Сафарингиз") : localized("Всё готово к поездке", "Ready to travel", "Safarga tayyor", "Сафарга тайёр")).font(.largeTitle.bold())
+                Text(travelDayLabel(session)).font(.headline).foregroundStyle(.white.opacity(0.8))
+                Text(session.displayBookingNumber).font(.caption.monospaced()).foregroundStyle(.white.opacity(0.7))
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(20).foregroundStyle(.white).background(Color.black, in: RoundedRectangle(cornerRadius: 26))
+            if travelScheduleError { Text(localized("Не удалось обновить расписание. Показана последняя доступная версия.", "Schedule refresh failed. Showing the last available version.", "Jadval yangilanmadi. Oxirgi mavjud nusxa ko‘rsatilmoqda.", "Жадвал янгиланмади. Охирги мавжуд нусха кўрсатилмоқда.")).font(.caption).foregroundStyle(.secondary) }
+            if !travelScheduleLoaded && items.isEmpty && !travelScheduleError { ProgressView().frame(maxWidth: .infinity) }
+            if let next {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(localized("Ближайшее событие", "Next event", "Keyingi tadbir", "Кейинги тадбир")).font(.caption.bold()).foregroundStyle(.secondary)
+                    Text(next.title).font(.title2.bold())
+                    Text([next.dateLocal, next.timeLocal ?? "", next.location].filter { !$0.isEmpty }.joined(separator: " · ")).font(.subheadline)
+                    Text(executionLabel(next.executionState)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }.frame(maxWidth: .infinity, alignment: .leading).padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+            }
+            if !today.isEmpty {
+                sectionHeader(title: localized("Сегодня", "Today", "Bugun", "Бугун"), trailing: nil)
+                ForEach(today) { item in
+                    HStack { Image(systemName: item.executionState == "completed" ? "checkmark.circle.fill" : "clock"); VStack(alignment: .leading, spacing: 4) { Text(item.title).font(.headline); Text([item.timeLocal ?? "", executionLabel(item.executionState)].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary) }; Spacer() }.padding(12)
+                }
+            }
+            Button { bookingPanel = .schedule } label: { managementRow(icon: "calendar", title: localized("Полное расписание", "Full schedule", "To‘liq jadval", "Тўлиқ жадвал"), subtitle: localized("Программа поездки", "Trip programme", "Safar dasturi", "Сафар дастури")) }.buttonStyle(.plain)
+            if let guide = session.guide { assignedGuideCard(session, guide: guide) }
+            else { guideTransferStatusCard(session, checkout: nil) }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                Button { bookingPanel = .status } label: { travelTile("doc.on.doc", localized("Документы", "Documents", "Hujjatlar", "Ҳужжатлар")) }.buttonStyle(.plain)
+                Button { bookingPanel = .package } label: { travelTile("building.2", localized("Отели и рейсы", "Hotels & flights", "Mehmonxonalar va reyslar", "Меҳмонхоналар ва рейслар")) }.buttonStyle(.plain)
+                if session.booking.customization?.esim == true || session.booking.includedServices?.contains(where: { $0.lowercased() == "esim" }) == true || !bookings.esimProfiles(for: session.id).isEmpty {
+                    NavigationLink { ESIMView(bookingID: session.id) } label: { travelTile("simcard", "eSIM") }.buttonStyle(.plain)
+                }
+                Button { showAdvisor = true } label: { travelTile("headphones", "Advisor") }.buttonStyle(.plain)
+                Button { showZiyarats = true } label: { travelTile("map", localized("Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар")) }.buttonStyle(.plain)
+                if bookings.canUseBookingCare(session.id) {
+                    NavigationLink { BookingChatView(bookingID: session.id) } label: { travelTile("message", localized("Поддержка", "Support", "Yordam", "Ёрдам")) }.buttonStyle(.plain)
+                } else {
+                    Link(destination: URL(string: "tel:+998508898845")!) { travelTile("phone", localized("Позвонить в поддержку", "Call support", "Yordamga qo‘ng‘iroq", "Ёрдамга қўнғироқ")) }.buttonStyle(.plain)
+                }
+            }
+        }
+    }
+    private func travelTile(_ icon: String, _ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) { Image(systemName: icon).font(.title2); Text(title).font(.subheadline.weight(.semibold)).fixedSize(horizontal: false, vertical: true) }.frame(maxWidth: .infinity, minHeight: 68, alignment: .leading).padding(14).foregroundStyle(.primary).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 18))
+    }
+    private func completedTrip(_ session: StoredBookingSession) -> some View {
+        let complete = session.effectiveStatus.uppercased() == "COMPLETED"
+        let checkout = bookings.cachedCheckout(id: session.id, token: account.bearerToken)
+        let feedback = checkout?.feedback ?? (feedbackSavedBookingID == session.id ? feedbackSaved : nil)
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: complete ? "checkmark.circle" : "xmark.circle").font(.system(size: 48, weight: .light))
+                    .scaleEffect(!complete || reduceMotion || completionAppeared ? 1 : 0.72)
+                    .opacity(!complete || reduceMotion || completionAppeared ? 1 : 0.4)
+                    .task(id: session.id) { withAnimation(reduceMotion ? nil : .spring(response: 0.55, dampingFraction: 0.75)) { completionAppeared = true } }
+                Text(complete ? localized("Поездка завершена", "Trip completed", "Safar yakunlandi", "Сафар якунланди") : localized("Поездка отменена", "Trip cancelled", "Safar bekor qilindi", "Сафар бекор қилинди")).font(.largeTitle.bold())
+                if complete { Text(localized("Пусть Аллах примет вашу умру.", "May Allah accept your Umrah.", "Alloh umrangizni qabul qilsin.", "Аллоҳ умрангизни қабул қилсин.")).foregroundStyle(.white.opacity(0.8)) }
+                Text(session.displayBookingNumber).font(.caption.monospaced())
+            }.frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(.white).padding(20).background(Color.black, in: RoundedRectangle(cornerRadius: 26))
+            Button { bookingPanel = .status } label: { managementRow(icon: "folder", title: localized("Архив документов", "Document archive", "Hujjatlar arxivi", "Ҳужжатлар архиви"), subtitle: localized("Файлы поездки", "Travel files", "Safar fayllari", "Сафар файллари")) }.buttonStyle(.plain)
+            Button { bookingPanel = .package } label: { managementRow(icon: "suitcase", title: localized("Детали поездки", "Trip details", "Safar tafsilotlari", "Сафар тафсилотлари"), subtitle: session.displayBookingNumber) }.buttonStyle(.plain)
+            Button { bookingPanel = .schedule } label: { managementRow(icon: "calendar", title: localized("Расписание", "Schedule", "Jadval", "Жадвал"), subtitle: localized("История поездки", "Trip history", "Safar tarixi", "Сафар тарихи")) }.buttonStyle(.plain)
+            if complete {
+                if let certificates = checkout?.certificates, !certificates.isEmpty {
+                    sectionHeader(title: localized("Памятные сертификаты", "Memorial certificates", "Esdalik sertifikatlari", "Эсдалик сертификатлари"), trailing: nil)
+                    ForEach(certificates) { certificate in
+                        Button { shareCertificate(certificate, session: session) } label: { managementRow(icon: "rosette", title: certificate.name, subtitle: localized("Сохранить PDF", "Save PDF", "PDF saqlash", "PDF сақлаш")) }.buttonStyle(.plain)
+                    }
+                    if certificateShareError { Text(localized("Не удалось создать PDF", "Could not create PDF", "PDF yaratilmadi", "PDF яратилмади")).font(.caption).foregroundStyle(.red) }
+                }
+                if let feedback { Text(localized("Спасибо за отзыв", "Thank you for your feedback", "Fikringiz uchun rahmat", "Фикрингиз учун раҳмат")).font(.headline); Text("\(feedback.rating)/5").font(.title2.bold()); if !feedback.comment.isEmpty { Text(feedback.comment).font(.subheadline) } }
+                else {
+                    Text(localized("Как прошла ваша поездка?", "How was your trip?", "Safaringiz qanday o‘tdi?", "Сафарингиз қандай ўтди?")).font(.title2.bold())
+                    HStack { ForEach(1...5, id: \.self) { value in Button { rating = value } label: { Image(systemName: value <= rating ? "star.fill" : "star").font(.title2).foregroundStyle(Color.primary).frame(maxWidth: .infinity, minHeight: 44) }.buttonStyle(.plain).accessibilityLabel("\(value)/5") } }
+                    TextField(localized("Комментарий (необязательно)", "Comment (optional)", "Izoh (ixtiyoriy)", "Изоҳ (ихтиёрий)"), text: $feedbackComment, axis: .vertical).lineLimit(2...5).padding(12).background(Color.iumrahRaisedBackground, in: RoundedRectangle(cornerRadius: 12))
+                    Button { Task { await sendTravelFeedback(session.id) } } label: { Text(localized("Отправить отзыв", "Send feedback", "Fikr yuborish", "Фикр юбориш")).font(.headline).frame(maxWidth: .infinity).padding(14).foregroundStyle(.white).background(Color.black, in: RoundedRectangle(cornerRadius: 16)) }.buttonStyle(.plain).disabled(rating == 0 || feedbackSending || feedbackComment.count > 1500).opacity(rating == 0 ? 0.5 : 1)
+                    if feedbackError { Text(localized("Не удалось отправить отзыв. Повторите попытку.", "Could not submit feedback. Please retry.", "Fikr yuborilmadi. Qayta urinib ko‘ring.", "Фикр юборилмади. Қайта уриниб кўринг.")).font(.caption).foregroundStyle(.red) }
+                }
+            }
+        }
+    }
+    private struct TravelCertificateFile: Identifiable { let id = UUID(); let url: URL }
+    @MainActor private func shareCertificate(_ certificate: IumrahUmrahCertificate, session: StoredBookingSession) {
+        certificateShareError = false
+        let page = CGRect(x: 0, y: 0, width: 842, height: 595)
+        let data = UIGraphicsPDFRenderer(bounds: page).pdfData { context in
+            context.beginPage()
+            UIColor.black.setFill(); context.cgContext.fill(page)
+            UIColor.white.setStroke(); context.cgContext.setLineWidth(1); context.cgContext.stroke(page.insetBy(dx: 24, dy: 24))
+            func draw(_ value: String, y: CGFloat, size: CGFloat, weight: UIFont.Weight, color: UIColor = .white, height: CGFloat = 55) {
+                let style = NSMutableParagraphStyle(); style.alignment = .center
+                (value as NSString).draw(in: CGRect(x: 60, y: y, width: 722, height: height), withAttributes: [.font: UIFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color, .paragraphStyle: style])
+            }
+            draw("iumrah", y: 65, size: 42, weight: .bold)
+            draw(localized("Памятный сертификат умры", "Umrah memorial certificate", "Umra esdalik sertifikati", "Умра эсдалик сертификати"), y: 155, size: 27, weight: .semibold)
+            draw(certificate.name, y: 231, size: 31, weight: .bold, height: 112)
+            draw(localized("Пусть Аллах примет вашу умру.", "May Allah accept your Umrah.", "Alloh umrangizni qabul qilsin.", "Аллоҳ умрангизни қабул қилсин."), y: 360, size: 19, weight: .regular)
+            draw("\(session.booking.input.startDate) – \(session.booking.input.endDate)", y: 419, size: 15, weight: .medium)
+            draw(certificate.id, y: 475, size: 11, weight: .regular, color: UIColor.lightGray)
+            draw(localized("Памятный документ iumrah · не официальный религиозный документ", "iumrah keepsake · not an official religious document", "iumrah esdaligi · rasmiy diniy hujjat emas", "iumrah эсдалиги · расмий диний ҳужжат эмас"), y: 513, size: 11, weight: .regular, color: UIColor.lightGray)
+        }
+        do {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("iumrah-certificates", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.complete])
+            let url = directory.appendingPathComponent("iumrah-\(UUID().uuidString).pdf")
+            try data.write(to: url, options: [.atomic, .completeFileProtection])
+            certificateShare = TravelCertificateFile(url: url)
+        } catch { certificateShareError = true }
+    }
+    @MainActor private func sendTravelFeedback(_ id: String) async {
+        guard !feedbackSending else { return }; feedbackSending = true; feedbackError = false; defer { feedbackSending = false }
+        do { let result = try await bookings.submitTravelFeedback(id: id, rating: rating, comment: feedbackComment); if activeSession?.id == id { feedbackSavedBookingID = id; feedbackSaved = result } }
+        catch { if activeSession?.id == id { feedbackError = true } }
+    }
+
     private func tripManagement(_ session: StoredBookingSession) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeader(title: manageSectionTitle, trailing: nil)
@@ -1441,7 +1713,7 @@ struct BookingsHomeView: View {
 
                 managementDivider
 
-                if bookings.canUseCareChat {
+                if bookings.canUseBookingCare(session.id) {
                     NavigationLink {
                         BookingChatView(bookingID: session.id)
                     } label: {
@@ -1477,7 +1749,7 @@ struct BookingsHomeView: View {
                     .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
             }
             Button(role: .destructive) { pendingDeleteID = session.id } label: {
-                Label(L10n.text("booking_cancel_and_delete", settings.language), systemImage: "trash").font(.subheadline.weight(.semibold)).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(16)
+                Label(localized("Запросить отмену", "Request cancellation", "Bekor qilishni so‘rash", "Бекор қилишни сўраш"), systemImage: "xmark.circle").font(.subheadline.weight(.semibold)).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(16)
             }.buttonStyle(.plain)
         }
     }
@@ -1534,7 +1806,7 @@ struct BookingsHomeView: View {
                         Button(role: .destructive) {
                             pendingDeleteID = session.id
                         } label: {
-                            Label(L10n.text("booking_delete", settings.language), systemImage: "trash")
+                            Label(localized("Запросить отмену", "Request cancellation", "Bekor qilishni so‘rash", "Бекор қилишни сўраш"), systemImage: "xmark.circle")
                         }
                     }
                 }
@@ -1819,11 +2091,13 @@ struct BookingsHomeView: View {
     @MainActor
     private func deleteBooking(_ id: String) async {
         do {
-            try await bookings.deleteBooking(id: id)
+            try await bookings.requestCancellation(id: id)
+            _ = try? await bookings.loadCheckout(id: id, token: account.bearerToken, force: true)
+            cancellationSent = true
             deleteError = nil
             IumrahHaptics.success()
         } catch {
-            deleteError = deleteErrorMessage(error)
+            deleteError = L10n.error(error, settings.language)
             IumrahHaptics.error()
         }
     }
@@ -2004,10 +2278,10 @@ struct BookingsHomeView: View {
     private var paymentCardTitle: String { localized("Наличие подтверждено", "Availability confirmed", "Mavjudlik tasdiqlandi", "Мавжудлик тасдиқланди") }
     private var paymentCardBody: String { localized("Проверьте данные паломников и перейдите к оплате, чтобы закрепить бронирование.", "Review pilgrim details and continue to payment to secure the booking.", "Bronni mustahkamlash uchun ziyoratchilar ma’lumotlarini tekshiring va to‘lovga o‘ting.", "Бронни мустаҳкамлаш учун зиёратчилар маълумотларини текширинг ва тўловга ўтинг.") }
 
-    private var confirmedStageTitle: String { localized("Бронирование подтверждено", "Booking confirmed", "Bron tasdiqlandi", "Брон тасдиқланди") }
-    private var confirmedStageSubtitle: String { localized("Позиции закреплены за вами", "Your trip components are secured", "Safar xizmatlari siz uchun band qilindi", "Сафар хизматлари сиз учун банд қилинди") }
+    private var confirmedStageTitle: String { localized("Подготавливаем поездку", "Preparing your trip", "Safaringizni tayyorlayapmiz", "Сафарингизни тайёрлаяпмиз") }
+    private var confirmedStageSubtitle: String { localized("Оплата подтверждена", "Payment confirmed", "To‘lov tasdiqlandi", "Тўлов тасдиқланди") }
     private var confirmedCardTitle: String { confirmedStageTitle }
-    private var confirmedCardBody: String { localized("Перелёт, проживание и выбранные услуги закреплены. Все детали доступны внутри бронирования.", "Flight, stay and selected services are secured. Full details are available inside the booking.", "Parvoz, yashash va tanlangan xizmatlar band qilindi. Barcha tafsilotlar bron ichida mavjud.", "Парвоз, яшаш ва танланган хизматлар банд қилинди. Барча тафсилотлар брон ичида мавжуд.") }
+    private var confirmedCardBody: String { localized("Готовим документы и услуги. Каждый опубликованный файл доступен в разделе статуса.", "We are preparing documents and services. Each published file is available in the status section.", "Hujjatlar va xizmatlar tayyorlanmoqda. Har bir fayl holat bo‘limida mavjud.", "Ҳужжатлар ва хизматлар тайёрланмоқда. Ҳар бир файл ҳолат бўлимида мавжуд.") }
 
     private var documentsStageTitle: String { localized("Документы готовы", "Documents ready", "Hujjatlar tayyor", "Ҳужжатлар тайёр") }
     private var documentsStageSubtitle: String { localized("Всё готово к поездке", "Everything is ready for travel", "Safar uchun hammasi tayyor", "Сафар учун ҳаммаси тайёр") }
@@ -2133,5 +2407,65 @@ private struct BookingIdentityCopyRow: View {
         }.frame(minHeight: 44)
         .onChange(of: value) { _, _ in resetTask?.cancel(); copied = false }
         .onDisappear { resetTask?.cancel(); copied = false }
+    }
+}
+
+
+// Booking-specific access recovery: verified contact proof, not an account login.
+private struct BookingRecoverySheet: View {
+    let language: AppSettingsStore.Language
+    let onRecovered: (StoredBookingSession) -> Void
+    @EnvironmentObject private var bookings: BookingStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var number = ""
+    @State private var contact = ""
+    @State private var code = ""
+    @State private var channel = "sms"
+    @State private var challenge: String?
+    @State private var working = false
+    @State private var errorMessage = false
+    private let contacts = IumrahBookingContactService()
+    private let service = BookingService()
+    private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
+        switch language { case .russian: return ru; case .uzbek: return uz; case .uzbekCyrillic: return cy; default: return en }
+    }
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(tr("Введите номер бронирования и ранее подтверждённый контакт. Аккаунт не нужен.", "Enter your booking number and previously verified contact. No account needed.", "Bron raqami va avval tasdiqlangan kontaktni kiriting. Hisob shart emas.", "Брон рақами ва аввал тасдиқланган контактни киритинг. Ҳисоб шарт эмас."))
+                    TextField(tr("Номер бронирования", "Booking number", "Bron raqami", "Брон рақами"), text: $number).textInputAutocapitalization(.characters).autocorrectionDisabled().disabled(challenge != nil || working)
+                    Picker(tr("Способ получения кода", "Get code by", "Kod olish usuli", "Код олиш усули"), selection: $channel) { Text("SMS").tag("sms"); Text("Email").tag("email") }.pickerStyle(.segmented).disabled(challenge != nil || working)
+                    TextField(channel == "sms" ? "+998" : "Email", text: $contact).keyboardType(channel == "sms" ? .phonePad : .emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled().disabled(challenge != nil || working)
+                    if challenge != nil { TextField(tr("Код из сообщения", "Verification code", "Tasdiqlash kodi", "Тасдиқлаш коди"), text: $code).keyboardType(.numberPad).textContentType(.oneTimeCode) }
+                    if errorMessage { Text(tr("Не удалось восстановить доступ. Проверьте номер и подтверждённый контакт, затем запросите новый код.", "Could not restore access. Check your booking number and verified contact, then request a new code.", "Kirish tiklanmadi. Raqam va tasdiqlangan kontaktni tekshirib, yangi kod oling.", "Кириш тикланмади. Рақам ва тасдиқланган контактни текшириб, янги код олинг.")).foregroundStyle(.red).font(.footnote) }
+                }
+                Section {
+                    Button { Task { await advance() } } label: {
+                        HStack { Spacer(); if working { ProgressView() } else { Text(challenge == nil ? tr("Получить код", "Get code", "Kod olish", "Код олиш") : tr("Открыть бронирование", "Open booking", "Bronni ochish", "Бронни очиш")) }; Spacer() }
+                    }.disabled(working || number.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || contact.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (challenge != nil && code.count != 6))
+                    if challenge != nil { Button(tr("Запросить новый код", "Request a new code", "Yangi kod olish", "Янги код олиш")) { challenge = nil; code = ""; errorMessage = false }.disabled(working) }
+                }
+            }.navigationTitle(tr("Моё бронирование", "My booking", "Mening bronim", "Менинг броним")).navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(tr("Закрыть", "Close", "Yopish", "Ёпиш")) { dismiss() }.disabled(working) } }
+        }
+    }
+    @MainActor private func advance() async {
+        guard !working else { return }; working = true; errorMessage = false; defer { working = false }
+        do {
+            if let challenge {
+                let proof: String; let email: String?; let phone: String?
+                if channel == "sms" { let result = try await contacts.confirmCode(challengeID: challenge, code: code); proof = result.verificationToken; phone = result.phone; email = nil }
+                else { let result = try await contacts.confirmEmailCode(challengeID: challenge, code: code); proof = result.verificationToken; email = result.email; phone = nil }
+                let response = try await service.recoverBooking(number: number, channel: channel, proof: proof)
+                let session = try bookings.adoptRecoveredBooking(response, email: email, phone: phone)
+                onRecovered(session); dismiss()
+            } else {
+                let result: BookingContactStartResponse
+                if channel == "sms" { result = try await contacts.requestCode(phone: contact) }
+                else { result = try await contacts.requestEmailCode(email: contact, locale: language.rawValue) }
+                challenge = result.challengeID
+            }
+        } catch { errorMessage = true; challenge = nil; code = "" }
     }
 }

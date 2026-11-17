@@ -393,7 +393,8 @@ struct BookingDetailView: View {
         case "NEW", "AVAILABILITY_CHECK":
             return session.availabilityEstimateDeadline.map { .availability($0) }
         case "PAYMENT_PENDING":
-            if session.paymentReceivedAt != nil {
+            if session.operationPaymentStatus?.lowercased() == "paid" { return nil }
+            if session.operationPaymentStatus?.lowercased() == "receipt_submitted" || (session.operationPaymentStatus == nil && session.paymentReceivedAt != nil) {
                 let deadline = lifecycleDeadline(
                     explicit: session.paymentConfirmationDeadlineAt,
                     start: session.paymentReceivedAt,
@@ -470,7 +471,7 @@ struct BookingDetailView: View {
         case .priceLock:
             return expired ? localized("Перед подтверждением оплаты iumrah повторно проверит актуальную итоговую стоимость.", "Before confirming payment, iumrah will recheck the current total price.", "To‘lovni tasdiqlashdan oldin iumrah yakuniy narxning dolzarbligini qayta tekshiradi.", "Тўловни тасдиқлашдан олдин iumrah якуний нархнинг долзарблигини қайта текширади.") : localized("Авиабилеты и некоторые другие компоненты имеют динамическую стоимость и после окончания периода могут потребовать повторной проверки.", "Flights and some other components have dynamic pricing and may require a fresh check after this period.", "Aviachiptalar va ayrim boshqa qismlar dinamik narxga ega, muddat tugagach qayta tekshiruv talab qilinishi mumkin.", "Авиачипталар ва айрим бошқа қисмлар динамик нархга эга, муддат тугагач қайта текширув талаб қилиниши мумкин.")
         case .paymentConfirmation:
-            return localized("Оплата получена. Обычно проверка и окончательная фиксация бронирования занимают до 10 минут.", "Payment received. Verification and final booking confirmation usually take up to 10 minutes.", "To‘lov qabul qilindi. Tekshiruv va bronni yakuniy tasdiqlash odatda 10 daqiqagacha davom etadi.", "Тўлов қабул қилинди. Текширув ва бронни якуний тасдиқлаш одатда 10 дақиқагача давом этади.")
+            return localized("Чек отправлен. Проверяем поступление средств; обычно это занимает около 10 минут.", "Receipt submitted. We are checking the transfer; this usually takes about 10 minutes.", "Chek yuborildi. Mablag‘ tushganini tekshiryapmiz; odatda 10 daqiqa.", "Чек юборилди. Маблағ тушганини текширяпмиз; одатда 10 дақиқа.")
         case .documents:
             return localized("Обычно доступные документы готовятся в течение 24 часов. Срок визы может зависеть от доступности официальных визовых систем Саудовской Аравии и внешних ограничений.", "Available travel documents are usually prepared within 24 hours. Visa timing can depend on the availability of Saudi Arabia’s official visa systems and external restrictions.", "Mavjud safar hujjatlari odatda 24 soat ichida tayyorlanadi. Viza muddati Saudiya Arabistonining rasmiy viza tizimlari mavjudligi va tashqi cheklovlarga bog‘liq bo‘lishi mumkin.", "Мавжуд сафар ҳужжатлари одатда 24 соат ичида тайёрланади. Виза муддати Саудия Арабистонининг расмий виза тизимлари мавжудлиги ва ташқи чекловларга боғлиқ бўлиши мумкин.")
         }

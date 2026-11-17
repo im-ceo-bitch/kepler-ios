@@ -297,6 +297,8 @@ struct IumrahPaymentReceipt: Codable, Identifiable, Hashable {
     let url: String?
     let contentType: String?
     let filename: String?
+    var amountUsd: Double? = nil
+    var reviewReason: String? = nil
 }
 
 struct IumrahTravelDocument: Codable, Identifiable, Hashable {
@@ -307,6 +309,8 @@ struct IumrahTravelDocument: Codable, Identifiable, Hashable {
     let createdAt: String
     let url: String
     let bookingReference: String?
+    var slots: [String]? = nil
+    var publicationStatus: String? = nil
 }
 
 struct IumrahBookingRewardsAmounts: Decodable, Hashable {
@@ -317,7 +321,14 @@ struct IumrahBookingRewardsAmounts: Decodable, Hashable {
     let payableUsd: Double
 }
 
+struct IumrahUmrahCertificate: Codable, Hashable, Identifiable { let position: Int; let id: String; let name: String; let issuedAt: String }
+struct IumrahTravelFeedback: Codable, Hashable { let rating: Int; let comment: String; let createdAt: String }
+struct IumrahTravelFeedbackRequest: Encodable { let rating: Int; let comment: String }
+struct IumrahTravelFeedbackResponse: Decodable { let ok: Bool; let feedback: IumrahTravelFeedback }
+
 struct IumrahCheckoutResponse: Decodable {
+    var certificates: [IumrahUmrahCertificate]? = nil
+    var feedback: IumrahTravelFeedback? = nil
     var rewards: IumrahBookingRewardsAmounts? = nil
     let ok: Bool
     let iumrahID: String
@@ -327,6 +338,9 @@ struct IumrahCheckoutResponse: Decodable {
     let payment: IumrahCheckoutPayment
     let receipts: [IumrahPaymentReceipt]
     let documents: [IumrahTravelDocument]
+    var paymentReview: IumrahPaymentReview? = nil
+    var cancellationRequestedAt: String? = nil
+    var documentRequirements: [IumrahDocumentRequirement]? = nil
 }
 
 struct IumrahSimpleResponse: Decodable { let ok: Bool }
@@ -519,4 +533,21 @@ struct IumrahAccountLinkBookingResponse: Decodable {
     let pilgrimID: String
     let bookingNumber: Int?
     let bookingDisplayNumber: String?
+}
+
+
+struct IumrahPaymentReview: Codable, Hashable {
+    let dueCents: Int?
+    let paidCents: Int
+    let satisfied: Bool
+    var historicalConfirmed: Bool? = nil
+}
+struct IumrahDocumentRequirement: Codable, Hashable, Identifiable {
+    var id: String { key }
+    let key: String
+    let kind: String
+    let label: String
+    let travelerPosition: Int?
+    let ready: Bool
+    var state: String? = nil
 }

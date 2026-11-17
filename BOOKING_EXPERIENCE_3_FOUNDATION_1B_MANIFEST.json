@@ -1,0 +1,31 @@
+{
+  "stage": "Foundation 1B",
+  "base": "iumrah-beta-update-booking-experience-3-foundation-1a-merged-20261117.zip",
+  "modified_from_1a": [
+    "Sources/Views/Booking/IumrahBookingConfirmationView.swift",
+    "Sources/Views/Booking/PilgrimCheckoutView.swift"
+  ],
+  "added_from_1a": [
+    "BOOKING_EXPERIENCE_3_FOUNDATION_1B.md",
+    "Sources/Models/IumrahAccountModels.swift",
+    "Sources/Services/IumrahAccountService.swift"
+  ],
+  "sha256": {
+    "BOOKING_EXPERIENCE_3_FOUNDATION_1A.md": "20e675e260618032bf043459bbdd942bc7c9734e5ee85446744d0d4fcf413c80",
+    "BOOKING_EXPERIENCE_3_FOUNDATION_1A_MERGED.md": "76fc4af53ee7f4ac214d7154cdfddf226da04ccd323b929058586969c71185e7",
+    "BOOKING_EXPERIENCE_3_FOUNDATION_1A_MERGED_MANIFEST.json": "2a7e75e89e15a544e64b891cac9a1e9df49ff0cf2f103b051769d7ddbe460b18",
+    "BOOKING_EXPERIENCE_3_FOUNDATION_1B.md": "67dbf23908ca0616b35b6594dc1f2a465a4726a89718c19df531de88d1ed5e72",
+    "Resources/iUmra.entitlements": "3e2278eedb8e82a52aabe4ca2e75305a68cd66146e51a8fcda4d27279d4af972",
+    "Resources/iUmraMacCatalyst.entitlements": "a5a0982c8574eb55357737cc18ab4e4f803f7e016cf6af59c3dd7543c2e91835",
+    "Resources/iumrahBeta.entitlements": "2ee85c0e29c55138204a306a96441a4927cf37bbc9fa1a3883f9440445f447df",
+    "Sources/Models/BookingModels.swift": "6698b2e0c3d56266ec10228b33e07529a37e4d5671bc5301e7998b0e99f20d9f",
+    "Sources/Models/IumrahAccountModels.swift": "a094bfc80d1bb7d017520cd26f57ba31bc0a0b369fb6b555e2071ed560d2fd97",
+    "Sources/Services/ClientPushService.swift": "b641effc4331a3b74a16507b76bf919335448ae8ec972314f1dcf52dbfa76292",
+    "Sources/Services/IumrahAccountService.swift": "16c0e381af7ce575bef82f19d6ed6908317a4bbae2a963427912b0fc6c907588",
+    "Sources/State/BookingStore.swift": "2894c533258c268ebb1078935f47c55eb4ae685f0a3f54ef68866721d393691d",
+    "Sources/Views/Booking/BusinessOfferView.swift": "6568c037447e3f523fa8b61453b681769d1f38ecd799fbfff28b8a9cd8568b06",
+    "Sources/Views/Booking/IumrahBookingConfirmationView.swift": "ea6f377552319c6fdf96891a6d4308e7565bac6c12d9fdccb917c127f7f219c5",
+    "Sources/Views/Booking/PilgrimCheckoutView.swift": "943e7e1d653ef4b122cee741207a0935cd43f0cdc55932ea473af4354762a82d",
+    "Sources/Views/RootView.swift": "e0417172346d91676e86c2a709a76c8c62ef8dbc46a0d2f9308ed3dfb79f5bfa"
+  }
+}

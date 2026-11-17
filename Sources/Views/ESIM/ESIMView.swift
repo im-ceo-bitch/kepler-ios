@@ -13,8 +13,10 @@ struct ESIMView: View {
     @State private var isRefreshing = false
     @State private var errorMessage: String?
 
+    var bookingID: String? = nil
     private var activeSession: StoredBookingSession? {
-        bookings.sessions.first { session in
+        if let bookingID { return bookings.booking(id: bookingID) }
+        return bookings.sessions.first { session in
             let value = (session.operationStatus ?? session.booking.status).lowercased()
             return value != "completed" && value != "cancelled"
         } ?? bookings.sessions.first

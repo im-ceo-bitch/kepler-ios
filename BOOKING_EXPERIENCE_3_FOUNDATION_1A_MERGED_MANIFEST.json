@@ -1,0 +1,54 @@
+{
+  "type": "cumulative-root-overlay",
+  "release": "foundation-1a-merged",
+  "files": [
+    {
+      "path": "BOOKING_EXPERIENCE_3_FOUNDATION_1A.md",
+      "sha256": "20e675e260618032bf043459bbdd942bc7c9734e5ee85446744d0d4fcf413c80"
+    },
+    {
+      "path": "BOOKING_EXPERIENCE_3_FOUNDATION_1A_MERGED.md",
+      "sha256": "76fc4af53ee7f4ac214d7154cdfddf226da04ccd323b929058586969c71185e7"
+    },
+    {
+      "path": "Resources/iUmra.entitlements",
+      "sha256": "3e2278eedb8e82a52aabe4ca2e75305a68cd66146e51a8fcda4d27279d4af972"
+    },
+    {
+      "path": "Resources/iUmraMacCatalyst.entitlements",
+      "sha256": "a5a0982c8574eb55357737cc18ab4e4f803f7e016cf6af59c3dd7543c2e91835"
+    },
+    {
+      "path": "Resources/iumrahBeta.entitlements",
+      "sha256": "2ee85c0e29c55138204a306a96441a4927cf37bbc9fa1a3883f9440445f447df"
+    },
+    {
+      "path": "Sources/Models/BookingModels.swift",
+      "sha256": "6698b2e0c3d56266ec10228b33e07529a37e4d5671bc5301e7998b0e99f20d9f"
+    },
+    {
+      "path": "Sources/Services/ClientPushService.swift",
+      "sha256": "b641effc4331a3b74a16507b76bf919335448ae8ec972314f1dcf52dbfa76292"
+    },
+    {
+      "path": "Sources/State/BookingStore.swift",
+      "sha256": "2894c533258c268ebb1078935f47c55eb4ae685f0a3f54ef68866721d393691d"
+    },
+    {
+      "path": "Sources/Views/Booking/BusinessOfferView.swift",
+      "sha256": "6568c037447e3f523fa8b61453b681769d1f38ecd799fbfff28b8a9cd8568b06"
+    },
+    {
+      "path": "Sources/Views/Booking/IumrahBookingConfirmationView.swift",
+      "sha256": "f9676510487ba5d7b55d4221171ea9e273b71bf3d699e218d1cba930ae20ed5d"
+    },
+    {
+      "path": "Sources/Views/Booking/PilgrimCheckoutView.swift",
+      "sha256": "c398c093f2fb1f098e33e5dd348f3e94dd679aec5ed4b6b843c4c1d2c20c3217"
+    },
+    {
+      "path": "Sources/Views/RootView.swift",
+      "sha256": "e0417172346d91676e86c2a709a76c8c62ef8dbc46a0d2f9308ed3dfb79f5bfa"
+    }
+  ]
+}

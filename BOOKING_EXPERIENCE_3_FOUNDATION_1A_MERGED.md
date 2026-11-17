@@ -1,0 +1,1 @@
+Use with the merged Business backend only. Supports legacy /api/offers#token and /offer/token links, offer revision, and verified acceptance. Replaces unmerged Foundation 1A; cumulative client overlay. Swift syntax checked; Xcode build and device Universal Links not verified.

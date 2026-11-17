@@ -3,6 +3,16 @@ import Foundation
 struct BookingService {
     private let api = APIClient.shared
 
+    private struct RecoveryRequest: Encodable {
+        let bookingNumber: String
+        let channel: String
+        let verificationToken: String
+    }
+
+    func recoverBooking(number: String, channel: String, proof: String) async throws -> BookingCreateResponse {
+        try await api.post("/api/package/booking-contact/recover", body: RecoveryRequest(bookingNumber: number, channel: channel, verificationToken: proof))
+    }
+
     func createBooking(_ request: BookingCreateEnvelope) async throws -> BookingCreateResponse {
         try await api.post(AppConfig.packageBookingPath, body: request)
     }
@@ -65,6 +75,9 @@ struct BookingService {
     }
 
     func fetchItinerary(id: String, headers: [String: String], language: AppSettingsStore.Language) async throws -> [BookingItineraryItem] {
+        if let managed: BookingItineraryResponse = try? await api.get("/api/catalog/hotels/client/trips/\(id)/itinerary", headers: headers), managed.managed == true {
+            return managed.items.sorted { ($0.dateLocal, $0.sortOrder) < ($1.dateLocal, $1.sortOrder) }
+        }
         do {
             let response: BookingItineraryResponse = try await api.get(
                 "/api/package/booking/\(id)/itinerary",
@@ -232,6 +245,14 @@ struct BookingService {
             body: IumrahFriendCreditApplyRequest(amountUsd: amountUsd),
             headers: headers
         )
+    }
+
+    func submitTravelFeedback(id: String, rating: Int, comment: String, headers: [String: String]) async throws -> IumrahTravelFeedbackResponse {
+        try await api.post("/api/catalog/hotels/client/trips/\(id)/feedback", body: IumrahTravelFeedbackRequest(rating: rating, comment: comment), headers: headers)
+    }
+
+    func requestCancellation(id: String, headers: [String: String]) async throws -> BookingMutationResponse {
+        try await api.post("/api/catalog/hotels/client/bookings/\(id)/cancel-request", body: [String:String](), headers: headers)
     }
 
     func deleteBooking(id: String, accessToken: String) async throws -> BookingMutationResponse {

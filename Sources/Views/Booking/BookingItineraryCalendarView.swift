@@ -42,6 +42,8 @@ struct BookingItineraryCalendarView: View {
         case completed
         case active
         case upcoming
+        case delayed
+        case rescheduled
     }
 
     private var serverItems: [BookingItineraryItem] {
@@ -52,7 +54,7 @@ struct BookingItineraryCalendarView: View {
     /// When that happens, use the package-aware baseline generated from the exact
     /// hotel stay dates and arrival city instead of presenting a broken schedule.
     private var items: [BookingItineraryItem] {
-        if serverItems.contains(where: { $0.timeLocal != nil }) {
+        if serverItems.contains(where: { $0.timeLocal != nil || $0.executionState != nil }) {
             return serverItems
         }
         let distinctServerDays = Set(serverItems.map(\.dateLocal)).count
@@ -462,14 +464,15 @@ struct BookingItineraryCalendarView: View {
     }
 
     private func temporalState(for item: BookingItineraryItem) -> TemporalState {
-        guard selectedDayIsToday, let start = localDateTime(day: item.dateLocal, time: item.timeLocal) else {
+        switch item.executionState {
+        case "completed": return .completed
+        case "in_progress": return .active
+        case "delayed": return .delayed
+        case "rescheduled": return .rescheduled
+        default:
+            if selectedDayIsToday, let start = localDateTime(day: item.dateLocal, time: item.timeLocal), Date() < start { return .upcoming }
             return .neutral
         }
-        let now = Date()
-        let end = localDateTime(day: item.dateLocal, time: item.endTimeLocal) ?? start.addingTimeInterval(50 * 60)
-        if now < start { return .upcoming }
-        if now >= start && now <= end { return .active }
-        return .completed
     }
 
     private func localDateTime(day: String, time: String?) -> Date? {
@@ -518,7 +521,7 @@ struct BookingItineraryCalendarView: View {
     private func stateTint(_ state: TemporalState) -> Color {
         switch state {
         case .active: return Color.blue
-        case .upcoming: return Color.orange
+        case .upcoming, .delayed, .rescheduled: return Color.orange
         case .completed: return Color.gray
         case .neutral: return Color.blue
         }
@@ -527,7 +530,7 @@ struct BookingItineraryCalendarView: View {
     private func statePillBackground(_ state: TemporalState) -> Color {
         switch state {
         case .active: return Color.blue.opacity(0.14)
-        case .upcoming: return Color.orange.opacity(0.16)
+        case .upcoming, .delayed, .rescheduled: return Color.orange.opacity(0.16)
         case .completed: return Color.primary.opacity(0.08)
         case .neutral: return Color.clear
         }
@@ -536,12 +539,14 @@ struct BookingItineraryCalendarView: View {
     private func stateCardBackground(_ state: TemporalState) -> Color {
         switch state {
         case .active: return Color.blue.opacity(0.08)
-        case .upcoming: return Color.iumrahRaisedBackground.opacity(0.86)
+        case .upcoming, .delayed, .rescheduled: return Color.iumrahRaisedBackground.opacity(0.86)
         case .completed, .neutral: return Color.iumrahRaisedBackground.opacity(0.72)
         }
     }
 
     private func stateTitle(_ state: TemporalState) -> String {
+        if state == .delayed { return tr("Delayed", "Задерживается", "Kechikmoqda", "Кечикмоқда") }
+        if state == .rescheduled { return tr("Rescheduled", "Перенесено", "Ko‘chirildi", "Кўчирилди") }
         switch (state, settings.language) {
         case (.active, .russian): return "Сейчас"
         case (.upcoming, .russian): return "Далее"
@@ -571,6 +576,7 @@ struct BookingItineraryCalendarView: View {
         case (.upcoming, .uzbekCyrillic): return "Кейин"
         case (.completed, .uzbekCyrillic): return "Бажарилди"
         case (.neutral, .uzbekCyrillic): return ""
+        case (.delayed, _), (.rescheduled, _): return ""
         }
     }
 
@@ -633,7 +639,7 @@ struct BookingItineraryCalendarView: View {
             updatedAt: item.updatedAt,
             timeLocal: item.timeLocal,
             endTimeLocal: item.endTimeLocal,
-            kind: item.kind
+            kind: item.kind, executionState: item.executionState
         )
     }
 

@@ -37,6 +37,9 @@ final class AppChromeStore: ObservableObject {
     @Published var shouldStartTripBuilder = false
     @Published var shouldStartFlightFirstBuilder = false
     @Published var requestedBookingID: String?
+    var requestedBookingStatus = false
+    var requestedBookingSchedule = false
+    var requestedBookingOverview = false
     @Published var requestedChatBookingID: String?
     @Published var requestedHotelID: String?
     @Published var requestedHotelConfiguratorID: String?
@@ -63,7 +66,10 @@ final class AppChromeStore: ObservableObject {
         IumrahHaptics.selection()
     }
 
-    func openBooking(id: String) {
+    func openBooking(id: String, showStatus: Bool = false, showSchedule: Bool = false, showOverview: Bool = false) {
+        requestedBookingStatus = showStatus
+        requestedBookingSchedule = showSchedule
+        requestedBookingOverview = showOverview
         requestedBookingID = id
         currentTab = .booking
         requestedTab = .booking

@@ -340,6 +340,70 @@ final class BookingStore: ObservableObject {
         return session
     }
 
+    /// Adopt the canonical receipt from a verified Business offer acceptance.
+    /// The offer endpoint already created the booking; never call create() again.
+    func adoptOfferBooking(_ response: BookingCreateResponse) throws -> StoredBookingSession {
+        guard let token = response.accessToken?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !token.isEmpty else { throw APIError.missingBookingToken }
+        let remote = response.booking
+        guard !remote.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw APIError.invalidResponse
+        }
+        if let trip = response.trip, trip.bookingID != remote.id {
+            throw APIError.invalidResponse
+        }
+        // A retried receipt must not replace a different credential or reset a
+        // newer locally stored booking. An account-only record can be upgraded
+        // with the guest token returned by this verified acceptance.
+        if let existing = booking(id: remote.id), !existing.accessToken.isEmpty {
+            guard existing.accessToken == token else { throw APIError.invalidResponse }
+            return existing
+        }
+        let existing = booking(id: remote.id)
+        let profile = remote.pilgrimProfile
+        var session = StoredBookingSession(
+            id: remote.id,
+            accessToken: token,
+            booking: remote,
+            travelerName: profile?.displayName ?? existing?.travelerName,
+            telegram: profile?.telegram ?? existing?.telegram,
+            whatsapp: profile?.whatsapp ?? existing?.whatsapp,
+            outboundFlight: existing?.outboundFlight,
+            inboundFlight: existing?.inboundFlight,
+            hotelSelection: remote.hotelSelection ?? existing?.hotelSelection,
+            madinahHotelSelection: remote.madinahHotelSelection ?? existing?.madinahHotelSelection,
+            guide: existing?.guide
+        )
+        if let existing {
+            session.transferVehicle = existing.transferVehicle
+            session.ziyaratMakkahOverride = existing.ziyaratMakkahOverride
+            session.ziyaratMadinahOverride = existing.ziyaratMadinahOverride
+            session.esimOverride = existing.esimOverride
+            session.pendingChangeConfirmation = existing.pendingChangeConfirmation
+            session.operationStatus = existing.operationStatus
+            session.pilgrimID = existing.pilgrimID
+            session.bookingNumber = existing.bookingNumber
+            session.bookingDisplayNumber = existing.bookingDisplayNumber
+            session.availabilityStartedAt = existing.availabilityStartedAt
+            session.availabilityDeadlineAt = existing.availabilityDeadlineAt
+            session.priceLockStartedAt = existing.priceLockStartedAt
+            session.priceLockExpiresAt = existing.priceLockExpiresAt
+            session.paymentReceivedAt = existing.paymentReceivedAt
+            session.paymentConfirmationDeadlineAt = existing.paymentConfirmationDeadlineAt
+            session.documentsStartedAt = existing.documentsStartedAt
+            session.documentsDeadlineAt = existing.documentsDeadlineAt
+            session.statusHistory = existing.statusHistory
+            session.pendingGeneratorQuoteProof = existing.pendingGeneratorQuoteProof
+            session.verifiedBookingEmail = existing.verifiedBookingEmail
+            session.verifiedBookingPhone = existing.verifiedBookingPhone
+        }
+        if let trip = response.trip {
+            session.mergeOperationalTrip(trip)
+        }
+        upsert(session)
+        return session
+    }
+
     private func syncGeneratorReportWithRetry(
         id: String,
         accessToken: String,

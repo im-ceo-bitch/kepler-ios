@@ -92,7 +92,7 @@ struct NuiteeJourneyHotelsView: View {
                     }.pickerStyle(.segmented)
                     if !ready { Text("Раскройте карточку сверху и укажите возраст детей для точного тарифа.").font(.footnote) }
                     if let selection = journey.localJourneyRooms[key] {
-                        Label(selection.hotel.name + " · " + selection.rate.roomName, systemImage: "checkmark.circle.fill")
+                        Label(selection.hotel.name + " · " + IumrahHotelRoomTitle.display(rate: selection.rate.roomName, fallback: NuiteeCopy.text("Номер", "Xona", "Room", settings.language)), systemImage: "checkmark.circle.fill")
                             .font(.subheadline).foregroundStyle(Color.iumrahJourneyGreen)
                         Text(NuiteeHotelService.usd(selection.rate.price) + " · " + NuiteeCopy.text("ориентировочно за номер, весь срок", "butun muddat uchun xona narxi, taxminan", "estimated per room, entire stay", settings.language)).font(.caption)
                     }

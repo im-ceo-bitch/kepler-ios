@@ -245,9 +245,14 @@ enum IumrahHotelPhotoIdentity {
         return values.filter { value in
             guard !value.isEmpty else { return false }
             guard var url = URLComponents(string: value) else { return seen.insert(value).inserted }
-            let sizing = Set(["width", "height", "w", "h", "size", "quality", "q", "fit"])
-            url.queryItems = url.queryItems?.filter { !sizing.contains($0.name.lowercased()) }
+            let sizing = Set(["width", "height", "w", "h", "size", "quality", "q", "fit", "format", "auto", "resize", "crop", "dpr", "imwidth", "impolicy"])
+            url.queryItems = url.queryItems?.filter { !sizing.contains($0.name.lowercased()) }.sorted {
+                ($0.name, $0.value ?? "") < ($1.name, $1.value ?? "")
+            }
             if url.queryItems?.isEmpty == true { url.queryItems = nil }
+            url.fragment = nil
+            url.scheme = url.scheme?.lowercased()
+            url.host = url.host?.lowercased()
             return seen.insert(url.string ?? value).inserted
         }
     }

@@ -248,6 +248,7 @@ struct BookingItineraryItem: Codable, Identifiable, Hashable {
     let timeLocal: String?
     let endTimeLocal: String?
     let kind: String?
+    var executionState: String? = nil
 }
 
 struct BookingItineraryResponse: Decodable {
@@ -256,6 +257,7 @@ struct BookingItineraryResponse: Decodable {
     let timezone: String?
     let stayPlan: PackageStayPlan?
     let items: [BookingItineraryItem]
+    var managed: Bool? = nil
 }
 
 struct ClientTripResponse: Decodable {

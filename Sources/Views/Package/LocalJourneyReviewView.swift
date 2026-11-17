@@ -139,6 +139,8 @@ struct IumrahHotelReviewsSection: View {
     @State private var selectedReview: NuiteeGuestReview?
     @State private var selectedListReview: NuiteeGuestReview?
     @State private var generation = UUID()
+    @State private var loadedReviewKey: String?
+    @State private var loadingReviewKey: String?
     @ScaledMetric(relativeTo: .body) private var compactReviewHeight: CGFloat = 278
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
         IumrahFlightCopy.text(settings.language, ru, en, uz, cy)
@@ -174,7 +176,7 @@ struct IumrahHotelReviewsSection: View {
                 .padding(.horizontal, -IumrahDesign.pagePadding)
                 Button(tr("Все отзывы", "All reviews", "Barcha sharhlar", "Барча шарҳлар")) { showAll = true }
                     .font(.subheadline.weight(.semibold)).tint(.primary)
-            } else if loading {
+            } else if loading || (loadedReviewKey == nil && !failed) {
                 Text(tr("Загружаем отзывы…", "Loading reviews…", "Sharhlar yuklanmoqda…", "Шарҳлар юкланмоқда…"))
                     .font(.subheadline).foregroundStyle(.secondary)
             } else if !failed {
@@ -187,7 +189,7 @@ struct IumrahHotelReviewsSection: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .task(id: hotelID + settings.language.rawValue) { await load(reset: true) }
+        .task(id: hotelID + "|" + settings.language.hotelContentCode) { await load(reset: true) }
         .sheet(item: $selectedReview) { review in IumrahHotelReviewDetail(review: review) }
         .sheet(isPresented: $showAll) {
             NavigationStack {
@@ -261,19 +263,24 @@ struct IumrahHotelReviewsSection: View {
         return date.formatted(.dateTime.day().month(.abbreviated).year().locale(Locale(identifier: settings.language.localeIdentifier)))
     }
     @MainActor private func load(reset: Bool) async {
-        if !reset && loading { return }
-        if reset { generation = UUID(); reviews = []; nextOffset = nil; total = nil; stale = false }
+        let language = settings.language.hotelContentCode
+        let key = hotelID + "|" + language
+        if !reset, loading, loadingReviewKey == key { return }
+        if reset, loadedReviewKey == key, !failed { return }
+        if loadedReviewKey != key { reviews = []; nextOffset = nil; total = nil; stale = false }
+        generation = UUID()
         let requestGeneration = generation
-        loading = true; failed = false
+        loading = true; failed = false; loadingReviewKey = key
+        defer { if generation == requestGeneration { loading = false; loadingReviewKey = nil } }
         do {
-            let result = try await NuiteeHotelService().reviews(hotelID: hotelID, language: settings.language.hotelContentCode, offset: reset ? 0 : (nextOffset ?? 0))
+            let result = try await IumrahHotelReviewCache.shared.load(hotelID: hotelID, language: language, more: !reset)
             guard !Task.isCancelled, generation == requestGeneration else { return }
-            var ids = Set(reviews.map(\.id))
-            reviews += result.reviews.filter { ids.insert($0.id).inserted }
-            nextOffset = result.nextOffset; total = result.total; stale = result.stale; loading = false
+            reviews = result.reviews
+            nextOffset = result.nextOffset; total = result.total; stale = result.stale
+            loadedReviewKey = key
         } catch {
             guard !Task.isCancelled, generation == requestGeneration else { return }
-            failed = true; loading = false
+            failed = true
         }
     }
 }

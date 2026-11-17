@@ -269,7 +269,7 @@ struct LegacyFinalPackageView: View {
                     Text(room.hotel.name).font(.headline)
                     Text(String(repeating: "★", count: max(0, min(5, room.hotel.roundedStars))) + " · " + L10n.city(room.city == "madinah" ? "Madinah" : "Makkah", settings.language))
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(room.rate.roomName).font(.subheadline)
+                    Text(IumrahHotelRoomTitle.display(rate: room.rate.roomName, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона"))).font(.subheadline)
                 }
                 Spacer(minLength: 0)
             }

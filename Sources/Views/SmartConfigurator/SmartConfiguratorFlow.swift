@@ -527,7 +527,7 @@ struct SmartConfiguratorFlow: View {
                     Text(cityTitle(room.city)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     Text(room.hotel.name).font(.headline).fixedSize(horizontal: false, vertical: true)
                     Text(String(repeating: "★", count: room.hotel.roundedStars)).font(.caption)
-                    Text(room.rate.roomName).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+                    Text(IumrahHotelRoomTitle.display(rate: room.rate.roomName, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона"))).font(.subheadline).fixedSize(horizontal: false, vertical: true)
                     Label("\(room.adults + room.childrenAges.count)", systemImage: "person.2").font(.caption).foregroundStyle(.secondary)
                     if !room.rate.mealPlan.isEmpty { Text(room.rate.mealPlan).font(.caption).foregroundStyle(.secondary) }
                 }

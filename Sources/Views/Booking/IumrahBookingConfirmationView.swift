@@ -14,6 +14,22 @@ struct IumrahBookingConfirmationView: View {
     var quote: PackageQuote? = nil
     let createBooking: @MainActor (BookingPilgrimProfile, BookingCreationNotificationIntent) async throws -> StoredBookingSession
 
+    init(quote: PackageQuote? = nil, createBooking: @escaping @MainActor (BookingPilgrimProfile, BookingCreationNotificationIntent) async throws -> StoredBookingSession) {
+        self.quote = quote
+        self.createBooking = createBooking
+    }
+
+    // Compatibility with native Business offers: the verified contact proof is
+    // passed through, rather than falling back to the unverified legacy closure.
+    init(quote: PackageQuote? = nil,
+         createVerifiedBooking: @escaping @MainActor (BookingPilgrimProfile, String, String) async throws -> StoredBookingSession,
+         createBooking: @escaping @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession) {
+        self.quote = quote
+        self.createBooking = { profile, intent in
+            try await createVerifiedBooking(profile, intent.contactChannel, intent.verificationToken)
+        }
+    }
+
     @ObservedObject private var push = PushNotificationManager.shared
     @State private var bookingRequestID = UUID().uuidString.lowercased()
     @State private var firstName = ""

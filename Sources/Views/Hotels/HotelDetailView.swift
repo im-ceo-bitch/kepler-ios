@@ -210,7 +210,7 @@ struct HotelDetailView: View {
 
     private var currentSelectionName: String? {
         if let selectedRoomCategory { return localizedRoomCategoryName(selectedRoomCategory.category) }
-        if let selectedRoomID, let room = detail?.rooms.first(where: { $0.id == selectedRoomID }) { return room.name }
+        if let selectedRoomID, let room = detail?.rooms.first(where: { $0.id == selectedRoomID }) { return localizedRoomName(room.name) }
 
         switch selectionRole {
         case .makkah:
@@ -1074,6 +1074,7 @@ struct HotelDetailView: View {
     }
 
     private func localizedRoomName(_ raw: String) -> String {
+        let raw = IumrahHotelRoomTitle.display(rate: raw, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона"))
         let normalized = normalize(raw)
         if normalized.contains("twin") && normalized.contains("city view") {
             switch settings.language {

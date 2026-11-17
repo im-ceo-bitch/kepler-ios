@@ -23,6 +23,7 @@ enum BookingStoreError: LocalizedError {
 final class BookingStore: ObservableObject {
     @Published private(set) var sessions: [StoredBookingSession] = []
     @Published private(set) var chats: [String: [ChatMessage]] = [:]
+    @Published private var travelESIMCache: [String: [ClientESIMProfile]] = [:]
     @Published private(set) var itineraries: [String: [BookingItineraryItem]] = [:]
     @Published private(set) var pushRegistrationReady: Bool?
     @Published private(set) var pushRegistrationError: String?
@@ -425,6 +426,24 @@ final class BookingStore: ObservableObject {
         if current != booking(id: id) { upsert(current) }
     }
 
+    func loadTravelESIMs(for bookingID: String) async throws {
+        guard let session = booking(id: bookingID) else { throw APIError.missingBookingToken }
+        let generation = bookingScopeGeneration
+        var headers: [String: String] = [:]
+        if !session.accessToken.isEmpty { headers["x-booking-token"] = session.accessToken }
+        if let accountToken, !accountToken.isEmpty { headers["Authorization"] = "Bearer " + accountToken }
+        guard !headers.isEmpty else { throw APIError.missingBookingToken }
+        let response = try await bookingService.fetchOperationalTrip(id: bookingID, headers: headers)
+        guard generation == bookingScopeGeneration, booking(id: bookingID)?.accessToken == session.accessToken,
+              response.trip.bookingID == bookingID else { throw CancellationError() }
+        travelESIMCache[bookingID] = response.esims ?? []
+    }
+
+    func travelESIMProfiles(for bookingID: String) -> [ClientESIMProfile] {
+        guard booking(id: bookingID) != nil else { return [] }
+        return travelESIMCache[bookingID] ?? []
+    }
+
     func refreshAll() async {
         let generation = bookingScopeGeneration
         var staleBookingIDs = Set<String>()
@@ -511,6 +530,7 @@ final class BookingStore: ObservableObject {
             checkoutRequests.removeAll()
             checkoutCache.removeAll()
             checkoutFriendsCache.removeAll()
+            travelESIMCache.removeAll()
             if accountToken != nil {
                 sessions.removeAll()
                 itineraries.removeAll()
@@ -1141,6 +1161,7 @@ final class BookingStore: ObservableObject {
         checkoutRequests[id] = nil
         checkoutCache[id] = nil
         checkoutFriendsCache[id] = nil
+        travelESIMCache[id] = nil
         sessions.removeAll(where: { $0.id == id })
         chatLoads[id]?.cancel()
         chatLoads[id] = nil

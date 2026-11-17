@@ -405,13 +405,14 @@ struct NuiteeHotelListingCard: View {
     let onOpen: () -> Void
     let onFavorite: () -> Void
     @State private var additionalPhotos: [String] = []
+    @State private var verifiedPhotoHotelID: String?
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width * 0.43
             HStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    NuiteeCatalogPreviewCollage(hotel: hotel, additionalPhotos: additionalPhotos)
+                    NuiteeHotelCollage(images: verifiedPhotoHotelID == hotel.id ? additionalPhotos : Array(IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 }).prefix(1)))
                         .frame(width: width, height: 232)
                     HStack(spacing: 5) {
                         Button(action: onFavorite) {
@@ -482,12 +483,16 @@ struct NuiteeHotelListingCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .onTapGesture(perform: onOpen)
         .task(id: hotel.id) {
-            additionalPhotos = []
+            guard verifiedPhotoHotelID != hotel.id else { return }
             let existing = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 })
-            guard existing.count < 3 else { return }
-            let result = await NuiteePreviewPhotoLoader.shared.photos(hotelID: hotel.id)
+            var result = await IumrahDistinctHotelPhotos.shared.select(existing)
+            if result.count < 3 {
+                let extra = await NuiteePreviewPhotoLoader.shared.photos(hotelID: hotel.id)
+                result = await IumrahDistinctHotelPhotos.shared.select(result + extra + existing)
+            }
             guard !Task.isCancelled else { return }
-            additionalPhotos = result
+            additionalPhotos = result.isEmpty ? Array(existing.prefix(1)) : result
+            verifiedPhotoHotelID = hotel.id
         }
     }
 }
@@ -543,6 +548,9 @@ struct NuiteeHotelDetailView: View {
     @State private var detail: NuiteeHotelDetail?
     @State private var rates: [NuiteeRoomRate] = []
     @State private var detailError: String?
+    @State private var loadedDetailKey: String?
+    @State private var loadedRatesKey: String?
+    @State private var loadedRatesAt: Date?
     @State private var ratesError: String?
     @State private var ratesLoading = true
     @State private var ratesCompleted = false
@@ -556,7 +564,7 @@ struct NuiteeHotelDetailView: View {
     private let service = NuiteeHotelService()
 
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
-    private var reloadID: String { "\(hotel.id):\(checkin.timeIntervalSince1970):\(nights):\(adults):\(settings.language.rawValue)" }
+    private var reloadID: String { "\(hotel.id):\(checkin.timeIntervalSince1970):\(nights):\(adults):\(childrenAges):\(settings.language.rawValue)" }
     private var photos: [String] {
         let hotelPhotos = detail?.images ?? []
         let roomPhotos = detail?.rooms.flatMap(\.images) ?? []
@@ -687,8 +695,8 @@ struct NuiteeHotelDetailView: View {
         .onAppear {
             HomePersonalizationStore.shared.visitHotel(.init(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: sandbox), owner: HomePersonalizationStore.owner(account))
         }
-        .task(id: settings.language.rawValue) { await refreshDetail() }
-        .task(id: reloadID) { await refreshRates() }
+        .task(id: hotel.id + "|" + settings.language.hotelContentCode) { await refreshDetail() }
+        .task(id: reloadID) { await refreshRates(force: false) }
         .fullScreenCover(isPresented: $isGalleryPresented) {
             NuiteeHotelGallery(images: photos, hotelName: hotel.name, rooms: detail?.rooms ?? [], onChooseRooms: { isGalleryPresented = false; galleryScrollToRooms = true })
         }
@@ -791,7 +799,10 @@ struct NuiteeHotelDetailView: View {
         let room = detail?.rooms.first(where: { $0.id == rate.roomId })
         return VStack(alignment: .leading, spacing: 12) {
             NuiteeRoomPhotoCarousel(images: room?.images ?? [], height: 176)
-            Text(rate.roomName).font(.headline)
+            Text(IumrahHotelRoomTitle.display(rate: rate.roomName, room: room?.name, fallback: NuiteeCopy.text("Номер", "Xona", "Room", settings.language))).font(.headline)
+            if IumrahHotelRoomTitle.clean(rate.roomName) != rate.roomName, room?.amenities.isEmpty != false, !rate.roomName.isEmpty {
+                Text(rate.roomName).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+            }
             if let room {
                 if let capacity = room.maxOccupancy, capacity > 0 {
                     Label("\(capacity) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language), systemImage: "person.2")
@@ -913,10 +924,22 @@ struct NuiteeHotelDetailView: View {
         return f.string(from: date)
     }
     private func refreshDetail() async {
-        do { detail = try await service.detail(hotelID: hotel.id, language: settings.language.hotelContentCode) }
-        catch { detailError = error.localizedDescription }
+        let language = settings.language.hotelContentCode
+        let key = hotel.id + "|" + language
+        guard loadedDetailKey != key else { return }
+        do {
+            let value = try await service.detail(hotelID: hotel.id, language: language)
+            guard !Task.isCancelled, key == hotel.id + "|" + settings.language.hotelContentCode else { return }
+            detail = value; detailError = nil; loadedDetailKey = key
+        } catch {
+            guard !Task.isCancelled, key == hotel.id + "|" + settings.language.hotelContentCode else { return }
+            detailError = error.localizedDescription
+        }
     }
-    private func refreshRates() async {
+    private func refreshRates(force: Bool = true) async {
+        let key = reloadID
+        if !force, loadedRatesKey == key, ratesCompleted, ratesError == nil,
+           let loadedRatesAt, Date().timeIntervalSince(loadedRatesAt) < 300 { return }
         let requestID = UUID()
         ratesRequestID = requestID
         let requestedCheckin = checkin
@@ -933,6 +956,7 @@ struct NuiteeHotelDetailView: View {
             guard result.ok else { throw APIError.invalidResponse }
             rates = result.rates.filter { $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty && !$0.roomId.isEmpty }
             if rates.isEmpty && !result.rates.isEmpty { throw APIError.invalidResponse }
+            loadedRatesKey = key; loadedRatesAt = Date()
         } catch {
             guard ratesRequestID == requestID, !Task.isCancelled else { return }
             ratesError = error.localizedDescription
@@ -953,7 +977,7 @@ private struct NuiteeHotelGallery: View {
     private struct PhotoSelection: Identifiable { let id = UUID(); let index: Int }
     private struct Album: Identifiable { let id: String; let title: String; let images: [String] }
     private var albums: [Album] {
-        [Album(id: "all", title: NuiteeCopy.text("Все фотографии", "Barcha suratlar", "All photos", settings.language), images: IumrahHotelPhotoIdentity.unique(images + rooms.flatMap(\.images)))] + rooms.filter { !$0.images.isEmpty }.map { Album(id: $0.id, title: $0.name, images: IumrahHotelPhotoIdentity.unique($0.images)) }
+        [Album(id: "all", title: NuiteeCopy.text("Все фотографии", "Barcha suratlar", "All photos", settings.language), images: IumrahHotelPhotoIdentity.unique(images + rooms.flatMap(\.images)))] + rooms.filter { !$0.images.isEmpty }.map { Album(id: $0.id, title: IumrahHotelRoomTitle.display(rate: $0.name, fallback: NuiteeCopy.text("Номер", "Xona", "Room", settings.language)), images: IumrahHotelPhotoIdentity.unique($0.images)) }
     }
     private var current: [String] { (albums.first(where: { $0.id == selection }) ?? albums[0]).images }
     var body: some View {
@@ -1041,22 +1065,13 @@ private actor NuiteePreviewPhotoLoader {
         guard !Task.isCancelled else { return [] }
         let task = Task<[String], Never> {
             guard let detail = try? await NuiteeHotelService().detail(hotelID: hotelID) else { return [] }
-            return Array(IumrahHotelPhotoIdentity.unique(detail.images + detail.rooms.flatMap(\.images)).prefix(3))
+            return Array(IumrahHotelPhotoIdentity.unique(detail.images + detail.rooms.flatMap(\.images)).prefix(30))
         }
         inFlight[hotelID] = task
         let result = await task.value
         inFlight[hotelID] = nil
         if !result.isEmpty { cache[hotelID] = result }
         return result
-    }
-}
-
-private struct NuiteeCatalogPreviewCollage: View {
-    let hotel: NuiteeHotel
-    var additionalPhotos: [String] = []
-    var body: some View {
-        let source = IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 } + additionalPhotos)
-        NuiteeHotelCollage(images: Array(source.prefix(3)))
     }
 }
 
@@ -1103,8 +1118,11 @@ private struct NuiteeRoomDetailsPage: View {
             VStack(alignment: .leading, spacing: 18) {
                     IumrahPageHelpCard("hotel.rate_details")
                     NuiteeRoomPhotoCarousel(images: room?.images ?? [], height: 260)
-                    Text(rate.roomName).font(.title2.bold())
+                    Text(IumrahHotelRoomTitle.display(rate: rate.roomName, room: room?.name, fallback: NuiteeCopy.text("Номер", "Xona", "Room", settings.language))).font(.title2.bold())
                     Text(hotelName).font(.subheadline).foregroundStyle(.secondary)
+                    if IumrahHotelRoomTitle.clean(rate.roomName) != rate.roomName, room?.amenities.isEmpty != false, !rate.roomName.isEmpty {
+                        Text(rate.roomName).font(.subheadline).foregroundStyle(.secondary)
+                    }
                     if let room {
                         if !room.description.isEmpty { Text(room.description).font(.body) }
                         if let maxOccupancy = room.maxOccupancy {

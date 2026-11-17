@@ -268,7 +268,7 @@ struct IumrahManualPackageView: View {
                 HotelCachedImage(rawURL: room.hotel.coverImageURL, thumbnailPixelDimension: 768).frame(height: 154).frame(maxWidth: .infinity).clipped().clipShape(RoundedRectangle(cornerRadius: 17))
                 Text(room.hotel.name).font(.title3.bold())
                 HStack { if room.hotel.roundedStars > 0 { Text(String(repeating: "★", count: room.hotel.roundedStars)) }; if let rating = room.hotel.rating { Text(String(format: "%.1f", rating)) } }.font(.caption).foregroundStyle(.secondary)
-                Text(room.rate.roomName).font(.subheadline.weight(.medium))
+                Text(IumrahHotelRoomTitle.display(rate: room.rate.roomName, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона"))).font(.subheadline.weight(.medium))
                 fact(t("Заезд / выезд", "Check-in / out", "Kirish / chiqish", "Кириш / чиқиш"), room.checkin.formatted(date: .abbreviated, time: .omitted) + " – " + room.checkout.formatted(date: .abbreviated, time: .omitted))
                 fact(t("Ночей", "Nights", "Tun", "Тун"), "\(TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights)")
                 Label(meals(room), systemImage: "fork.knife").font(.subheadline).foregroundStyle(.secondary)

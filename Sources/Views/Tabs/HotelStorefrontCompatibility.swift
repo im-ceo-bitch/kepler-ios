@@ -779,6 +779,7 @@ struct HotelStorefrontCard: View {
     var onSelectHotel: (() -> Void)? = nil
 
     @State private var detailImages: [String] = []
+    @State private var verifiedPhotoHotelID: String?
     private let cardHeight: CGFloat = 232
 
     var body: some View {
@@ -787,7 +788,7 @@ struct HotelStorefrontCard: View {
 
             HStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    HotelStorefrontCollage(images: detailImages.isEmpty ? images : detailImages, fallback: hotel.coverImageURL)
+                    HotelStorefrontCollage(images: verifiedPhotoHotelID == hotel.id ? detailImages : Array(IumrahHotelPhotoIdentity.unique(images + [hotel.coverImageURL].compactMap { $0 }).prefix(1)), fallback: nil)
                         .frame(width: mediaWidth, height: cardHeight)
 
                     HStack(spacing: 6) {
@@ -923,9 +924,15 @@ struct HotelStorefrontCard: View {
             }
         }
         .task(id: hotel.id) {
-            guard IumrahHotelPhotoIdentity.unique(images).count < 3 else { return }
-            guard let detail = try? await HotelCatalogService().hotelDetail(id: hotel.id), !Task.isCancelled else { return }
-            detailImages = detail.images.sorted { $0.position < $1.position }.map(\.url)
+            guard verifiedPhotoHotelID != hotel.id else { return }
+            let existing = IumrahHotelPhotoIdentity.unique(images + [hotel.coverImageURL].compactMap { $0 })
+            var result = await IumrahDistinctHotelPhotos.shared.select(existing)
+            if result.count < 3, let detail = try? await HotelCatalogService().hotelDetail(id: hotel.id) {
+                result = await IumrahDistinctHotelPhotos.shared.select(result + detail.images.sorted { $0.position < $1.position }.map(\.url) + existing)
+            }
+            guard !Task.isCancelled else { return }
+            detailImages = result.isEmpty ? Array(existing.prefix(1)) : result
+            verifiedPhotoHotelID = hotel.id
         }
         .accessibilityAddTraits(.isButton)
     }
@@ -946,15 +953,15 @@ private struct HotelStorefrontCollage: View {
     var body: some View {
         GeometryReader { proxy in
             if resolved.count < 2 {
-                HotelCachedImage(rawURL: resolved.first)
+                HotelCachedImage(rawURL: resolved.first, thumbnailPixelDimension: 512)
                     .frame(width: proxy.size.width, height: proxy.size.height).clipped()
             } else {
                 VStack(spacing: 3) {
-                    HotelCachedImage(rawURL: resolved[0])
+                    HotelCachedImage(rawURL: resolved[0], thumbnailPixelDimension: 512)
                         .frame(height: proxy.size.height * 0.62).clipped()
                     HStack(spacing: 3) {
-                        HotelCachedImage(rawURL: resolved[1])
-                        if resolved.count > 2 { HotelCachedImage(rawURL: resolved[2]) }
+                        HotelCachedImage(rawURL: resolved[1], thumbnailPixelDimension: 512)
+                        if resolved.count > 2 { HotelCachedImage(rawURL: resolved[2], thumbnailPixelDimension: 512) }
                     }
                     .frame(height: proxy.size.height * 0.38 - 3).clipped()
                 }
@@ -2560,10 +2567,10 @@ struct StorefrontUmrahPackageDetailView: View {
         let role: HotelSelectionRole = isMadinahCity(packageHotel.city) ? .madinah : .makkah
         switch role {
         case .makkah:
-            if let room = journey.selectedRoom { return room.name }
+            if let room = journey.selectedRoom { return IumrahHotelRoomTitle.display(rate: room.name, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона")) }
             if let category = journey.selectedRoomCategory { return L10n.text(category.category.titleKey, settings.language) }
         case .madinah:
-            if let room = journey.selectedMadinahRoom { return room.name }
+            if let room = journey.selectedMadinahRoom { return IumrahHotelRoomTitle.display(rate: room.name, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона")) }
             if let category = journey.selectedMadinahRoomCategory { return L10n.text(category.category.titleKey, settings.language) }
         }
         return nil

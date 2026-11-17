@@ -59,7 +59,7 @@ struct BookingCheckoutView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     } else if let room = journey.selectedRoom {
-                        Label(room.name, systemImage: "bed.double")
+                        Label(IumrahHotelRoomTitle.display(rate: room.name, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона")), systemImage: "bed.double")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }

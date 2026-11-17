@@ -62,6 +62,7 @@ final class SmartConfiguratorStore: ObservableObject {
     @Published private(set) var hotelSearchCity: String?
     @Published private(set) var replacingCity: String?
     @Published private(set) var replacementError: String?
+    @Published private(set) var hotelsChangedWithFlights = false
     private var excludedHotels: [String: Set<String>] = [:]
 
 
@@ -82,7 +83,7 @@ final class SmartConfiguratorStore: ObservableObject {
     func clear() {
         result = nil; error = nil; connecting = false; progress = .flights
         flightPreview = []; roomPreview = []; transferPreview = nil
-        hotelSearchCity = nil; replacementError = nil; excludedHotels = [:]
+        hotelSearchCity = nil; replacementError = nil; hotelsChangedWithFlights = false; excludedHotels = [:]
     }
 
     func assemble() async {
@@ -185,6 +186,109 @@ final class SmartConfiguratorStore: ObservableObject {
         roomPreview = Self.sortedRooms(result.localJourneyRooms)
         flightPreview = [result.selectedOutbound, result.selectedInbound].compactMap { $0 }
         transferPreview = result.selectedTransferVehicle?.modelName
+    }
+
+    enum EditKind: Hashable { case flights, hotel(String), transfer }
+
+    func makeEditJourney() -> JourneyStore? {
+        guard let previous = result, !busy else { return nil }
+        let next = JourneyStore()
+        next.usesLocalJourney = true
+        next.trip = previous.trip
+        next.flightSearchFlexDays = previous.flightSearchFlexDays
+        next.packageFlightPath = previous.packageFlightPath
+        next.selectedPublishedCompleteID = previous.selectedPublishedCompleteID
+        next.selectedPublishedOutboundID = previous.selectedPublishedOutboundID
+        next.selectedPublishedReturnID = previous.selectedPublishedReturnID
+        next.stagedUmrahFlights = previous.stagedUmrahFlights
+        next.stagedAviasalesOffers = previous.stagedAviasalesOffers
+        next.mixedFlightIdentity = previous.mixedFlightIdentity
+        next.localJourneyFlights = previous.localJourneyFlights
+        next.localJourneyRooms = previous.localJourneyRooms
+        next.selectedOutbound = previous.selectedOutbound
+        next.selectedInbound = previous.selectedInbound
+        copyTransfer(from: previous, to: next)
+        return next
+    }
+
+    private func copyTransfer(from previous: JourneyStore, to next: JourneyStore) {
+        next.selectedTransferVehicle = previous.selectedTransferVehicle
+        next.haramainTrainSelected = previous.haramainTrainSelected
+        next.haramainFareClass = previous.haramainFareClass
+        next.haramainAdultTickets = previous.haramainAdultTickets
+        next.haramainChildTickets = previous.haramainChildTickets
+        next.confirmTransferSelection()
+    }
+
+    /// Never mutate the last confirmed package until the replacement is priced.
+    func applyEdit(_ next: JourneyStore, kind: EditKind) async {
+        guard !busy, let previous = result else { return }
+        busy = true; replacementError = nil
+        var replacedHotel = false
+        defer { busy = false; hotelSearchCity = nil }
+        do {
+            guard next.trip.adults == previous.trip.adults,
+                  next.trip.children == previous.trip.children,
+                  next.trip.infants == previous.trip.infants,
+                  next.trip.rooms == previous.trip.rooms,
+                  next.trip.scope == previous.trip.scope else { throw Failure.room }
+            if kind == .flights {
+                copyTransfer(from: previous, to: next)
+                let windows = TripStayPlanner.windows(for: next.trip)
+                var stays = [("makkah", windows.makkah)]
+                if let madinah = windows.madinah { stays.append(("madinah", madinah)) }
+                for (city, window) in stays {
+                    let old = previous.localJourneyRooms.filter { $0.value.city == city }
+                    if old.count == next.trip.rooms && old.values.allSatisfy({ $0.checkin == window.checkIn && $0.checkout == window.checkOut }) {
+                        next.localJourneyRooms.merge(old) { _, new in new }
+                    } else {
+                        hotelSearchCity = city
+                        var p = preferences
+                        if let stars = old.values.first?.hotel.roundedStars {
+                            p.tier = stars <= 2 ? .economy : stars == 3 ? .standard : stars == 4 ? .comfort : .luxury
+                        }
+                        let rooms: [String: LocalJourneyRoom]
+                        if let refreshed = try await refreshPreviousRooms(old, window: window, count: next.trip.rooms) {
+                            rooms = refreshed
+                        } else {
+                            rooms = try await selectRooms(city: city, window: window, p: p, count: next.trip.rooms)
+                            replacedHotel = true
+                        }
+                        next.localJourneyRooms.merge(rooms) { _, new in new }
+                    }
+                }
+            }
+            guard next.localRoomsComplete,
+                  let vehicle = next.selectedTransferVehicle,
+                  vehicle.passengerCapacity >= next.trip.travelerCount else { throw Failure.room }
+            next.confirmTransferSelection()
+            await next.buildQuote()
+            try Task.checkCancellation()
+            guard next.hasFinalGeneratorQuote, next.quote?.bookingAllowed == true,
+                  next.selectedOutbound != nil, next.selectedInbound != nil else { throw Failure.quote }
+            result = next
+            hotelsChangedWithFlights = kind == .flights && replacedHotel
+            connecting = (next.selectedOutbound?.stops ?? 0) > 0 || (next.selectedInbound?.stops ?? 0) > 0
+            syncReview()
+        } catch is CancellationError { return }
+        catch { if !Task.isCancelled { replacementError = error.localizedDescription } }
+    }
+
+    private func refreshPreviousRooms(_ old: [String: LocalJourneyRoom], window: TripStayWindow, count: Int) async throws -> [String: LocalJourneyRoom]? {
+        guard old.count == count, window.checkOut > window.checkIn else { return nil }
+        let service = NuiteeHotelService()
+        var refreshed: [String: LocalJourneyRoom] = [:]
+        for (key, room) in old.sorted(by: { $0.key < $1.key }) {
+            try Task.checkCancellation()
+            let response = try await service.rates(hotelID: room.hotel.id, checkin: window.checkIn, checkout: window.checkOut,
+                adults: room.adults, childrenAges: room.childrenAges, smartTimeout: true)
+            guard response.ok, let rate = response.rates.filter({
+                $0.roomId == room.rate.roomId && $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty
+            }).min(by: { $0.price < $1.price }) else { return nil }
+            refreshed[key] = .init(id: room.id, city: room.city, hotel: room.hotel, rate: rate,
+                checkin: window.checkIn, checkout: window.checkOut, adults: room.adults, childrenAges: room.childrenAges, meals: room.meals)
+        }
+        return refreshed
     }
 
     private static func sortedRooms(_ rooms: [String: LocalJourneyRoom]) -> [LocalJourneyRoom] {

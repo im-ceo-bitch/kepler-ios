@@ -5,6 +5,16 @@ struct NuiteeJourneyHotelsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var journey: JourneyStore
     var transferAlreadySelected = false
+    var smartCity: String? = nil
+    var smartConfirm: (() -> Void)? = nil
+
+    init(transferAlreadySelected: Bool = false, smartCity: String? = nil, smartChildAges: [Int] = [], smartConfirm: (() -> Void)? = nil) {
+        self.transferAlreadySelected = transferAlreadySelected
+        self.smartCity = smartCity
+        self.smartConfirm = smartConfirm
+        _city = State(initialValue: smartCity ?? "makkah")
+        _ages = State(initialValue: smartChildAges)
+    }
     @State private var showFinalAfterHotels = false
     @State private var city = "makkah"
     @State private var roomIndex = 0
@@ -59,6 +69,7 @@ struct NuiteeJourneyHotelsView: View {
                     IumrahJourneyDisclosureCard(title: "Отели и номера", total: "\(journey.trip.travelerCount) чел. · \(journey.trip.rooms) ном.",
                         subtitle: "\(window.checkIn.formatted(date: .abbreviated, time: .omitted)) — \(window.checkOut.formatted(date: .abbreviated, time: .omitted)) · \(roomAdults) взр. · \(roomChildren.count) дет.",
                         priceCaption: "Состав поездки") {
+                        if smartCity == nil {
                         Stepper("Номера: \(journey.trip.rooms)", value: $journey.trip.rooms, in: 1...journey.trip.adults)
                         ForEach(ages.indices, id: \.self) { index in
                             Picker("Возраст ребёнка \(index + 1)", selection: $ages[index]) {
@@ -66,12 +77,15 @@ struct NuiteeJourneyHotelsView: View {
                                 ForEach(0...17, id: \.self) { Text("\($0)").tag($0) }
                             }
                         }
+                        } else {
+                            Text(city == "makkah" ? "Мекка" : "Медина").font(.headline)
+                        }
                     }
                 }
                 .id("hotels-top")
                 LazyVStack(alignment: .leading, spacing: 14) {
                     IumrahPageHelpCard(!ready ? "hotels.child_ages" : journey.localRoomsComplete ? "hotels.complete" : journey.trip.rooms > 1 ? "hotels.multiple_rooms" : city == "madinah" ? "hotels.madinah" : "hotels.makkah")
-                    if journey.trip.scope == .makkahAndMadinah {
+                    if smartCity == nil && journey.trip.scope == .makkahAndMadinah {
                         Picker("Город", selection: $city) {
                             Text("Мекка").tag("makkah")
                             Text("Медина").tag("madinah")
@@ -120,12 +134,12 @@ struct NuiteeJourneyHotelsView: View {
         })
         .task(id: searchID) { await load() }
         .onAppear {
-            if ages.count != journey.trip.children + journey.trip.infants {
+            if smartCity == nil && ages.count != journey.trip.children + journey.trip.infants {
                 ages = Array(repeating: -1, count: journey.trip.children + journey.trip.infants)
             }
         }
         .onChange(of: journey.trip.rooms) { _, _ in invalidateRooms() }
-        .onChange(of: ages) { _, _ in journey.localJourneyRooms = [:]; journey.quote = nil }
+        .onChange(of: ages) { _, _ in if smartCity == nil { journey.localJourneyRooms = [:]; journey.quote = nil } }
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: window.checkIn, nights: window.nights,
                 adults: roomAdults, sandbox: sandbox, childrenAges: roomChildren, onSelectRate: { rate in
@@ -149,7 +163,7 @@ struct NuiteeJourneyHotelsView: View {
         .navigationDestination(isPresented: $showFinalAfterHotels) { FinalPackageView() }
         .safeAreaInset(edge: .bottom) {
             if journey.localRoomsComplete {
-                Button(transferAlreadySelected ? "Посмотреть итог" : "Выбрать трансфер") { finishRooms() }
+                Button(smartCity != nil ? IumrahFlightCopy.text(settings.language, "Подтвердить отель", "Confirm hotel", "Mehmonxonani tasdiqlash", "Меҳмонхонани тасдиқлаш") : transferAlreadySelected ? "Посмотреть итог" : "Выбрать трансфер") { finishRooms() }
                     .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
             }
         }
@@ -157,7 +171,7 @@ struct NuiteeJourneyHotelsView: View {
 
     private func advanceToNextSelection() {
         // Advance only after the detail view has popped. Never mutate its city/date bindings mid-dismissal.
-        let cities = journey.trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"]
+        let cities = smartCity.map { [$0] } ?? (journey.trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"])
         let orderedCities = [city] + cities.filter { $0 != city }
         for nextCity in orderedCities {
             if let nextRoom = (0..<journey.trip.rooms).first(where: { journey.localJourneyRooms["\(nextCity):\($0)"] == nil }) {
@@ -167,11 +181,12 @@ struct NuiteeJourneyHotelsView: View {
                 return
             }
         }
-        if journey.localRoomsComplete { finishRooms() }
+        if journey.localRoomsComplete && smartCity == nil { finishRooms() }
     }
 
     private func finishRooms() {
         journey.invalidateLocalJourneyQuote()
+        if let smartConfirm { smartConfirm(); return }
         if transferAlreadySelected { journey.confirmTransferSelection(); showFinalAfterHotels = true }
         else { showTransfer = true }
     }

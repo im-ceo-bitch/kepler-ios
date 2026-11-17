@@ -294,43 +294,37 @@ struct IumrahAccountService {
         }
     }
 
-    private func checkoutHeaders(token: String?, bookingToken: String?) -> [String: String] {
-        var headers: [String: String] = [:]
-        if let bookingToken, !bookingToken.isEmpty { headers["x-booking-token"] = bookingToken }
-        if let token, !token.isEmpty { headers["Authorization"] = "Bearer \(token)" }
-        return headers
-    }
-
-    func saveTraveler(bookingID: String, position: Int, form: IumrahTravelerForm, token: String?, bookingToken: String? = nil) async throws -> IumrahTravelerForm {
+    func saveTraveler(bookingID: String, position: Int, form: IumrahTravelerForm, token: String) async throws -> IumrahTravelerForm {
         let value: IumrahTravelerSaveResponse = try await api.put(
             "/api/catalog/hotels/client/trips/\(bookingID)/travelers/\(position)",
             body: IumrahTravelerSaveRequest(form),
-            headers: checkoutHeaders(token: token, bookingToken: bookingToken)
+            headers: ["Authorization": "Bearer \(token)"]
         )
         return value.traveler
     }
 
-    func uploadPassport(bookingID: String, position: Int, data: Data, contentType: String, token: String?, bookingToken: String? = nil) async throws {
-        let _: IumrahSimpleResponse = try await api.upload(
+    func uploadPassport(bookingID: String, position: Int, data: Data, contentType: String, token: String) async throws {
+        let response: IumrahSimpleResponse = try await api.upload(
             "/api/catalog/hotels/client/trips/\(bookingID)/travelers/\(position)/passport",
             data: data,
             contentType: contentType,
-            headers: checkoutHeaders(token: token, bookingToken: bookingToken)
+            headers: ["Authorization": "Bearer \(token)"]
         )
+        guard response.ok else { throw APIError.invalidResponse }
     }
 
-    func uploadReceipt(bookingID: String, method: String, data: Data, contentType: String, token: String?, bookingToken: String? = nil) async throws -> String {
+    func uploadReceipt(bookingID: String, method: String, data: Data, contentType: String, token: String) async throws -> String {
         let value: IumrahReceiptResponse = try await api.upload(
             "/api/catalog/hotels/client/trips/\(bookingID)/receipt",
             data: data,
             contentType: contentType,
-            headers: checkoutHeaders(token: token, bookingToken: bookingToken).merging(["x-payment-method": method]) { _, new in new }
+            headers: ["Authorization": "Bearer \(token)", "x-payment-method": method]
         )
         return value.id
     }
 
-    func media(path: String, token: String?, bookingToken: String? = nil) async throws -> Data {
-        try await api.fetchData(path, headers: checkoutHeaders(token: token, bookingToken: bookingToken))
+    func media(path: String, token: String) async throws -> Data {
+        try await api.fetchData(path, headers: ["Authorization": "Bearer \(token)"])
     }
 
     func registerCurrentSession(token: String, locale: String) async throws -> IumrahSecurityOverview {

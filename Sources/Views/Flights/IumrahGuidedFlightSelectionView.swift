@@ -8,6 +8,8 @@ struct IumrahGuidedFlightSelectionView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Environment(\.dismiss) private var dismiss
 
+    var smartConfirm: (() -> Void)? = nil
+
     @State private var filters = IumrahFlightFilterState()
     @State private var visibleCount = 20
     @State private var editingSearch = false
@@ -285,7 +287,7 @@ struct IumrahGuidedFlightSelectionView: View {
             summary: "\(currentOrigin) → \(currentDestination)",
             subtitle: "\(dayText(journey.trip.departureDate)) – \(dayText(journey.trip.returnDate)) · \(journey.trip.travelerCount) · \(cabinTitle)") {
             IumrahCompactSearchFields {
-                IumrahFlightSearchEditor {
+                IumrahFlightSearchEditor(lockParty: smartConfirm != nil) {
                     pendingChoice = nil
                     outbound = nil
                     inbound = nil
@@ -685,7 +687,7 @@ struct IumrahGuidedFlightSelectionView: View {
         journey.clearStagedUmrahFlights()
         journey.trip.departureDate = outboundDate
         journey.trip.returnDate = inboundDate
-        journey.trip.saudiArrivalDate = outbound.arrivalAt.flatMap { dateFromISODay(dayKey($0)) }
+        journey.trip.saudiArrivalDate = outbound.arrivalAt.flatMap { dateFromISODay(dayKey(IumrahFlightClock.local($0, airport: outbound.destination))) }
         journey.trip.flightTripType = .roundTrip
         journey.trip.selectedReturnAirport = inbound.origin.uppercased() == "MED" ? .madinah : .jeddah
         journey.trip.arrivalAirport = outbound.destination.uppercased() == "MED" ? .madinah : .jeddah
@@ -739,7 +741,7 @@ struct IumrahGuidedFlightSelectionView: View {
                 arrivalAt: flight.arrivalAt, displayedPrice: flight.price)
         }
         IumrahHaptics.success()
-        showHotelPicker = true
+        if let smartConfirm { smartConfirm() } else { showHotelPicker = true }
     }
 
     private func independentIdentity(_ flight: FlightChoice) -> String {

@@ -21,7 +21,6 @@ struct IumrahBookingPassportsView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(alignment: .leading, spacing: 18) {
                 header
-                securityAnimationCard
                 instructionCard
 
                 if isLoading && checkout == nil {
@@ -33,11 +32,16 @@ struct IumrahBookingPassportsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .iumrahCard()
                 } else if let travelers = checkout?.travelers, !travelers.isEmpty {
+                    let attached = travelers.filter(\.hasPassport).count
+                    ProgressView(value: Double(attached), total: Double(travelers.count))
+                    Text("\(attached) / \(travelers.count)").font(.headline.monospacedDigit())
                     ForEach(travelers) { traveler in
                         NavigationLink {
                             IumrahTravelerProfileView(
                                 bookingID: bookingID,
                                 traveler: traveler,
+                                passportOnly: true,
+                                bookingContactName: holderName(traveler),
                                 onSaved: { Task { await loadCheckout(showLoader: false) } }
                             )
                         } label: {
@@ -45,6 +49,8 @@ struct IumrahBookingPassportsView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                } else if checkout == nil && account.bearerToken == nil {
+                    IumrahBookingAccessCard(bookingID: bookingID)
                 } else {
                     Text(tr("No travelers found.", "Участники не найдены.", "Sayohatchilar topilmadi.", "Саёҳатчилар топилмади."))
                         .font(.subheadline)
@@ -69,7 +75,7 @@ struct IumrahBookingPassportsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         
-        .task { await loadCheckout(showLoader: true) }
+        .task(id: account.bearerToken) { await loadCheckout(showLoader: true) }
     }
 
     private var securityAnimationCard: some View {
@@ -97,10 +103,10 @@ struct IumrahBookingPassportsView: View {
                 .font(.system(size: 31, weight: .bold, design: .rounded))
                 .tracking(-0.6)
             Text(tr(
-                "One clear information-page photo for every pilgrim is enough. Manual fields are optional.",
-                "Для каждого паломника достаточно одной чёткой фотографии страницы с данными. Ручное заполнение — по желанию.",
-                "Har bir ziyoratchi uchun ma’lumotlar sahifasining bitta aniq rasmi yetarli. Qo‘lda to‘ldirish ixtiyoriy.",
-                "Ҳар бир зиёратчи учун маълумотлар саҳифасининг битта аниқ расми етарли. Қўлда тўлдириш ихтиёрий."
+                "One clear information-page photo for every pilgrim. No forms to repeat.",
+                "Для каждого паломника — одна чёткая фотография страницы с данными. Повторно заполнять анкеты не нужно.",
+                "Har bir ziyoratchi uchun ma’lumotlar sahifasining bitta aniq rasmi. Anketani qayta to‘ldirish shart emas.",
+                "Ҳар бир зиёратчи учун маълумотлар саҳифасининг битта аниқ расми. Анкетани қайта тўлдириш шарт эмас."
             ))
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -177,6 +183,12 @@ struct IumrahBookingPassportsView: View {
         }
     }
 
+    private func holderName(_ traveler: IumrahTravelerForm) -> String? {
+        let relationship = traveler.relationship?.lowercased() ?? ""
+        guard relationship == "self" || (relationship.isEmpty && traveler.position == 1) else { return nil }
+        return session?.booking.pilgrimProfile?.displayName ?? session?.travelerName
+    }
+
     private func travelerName(_ traveler: IumrahTravelerForm) -> String {
         let name = [traveler.firstName, traveler.middleName, traveler.lastName]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -184,7 +196,8 @@ struct IumrahBookingPassportsView: View {
             .joined(separator: " ")
         if !name.isEmpty { return name }
         let relationship = traveler.relationship?.lowercased() ?? ""
-        if relationship == "self" || traveler.position == 1 {
+        if let holder = holderName(traveler), !holder.isEmpty { return holder }
+        if relationship == "self" || (relationship.isEmpty && traveler.position == 1) {
             return tr("Booking holder", "Владелец бронирования", "Bron egasi", "Брон эгаси")
         }
         return tr("Traveler \(traveler.position)", "Участник \(traveler.position)", "Sayohatchi \(traveler.position)", "Саёҳатчи \(traveler.position)")

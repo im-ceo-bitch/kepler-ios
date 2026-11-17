@@ -1,5 +1,4 @@
 import SwiftUI
-import UserNotifications
 
 /// The same guest checkout is used by Hotel First, Flight First and Configurator.
 /// No account form is shown; a verified contact can establish an internal profile session.
@@ -13,7 +12,6 @@ struct IumrahBookingConfirmationView: View {
     @Environment(\.smartBookingDone) private var smartBookingDone
 
     var quote: PackageQuote? = nil
-    var createVerifiedBooking: (@MainActor (BookingPilgrimProfile, String, String) async throws -> StoredBookingSession)? = nil
     let createBooking: @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession
 
     @State private var firstName = ""
@@ -201,7 +199,7 @@ struct IumrahBookingConfirmationView: View {
                 .focused($activeField, equals: .firstName)
                 .onSubmit { activeField = .lastName }
                 .bookingInputStyle()
-                .disabled(isCodeStep || savedBooking != nil)
+                .disabled(isCodeStep)
 
             fieldLabel("02", copy("Фамилия", "Last name", "Familiya", "Фамилия", "اسم العائلة"))
             TextField(copy("Фамилия в паспорте", "Passport last name", "Pasportdagi familiya", "Паспортдаги фамилия", "اسم العائلة كما في الجواز"), text: $lastName)
@@ -211,7 +209,7 @@ struct IumrahBookingConfirmationView: View {
                 .focused($activeField, equals: .lastName)
                 .onSubmit { activeField = channel == .sms ? .phone : .email }
                 .bookingInputStyle()
-                .disabled(isCodeStep || savedBooking != nil || firstName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                .disabled(isCodeStep || firstName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
 
             fieldLabel("03", copy("Куда отправлять уведомления?", "Booking updates", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"))
             Picker(copy("Куда отправлять уведомления?", "Booking updates", "Tasdiqlash usuli", "Тасдиқлаш усули", "طريقة التحقق"), selection: $channel) {
@@ -219,7 +217,7 @@ struct IumrahBookingConfirmationView: View {
                 Label("Email", systemImage: "envelope.fill").tag(ContactChannel.email)
             }
             .pickerStyle(.segmented)
-            .disabled(isCodeStep || savedBooking != nil)
+            .disabled(isCodeStep)
             if channel == .sms {
                 fieldLabel("", copy("Номер телефона", "Phone number", "Telefon raqami", "Телефон рақами", "رقم الهاتف"))
             TextField("+998 90 123 45 67", text: $phone)
@@ -228,7 +226,7 @@ struct IumrahBookingConfirmationView: View {
                 .focused($activeField, equals: .phone)
                 .environment(\.layoutDirection, .leftToRight)
                 .bookingInputStyle()
-                .disabled(isCodeStep || savedBooking != nil || lastName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                .disabled(isCodeStep || lastName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
             Text(copy("SMS-подтверждение доступно для номеров Узбекистана (+998).", "SMS confirmation currently supports Uzbekistan numbers (+998).", "SMS tasdiqlash hozircha O‘zbekiston raqamlari (+998) uchun.", "SMS тасдиқлаш ҳозирча Ўзбекистон рақамлари (+998) учун.", "التحقق عبر الرسائل متاح حاليًا للأرقام الأوزبكية (+998)."))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -241,7 +239,7 @@ struct IumrahBookingConfirmationView: View {
                     .autocorrectionDisabled()
                     .focused($activeField, equals: .email)
                     .bookingInputStyle()
-                    .disabled(isCodeStep || savedBooking != nil || lastName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
+                    .disabled(isCodeStep || lastName.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
             }
             if isCodeStep {
                 Button(copy("Изменить данные", "Edit details", "Ma’lumotlarni o‘zgartirish", "Маълумотларни ўзгартириш", "تعديل البيانات")) {
@@ -298,7 +296,7 @@ struct IumrahBookingConfirmationView: View {
                      ? copy("Проверяем…", "Checking…", "Tekshirilmoqda…", "Текширилмоқда…", "جارٍ التحقق…")
                      : isCodeStep
                      ? copy("Подтвердить и забронировать", "Confirm booking", "Tasdiqlash va bron qilish", "Тасдиқлаш ва брон қилиш", "تأكيد الحجز")
-                     : copy("Получить код подтверждения", "Get verification code", "Tasdiqlash kodini olish", "Тасдиқлаш кодини олиш", "احصل على رمز التحقق"))
+                     : copy("Забронировать Умру", "Book Umrah", "Umrani bron qilish", "Умрани брон қилиш", "احجز العمرة"))
 
             }
             .font(.headline)
@@ -371,10 +369,8 @@ struct IumrahBookingConfirmationView: View {
             let committed: StoredBookingSession
             if let savedBooking { committed = savedBooking }
             else {
-                if let createVerifiedBooking { committed = try await createVerifiedBooking(profile, channel.rawValue, verificationProof) }
-                else { committed = try await createBooking(profile) }
+                committed = try await createBooking(profile)
                 savedBooking = committed // retries never create a duplicate booking
-                Task { await notifyBookingCreated(committed) }
             }
             let session = try await bookings.resolveBookingIdentity(committed)
             savedBooking = session
@@ -395,8 +391,20 @@ struct IumrahBookingConfirmationView: View {
             bookings.recordVerifiedContact(id: session.id, email: confirmedEmail, phone: confirmedPhone)
             // Attaching the verified notification contact is already a successful booking.
             // Exchange failure never rolls it back and never creates a second trip.
-            // A verified contact belongs to this booking. Creating an account is optional.
-            // The existing booking access token is retained in the secure booking vault.
+            if !account.isAuthenticated {
+                do {
+                    let auth = try await verificationService.exchangeProfile(bookingID: session.id, bookingToken: session.accessToken, verificationToken: verificationProof, channel: channel.rawValue, locale: settings.language.rawValue)
+                    let linked = try await IumrahAccountService().linkBooking(bookingID: session.id, bookingToken: session.accessToken, token: auth.session.token)
+                    guard IumrahSeamlessBookingPolicy.sameIdentity(linked.pilgrimID, auth.account.iumrahID) else { throw APIError.invalidResponse }
+                    let local = bookings.booking(id: session.id) ?? session
+                    _ = await account.acceptVerifiedSession(auth, locale: settings.language.rawValue)
+                    bookings.setAccountToken(account.bearerToken)
+                    bookings.adoptVerifiedBooking(local, link: linked)
+                    savedBooking = bookings.booking(id: session.id) ?? local
+                } catch {
+                    profileAccessPending = true
+                }
+            }
             if let current = account.bearerToken, !profileAccessPending, let identity = account.iumrahID {
                 if let existing = bookings.booking(id: session.id), !IumrahSeamlessBookingPolicy.sameIdentity(existing.displayPilgrimID, identity) {
                     do {
@@ -448,7 +456,7 @@ struct IumrahBookingConfirmationView: View {
             }
             Button {
                 if let smartBookingDone { smartBookingDone() } else { dismiss() }
-                chrome.openBooking(id: session.id, showStatus: true)
+                chrome.openBooking(id: session.id)
             } label: {
                 Text(copy("Открыть бронирование", "Open booking", "Bronni ochish", "Бронни очиш", "عرض الحجز"))
             }
@@ -540,20 +548,6 @@ struct IumrahBookingConfirmationView: View {
         "Open booking": "Buka tempahan",
         "Done": "Selesai",
     ]
-    @MainActor private func notifyBookingCreated(_ session: StoredBookingSession) async {
-        let push = PushNotificationManager.shared
-        await push.ensureAuthorizationForBookedTrips(hasBookings: true)
-        guard push.isAuthorized else { return }
-        if let device = push.deviceToken,
-           (try? await ClientPushService().notifyCreated(deviceToken: device, bookingID: session.id, bookingToken: session.accessToken, locale: settings.language.rawValue)) == true { return }
-        let content = UNMutableNotificationContent()
-        content.title = copy("Бронирование создано", "Booking created", "Bron yaratildi", "Брон яратилди", "تم إنشاء الحجز")
-        content.body = copy("Проверяем наличие. Оплата пока не требуется.", "Checking availability. No payment is required yet.", "Mavjudlik tekshirilmoqda. Hozircha to‘lov talab etilmaydi.", "Мавжудлик текширилмоқда. Ҳозирча тўлов талаб этилмайди.", "نتحقق من التوفر. لا يلزم الدفع الآن.")
-        content.sound = .default
-        content.userInfo = ["type": "booking_created", "bookingID": session.id, "status": "availability_check"]
-        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "iumrah.booking.created." + session.id, content: content, trigger: nil))
-    }
-
     private func copy(_ ru: String, _ en: String, _ uz: String, _ uzCy: String, _ ar: String) -> String {
         switch settings.language {
         case .russian: return ru

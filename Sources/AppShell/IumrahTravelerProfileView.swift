@@ -7,11 +7,14 @@ import UIKit
 struct IumrahTravelerProfileView: View {
     @EnvironmentObject private var account: IumrahAccountStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var bookings: BookingStore
     @Environment(\.dismiss) private var dismiss
 
     let bookingID: String
     let traveler: IumrahTravelerForm
     var onSaved: (() -> Void)? = nil
+    let passportOnly: Bool
+    let bookingContactName: String?
 
     @State private var form: IumrahTravelerForm
     @State private var passportPhoto: PhotosPickerItem?
@@ -27,10 +30,12 @@ struct IumrahTravelerProfileView: View {
 
     private let service = IumrahAccountService()
 
-    init(bookingID: String, traveler: IumrahTravelerForm, onSaved: (() -> Void)? = nil) {
+    init(bookingID: String, traveler: IumrahTravelerForm, passportOnly: Bool = false, bookingContactName: String? = nil, onSaved: (() -> Void)? = nil) {
         self.bookingID = bookingID
         self.traveler = traveler
         self.onSaved = onSaved
+        self.passportOnly = passportOnly
+        self.bookingContactName = bookingContactName
         _form = State(initialValue: traveler)
         _dateOfBirthInput = State(initialValue: Self.displayDate(traveler.dateOfBirth))
         _passportExpiryInput = State(initialValue: Self.displayDate(traveler.passportExpiryDate))
@@ -38,13 +43,29 @@ struct IumrahTravelerProfileView: View {
 
     private var passportReady: Bool { traveler.hasPassport || uploadedInSession }
 
+    private var hasVerifiedAccess: Bool {
+        guard passportOnly else { return account.bearerToken != nil }
+        guard let checkout = bookings.cachedCheckout(id: bookingID, token: account.bearerToken),
+              let id = account.iumrahID, account.bearerToken != nil else { return false }
+        return IumrahSeamlessBookingPolicy.sameIdentity(id, checkout.iumrahID)
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
                 header
-                securityAnimationCard
-                passportCard
-                manualCard
+                if hasVerifiedAccess {
+                    passportCard
+                    if !passportOnly { manualCard }
+                    securityAnimationCard
+                } else {
+                    IumrahBookingAccessCard(bookingID: bookingID)
+                    if account.bearerToken != nil {
+                        Button(tr("Refresh access", "Обновить доступ", "Kirishni yangilash", "Киришни янгилаш")) {
+                            Task { _ = try? await bookings.loadCheckout(id: bookingID, token: account.bearerToken, force: true) }
+                        }.buttonStyle(IumrahSecondaryButtonStyle())
+                    }
+                }
 
                 if let errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -63,6 +84,9 @@ struct IumrahTravelerProfileView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .scrollDismissesKeyboard(.interactively)
+        .task(id: account.bearerToken) {
+            if passportOnly { _ = try? await bookings.loadCheckout(id: bookingID, token: account.bearerToken, force: true) }
+        }
         .onChange(of: passportPhoto) { _, item in
             guard let item else { return }
             Task { await preparePreview(item) }
@@ -73,7 +97,7 @@ struct IumrahTravelerProfileView: View {
         VStack(spacing: 10) {
             LoopingVideoView(resource: "iumrah-security-identity", gravity: .resizeAspect)
                 .frame(maxWidth: .infinity)
-                .frame(height: 190)
+                .frame(height: 112)
                 .background(Color.black, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
@@ -107,10 +131,10 @@ struct IumrahTravelerProfileView: View {
                 .tracking(-0.55)
 
             Text(tr(
-                "A clear photo of the information page is enough. Manual entry below is optional.",
-                "Достаточно чёткой фотографии страницы с данными. Заполнять данные вручную ниже не обязательно.",
-                "Ma’lumotlar sahifasining aniq rasmi yetarli. Quyidagi ma’lumotlarni qo‘lda kiritish shart emas.",
-                "Маълумотлар саҳифасининг аниқ расми етарли. Қуйидаги маълумотларни қўлда киритиш шарт эмас."
+                "A clear photo of the information page is enough. We will check the document.",
+                "Достаточно чёткой фотографии страницы с данными. Мы проверим документ.",
+                "Ma’lumotlar sahifasining aniq rasmi yetarli. Hujjatni tekshiramiz.",
+                "Маълумотлар саҳифасининг аниқ расми етарли. Ҳужжатни текширамиз."
             ))
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -373,8 +397,8 @@ struct IumrahTravelerProfileView: View {
 
     @MainActor
     private func uploadPassport() async {
-        guard let token = account.bearerToken, let data = previewData else {
-            errorMessage = tr("Sign in to attach the passport.", "Войдите в аккаунт, чтобы прикрепить паспорт.", "Pasportni biriktirish uchun akkauntga kiring.", "Паспортни бириктириш учун аккаунтга киринг.")
+        guard hasVerifiedAccess, let token = account.bearerToken, let data = previewData else {
+            errorMessage = tr("Confirm access to your booking to attach the passport.", "Подтвердите доступ к бронированию, чтобы прикрепить паспорт.", "Pasportni biriktirish uchun bronga kirishni tasdiqlang.", "Паспортни бириктириш учун бронга киришни тасдиқланг.")
             return
         }
 
@@ -391,8 +415,11 @@ struct IumrahTravelerProfileView: View {
                 token: token
             )
             uploadedInSession = true
+            previewData = nil
+            previewImage = nil
             IumrahHaptics.success()
             onSaved?()
+            if passportOnly { dismiss() }
         } catch {
             errorMessage = error.localizedDescription
             IumrahHaptics.error()
@@ -449,6 +476,7 @@ struct IumrahTravelerProfileView: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
+        if name.isEmpty, let bookingContactName, !bookingContactName.isEmpty { return bookingContactName }
         return name.isEmpty
             ? tr("Traveler \(form.position)", "Участник \(form.position)", "Sayohatchi \(form.position)", "Саёҳатчи \(form.position)")
             : name

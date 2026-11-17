@@ -37,6 +37,7 @@ struct IumrahOrbitV5: View {
     var accessibilityTitle: String = "iumrah Account"
     var pinnedSymbol: String? = nil
     var mergeToCenter: Bool = false
+    var pinRevealDuration: TimeInterval = 0.55
 
     init(
         services: [IumrahOrbitV5Service] = IumrahOrbitV5Service.showcase,
@@ -49,7 +50,8 @@ struct IumrahOrbitV5: View {
         logoWidthFraction: CGFloat = 0.38,
         accessibilityTitle: String = "iumrah Account",
         pinnedSymbol: String? = nil,
-        mergeToCenter: Bool = false
+        mergeToCenter: Bool = false,
+        pinRevealDuration: TimeInterval = 0.55
     ) {
         self.services = services
         self.diameter = diameter
@@ -62,6 +64,7 @@ struct IumrahOrbitV5: View {
         self.accessibilityTitle = accessibilityTitle
         self.pinnedSymbol = pinnedSymbol
         self.mergeToCenter = mergeToCenter
+        self.pinRevealDuration = max(0.15, pinRevealDuration)
     }
 
     @State private var visible = false
@@ -88,7 +91,7 @@ struct IumrahOrbitV5: View {
             let merge = IumrahOrbitV5Geometry.ease((assemblyTime - 0.32) / 0.68)
             let rotation = IumrahOrbitV5Geometry.rotation(motionTime, duration: rotationDuration)
             let reveal: IumrahOrbitV5Geometry.Reveal? = mergeToCenter ? nil : pinnedSymbol != nil ? IumrahOrbitV5Geometry.pinnedReveal(
-                rotation: rotation, expansion: reduceMotion || pinSettled ? 1 : IumrahOrbitV5Geometry.ease(timeline.date.timeIntervalSince(pinStarted) / 0.55)
+                rotation: rotation, expansion: reduceMotion || pinSettled ? 1 : IumrahOrbitV5Geometry.ease(timeline.date.timeIntervalSince(pinStarted) / pinRevealDuration)
             ) : (services.isEmpty ? nil : IumrahOrbitV5Geometry.reveal(
                 time: motionTime, rotation: rotation, duration: revealDuration, still: reduceMotion
             ))
@@ -177,7 +180,7 @@ struct IumrahOrbitV5: View {
         .task(id: pinnedSymbol) {
             updatePin()
             if pinnedSymbol != nil {
-                try? await Task.sleep(for: .milliseconds(560))
+                try? await Task.sleep(for: .seconds(pinRevealDuration + 0.02))
                 if !Task.isCancelled { pinSettled = true }
             }
         }

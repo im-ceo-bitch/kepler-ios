@@ -4,6 +4,22 @@ struct BookingCreateEnvelope: Encodable {
     let lang: String
     let booking: BookingDraftRequest
     let quoteProof: String?
+    var notificationIntent: BookingCreationNotificationIntent? = nil
+}
+
+/// Request-only. The backend must validate the proof and derive the recipient from it.
+/// Never store this value in StoredBookingSession or the pilgrim profile.
+struct BookingCreationNotificationIntent: Encodable {
+    let requestID: String
+    let event: String
+    let contactChannel: String
+    let contact: String
+    let verificationToken: String
+    let locale: String
+    let pushDeviceToken: String?
+    let pushEnvironment: String
+    let appBundleID: String
+    let installationID: String
 }
 
 struct BookingDraftRequest: Encodable {

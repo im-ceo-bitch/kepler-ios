@@ -18,6 +18,7 @@ enum IumrahBookingNotificationContact {
 struct IumrahBookingCreatedContent: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
+    @ObservedObject private var push = PushNotificationManager.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     let session: StoredBookingSession
@@ -35,6 +36,7 @@ struct IumrahBookingCreatedContent: View {
             bookingCard
             confirmation
             availability
+            bookingSummary
             notificationChannels
             nextSteps
         }
@@ -191,6 +193,41 @@ struct IumrahBookingCreatedContent: View {
         .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 20))
     }
 
+    private func receiptCopy(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
+        switch settings.language {
+        case .russian: return ru
+        case .uzbek: return uz
+        case .uzbekCyrillic: return cy
+        default: return en
+        }
+    }
+
+    private var bookingSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(receiptCopy("Данные бронирования", "Booking details", "Bron ma’lumotlari", "Брон маълумотлари"))
+                .font(.headline).accessibilityAddTraits(.isHeader)
+            Label(current.booking.input.startDate + " — " + current.booking.input.endDate, systemImage: "calendar")
+            Label(current.booking.flight, systemImage: "airplane")
+            if !current.booking.hotelNames.makkah.isEmpty {
+                Label(current.booking.hotelNames.makkah, systemImage: "building.2")
+            }
+            if current.booking.input.includeMadinah, !current.booking.hotelNames.madinah.isEmpty {
+                Label(current.booking.hotelNames.madinah, systemImage: "building.2")
+            }
+            if let transfer = current.transferVehicle {
+                Label(transfer.modelName, systemImage: "car")
+            }
+            if current.isCheckingAvailability {
+            Text(receiptCopy("Компоненты проверяются. Это ещё не подтверждение наличия.", "Components are being checked. Availability is not yet confirmed.", "Xizmatlar tekshirilmoqda. Mavjudlik hali tasdiqlanmagan.", "Хизматлар текширилмоқда. Мавжудлик ҳали тасдиқланмаган."))
+                .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .font(.subheadline)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 20))
+    }
+
     private var notificationChannels: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(t(.notifications)).font(.headline).accessibilityAddTraits(.isHeader)
@@ -215,6 +252,26 @@ struct IumrahBookingCreatedContent: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
             }
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "bell.badge")
+                    .font(.title3.weight(.medium))
+                    .frame(width: 42, height: 42)
+                    .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Push").font(.subheadline.weight(.semibold))
+                    Text(push.statusText(language: settings.language))
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                if push.authorizationStatus == .notDetermined {
+                    Button(receiptCopy("Разрешить", "Enable", "Yoqish", "Ёқиш")) {
+                        Task { await push.requestAuthorization() }
+                    }.font(.footnote.weight(.semibold))
+                }
+            }
+            Text(receiptCopy("Подключение канала не означает, что сообщение уже доставлено.", "A connected channel does not mean the message has been delivered.", "Kanal ulangan bo‘lsa ham, xabar yetkazilgani tasdiqlanmagan.", "Канал уланган бўлса ҳам, хабар етказилгани тасдиқланмаган."))
+                .font(.caption).foregroundStyle(.secondary)
+            Divider()
             IumrahTelegramConnectCard(session: current, style: .confirmation)
             Text(t(.channelsBody))
                 .font(.footnote)
@@ -279,11 +336,11 @@ struct IumrahBookingCreatedContent: View {
         let values: [String]
         switch settings.language {
         case .russian:
-            values = ["Индивидуальная умра", "паломники", "Стоимость пакета", "На человека:", "Бронирование создано", "Сейчас ничего оплачивать не нужно. Цена может измениться при проверке наличия.", "Проверяем доступность", "Около 30 минут", "Обычно подтверждаем наличие примерно за 30 минут. Иногда проверка занимает больше времени. Уведомим вас, когда она завершится.", "Проверка продолжается", "Проверка занимает больше времени, чем обычно. Бронирование сохранено. Мы сообщим о результате.", "Статус обновился", "Откройте бронирование, чтобы узнать актуальный статус и дальнейшие действия.", "Ваши уведомления", "Электронная почта", "Контакт подтверждён", "Этот контакт подключён к бронированию. Уведомление о создании и дальнейших изменениях отправляется по выбранному каналу.", "О каждом изменении статуса сообщим по подключённым каналам. Вы можете закрыть приложение.", "Что дальше?", "Проверяем отели, рейсы и остальные услуги.", "Оплата бронирования", "Сообщим, когда можно будет оплатить поездку.", "Подготовка документов", "После оплаты и подтверждения подготовим документы и информацию о поездке."]
+            values = ["Индивидуальная умра", "паломники", "Стоимость пакета", "На человека:", "Бронирование создано", "Сейчас ничего оплачивать не нужно. Цена может измениться при проверке наличия.", "Проверяем доступность", "Около 30 минут", "Обычно подтверждаем наличие примерно за 30 минут. Иногда проверка занимает больше времени. Уведомим вас, когда она завершится.", "Проверка продолжается", "Проверка занимает больше времени, чем обычно. Бронирование сохранено. Мы сообщим о результате.", "Статус обновился", "Откройте бронирование, чтобы узнать актуальный статус и дальнейшие действия.", "Ваши уведомления", "Электронная почта", "Контакт подтверждён", "Контакт подтверждён и подключён к бронированию.", "О каждом изменении статуса сообщим по подключённым каналам. Вы можете закрыть приложение.", "Что дальше?", "Проверяем отели, рейсы и остальные услуги.", "Оплата бронирования", "Сообщим, когда можно будет оплатить поездку.", "Подготовка документов", "После оплаты и подтверждения подготовим документы и информацию о поездке."]
         case .uzbek:
-            values = ["Individual umra", "ziyoratchilar", "Paket narxi", "Bir kishi uchun:", "Bron yaratildi", "Hozir to‘lov talab qilinmaydi. Tekshiruvda narx o‘zgarishi mumkin.", "Mavjudlikni tekshiryapmiz", "Taxminan 30 daqiqa", "Odatda mavjudlik taxminan 30 daqiqada tasdiqlanadi. Ba’zan ko‘proq vaqt ketadi. Yakunlangach xabar beramiz.", "Tekshiruv davom etmoqda", "Tekshiruv odatdagidan uzoqroq davom etmoqda. Bron saqlandi. Natijani xabar qilamiz.", "Holat yangilandi", "Joriy holat va keyingi qadamlar uchun bronni oching.", "Bildirishnomalaringiz", "Elektron pochta", "Kontakt tasdiqlangan", "Bu kontakt bronga ulandi. Bron yaratilishi va keyingi o‘zgarishlar haqida tanlangan kanal orqali xabar yuboriladi.", "Har bir holat o‘zgarishi haqida ulangan kanallar orqali xabar beramiz. Ilovani yopishingiz mumkin.", "Keyin nima?", "Mehmonxonalar, reyslar va xizmatlarni tekshiramiz.", "Bron uchun to‘lov", "Safar uchun to‘lov ochilganda xabar beramiz.", "Hujjatlarni tayyorlash", "To‘lov va tasdiqdan keyin safar hujjatlari va ma’lumotlarini tayyorlaymiz."]
+            values = ["Individual umra", "ziyoratchilar", "Paket narxi", "Bir kishi uchun:", "Bron yaratildi", "Hozir to‘lov talab qilinmaydi. Tekshiruvda narx o‘zgarishi mumkin.", "Mavjudlikni tekshiryapmiz", "Taxminan 30 daqiqa", "Odatda mavjudlik taxminan 30 daqiqada tasdiqlanadi. Ba’zan ko‘proq vaqt ketadi. Yakunlangach xabar beramiz.", "Tekshiruv davom etmoqda", "Tekshiruv odatdagidan uzoqroq davom etmoqda. Bron saqlandi. Natijani xabar qilamiz.", "Holat yangilandi", "Joriy holat va keyingi qadamlar uchun bronni oching.", "Bildirishnomalaringiz", "Elektron pochta", "Kontakt tasdiqlangan", "Tasdiqlangan kontakt bronga ulandi.", "Har bir holat o‘zgarishi haqida ulangan kanallar orqali xabar beramiz. Ilovani yopishingiz mumkin.", "Keyin nima?", "Mehmonxonalar, reyslar va xizmatlarni tekshiramiz.", "Bron uchun to‘lov", "Safar uchun to‘lov ochilganda xabar beramiz.", "Hujjatlarni tayyorlash", "To‘lov va tasdiqdan keyin safar hujjatlari va ma’lumotlarini tayyorlaymiz."]
         case .uzbekCyrillic:
-            values = ["Индивидуал умра", "зиёратчилар", "Пакет нархи", "Бир киши учун:", "Брон яратилди", "Ҳозир тўлов талаб қилинмайди. Текширувда нарх ўзгариши мумкин.", "Мавжудликни текширяпмиз", "Тахминан 30 дақиқа", "Одатда мавжудлик тахминан 30 дақиқада тасдиқланади. Баъзан кўпроқ вақт кетади. Якунлангач хабар берамиз.", "Текширув давом этмоқда", "Текширув одатдагидан узоқроқ давом этмоқда. Брон сақланди. Натижани хабар қиламиз.", "Ҳолат янгиланди", "Жорий ҳолат ва кейинги қадамлар учун бронни очинг.", "Билдиришномаларингиз", "Электрон почта", "Контакт тасдиқланган", "Бу контакт бронга уланди. Брон яратилиши ва кейинги ўзгаришлар ҳақида танланган канал орқали хабар юборилади.", "Ҳар бир ҳолат ўзгариши ҳақида уланган каналлар орқали хабар берамиз. Иловани ёпишингиз мумкин.", "Кейин нима?", "Меҳмонхоналар, рейслар ва хизматларни текширамиз.", "Брон учун тўлов", "Сафар учун тўлов очилганда хабар берамиз.", "Ҳужжатларни тайёрлаш", "Тўлов ва тасдиқдан кейин сафар ҳужжатлари ва маълумотларини тайёрлаймиз."]
+            values = ["Индивидуал умра", "зиёратчилар", "Пакет нархи", "Бир киши учун:", "Брон яратилди", "Ҳозир тўлов талаб қилинмайди. Текширувда нарх ўзгариши мумкин.", "Мавжудликни текширяпмиз", "Тахминан 30 дақиқа", "Одатда мавжудлик тахминан 30 дақиқада тасдиқланади. Баъзан кўпроқ вақт кетади. Якунлангач хабар берамиз.", "Текширув давом этмоқда", "Текширув одатдагидан узоқроқ давом этмоқда. Брон сақланди. Натижани хабар қиламиз.", "Ҳолат янгиланди", "Жорий ҳолат ва кейинги қадамлар учун бронни очинг.", "Билдиришномаларингиз", "Электрон почта", "Контакт тасдиқланган", "Тасдиқланган контакт бронга уланди.", "Ҳар бир ҳолат ўзгариши ҳақида уланган каналлар орқали хабар берамиз. Иловани ёпишингиз мумкин.", "Кейин нима?", "Меҳмонхоналар, рейслар ва хизматларни текширамиз.", "Брон учун тўлов", "Сафар учун тўлов очилганда хабар берамиз.", "Ҳужжатларни тайёрлаш", "Тўлов ва тасдиқдан кейин сафар ҳужжатлари ва маълумотларини тайёрлаймиз."]
         case .arabic:
             values = ["عمرة فردية", "معتمرون", "سعر الباقة", "لكل شخص:", "تم إنشاء الحجز", "لا يلزم الدفع الآن. قد يتغير السعر عند التحقق من التوفر.", "نتحقق من التوفر", "نحو 30 دقيقة", "يستغرق التحقق عادة نحو 30 دقيقة وقد يستغرق وقتًا أطول أحيانًا. سنخبرك عند اكتماله.", "التحقق مستمر", "يستغرق التحقق وقتًا أطول من المعتاد. حجزك محفوظ وسنخبرك بالنتيجة.", "تم تحديث الحالة", "افتح الحجز لمعرفة الحالة الحالية والخطوات التالية.", "إشعاراتك", "البريد الإلكتروني", "تم التحقق من جهة الاتصال", "تم ربط جهة الاتصال بالحجز. تُرسل تحديثات الإنشاء والحالة عبر القناة المختارة.", "سنبلغك بكل تغيير في الحالة عبر القنوات المرتبطة. يمكنك إغلاق التطبيق.", "ما التالي؟", "نتحقق من الفنادق والرحلات والخدمات.", "دفع الحجز", "سنخبرك عند إتاحة الدفع.", "إعداد الوثائق", "بعد الدفع والتأكيد سنجهز وثائق الرحلة ومعلوماتها."]
         case .turkish:
@@ -293,7 +350,7 @@ struct IumrahBookingCreatedContent: View {
         case .malay:
             values = ["Umrah individu", "jemaah", "Harga pakej", "Seorang:", "Tempahan dibuat", "Tiada bayaran diperlukan sekarang. Harga mungkin berubah semasa semakan ketersediaan.", "Menyemak ketersediaan", "Kira-kira 30 minit", "Semakan biasanya mengambil kira-kira 30 minit, kadangkala lebih lama. Kami akan memaklumkan apabila selesai.", "Semakan diteruskan", "Semakan mengambil masa lebih lama. Tempahan disimpan; kami akan memaklumkan hasilnya.", "Status dikemas kini", "Buka tempahan untuk melihat status dan langkah seterusnya.", "Pemberitahuan anda", "E-mel", "Hubungan disahkan", "Hubungan ini dipautkan kepada tempahan. Kemas kini dihantar melalui saluran yang dipilih.", "Kami akan memaklumkan setiap perubahan status melalui saluran yang dipautkan. Anda boleh menutup aplikasi.", "Apa seterusnya?", "Kami menyemak hotel, penerbangan dan perkhidmatan.", "Bayaran tempahan", "Kami akan memaklumkan apabila bayaran tersedia.", "Penyediaan dokumen", "Selepas bayaran dan pengesahan, kami menyediakan dokumen perjalanan."]
         case .english:
-            values = ["Private Umrah", "pilgrims", "Package total", "Per person:", "Booking created", "No payment is required now. The price may change during the availability check.", "Checking availability", "About 30 minutes", "Availability is usually confirmed in about 30 minutes. Sometimes it takes longer. We will notify you when the check is complete.", "Still checking", "The check is taking longer than usual. Your booking is saved. We will notify you of the result.", "Status updated", "Open your booking to see the latest status and next steps.", "Your notifications", "Email", "Verified contact", "This contact is linked to your booking. Booking creation and status updates are sent through your selected channel.", "We will notify you of every status change through connected channels. You can close the app.", "What happens next?", "We check hotels, flights and other services.", "Booking payment", "We will notify you when payment is available.", "Preparing documents", "After payment and confirmation, we prepare your travel documents and information."]
+            values = ["Private Umrah", "pilgrims", "Package total", "Per person:", "Booking created", "No payment is required now. The price may change during the availability check.", "Checking availability", "About 30 minutes", "Availability is usually confirmed in about 30 minutes. Sometimes it takes longer. We will notify you when the check is complete.", "Still checking", "The check is taking longer than usual. Your booking is saved. We will notify you of the result.", "Status updated", "Open your booking to see the latest status and next steps.", "Your notifications", "Email", "Verified contact", "This verified contact is linked to your booking.", "We will notify you of every status change through connected channels. You can close the app.", "What happens next?", "We check hotels, flights and other services.", "Booking payment", "We will notify you when payment is available.", "Preparing documents", "After payment and confirmation, we prepare your travel documents and information."]
         }
         return values[key.rawValue]
     }

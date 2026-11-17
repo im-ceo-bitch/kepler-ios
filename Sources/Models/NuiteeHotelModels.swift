@@ -44,12 +44,29 @@ struct NuiteeHotelListEnvelope: Codable {
     var nextOffset: Int? = nil
 }
 
+enum NuiteeHotelPaging {
+    static let pageSize = 12
+
+    /// Accept a server cursor only if it advances; for total-only responses derive the next offset.
+    static func nextOffset(_ response: NuiteeHotelListEnvelope, requestedOffset: Int) -> Int? {
+        if let next = response.nextOffset { return next > requestedOffset ? next : nil }
+        guard !response.hotels.isEmpty, let total = response.total else { return nil }
+        let consumed = requestedOffset + response.hotels.count
+        return consumed < total ? consumed : nil
+    }
+
+    static func append(_ existing: [NuiteeHotel], _ incoming: [NuiteeHotel]) -> [NuiteeHotel] {
+        var ids = Set(existing.map(\.id))
+        return existing + incoming.filter { ids.insert($0.id).inserted }
+    }
+}
+
 extension NuiteeHotelListEnvelope {
     /// Older unified Worker contracts return the entire city without pagination.
     /// Apply the exact same filters locally only for that response shape.
     static func normalizedPage(_ result: NuiteeHotelListEnvelope, stars: Int, offset: Int, pageSize: Int,
                                query: String, favorites: Set<String>?) -> NuiteeHotelListEnvelope {
-        guard result.total == nil else { return result }
+        guard result.total == nil, result.nextOffset == nil else { return result }
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let filtered = result.hotels.filter { hotel in
             (stars == 0 || hotel.roundedStars == stars) &&

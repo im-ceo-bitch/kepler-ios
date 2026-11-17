@@ -195,6 +195,7 @@ final class BookingStore: ObservableObject {
         quote: PackageQuote,
         language: AppSettingsStore.Language,
         pilgrimProfile: BookingPilgrimProfile?,
+        notificationIntent: BookingCreationNotificationIntent? = nil,
         nuiteeRooms: [BookingNuiteeRoomSelection]? = nil
     ) async throws -> StoredBookingSession {
         guard quote.bookingAllowed != false, let quoteID = quote.quoteId,
@@ -221,6 +222,7 @@ final class BookingStore: ObservableObject {
             quote: quote,
             language: language,
             pilgrimProfile: pilgrimProfile,
+            notificationIntent: notificationIntent,
             nuiteeRooms: nuiteeRooms
         )
         let response = try await bookingService.createBooking(payload)
@@ -1097,6 +1099,11 @@ final class BookingStore: ObservableObject {
         default:
             return false
         }
+    }
+
+    func canOpenBookingFromPush(id: String) -> Bool {
+        guard let session = booking(id: id) else { return false }
+        return !pushHeaderCandidates(for: session).isEmpty
     }
 
     private func pushHeaderCandidates(for session: StoredBookingSession) -> [[String: String]] {

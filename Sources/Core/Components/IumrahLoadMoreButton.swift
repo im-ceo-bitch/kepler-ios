@@ -4,6 +4,7 @@ import SwiftUI
 struct IumrahLoadMoreButton: View {
     @EnvironmentObject private var settings: AppSettingsStore
     let remaining: Int
+    var pageSize: Int = 20
     let action: () -> Void
     var body: some View {
         if remaining > 0 {
@@ -11,7 +12,7 @@ struct IumrahLoadMoreButton: View {
                 IumrahHaptics.selection()
                 action()
             } label: {
-                Text(NuiteeCopy.text("Показать ещё \(min(20, remaining))", "Yana \(min(20, remaining)) ta ko‘rsatish", "Show \(min(20, remaining)) more", settings.language))
+                Text(NuiteeCopy.text("Показать ещё \(min(pageSize, remaining))", "Yana \(min(pageSize, remaining)) ta ko‘rsatish", "Show \(min(pageSize, remaining)) more", settings.language))
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(IumrahSecondaryButtonStyle())
@@ -34,7 +35,7 @@ struct IumrahHotelPageButton: View {
                 HStack {
                     Spacer()
                     if loading { ProgressView().controlSize(.small) }
-                    Text(failed ? NuiteeCopy.text("Повторить загрузку", "Qayta yuklash", "Retry loading", settings.language) : NuiteeCopy.text("Показать ещё \(min(10, max(1, remaining))) отелей", "Yana \(min(10, max(1, remaining))) ta mehmonxona", "Show \(min(10, max(1, remaining))) more hotels", settings.language))
+                    Text(failed ? NuiteeCopy.text("Повторить загрузку", "Qayta yuklash", "Retry loading", settings.language) : remaining > 0 ? NuiteeCopy.text("Показать ещё \(min(NuiteeHotelPaging.pageSize, remaining)) отелей", "Yana \(min(NuiteeHotelPaging.pageSize, remaining)) ta mehmonxona", "Show \(min(NuiteeHotelPaging.pageSize, remaining)) more hotels", settings.language) : NuiteeCopy.text("Показать ещё отели", "Yana mehmonxonalar", "Show more hotels", settings.language))
                     Spacer()
                 }
             }.buttonStyle(IumrahSecondaryButtonStyle()).disabled(loading).padding(.vertical, 6)

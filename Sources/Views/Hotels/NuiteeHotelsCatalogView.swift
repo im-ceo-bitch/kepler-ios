@@ -51,20 +51,23 @@ final class NuiteeCatalogModel: ObservableObject {
     @Published private(set) var loadingMore = false
     @Published private(set) var pageError = false
     private var activeKey = ""
+    private var hasLoadedPage = false
 
     func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, stars: Int = 0,
                 query: String = "", favorites: Set<String>? = nil, forceRefresh: Bool = false) async {
-        let version = UUID(); generation = version
         let requestedKey = key(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites)
         let sameSearch = activeKey == requestedKey
+        if sameSearch && !forceRefresh && hasLoadedPage { return }
+        let version = UUID(); generation = version
         activeKey = requestedKey
         busy = true; loadingMore = false; pageError = false; errorMessage = nil; rateError = nil
-        if !sameSearch { hotels = []; nextOffset = nil; total = 0 }
+        if !sameSearch { hotels = []; nextOffset = nil; total = 0; hasLoadedPage = false }
         defer { if generation == version { busy = false } }
         do {
             let page = try await service.hotelPage(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites)
             guard generation == version, !Task.isCancelled else { return }
-            apply(page, append: false)
+            apply(page, append: false, requestedOffset: 0)
+            hasLoadedPage = true
         } catch {
             guard generation == version, !Task.isCancelled else { return }
             if hotels.isEmpty { errorMessage = "HOTEL_CATALOG_UNAVAILABLE" }
@@ -84,7 +87,7 @@ final class NuiteeCatalogModel: ObservableObject {
         do {
             let page = try await service.hotelPage(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, stars: stars, offset: offset, query: query, favorites: favorites)
             guard generation == version, !Task.isCancelled else { return }
-            apply(page, append: true)
+            apply(page, append: true, requestedOffset: offset)
         } catch { if generation == version && !Task.isCancelled { pageError = true } }
     }
 
@@ -94,17 +97,15 @@ final class NuiteeCatalogModel: ObservableObject {
     private func key(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, stars: Int, query: String, favorites: Set<String>?) -> String {
         "\(city.rawValue)|\(checkin.timeIntervalSince1970)|\(checkout.timeIntervalSince1970)|\(adults)|\(stars)|\(query)|\(favorites?.sorted().joined(separator: ",") ?? "*")"
     }
-    private func apply(_ response: NuiteeHotelListEnvelope, append: Bool) {
+    private func apply(_ response: NuiteeHotelListEnvelope, append: Bool, requestedOffset: Int) {
         let rows = response.hotels.map { hotel -> NuiteeHotel in
             var row = hotel
             if row.rateStatus == nil { row.rateStatus = row.minimumRate != nil ? (response.pricesStale ? "cached" : "available") : response.rateError != nil ? "provider_error" : "no_availability" }
             return row
         }
-        if append {
-            var ids = Set(hotels.map(\.id))
-            hotels += rows.filter { ids.insert($0.id).inserted }
-        } else { hotels = rows }
-        nextOffset = response.nextOffset; total = response.total ?? hotels.count
+        hotels = NuiteeHotelPaging.append(append ? hotels : [], rows)
+        nextOffset = NuiteeHotelPaging.nextOffset(response, requestedOffset: requestedOffset)
+        total = response.total ?? (append ? max(total, hotels.count) : hotels.count)
         sandbox = response.sandbox; catalogStale = response.hotelCatalogStale || response.pricesStale
         rateError = response.rateError
     }
@@ -386,7 +387,7 @@ struct NuiteeHotelsCatalogView: View {
 
     private func reload() async {
         lastLoadedDay = Date()
-        await model.reload(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil)
+        await model.reload(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil, forceRefresh: true)
     }
     private func toggleFavorite(_ id: String) {
         if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }

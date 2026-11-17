@@ -15,7 +15,7 @@ struct PrimaryHotelView: View {
     @State private var isPreparingPublishedPackage = false
     @State private var publishedPackageError: String?
     @State private var activeHotelCity: HotelSelectionRole = .makkah
-    @State private var visibleHotelCount = 20
+    @State private var visibleHotelCount = NuiteeHotelPaging.pageSize
     @State private var starFilter: Int? = nil
     @State private var isUpdatingPrice = false
     @State private var hotelForDetails: HotelSummary?
@@ -114,10 +114,10 @@ struct PrimaryHotelView: View {
         }
         .onChange(of: activeHotelCity) { _, _ in
             starFilter = nil
-            visibleHotelCount = 20
+            visibleHotelCount = NuiteeHotelPaging.pageSize
             IumrahHaptics.selection()
         }
-        .onChange(of: starFilter) { _, _ in visibleHotelCount = 20 }
+        .onChange(of: starFilter) { _, _ in visibleHotelCount = NuiteeHotelPaging.pageSize }
         .navigationDestination(isPresented: $showTransfer) {
             TransferSelectionView(familyFlow: familyFlow)
         }
@@ -556,11 +556,9 @@ struct PrimaryHotelView: View {
             } else {
                 ForEach(Array(orderedHotels.prefix(visibleHotelCount))) { hotel in
                     alternativeHotelRow(hotel)
-                        .onAppear {
-                            if hotel.id == orderedHotels.prefix(visibleHotelCount).last?.id {
-                                visibleHotelCount = min(visibleHotelCount + 20, orderedHotels.count)
-                            }
-                        }
+                }
+                IumrahLoadMoreButton(remaining: max(0, orderedHotels.count - visibleHotelCount), pageSize: NuiteeHotelPaging.pageSize) {
+                    visibleHotelCount = min(visibleHotelCount + NuiteeHotelPaging.pageSize, orderedHotels.count)
                 }
             }
         }

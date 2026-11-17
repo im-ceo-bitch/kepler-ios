@@ -12,8 +12,10 @@ struct IumrahBookingConfirmationView: View {
     @Environment(\.smartBookingDone) private var smartBookingDone
 
     var quote: PackageQuote? = nil
-    let createBooking: @MainActor (BookingPilgrimProfile) async throws -> StoredBookingSession
+    let createBooking: @MainActor (BookingPilgrimProfile, BookingCreationNotificationIntent) async throws -> StoredBookingSession
 
+    @ObservedObject private var push = PushNotificationManager.shared
+    @State private var bookingRequestID = UUID().uuidString.lowercased()
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var phone = "+998"
@@ -60,6 +62,7 @@ struct IumrahBookingConfirmationView: View {
                     identityAnimation
                     introduction
                     identityFields
+                    notificationPlan
                     if let quote, quote.bookingAllowed != false, !quote.isEstimated { priceSummary(quote) }
                     noPaymentNotice
                     if isCodeStep { verificationFields }
@@ -252,6 +255,26 @@ struct IumrahBookingConfirmationView: View {
         .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 
+    private var notificationPlan: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(copy("Подтверждение и статус поездки", "Booking confirmation and trip status", "Bron tasdig‘i va safar holati", "Брон тасдиғи ва сафар ҳолати", "تأكيد الحجز وحالة الرحلة"), systemImage: "bell.badge")
+                .font(.subheadline.weight(.semibold))
+            Label(channel == .sms
+                  ? copy("SMS · номер брони и ссылка на поездку", "SMS · booking number and trip link", "SMS · bron raqami va safar havolasi", "SMS · брон рақами ва сафар ҳаволаси", "رسالة · رقم الحجز ورابط الرحلة")
+                  : copy("Email · данные брони и состав пакета", "Email · booking details and package contents", "Email · bron va paket tarkibi", "Email · брон ва пакет таркиби", "البريد · تفاصيل الحجز ومكونات الباقة"), systemImage: channel == .sms ? "message" : "envelope")
+                .font(.footnote)
+            Label(copy("Push · если разрешены уведомления iOS", "Push · when iOS notifications are allowed", "Push · iOS bildirishnomalari yoqilgan bo‘lsa", "Push · iOS билдиришномалари ёқилган бўлса", "إشعارات التطبيق عند السماح بها"), systemImage: "iphone")
+                .font(.footnote)
+            if push.authorizationStatus == .denied {
+                Text(copy("Push отключены. SMS или email остаются доступны.", "Push is disabled. SMS or email remains available.", "Push o‘chiq. SMS yoki email mavjud.", "Push ўчиқ. SMS ёки email мавжуд.", "إشعارات التطبيق معطلة. الرسائل أو البريد متاحان."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 20))
+    }
+
     private var verificationFields: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(channel == .sms ? copy("Введите код из SMS", "Enter your SMS code", "SMS kodini kiriting", "SMS кодини киритинг", "أدخل رمز الرسالة") : copy("Введите код из письма", "Enter your email code", "Email kodini kiriting", "Email кодини киритинг", "أدخل رمز البريد"), systemImage: channel == .sms ? "message.fill" : "envelope.fill")
@@ -369,7 +392,18 @@ struct IumrahBookingConfirmationView: View {
             let committed: StoredBookingSession
             if let savedBooking { committed = savedBooking }
             else {
-                committed = try await createBooking(profile)
+                // Request permission before creation, not after the first event has fired.
+                // Denial or an unavailable APNs token never blocks guest checkout.
+                let deviceToken = await push.prepareBookingCreationToken()
+                let intent = BookingCreationNotificationIntent(
+                    requestID: bookingRequestID, event: "booking_created",
+                    contactChannel: channel.rawValue, contact: verifiedContact,
+                    verificationToken: verificationProof, locale: settings.language.rawValue,
+                    pushDeviceToken: deviceToken, pushEnvironment: "production",
+                    appBundleID: AppIdentity.runtimeBundleID,
+                    installationID: ClientNotificationCenter.shared.installationID
+                )
+                committed = try await createBooking(profile, intent)
                 savedBooking = committed // retries never create a duplicate booking
             }
             let session = try await bookings.resolveBookingIdentity(committed)
@@ -419,6 +453,14 @@ struct IumrahBookingConfirmationView: View {
             settings.lastName = profile.lastName
             if let confirmedPhone { settings.phone = confirmedPhone }
             isFinished = true
+            // A late APNs callback is handled by RootView as well. The server should
+            // replay the pending creation event only once for the registered device.
+            Task { @MainActor in
+                if let token = push.deviceToken, push.isAuthorized {
+                    await bookings.syncPushSubscriptions(deviceToken: token, locale: settings.language.rawValue)
+                }
+                await ClientNotificationCenter.shared.sync(deviceToken: push.deviceToken, accountToken: account.bearerToken, hasTrip: true, locale: settings.language.rawValue)
+            }
         } catch {
             if let savedBooking, !savedBooking.hasServerIdentity {
                 errorMessage = copy("Бронирование сохранено. Не удалось получить номер бронирования и iumrah ID. Повторите подтверждение — новое бронирование не будет создано.",

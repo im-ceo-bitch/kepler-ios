@@ -1,6 +1,20 @@
 import Foundation
 
+/// A full-catalogue response from an older Worker is paged in memory for this search.
+/// No room selection tokens or final quotes are cached here.
+private actor NuiteeLegacyPageCache {
+    private var entries: [String: NuiteeHotelListEnvelope] = [:]
+    private var order: [String] = []
+    func read(_ key: String) -> NuiteeHotelListEnvelope? { entries[key] }
+    func remove(_ key: String) { entries[key] = nil; order.removeAll { $0 == key } }
+    func write(_ value: NuiteeHotelListEnvelope, key: String) {
+        remove(key); entries[key] = value; order.append(key)
+        while order.count > 4 { entries[order.removeFirst()] = nil }
+    }
+}
+
 struct NuiteeHotelService {
+    private let legacyPages = NuiteeLegacyPageCache()
     private let api = APIClient.shared
 
     private static func dateText(_ date: Date) -> String {
@@ -40,7 +54,7 @@ struct NuiteeHotelService {
     }
 
     func hotelPage(city: String, checkin: Date, checkout: Date, adults: Int, stars: Int = 0,
-                   offset: Int = 0, pageSize: Int = 10, query: String = "", favorites: Set<String>? = nil,
+                   offset: Int = 0, pageSize: Int = NuiteeHotelPaging.pageSize, query: String = "", favorites: Set<String>? = nil,
                    catalogOnly: Bool = false, allowCatalogFallback: Bool = true) async throws -> NuiteeHotelListEnvelope {
         var params = [URLQueryItem(name: "city", value: city), URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
                       URLQueryItem(name: "checkout", value: Self.dateText(checkout)), URLQueryItem(name: "adults", value: String(adults)),
@@ -48,9 +62,19 @@ struct NuiteeHotelService {
                       URLQueryItem(name: "pageSize", value: String(pageSize)), URLQueryItem(name: "query", value: query),
                       URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")]
         if let favorites { params.append(URLQueryItem(name: "hotelIds", value: favorites.sorted().joined(separator: ","))) }
+        // Keep the exact search (including filters) separate. A new first page always refreshes.
+        var cacheKey = URLComponents()
+        cacheKey.queryItems = params.filter { $0.name != "offset" && $0.name != "pageSize" }
+        let key = cacheKey.percentEncodedQuery ?? ""
+        if offset == 0 { await legacyPages.remove(key) }
+        if offset > 0, let cached = await legacyPages.read(key) {
+            return NuiteeHotelListEnvelope.normalizedPage(cached, stars: stars, offset: offset, pageSize: pageSize, query: query, favorites: favorites)
+        }
         do {
             let result: NuiteeHotelListEnvelope = try await api.get("/api/package/nuitee/hotels", query: params, timeoutInterval: 45)
             guard result.ok else { throw APIError.invalidResponse }
+            try Task.checkCancellation()
+            if result.total == nil && result.nextOffset == nil { await legacyPages.write(result, key: key) }
             return NuiteeHotelListEnvelope.normalizedPage(result, stars: stars, offset: offset, pageSize: pageSize, query: query, favorites: favorites)
         } catch {
             try Task.checkCancellation()

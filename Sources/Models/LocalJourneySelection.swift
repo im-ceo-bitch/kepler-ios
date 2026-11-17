@@ -145,7 +145,7 @@ extension JourneyStore {
 enum ConfiguratorBookingCopy {
     static func message(_ code: String, language: AppSettingsStore.Language) -> String {
         let values: [String]
-        if code.contains("AVIASALES_IDENTITY_INVALID") || code.contains("AVIASALES_ROUTE_MISMATCH") {
+        if code.contains("AVIASALES_IDENTITY_INVALID") || code.contains("AVIASALES_ROUTE_MISMATCH") || code.contains("MIXED_ROUTE_MISMATCH") || code.contains("MIXED_IDENTITY_INVALID") || code.contains("MIXED_REQUIRES_ONE_WAY_FARES") {
             values = ["Не удалось проверить выбранный маршрут на сервере. Выберите рейсы заново. Если ошибка повторится, обратитесь в поддержку.", "The server could not verify the selected route. Select the flights again. If this continues, contact support.", "Server tanlangan yo‘nalishni tekshira olmadi. Reyslarni qayta tanlang. Xato takrorlansa, yordam xizmatiga murojaat qiling.", "Сервер танланган йўналишни текшира олмади. Рейсларни қайта танланг. Хато такрорланса, ёрдам хизматига мурожаат қилинг."]
         } else if code.contains("AVIASALES_PARTY_FARE_UNAVAILABLE") {
             values = ["Для этого рейса API не подтвердил тарифы детей и младенцев. Выберите опубликованный рейс с тарифом для вашего состава поездки.", "The API has not confirmed child and infant fares for this flight. Choose a published flight priced for your party.", "API bu reys uchun bolalar va chaqaloqlar tariflarini tasdiqlamadi. Guruhingiz uchun tarifi bor e’lon qilingan reysni tanlang.", "API бу рейс учун болалар ва чақалоқлар тарифларини тасдиқламади. Гуруҳингиз учун тарифи бор эълон қилинган рейсни танланг."]

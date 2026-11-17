@@ -1427,8 +1427,8 @@ struct StorefrontUmrahPackageDetailView: View {
             )
         }
         .navigationDestination(isPresented: $isProfileSheetPresented) {
-            IumrahBookingConfirmationView(quote: currentQuote, createBooking: { profile in
-                try await createBooking(profile: profile)
+            IumrahBookingConfirmationView(quote: currentQuote, createBooking: { profile, notificationIntent in
+                try await createBooking(profile: profile, notificationIntent: notificationIntent)
             })
             .environmentObject(settings)
         }
@@ -2977,7 +2977,7 @@ struct StorefrontUmrahPackageDetailView: View {
     }
 
     @MainActor
-    private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
+    private func createBooking(profile: BookingPilgrimProfile, notificationIntent: BookingCreationNotificationIntent) async throws -> StoredBookingSession {
         guard !isSubmitting,
               let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
@@ -3006,7 +3006,8 @@ struct StorefrontUmrahPackageDetailView: View {
                 inbound: inbound,
                 quote: quote,
                 language: settings.language,
-                pilgrimProfile: profile
+                pilgrimProfile: profile,
+                notificationIntent: notificationIntent
             )
             if let deviceToken = push.deviceToken {
                 await bookings.syncPushSubscriptions(deviceToken: deviceToken, locale: settings.language.rawValue)

@@ -17,6 +17,7 @@ enum BookingDraftBuilder {
         quote: PackageQuote,
         language: AppSettingsStore.Language,
         pilgrimProfile: BookingPilgrimProfile?,
+        notificationIntent: BookingCreationNotificationIntent? = nil,
         nuiteeRooms: [BookingNuiteeRoomSelection]? = nil
     ) -> BookingCreateEnvelope {
         let stay: TripStayBreakdown
@@ -128,7 +129,7 @@ enum BookingDraftBuilder {
                 madinahHotel: madinahHotel.map { generatorHotel($0, room: madinahRoom, roomCategory: madinahRoomCategory, authoritativeRoomId: authoritativeMadinahRoomId) }
             )
         )
-        return BookingCreateEnvelope(lang: language.rawValue, booking: draft, quoteProof: quote.quoteProof)
+        return BookingCreateEnvelope(lang: language.rawValue, booking: draft, quoteProof: quote.quoteProof, notificationIntent: notificationIntent)
     }
 
     private static func generatorFlight(_ offer: FlightOffer) -> BookingGeneratorFlightSnapshot {

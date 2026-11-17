@@ -38,8 +38,8 @@ struct BookingCheckoutView: View {
             BookingDetailView(bookingID: session.id)
         }
         .navigationDestination(isPresented: $showProfileSheet) {
-            IumrahBookingConfirmationView(quote: journey.quote, createBooking: { profile in
-                try await submitBooking(profile: profile)
+            IumrahBookingConfirmationView(quote: journey.quote, createBooking: { profile, notificationIntent in
+                try await submitBooking(profile: profile, notificationIntent: notificationIntent)
             })
         }
     }
@@ -164,7 +164,7 @@ struct BookingCheckoutView: View {
     }
 
     @MainActor
-    private func submitBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
+    private func submitBooking(profile: BookingPilgrimProfile, notificationIntent: BookingCreationNotificationIntent) async throws -> StoredBookingSession {
         guard let hotel = journey.selectedHotel,
               let outbound = journey.selectedOutbound,
               let quote = journey.quote else { throw BookingStoreError.authoritativeQuoteRequired }
@@ -185,7 +185,8 @@ struct BookingCheckoutView: View {
             inbound: inbound,
             quote: quote,
             language: settings.language,
-            pilgrimProfile: profile
+            pilgrimProfile: profile,
+                notificationIntent: notificationIntent
             )
             // Creating a booking request is not a paid/confirmed sale.
             await IumrahIntelligence.shared.record("booking_submitted", screen: "checkout")

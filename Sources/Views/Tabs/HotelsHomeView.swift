@@ -37,7 +37,7 @@ struct HotelsHomeView: View {
     @State private var searchExpanded = false
     @State private var flightDirection = 0
     @StateObject private var hotelCatalog = NuiteeCatalogModel()
-    @State private var manualHotelLimit = 20
+    @State private var manualHotelLimit = NuiteeHotelPaging.pageSize
     @StateObject private var flightCatalog = IumrahFlightBrowseModel()
     @State private var appliedHotelName = ""
     @State private var manualQuoteRequired = false
@@ -233,7 +233,7 @@ struct HotelsHomeView: View {
             }
             if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
         }
-        .onChange(of: hotelName) { _, _ in manualHotelLimit = 20 }
+        .onChange(of: hotelName) { _, _ in manualHotelLimit = NuiteeHotelPaging.pageSize }
         .onChange(of: hotelChildren) { _, count in
             if count > childAges.count { childAges += Array(repeating: 6, count: count - childAges.count) }
             if count < childAges.count { childAges = Array(childAges.prefix(count)) }
@@ -413,7 +413,7 @@ struct HotelsHomeView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                IumrahLoadMoreButton(remaining: matching.count - manualHotelLimit) { manualHotelLimit += 20 }
+                IumrahLoadMoreButton(remaining: matching.count - manualHotelLimit, pageSize: NuiteeHotelPaging.pageSize) { manualHotelLimit += NuiteeHotelPaging.pageSize }
             }
         }
         .padding(.horizontal, IumrahDesign.pagePadding)
@@ -533,7 +533,7 @@ struct HotelsHomeView: View {
     }
 
     @MainActor private func loadManualHotelCatalog() async {
-        manualHotelLimit = 20
+        manualHotelLimit = NuiteeHotelPaging.pageSize
         let requestID = UUID()
         manualHotelsRequestID = requestID
         manualHotelsBusy = true

@@ -140,8 +140,8 @@ struct LegacyFinalPackageView: View {
         }
         .task { await push.refreshAndRegisterIfAllowed() }
         .navigationDestination(isPresented: $isProfileSheetPresented) {
-            IumrahBookingConfirmationView(quote: journey.quote, createBooking: { profile in
-                try await createBooking(profile: profile)
+            IumrahBookingConfirmationView(quote: journey.quote, createBooking: { profile, notificationIntent in
+                try await createBooking(profile: profile, notificationIntent: notificationIntent)
             }).environmentObject(settings)
         }
         .navigationDestination(isPresented: $showCreatedBooking) {
@@ -479,7 +479,7 @@ struct LegacyFinalPackageView: View {
         }
     }
     @MainActor
-    private func createBooking(profile: BookingPilgrimProfile) async throws -> StoredBookingSession {
+    private func createBooking(profile: BookingPilgrimProfile, notificationIntent: BookingCreationNotificationIntent) async throws -> StoredBookingSession {
         if let pendingBookingSession { return pendingBookingSession }
         guard !isSubmitting, canBook,
               let hotel = journey.selectedHotel,
@@ -527,6 +527,7 @@ struct LegacyFinalPackageView: View {
                 quote: quote,
                 language: settings.language,
                 pilgrimProfile: profile,
+                notificationIntent: notificationIntent,
                 nuiteeRooms: journey.usesLocalJourney ? journey.localBookingRooms : nil
             )
             pendingBookingSession = session

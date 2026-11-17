@@ -437,8 +437,12 @@ struct RootView: View {
             }
             return
         }
-        if let bookingID = event.bookingID {
-            chrome.openBooking(id: bookingID)
+        if let bookingID = event.bookingID ?? event.destinationBookingID {
+            if bookings.canOpenBookingFromPush(id: bookingID) {
+                chrome.openBooking(id: bookingID)
+            } else {
+                chrome.navigate(to: .booking)
+            }
         }
     }
 
@@ -450,7 +454,7 @@ struct RootView: View {
         case "care": chrome.navigate(to: .care)
         case "account": chrome.navigate(to: .account)
         case "booking":
-            if let bookingID, bookings.booking(id: bookingID) != nil { chrome.openBooking(id: bookingID) }
+            if let bookingID, bookings.canOpenBookingFromPush(id: bookingID) { chrome.openBooking(id: bookingID) }
             else { chrome.navigate(to: .booking) }
         default: chrome.navigate(to: .home)
         }

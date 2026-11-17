@@ -99,6 +99,17 @@ final class PushNotificationManager: ObservableObject {
         }
     }
 
+    func prepareBookingCreationToken() async -> String? {
+        await ensureAuthorizationForBookedTrips(hasBookings: true)
+        guard isAuthorized else { return nil }
+        for _ in 0..<8 {
+            if let token = deviceToken, !token.isEmpty { return token }
+            if Task.isCancelled { return nil }
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+        return deviceToken
+    }
+
     func didRegister(deviceToken data: Data) {
         let token = data.map { String(format: "%02x", $0) }.joined()
         deviceToken = token

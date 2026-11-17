@@ -16,13 +16,13 @@ struct CareHomeView: View {
     @AppStorage("iumrah.care.cachedPhoneUZ") private var cachedPhoneUZ = "+998 50 889 88 45"
     @AppStorage("iumrah.care.cachedTelegram") private var cachedTelegram = "@saudiclub966"
 
-    private var activeSession: StoredBookingSession? {
-        bookings.sessions.first { session in
-            !["COMPLETED", "CANCELLED"].contains(session.effectiveStatus.uppercased())
-        } ?? bookings.sessions.first
-    }
+    private var chatAvailable: Bool { bookings.defaultCareChatKey != nil }
 
-    private var chatAvailable: Bool { bookings.canUseCareChat }
+    private func openDefaultChat() {
+        guard let key = bookings.defaultCareChatKey else { return }
+        openedChatBookingID = key
+        showHeaderChat = true
+    }
 
     private var fixedHeader: some View {
         IumrahPrimaryTabHeader(
@@ -36,7 +36,7 @@ struct CareHomeView: View {
                             switch index {
                             case 0: openPhone()
                             case 1: openTelegram()
-                            case 2: if chatAvailable { showHeaderChat = true }
+                            case 2: openDefaultChat()
                             default: break
                             }
                         }
@@ -85,8 +85,8 @@ struct CareHomeView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
         .navigationDestination(isPresented: $showHeaderChat) {
-            if chatAvailable {
-                BookingChatView(bookingID: "account").id("account")
+            if let key = openedChatBookingID, bookings.canUseCareChat(for: key) {
+                BookingChatView(bookingID: key).id(key)
             } else {
                 ContentUnavailableView("Чат будет доступен после бронирования", systemImage: "message")
             }
@@ -95,9 +95,12 @@ struct CareHomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: chrome.requestedChatBookingID) { _, _ in openRequestedChat() }
         .onAppear { openRequestedChat() }
+        .onChange(of: bookings.defaultCareChatKey) { _, _ in openRequestedChat() }
         .onChange(of: bookings.sessions) { _, _ in
-            if !chatAvailable { showHeaderChat = false; openedChatBookingID = nil; chrome.requestedChatBookingID = nil }
-            else { openRequestedChat() }
+            if let key = openedChatBookingID, !bookings.canUseCareChat(for: key) {
+                showHeaderChat = false; openedChatBookingID = nil
+            }
+            openRequestedChat()
         }
         .onChange(of: showHeaderChat) { _, shown in if !shown { openedChatBookingID = nil } }
         .task {
@@ -106,8 +109,8 @@ struct CareHomeView: View {
     }
 
     private func openRequestedChat() {
-        guard chatAvailable, let id = chrome.requestedChatBookingID, (id == "account" && bookings.canUseCareChat) || bookings.booking(id: id) != nil else { return }
-        openedChatBookingID = id
+        guard let id = chrome.requestedChatBookingID, bookings.canUseCareChat(for: id) else { return }
+        openedChatBookingID = bookings.careChatKey(for: id)
         chrome.requestedChatBookingID = nil
         showHeaderChat = true
     }
@@ -166,11 +169,17 @@ struct CareHomeView: View {
                 }
 
                 if bookings.canUseCareChat {
-                    Label(tr("Your personal Care chat is available", "Ваш личный чат Care доступен", "Shaxsiy Care chatingiz mavjud", "Шахсий Care чатингиз мавжуд"), systemImage: "checkmark.circle")
-                        .font(.system(size: 14.5, weight: .semibold, design: .rounded))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(action: openDefaultChat) {
+                        HStack {
+                            Label(tr("Open Care chat", "Открыть чат Care", "Care chatini ochish", "Care чатини очиш"), systemImage: "message.fill")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
                         .padding(13)
                         .background(neutralTileBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }.buttonStyle(.plain)
                 } else {
                     lockedChatNote
                 }
@@ -189,9 +198,9 @@ struct CareHomeView: View {
     @ViewBuilder
     private var careActions: some View {
         HStack(alignment: .top, spacing: 9) {
-            if chatAvailable {
+            if let key = bookings.defaultCareChatKey {
                 NavigationLink {
-                    BookingChatView(bookingID: bookings.canUseCareChat ? "account" : (activeSession?.id ?? "account"))
+                    BookingChatView(bookingID: key)
                 } label: {
                     careActionTile(
                         icon: "message.fill",

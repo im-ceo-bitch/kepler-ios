@@ -35,6 +35,7 @@ final class BookingStore: ObservableObject {
     private let accountService = IumrahAccountService()
     private let legacyStorageKey = "iumrah.booking.sessions.v1"
     @Published private var accountToken: String?
+    @Published private var careAccountOwner: String?
     private var chatCacheKeys: [String: String] = [:]
     private var chatCursors: [String: String] = [:]
     private var chatScopeVersions: [String: String] = [:]
@@ -46,8 +47,35 @@ final class BookingStore: ObservableObject {
         if token == nil { return sessions.filter { !$0.accessToken.isEmpty } }
         return sessions
     }
-    var canUseCareChat: Bool {
-        hasCareAccount && sessions.contains { !["COMPLETED", "CANCELLED"].contains($0.effectiveStatus.uppercased()) }
+    private func careScope(for session: StoredBookingSession) -> String? {
+        IumrahSeamlessBookingPolicy.careScope(status: session.effectiveStatus, bookingID: session.id,
+            bookingToken: session.accessToken, owner: session.displayPilgrimID,
+            accountOwner: careAccountOwner, accountToken: accountToken)
+    }
+    var defaultCareChatKey: String? {
+        let scopes = sessions.compactMap { careScope(for: $0) }
+        return scopes.contains("account") ? "account" : scopes.first
+    }
+    var canUseCareChat: Bool { defaultCareChatKey != nil }
+    func canUseCareChat(for bookingID: String) -> Bool {
+        careHeaders(for: careChatKey(for: bookingID)) != nil
+    }
+    /// Resolve only a locally authorized booking; a push payload is never proof of ownership.
+    func careChatKey(for event: IumrahPushEvent) -> String? {
+        guard event.type.hasPrefix("chat_"), let id = event.bookingID else { return nil }
+        if id == "account" {
+            if let owner = event.pilgrimID {
+                if hasCareAccount, IumrahSeamlessBookingPolicy.sameIdentity(owner, careAccountOwner),
+                   careHeaders(for: "account") != nil { return "account" }
+                let matches = sessions.filter { IumrahSeamlessBookingPolicy.sameIdentity($0.displayPilgrimID, owner) && careScope(for: $0) != nil }
+                // Do not guess a guest booking when several trips have the same owner.
+                return matches.count == 1 ? careScope(for: matches[0]) : nil
+            }
+            return careHeaders(for: "account") != nil ? "account" : nil
+        }
+        guard let session = booking(id: id), let scope = careScope(for: session) else { return nil }
+        if let owner = event.pilgrimID, !IumrahSeamlessBookingPolicy.sameIdentity(owner, session.displayPilgrimID) { return nil }
+        return scope
     }
     private var bookingScopeGeneration = UUID()
     private struct CheckoutCacheEntry {
@@ -138,7 +166,10 @@ final class BookingStore: ObservableObject {
         return value
     }
 
-    func careChatKey(for bookingID: String) -> String { hasCareAccount ? "account" : bookingID }
+    func careChatKey(for bookingID: String) -> String {
+        if bookingID == "account" { return "account" }
+        return booking(id: bookingID).flatMap { careScope(for: $0) } ?? bookingID
+    }
     private var chatLoads: [String: Task<[ChatMessage], Error>] = [:]
     private var chatAuthGeneration = UUID()
 
@@ -468,8 +499,10 @@ final class BookingStore: ObservableObject {
         persist()
     }
 
-    func setAccountToken(_ token: String?) {
+    func setAccountToken(_ token: String?, owner: String? = nil) {
         let next = token?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nextOwner = next?.isEmpty == false ? owner : nil
+        if careAccountOwner != nextOwner { careAccountOwner = nextOwner }
         if next != accountToken {
             bookingScopeGeneration = UUID()
             for request in checkoutRequests.values { request.task.cancel() }
@@ -639,9 +672,13 @@ final class BookingStore: ObservableObject {
     }
 
     private func careHeaders(for bookingID: String) -> [String: String]? {
-        guard canUseCareChat else { return nil }
-        if bookingID == "account", let token = accountToken, !token.isEmpty { return ["Authorization": "Bearer \(token)"] }
-        guard bookingID != "account", let session = booking(id: bookingID), !session.accessToken.isEmpty else { return nil }
+        if bookingID == "account" {
+            guard let token = accountToken, !token.isEmpty,
+                  sessions.contains(where: { careScope(for: $0) == "account" }) else { return nil }
+            return ["Authorization": "Bearer \(token)"]
+        }
+        guard let session = booking(id: bookingID), careScope(for: session) == bookingID,
+              !session.accessToken.isEmpty else { return nil }
         return ["x-booking-token": session.accessToken]
     }
 
@@ -683,8 +720,8 @@ final class BookingStore: ObservableObject {
     }
 
     func loadChat(for bookingID: String) async throws -> [ChatMessage] {
-        if let running = chatLoads[bookingID] { return try await running.value }
         guard let headers = careHeaders(for: bookingID), let key = chatCacheKey(for: bookingID) else { throw APIError.missingBookingToken }
+        if let running = chatLoads[bookingID], chatCacheKeys[bookingID] == key { return try await running.value }
         _ = cachedChat(for: bookingID)
         let generation = chatAuthGeneration
         let task = Task { @MainActor in
@@ -695,7 +732,7 @@ final class BookingStore: ObservableObject {
                 let unread = (chats[bookingID] ?? []).filter { $0.senderType == "client" && $0.readByStaff != true }.suffix(80).map(\.id)
                 let response = try await chatService.loadChat(bookingID: bookingID, after: cursor, scope: chatScopeVersions[bookingID], unread: unread, headers: headers)
                 try Task.checkCancellation()
-                guard generation == chatAuthGeneration, chatCacheKeys[bookingID] == key else { throw CancellationError() }
+                guard generation == chatAuthGeneration, chatCacheKeys[bookingID] == key, chatCacheKey(for: bookingID) == key else { throw CancellationError() }
                 if response.reset == true {
                     chats[bookingID] = []
                     let files = (try? FileManager.default.contentsOfDirectory(at: chatCacheDirectory, includingPropertiesForKeys: nil)) ?? []
@@ -722,7 +759,7 @@ final class BookingStore: ObservableObject {
         _ = cachedChat(for: bookingID)
         let generation = chatAuthGeneration
         let created = try await chatService.send(message: message, bookingID: bookingID, clientMessageID: clientMessageID, headers: headers)
-        guard generation == chatAuthGeneration else { throw CancellationError() }
+        guard generation == chatAuthGeneration, careHeaders(for: bookingID) == headers else { throw CancellationError() }
         chats[bookingID] = mergeChat([created], for: bookingID)
         persistChat(bookingID)
         return created
@@ -733,7 +770,7 @@ final class BookingStore: ObservableObject {
         _ = cachedChat(for: bookingID)
         let generation = chatAuthGeneration
         let created = try await chatService.sendPhoto(data: data, bookingID: bookingID, headers: headers)
-        guard generation == chatAuthGeneration else { throw CancellationError() }
+        guard generation == chatAuthGeneration, careHeaders(for: bookingID) == headers else { throw CancellationError() }
         chats[bookingID] = mergeChat([created], for: bookingID)
         persistChat(bookingID)
         return created
@@ -746,7 +783,7 @@ final class BookingStore: ObservableObject {
         let url = chatCacheDirectory.appendingPathComponent(key + "-" + pathHash + ".media")
         if let data = try? Data(contentsOf: url), !data.isEmpty { return data }
         let data = try await chatService.loadAttachment(path: path, headers: headers)
-        guard generation == chatAuthGeneration else { throw CancellationError() }
+        guard generation == chatAuthGeneration, careHeaders(for: bookingID) == headers else { throw CancellationError() }
         if data.count <= 5_000_000 {
             try? FileManager.default.createDirectory(at: chatCacheDirectory, withIntermediateDirectories: true)
             try? data.write(to: url, options: [.atomic, .completeFileProtection])
@@ -754,16 +791,33 @@ final class BookingStore: ObservableObject {
         return data
     }
 
+    private var pushSyncTask: Task<Void, Never>?
+    private var pushSyncRevision = 0
+
     func syncPushSubscriptions(deviceToken: String, locale: String) async {
-        guard !hasCareAccount else { return }
         let token = deviceToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else { return }
+        pushSyncRevision &+= 1
+        let revision = pushSyncRevision
+        let previous = pushSyncTask
+        let task = Task { @MainActor [weak self] in
+            await previous?.value
+            guard let self, self.pushSyncRevision == revision else { return }
+            await self.registerBookingPushes(token: token, locale: locale, revision: revision)
+        }
+        pushSyncTask = task
+        await task.value
+        if pushSyncRevision == revision { pushSyncTask = nil }
+    }
 
+    private func registerBookingPushes(token: String, locale: String, revision: Int) async {
+        let generation = bookingScopeGeneration
         var registeredAny = false
         var observedReady: Bool?
         var firstError: String?
 
         for session in sessions {
+            guard pushSyncRevision == revision, generation == bookingScopeGeneration else { return }
             let candidates = pushHeaderCandidates(for: session)
             guard !candidates.isEmpty else { continue }
 
@@ -771,6 +825,7 @@ final class BookingStore: ObservableObject {
             var registered = false
 
             for headers in candidates {
+                guard pushSyncRevision == revision, generation == bookingScopeGeneration else { return }
                 do {
                     let ready = try await clientPushService.register(
                         deviceToken: token,
@@ -778,6 +833,7 @@ final class BookingStore: ObservableObject {
                         headers: headers,
                         locale: locale
                     )
+                    guard pushSyncRevision == revision, generation == bookingScopeGeneration else { return }
                     registeredAny = true
                     registered = true
                     if let ready {
@@ -796,9 +852,8 @@ final class BookingStore: ObservableObject {
             }
         }
 
-        if registeredAny {
-            pushRegistrationReady = observedReady
-        }
+        guard pushSyncRevision == revision, generation == bookingScopeGeneration else { return }
+        pushRegistrationReady = registeredAny ? observedReady : nil
         pushRegistrationError = firstError
     }
 
@@ -1047,7 +1102,7 @@ final class BookingStore: ObservableObject {
     private func pushHeaderCandidates(for session: StoredBookingSession) -> [[String: String]] {
         var candidates: [[String: String]] = []
 
-        if let accountToken {
+        if let accountToken, IumrahSeamlessBookingPolicy.sameIdentity(session.displayPilgrimID, careAccountOwner) {
             let permanentToken = accountToken.trimmingCharacters(in: .whitespacesAndNewlines)
             if !permanentToken.isEmpty {
                 candidates.append(["Authorization": "Bearer \(permanentToken)"])

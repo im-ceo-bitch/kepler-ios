@@ -162,7 +162,7 @@ struct IumrahBookingAccessCard: View {
                 _ = try await service.tripDetail(bookingID: bookingID, token: auth.session.token)
             }
             _ = await account.acceptVerifiedSession(auth, locale: locale)
-            bookings.setAccountToken(account.bearerToken)
+            bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
             if let target, let link { bookings.adoptVerifiedBooking(target, link: link) }
             await bookings.restoreAccountTrips(token: auth.session.token)
             if let bookingID { _ = try? await bookings.loadCheckout(id: bookingID, token: auth.session.token, force: true) }

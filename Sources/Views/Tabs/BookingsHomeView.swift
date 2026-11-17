@@ -1441,7 +1441,7 @@ struct BookingsHomeView: View {
 
                 managementDivider
 
-                if bookings.canUseCareChat {
+                if bookings.canUseCareChat(for: session.id) {
                     NavigationLink {
                         BookingChatView(bookingID: session.id)
                     } label: {

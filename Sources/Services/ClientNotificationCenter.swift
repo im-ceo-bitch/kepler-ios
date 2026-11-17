@@ -122,6 +122,7 @@ final class ClientNotificationCenter: ObservableObject {
                     headers: headers
                 )
                 guard registrationRevision == revision else { return }
+                guard response.ok else { throw APIError.invalidResponse }
                 pushProviderReady = response.ready
                 await refresh(accountToken: accountToken, expectedRevision: revision)
                 guard registrationRevision == revision else { return }

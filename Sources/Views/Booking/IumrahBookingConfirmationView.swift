@@ -398,7 +398,7 @@ struct IumrahBookingConfirmationView: View {
                     guard IumrahSeamlessBookingPolicy.sameIdentity(linked.pilgrimID, auth.account.iumrahID) else { throw APIError.invalidResponse }
                     let local = bookings.booking(id: session.id) ?? session
                     _ = await account.acceptVerifiedSession(auth, locale: settings.language.rawValue)
-                    bookings.setAccountToken(account.bearerToken)
+                    bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
                     bookings.adoptVerifiedBooking(local, link: linked)
                     savedBooking = bookings.booking(id: session.id) ?? local
                 } catch {

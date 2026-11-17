@@ -13,6 +13,7 @@ struct BookingChatView: View {
 
     let requestedBookingID: String
     private var bookingID: String { bookings.careChatKey(for: requestedBookingID) }
+    private var chatAvailable: Bool { bookings.canUseCareChat(for: requestedBookingID) }
 
     @StateObject private var appearance: CareChatAppearanceStore
 
@@ -49,7 +50,7 @@ struct BookingChatView: View {
 
     var body: some View {
         Group {
-            if bookings.canUseBookingCare(requestedBookingID) { chatScreen }
+            if chatAvailable { chatScreen }
             else { ContentUnavailableView(tr("Chat available after booking", "Чат доступен после бронирования", "Chat brondan keyin", "Чат брондан кейин"), systemImage: "lock.fill") }
         }
             .navigationDestination(isPresented: $showCareProfile) { careProfileScreen }
@@ -62,11 +63,16 @@ struct BookingChatView: View {
             .statusBarHidden(false)
             .toolbar(.visible, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
-            .onAppear { if bookings.canUseBookingCare(requestedBookingID) { chatDidAppear() } }
-            .onChange(of: bookings.canUseBookingCare(requestedBookingID)) { _, allowed in
-                if !allowed { messages = []; draft = ""; failedDraft = nil; pendingOutgoing = nil; launchingOutgoing = nil; composerFocused = false; errorMessage = nil }
+            .onAppear { if chatAvailable { chatDidAppear() } }
+            .onChange(of: chatAvailable) { _, allowed in
+                if !allowed { messages = []; draft = ""; failedDraft = nil; pendingOutgoing = nil; launchingOutgoing = nil; composerFocused = false; errorMessage = nil; chatDidDisappear() }
+                else { chatDidAppear() }
             }
-            .onChange(of: bookingID) { _, newValue in push.activeChatBookingID = newValue }
+            .onChange(of: bookingID) { _, newValue in
+                messages = []; draft = ""; failedDraft = nil; pendingOutgoing = nil; launchingOutgoing = nil
+                errorMessage = nil; composerFocused = false; isLoading = true
+                if chatAvailable { push.activeChatBookingID = newValue }
+            }
             .onDisappear(perform: chatDidDisappear)
     }
 
@@ -179,8 +185,7 @@ struct BookingChatView: View {
     }
 
     private func handlePushEvent(proxy: ScrollViewProxy) {
-        guard push.lastEvent?.bookingID == bookingID,
-              push.lastEvent?.type.hasPrefix("chat_") == true else { return }
+        guard let event = push.lastEvent, bookings.careChatKey(for: event) == bookingID else { return }
         Task { await load(silent: true, proxy: proxy) }
     }
 
@@ -679,7 +684,9 @@ struct BookingChatView: View {
 
         do {
             let previousIDs = Set(messages.map(\.id))
-            let loaded = try await bookings.loadChat(for: bookingID)
+            let scope = bookingID
+            let loaded = try await bookings.loadChat(for: scope)
+            guard !Task.isCancelled, scope == bookingID, chatAvailable else { return }
 
             let newIncoming = loaded.filter { message in
                 !previousIDs.contains(message.id) && !isMine(message)

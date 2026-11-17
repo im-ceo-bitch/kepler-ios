@@ -1722,7 +1722,7 @@ struct PilgrimCheckoutView: View {
     @MainActor
     private func finishAccountActivation(_ profile: IumrahAccountProfile, session: StoredBookingSession) async {
         _ = profile
-        bookings.setAccountToken(account.bearerToken)
+        bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
         if let linked = try? await account.linkBooking(bookingID: bookingID, bookingToken: session.accessToken) {
             await bookings.applyCanonicalLink(linked, to: bookingID)
         }
@@ -1778,7 +1778,7 @@ struct PilgrimCheckoutView: View {
                 )
             }
             guard let session else { throw APIError.missingBookingToken }
-            bookings.setAccountToken(account.bearerToken)
+            bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
             let linked = try await account.linkBooking(bookingID: bookingID, bookingToken: session.accessToken)
             await bookings.applyCanonicalLink(linked, to: bookingID)
             if let token = account.bearerToken { await bookings.restoreAccountTrips(token: token) }

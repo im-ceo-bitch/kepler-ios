@@ -17,4 +17,16 @@ enum IumrahSeamlessBookingPolicy {
         if channel == "sms", let phone, !phone.isEmpty { return normalizedPhone(phone) == normalizedPhone(contact) }
         return false
     }
+    /// Local routing only; every request still requires a valid server credential.
+    static func careIsActive(_ status: String) -> Bool {
+        let status = status.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return !status.isEmpty && !["COMPLETED", "CANCELLED", "CANCELED", "DELETED"].contains(status)
+    }
+    static func careScope(status: String, bookingID: String, bookingToken: String,
+                          owner: String?, accountOwner: String?, accountToken: String?) -> String? {
+        guard careIsActive(status), !bookingID.isEmpty, bookingID != "account" else { return nil }
+        if let token = accountToken, !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           sameIdentity(owner, accountOwner) { return "account" }
+        return bookingToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : bookingID
+    }
 }

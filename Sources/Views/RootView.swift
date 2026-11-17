@@ -97,13 +97,13 @@ struct RootView: View {
                 }
             }
             .onChange(of: account.account) { _, newAccount in
-                bookings.setAccountToken(account.bearerToken)
+                bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
                 syncLocalProfileFromAccount()
                 syncWidgets()
                 Task { await syncClientNotifications() }
                 guard newAccount != nil, let token = account.bearerToken else {
-                    chrome.requestedBookingID = nil
-                    chrome.requestedChatBookingID = nil
+                    if let id = chrome.requestedBookingID, bookings.booking(id: id) == nil { chrome.requestedBookingID = nil }
+                    if let key = chrome.requestedChatBookingID, !bookings.canUseCareChat(for: key) { chrome.requestedChatBookingID = nil }
                     return
                 }
                 Task {
@@ -141,9 +141,8 @@ struct RootView: View {
             .onChange(of: push.eventRevision) { _, _ in
                 guard hasCompletedOnboarding else { return }
                 Task {
-                    if let event = push.lastEvent, let bookingID = event.bookingID,
-                       event.type.hasPrefix("chat_") && (event.pilgrimID == nil || event.pilgrimID == account.account?.iumrahID) {
-                        _ = try? await bookings.loadChat(for: bookings.careChatKey(for: bookingID))
+                    if let event = push.lastEvent, event.type.hasPrefix("chat_") {
+                        if let key = bookings.careChatKey(for: event) { _ = try? await bookings.loadChat(for: key) }
                     } else {
                         await bookings.refreshAll()
                         await clientNotifications.refresh(accountToken: account.bearerToken)
@@ -388,10 +387,10 @@ struct RootView: View {
 
         // Keep the cinematic first launch independent from account/network restoration.
         // This prevents stale sessions or slow network calls from competing with the intro.
-        bookings.setAccountToken(account.bearerToken)
+        bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
         await account.restore()
         syncLocalProfileFromAccount()
-        bookings.setAccountToken(account.bearerToken)
+        bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
 
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)
@@ -420,7 +419,13 @@ struct RootView: View {
     @MainActor
     private func handleOpenedPushIfNeeded() {
         guard let event = push.lastOpenedEvent else { return }
-        if let pilgrimID = event.pilgrimID, pilgrimID != account.account?.iumrahID {
+        if event.type.hasPrefix("chat_") {
+            guard let key = bookings.careChatKey(for: event) else { return }
+            chrome.requestedChatBookingID = key
+            chrome.navigate(to: .care)
+            return
+        }
+        if let pilgrimID = event.pilgrimID, !IumrahSeamlessBookingPolicy.sameIdentity(pilgrimID, account.account?.iumrahID) {
             guard let bookingID = event.bookingID, let local = bookings.booking(id: bookingID),
                   !local.accessToken.isEmpty, let owner = local.displayPilgrimID,
                   IumrahSeamlessBookingPolicy.sameIdentity(owner, pilgrimID) else { return }
@@ -433,12 +438,7 @@ struct RootView: View {
             return
         }
         if let bookingID = event.bookingID {
-            if event.type.hasPrefix("chat_") {
-                chrome.requestedChatBookingID = bookings.careChatKey(for: bookingID)
-                chrome.navigate(to: .care)
-            } else {
-                chrome.openBooking(id: bookingID)
-            }
+            chrome.openBooking(id: bookingID)
         }
     }
 

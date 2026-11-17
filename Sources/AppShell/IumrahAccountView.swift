@@ -2241,7 +2241,7 @@ struct IumrahAccountView: View {
 
     @MainActor
     private func completeAuthenticatedLogin(_ profile: IumrahAccountProfile) async {
-        bookings.setAccountToken(account.bearerToken)
+        bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)
             await bookings.refreshAll()
@@ -2303,7 +2303,7 @@ struct IumrahAccountView: View {
     @MainActor
     private func refreshAccountContent() async {
         balanceRefreshRevision &+= 1
-        bookings.setAccountToken(account.bearerToken)
+        bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)
             await bookings.refreshAll()

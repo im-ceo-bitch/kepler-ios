@@ -192,6 +192,8 @@ struct RemoteBooking: Codable, Identifiable, Hashable {
     let customization: BookingCustomization?
     let includedServices: [String]?
     let generatorTrace: BookingGeneratorTrace?
+    // Native Business offers return this identifier; older bookings omit it.
+    var offerPackageID: String? = nil
 }
 
 struct BookingInputRecord: Codable, Hashable {

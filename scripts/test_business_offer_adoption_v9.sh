@@ -44,6 +44,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 func receipt(_ id: String = "B1", _ token: String? = "secret", _ tripID: String? = "B1") throws -> BookingCreateResponse {
     var json: [String: Any] = ["booking": [
         "id": id, "status": "AVAILABILITY_CHECK", "planId": "standard",
+        "offerPackageID": "offer-123",
         "totalUsd": 2500, "perPilgrimUsd": 1250,
         "input": ["startDate": "2026-11-24", "endDate": "2026-11-30", "from": "Tashkent", "originCode": "TAS", "arrivalAirportCode": "MED", "includeMadinah": true, "travelers": ["adults": 2, "children": 0, "infants": 0, "rooms": 1]],
         "route": ["originCode": "TAS", "outboundDestination": "MED", "returnOrigin": "JED"],
@@ -64,6 +65,21 @@ func receipt(_ id: String = "B1", _ token: String? = "secret", _ tripID: String?
     require(initial.travelerName == "Test Person" && initial.hotelSelection?.hotelId == "H1", "canonical profile/hotel")
     require(initial.hasServerIdentity && initial.displayBookingNumber == "#0005" && initial.displayPilgrimID == "00000090", "canonical identity")
     require(store.sessions.count == 1 && store.writes == 1, "first persistence")
+    // Exact expression from BusinessOfferView.swift:61 in the archive failure.
+    let offer = (packageID: "offer-123", title: "Example")
+    let session = store.sessions.first(where: { $0.booking.offerPackageID == offer.packageID })
+    require(session?.id == initial.id, "native offer lookup compiles and finds the booking")
+    let encoded = try JSONEncoder().encode(initial.booking)
+    let roundTrip = try JSONDecoder().decode(RemoteBooking.self, from: encoded)
+    require(roundTrip.offerPackageID == "offer-123", "offer survives persistence")
+    var oldBooking = try JSONSerialization.jsonObject(with: encoded) as! [String: Any]
+    oldBooking.removeValue(forKey: "offerPackageID")
+    let old = try JSONDecoder().decode(RemoteBooking.self, from: JSONSerialization.data(withJSONObject: oldBooking))
+    require(old.offerPackageID == nil, "old bookings without offer ID still decode")
+    oldBooking["offerPackageID"] = NSNull()
+    let null = try JSONDecoder().decode(RemoteBooking.self, from: JSONSerialization.data(withJSONObject: oldBooking))
+    require(null.offerPackageID == nil, "null offer ID still decodes")
+
     store.sessions[0].verifiedBookingEmail = "verified@example.invalid"
     let retry = try store.adoptOfferBooking(receipt())
     require(store.sessions.count == 1 && store.writes == 1 && retry.verifiedBookingEmail == "verified@example.invalid", "idempotent retry")

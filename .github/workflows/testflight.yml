@@ -10,6 +10,11 @@ on:
         type: string
         required: true
         default: '2.1.0'
+      wait_for_processing:
+        description: 'Wait for Apple processing (optional; slower)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -288,6 +293,7 @@ jobs:
           issuer-id: ${{ secrets.ASC_ISSUER_ID }}
           api-key-id: ${{ secrets.ASC_KEY_ID }}
           api-private-key: ${{ secrets.ASC_API_KEY_P8 }}
+          wait-for-processing: ${{ inputs.wait_for_processing }}
       - name: Summary
         if: success()
         shell: bash
@@ -303,7 +309,12 @@ jobs:
             awk '/Build Timing Summary/{show=1} show{print}' "$RUNNER_TEMP/iumrah-archive.log" | tail -n 40 >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "Check App Store Connect → TestFlight after Apple's processing." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ inputs.wait_for_processing }}" = "true" ]; then
+            echo "Apple processing completed successfully." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Upload complete. Apple processing continues independently; GitHub success does not mean the build is ready for testing yet." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "Check App Store Connect → TestFlight for processing and distribution status." >> "$GITHUB_STEP_SUMMARY"
       # This step runs only after another step has already failed.
       # It must not depend on GitHub artifact availability.
       - name: Explain original failure in Actions logs and summary

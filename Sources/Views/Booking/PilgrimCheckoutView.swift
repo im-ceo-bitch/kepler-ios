@@ -1407,9 +1407,18 @@ struct PilgrimCheckoutView: View {
             Text(tr("Each document appears here as soon as it is ready.", "Каждый документ появится здесь отдельно сразу после готовности.", "Har bir hujjat tayyor bo‘lishi bilan shu yerda alohida paydo bo‘ladi.", "Ҳар бир ҳужжат тайёр бўлиши билан шу ерда алоҳида пайдо бўлади."))
                 .font(.subheadline).foregroundStyle(.secondary)
 
+            let visas = (value.documentRequirements ?? []).filter { $0.kind == "visa" }
+            if !visas.isEmpty {
+                let ready = visas.allSatisfy(\.ready)
+                Label(ready ? tr("Visas ready · tickets are next", "Визы готовы · далее покупка билетов", "Vizalar tayyor · keyin chiptalar", "Визалар тайёр · кейин чипталар") : tr("Visas first · tickets after visas are issued", "Сначала визы · билеты после получения виз", "Avval vizalar · keyin aviachiptalar", "Аввал визалар · кейин авиачипталар"), systemImage: ready ? "checkmark.circle" : "clock").font(.subheadline.weight(.semibold))
+                if visas.contains(where: { $0.state == "refused" }) { Text(tr("Visa requires support review", "Отказ в визе · требуется решение поддержки", "Viza bo‘yicha yordam kerak", "Виза бўйича ёрдам керак")).font(.caption).foregroundStyle(.secondary) }
+                ForEach(visas) { visa in
+                    HStack { Text(tr("Visa", "Виза", "Viza", "Виза") + " · \(visa.travelerPosition ?? 1)"); Spacer(); Text(visa.ready ? tr("Issued", "Оформлена", "Tayyor", "Тайёр") : visa.state == "submitted" ? tr("Submitted", "Подана", "Topshirildi", "Топширилди") : tr("Pending", "Ожидается", "Kutilmoqda", "Кутилмоқда")) }.font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            documentStatusRow(kind: "visa", title: tr("Visa", "Виза", "Viza", "Виза"), icon: "checkmark.seal.fill", documents: value.documents)
             documentStatusRow(kind: "ticket", title: tr("Airline ticket", "Авиабилет", "Aviachipta", "Авиачипта"), icon: "airplane", documents: value.documents)
             documentStatusRow(kind: "voucher", title: tr("Hotel confirmation", "Подтверждение отеля", "Mehmonxona tasdig‘i", "Меҳмонхона тасдиғи"), icon: "building.2.fill", documents: value.documents)
-            documentStatusRow(kind: "visa", title: tr("Visa", "Виза", "Viza", "Виза"), icon: "checkmark.seal.fill", documents: value.documents)
             documentStatusRow(kind: "insurance", title: tr("Insurance", "Страховка", "Sug‘urta", "Суғурта"), icon: "cross.case.fill", documents: value.documents)
 
             ForEach(value.documents.filter { !["ticket", "voucher", "visa", "insurance"].contains($0.documentKind) }) { document in

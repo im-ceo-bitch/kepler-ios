@@ -28,6 +28,9 @@ struct GeneratorGroupSavingsQuoteSet: Hashable {
 final class JourneyStore: ObservableObject {
     var cachedLocalBookingInputKey: String?
     @Published var trip = TripDraft() { didSet { cachedLocalBookingInputKey = nil } }
+    @Published var tripSummaryChildAges: [Int] = []
+    var tripSummaryApprovalHeaders: [String:String] = [:]
+    @Published private(set) var tripSummaryRevision: UInt64 = 0
     @Published var usesLocalJourney = false
     @Published var localJourneyFlights: [LocalJourneyFlight] = [] { didSet { cachedLocalBookingInputKey = nil } }
     @Published var localJourneyRooms: [String: LocalJourneyRoom] = [:] { didSet { cachedLocalBookingInputKey = nil } }
@@ -1167,7 +1170,7 @@ final class JourneyStore: ObservableObject {
                 makkahRoomID: makkah.rate.roomId, madinahHotelID: madinah?.hotel.id, madinahRoomID: madinah?.rate.roomId,
                 includeHaramainTrain: haramainTrainSelected, transferVehicle: selectedTransferVehicle,
                 haramainFareClass: haramainFareClass, haramainTicketCount: haramainTicketCount,
-                nuiteeRooms: selectedRooms)
+                nuiteeRooms: selectedRooms, packageApprovalHeaders: tripSummaryApprovalHeaders)
             guard localBookingInputKey == identity, !Task.isCancelled else { return }
             guard resolved.resolvedTier == tier.rawValue else { throw APIError.invalidResponse }
             selectedOutbound = pair.outbound; selectedInbound = inbound
@@ -1176,7 +1179,7 @@ final class JourneyStore: ObservableObject {
             selectedMadinahHotel = madinah?.bookingHotel; selectedMadinahRoom = madinah?.bookingRoom
             quote = resolved; errorMessage = nil
         } catch {
-            guard localBookingInputKey == identity else { return }
+            guard localBookingInputKey == identity, !Task.isCancelled else { return }
             quote = nil; errorMessage = error.localizedDescription
         }
     }
@@ -1627,4 +1630,69 @@ final class JourneyStore: ObservableObject {
             ?? local.startOfDay(for: date)
     }
 
+}
+
+@MainActor extension JourneyStore {
+    func invalidateTripSummaryQuote() {
+        tripSummaryRevision &+= 1
+        packageQuoteRevision &+= 1
+        cachedLocalBookingInputKey = nil
+        quote = nil
+    }
+    func applyTripSummaryGuests(_ next: TripDraft, ages: [Int]) {
+        invalidateTripSummaryQuote()
+        trip = next
+        tripSummaryChildAges = ages
+        // Exact supplier offers are specific to occupancy; they must be selected again.
+        localJourneyRooms = [:]
+        selectedRoom = nil; selectedRoomCategory = nil
+        selectedMadinahRoom = nil; selectedMadinahRoomCategory = nil
+        hotelPriceSnapshot = nil; cancelHotelPricePrefetch()
+        if let vehicle = selectedTransferVehicle, vehicle.passengerCapacity < next.travelerCount {
+            selectedTransferVehicle = TransferVehicleKind.carnival.passengerCapacity >= next.travelerCount ? .carnival : nil
+            transferSelectionConfirmed = false
+        }
+        if haramainTrainSelected { haramainAdultTickets = next.adults; haramainChildTickets = next.children; transferSelectionConfirmed = false }
+    }
+    func tripSummaryEditingCopy() -> JourneyStore {
+        let copy = JourneyStore()
+        copy.trip = trip; copy.tripSummaryChildAges = tripSummaryChildAges; copy.tripSummaryApprovalHeaders = tripSummaryApprovalHeaders; copy.usesLocalJourney = usesLocalJourney
+        copy.localJourneyFlights = localJourneyFlights; copy.localJourneyRooms = localJourneyRooms
+        copy.packageFlightPath = packageFlightPath; copy.flightSearchFlexDays = flightSearchFlexDays
+        copy.selectedPublishedCompleteID = selectedPublishedCompleteID; copy.selectedPublishedOutboundID = selectedPublishedOutboundID; copy.selectedPublishedReturnID = selectedPublishedReturnID
+        copy.stagedUmrahFlights = stagedUmrahFlights; copy.stagedAviasalesOffers = stagedAviasalesOffers; copy.mixedFlightIdentity = mixedFlightIdentity
+        copy.selectedHotel = selectedHotel; copy.selectedRoom = selectedRoom; copy.selectedRoomCategory = selectedRoomCategory
+        copy.selectedMadinahHotel = selectedMadinahHotel; copy.selectedMadinahRoom = selectedMadinahRoom; copy.selectedMadinahRoomCategory = selectedMadinahRoomCategory
+        copy.hotels = hotels; copy.madinahHotels = madinahHotels
+        copy.selectedOutbound = selectedOutbound; copy.selectedInbound = selectedInbound
+        copy.selectedTransferVehicle = selectedTransferVehicle; copy.transferSelectionConfirmed = transferSelectionConfirmed
+        copy.haramainTrainSelected = haramainTrainSelected; copy.haramainFareClass = haramainFareClass; copy.haramainAdultTickets = haramainAdultTickets; copy.haramainChildTickets = haramainChildTickets
+        return copy
+    }
+    func applyTripSummaryEditor(_ session: TripSummaryEditSession) {
+        let copy = session.draft
+        invalidateTripSummaryQuote()
+        switch session.kind {
+        case .flights:
+            let old = trip
+            trip = copy.trip; usesLocalJourney = copy.usesLocalJourney
+            packageFlightPath = copy.packageFlightPath; flightSearchFlexDays = copy.flightSearchFlexDays
+            selectedPublishedCompleteID = copy.selectedPublishedCompleteID; selectedPublishedOutboundID = copy.selectedPublishedOutboundID; selectedPublishedReturnID = copy.selectedPublishedReturnID
+            stagedUmrahFlights = copy.stagedUmrahFlights; stagedAviasalesOffers = copy.stagedAviasalesOffers; mixedFlightIdentity = copy.mixedFlightIdentity
+            localJourneyFlights = copy.localJourneyFlights; selectedOutbound = copy.selectedOutbound; selectedInbound = copy.selectedInbound
+            let sameStay = old.departureDate == trip.departureDate && old.returnDate == trip.returnDate && old.hotelStayStartDate == trip.hotelStayStartDate && old.arrivalAirport == trip.arrivalAirport && old.scope == trip.scope
+            if !sameStay { localJourneyRooms = [:]; selectedRoom = nil; selectedMadinahRoom = nil; selectedRoomCategory = nil; selectedMadinahRoomCategory = nil }
+            if !old.isRoundTripFlight || !sameStay { transferSelectionConfirmed = false }
+        case .hotel, .allHotels:
+            localJourneyRooms = copy.localJourneyRooms; trip.packageTier = copy.trip.packageTier
+            let ages = copy.localJourneyRooms.values.filter { $0.city == "makkah" }.sorted { $0.id < $1.id }.flatMap(\.childrenAges)
+            if ages.count == trip.children + trip.infants { tripSummaryChildAges = ages }
+        case .catalog:
+            selectedHotel = copy.selectedHotel; selectedRoom = copy.selectedRoom; selectedRoomCategory = copy.selectedRoomCategory
+            selectedMadinahHotel = copy.selectedMadinahHotel; selectedMadinahRoom = copy.selectedMadinahRoom; selectedMadinahRoomCategory = copy.selectedMadinahRoomCategory
+        case .transfer:
+            selectedTransferVehicle = copy.selectedTransferVehicle; transferSelectionConfirmed = copy.transferSelectionConfirmed
+        }
+        hotelPriceSnapshot = nil; cancelHotelPricePrefetch()
+    }
 }

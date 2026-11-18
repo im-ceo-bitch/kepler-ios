@@ -100,6 +100,9 @@ struct BookingDetailView: View {
                         onChangeMadinahHotel: { showMadinahHotelChange = true }
                     )
                     contactCard(session)
+                    NavigationLink { BookingRefundView(bookingID: bookingID, bookingToken: session.accessToken) } label: {
+                        HStack { Image(systemName: "arrow.uturn.backward.circle"); Text(localizedDetail("Отмена и возврат", "Cancellation and refund", "Bekor qilish va qaytarish", "Бекор қилиш ва қайтариш")); Spacer(); Image(systemName: "chevron.forward").font(.caption) }.font(.headline).iumrahCard()
+                    }.buttonStyle(.plain)
                     if session.pendingChangeConfirmation == true || confirmationSent { confirmationCard(session) }
                     IumrahTelegramConnectCard(session: session, accountToken: account.bearerToken, style: .compact)
                 }

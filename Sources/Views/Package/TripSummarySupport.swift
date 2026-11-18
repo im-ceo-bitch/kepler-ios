@@ -1,0 +1,226 @@
+import Foundation
+import SwiftUI
+import Security
+
+// No minor counts towards the special adult-only exception. Hotel supplier
+// occupancy still has to be checked, including each actual child's age.
+struct TripSummaryGuestDraft {
+    enum AgeGroup { case teen, child, infant
+        var defaultAge: Int { switch self { case .teen: return -12; case .child: return -2; case .infant: return -3 } }
+        func contains(_ age: Int) -> Bool { switch self { case .teen: return age == -12 || (12...17).contains(age); case .child: return age == -2 || (2...11).contains(age); case .infant: return age == -3 || (0...1).contains(age) } }
+    }
+    var adults: Int
+    var rooms: Int
+    var ages: [Int]
+    var total: Int { adults + ages.count }
+    static func minimumRooms(_ adults: Int) -> Int { max(1, (adults + 4) / 5) }
+    @MainActor init(journey: JourneyStore) {
+        adults = journey.trip.adults; rooms = journey.trip.rooms
+        let existing = journey.tripSummaryChildAges
+        let selected = journey.localJourneyRooms.values.filter { $0.city == "makkah" }.sorted { $0.id < $1.id }.flatMap(\.childrenAges)
+        let count = journey.trip.children + journey.trip.infants
+        ages = existing.count == count ? existing : selected.count == count ? selected : Array(repeating: -1, count: count)
+    }
+    func trip(from original: TripDraft) -> TripDraft {
+        var next = original
+        next.adults = adults; next.rooms = rooms
+        next.children = ages.filter { $0 >= 2 }.count
+        next.infants = ages.filter { $0 >= 0 && $0 < 2 }.count
+        return next
+    }
+}
+
+@MainActor
+final class TripSummaryEditSession: Identifiable {
+    enum Kind: Equatable { case flights, hotel(String), allHotels, catalog(HotelSelectionRole), transfer }
+    let id = UUID()
+    let kind: Kind
+    let draft: JourneyStore
+    let ages: [Int]
+    init(kind: Kind, journey: JourneyStore) {
+        self.kind = kind
+        self.draft = journey.tripSummaryEditingCopy()
+        ages = TripSummaryGuestDraft(journey: journey).ages
+        if case .hotel(let city) = kind { draft.localJourneyRooms = draft.localJourneyRooms.filter { $0.value.city != city } }
+    }
+}
+
+struct TripSummarySavedReceipt: Codable {
+    let packageID: String
+    let revision: Int
+    let status: String
+    let expiresAt: String
+    var shareURL: String? = nil
+    var package: SavedPackageSnapshot? = nil
+}
+
+// A per-package capability; never put this in share text, URL or UserDefaults.
+struct TripSummaryOwnerCredential {
+    let token: String
+    static func create() throws -> Self {
+        var data = Data(count: 32)
+        let status = data.withUnsafeMutableBytes { buffer in SecRandomCopyBytes(kSecRandomDefault, 32, buffer.baseAddress!) }
+        guard status == errSecSuccess else { throw APIError.invalidResponse }
+        let token = data.map { String(format: "%02x", $0) }.joined()
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.iumrah.saved-package", kSecAttrAccount as String: token, kSecValueData as String: Data(token.utf8), kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        guard SecItemAdd(query as CFDictionary, nil) == errSecSuccess else { throw APIError.invalidResponse }
+        return .init(token: token)
+    }
+    static func all() -> [(TripSummaryOwnerCredential, TripSummarySavedReceipt)] {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.iumrah.saved-package", kSecReturnAttributes as String: true, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitAll]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let rows = result as? [[String: Any]] else { return [] }
+        return rows.compactMap { row in
+            guard let token = row[kSecAttrAccount as String] as? String, let data = row[kSecValueData as String] as? Data, let receipt = try? JSONDecoder().decode(TripSummarySavedReceipt.self, from: data) else { return nil }
+            return (.init(token: token), receipt)
+        }.sorted { $0.1.expiresAt > $1.1.expiresAt }
+    }
+    func record(_ receipt: TripSummarySavedReceipt) {
+        // Index uses the opaque package ID rather than the capability.
+        guard let data = try? JSONEncoder().encode(receipt) else { return }
+        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "com.iumrah.saved-package", kSecAttrAccount as String: token]
+        _ = SecItemUpdate(base as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+    }
+}
+
+// Add public selection metadata to the same validated booking-draft contract.
+// No booking is created by this endpoint. The backend verifies the opaque quote.
+enum TripSummarySavedClient {
+    private struct Details: Encodable {
+        struct Flight: Encodable {
+            let id: String; let airline: String
+            let outboundOrigin: String; let outboundDestination: String; let outboundDate: String
+            let outboundDepartureTime: String; let outboundArrivalTime: String; let outboundStops: Int
+            let returnOrigin: String?; let returnDestination: String?; let returnDate: String?
+            let returnDepartureTime: String?; let returnArrivalTime: String?; let returnStops: Int?
+            let outboundCurrency = "USD"; let returnCurrency = "USD"
+        }
+        struct Hotel: Encodable {
+            let id: String; let name: String; let city: String; let stars: Int?
+            let checkIn: String; let checkOut: String; let totalPrice: Double
+            let currency = "USD"
+        }
+        let pricingMode = "live"
+        let flight: Flight
+        let makkahHotel: Hotel
+        let madinahHotel: Hotel?
+    }
+    private struct SavedBooking: Encodable {
+        let base: BookingDraftRequest; let details: Details
+        enum Keys: String, CodingKey { case selectionDetails }
+        func encode(to encoder: Encoder) throws {
+            try base.encode(to: encoder)
+            var container = encoder.container(keyedBy: Keys.self)
+            try container.encode(details, forKey: .selectionDetails)
+        }
+    }
+    private struct Request: Encodable {
+        let lang: String; let booking: SavedBooking; let quoteProof: String; let revision: Int?
+    }
+    static func save(_ payload: BookingCreateEnvelope, credential: TripSummaryOwnerCredential, previous: TripSummarySavedReceipt?, price: TripSummaryPublicPrice) async throws -> TripSummarySavedReceipt {
+        guard let proof = payload.quoteProof, let trace = payload.booking.generatorTrace else { throw APIError.invalidResponse }
+        let b = payload.booking; let o = trace.outbound; let i = trace.inbound
+        let f = Details.Flight(id: b.selection.flightId, airline: o.airline, outboundOrigin: o.origin, outboundDestination: o.destination, outboundDate: b.input.startDate, outboundDepartureTime: o.departureAt, outboundArrivalTime: o.arrivalAt, outboundStops: o.stops ?? 0, returnOrigin: i?.origin, returnDestination: i?.destination, returnDate: i == nil ? nil : b.input.endDate, returnDepartureTime: i?.departureAt, returnArrivalTime: i?.arrivalAt, returnStops: i?.stops)
+        func cost(_ code: String) -> Double { NSDecimalNumber(decimal: price.components.first(where: { $0.code == code })?.amountUsd ?? 0).doubleValue }
+        let m = Details.Hotel(id: b.selection.makkahHotelId, name: b.hotelNames.makkah, city: "makkah", stars: nil, checkIn: b.stay.makkahCheckIn, checkOut: b.stay.makkahCheckOut, totalPrice: cost("makkah_hotel"))
+        let d: Details.Hotel? = b.selection.madinahHotelId.flatMap { id in
+            guard let start = b.stay.madinahCheckIn, let end = b.stay.madinahCheckOut else { return nil }
+            return .init(id: id, name: b.hotelNames.madinah, city: "madinah", stars: nil, checkIn: start, checkOut: end, totalPrice: cost("madinah_hotel"))
+        }
+        let request = Request(lang: payload.lang, booking: .init(base: b, details: .init(flight: f, makkahHotel: m, madinahHotel: d)), quoteProof: proof, revision: previous?.revision)
+        let headers = ["x-package-owner": credential.token]
+        let receipt: TripSummarySavedReceipt
+        if let previous { receipt = try await APIClient.shared.patch("/api/offers/saved/\(previous.packageID)", body: request, headers: headers) }
+        else { receipt = try await APIClient.shared.post("/api/offers/saved", body: request, headers: headers) }
+        credential.record(receipt)
+        return receipt
+    }
+}
+
+struct TripSummaryCalendar: View {
+    let trip: TripDraft
+    let quote: PackageQuote?
+    let outbound: FlightOffer?
+    let inbound: FlightOffer?
+    let language: AppSettingsStore.Language
+    @State private var selected: String?
+    private func t(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String { IumrahFlightCopy.text(language, ru, en, uz, cy) }
+    private struct Entry: Identifiable {
+        let id: String; let day: String; let time: String?; let title: String; let subtitle: String; let icon: String
+    }
+    private func localizedTitle(_ kind: String?, fallback: String) -> String {
+        switch kind {
+        case "arrival": return t("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш")
+        case "airportExit": return t("Выход из аэропорта", "Airport exit", "Aeroportdan chiqish", "Аэропортдан чиқиш")
+        case "hotelTransfer": return t("Трансфер в отель", "Hotel transfer", "Mehmonxonaga transfer", "Меҳмонхонага трансфер")
+        case "hotelCheckIn": return t("Заселение", "Check-in", "Joylashish", "Жойлашиш")
+        case "hotelCheckOut": return t("Выселение", "Check-out", "Chiqish", "Чиқиш")
+        case "intercityTransfer": return t("Переезд между городами", "Intercity transfer", "Shaharlararo transfer", "Шаҳарлараро трансфер")
+        case "umrah": return t("Совершение умры", "Umrah", "Umra", "Умра")
+        case "makkahZiyarat", "madinahZiyarat": return t("Зияраты", "Ziyarat", "Ziyoratlar", "Зиёратлар")
+        case "airportTransfer": return t("Трансфер в аэропорт", "Airport transfer", "Aeroportga transfer", "Аэропортга трансфер")
+        case "flightHome": return t("Вылет домой", "Flight home", "Uyga uchish", "Уйга учиш")
+        default: return fallback
+        }
+    }
+    private var entries: [Entry] {
+        var result: [Entry] = []
+        func flight(_ offer: FlightOffer, arrival: Bool, title: String, id: String) {
+            let airport = arrival ? offer.destination : offer.origin
+            let instant = ISO8601DateFormatter().string(from: arrival ? offer.arrivalAt : offer.departureAt)
+            let local = IumrahFlightClock.local(instant, airport: airport)
+            result.append(.init(id: id, day: String(local.prefix(10)), time: IumrahFlightClock.time(local), title: title, subtitle: airport, icon: arrival ? "airplane.arrival" : "airplane.departure"))
+        }
+        if let out = outbound { flight(out, arrival: false, title: t("Вылет", "Departure", "Uchish", "Учиш"), id: "out") }
+        if let events = quote?.itineraryPreview, !events.isEmpty {
+            result += events.map { .init(id: $0.id, day: $0.dateLocal, time: $0.timeLocal, title: localizedTitle($0.kind, fallback: $0.title), subtitle: $0.location, icon: $0.icon) }
+        } else {
+            if let out = outbound { flight(out, arrival: true, title: t("Прилёт", "Arrival", "Yetib kelish", "Етиб келиш"), id: "arrival") }
+            if let stay = quote?.stayPlan {
+                func add(_ id: String, _ day: String, _ title: String, _ city: String) { result.append(.init(id: id, day: day, time: nil, title: title, subtitle: city, icon: "bed.double")) }
+                add("m-in", stay.makkahCheckIn, t("Заселение", "Check-in", "Joylashish", "Жойлашиш"), "Makkah")
+                add("m-out", stay.makkahCheckOut, t("Выселение", "Check-out", "Chiqish", "Чиқиш"), "Makkah")
+                if let d = stay.madinahCheckIn { add("d-in", d, t("Заселение", "Check-in", "Joylashish", "Жойлашиш"), "Madinah") }
+                if let d = stay.madinahCheckOut { add("d-out", d, t("Выселение", "Check-out", "Chiqish", "Чиқиш"), "Madinah") }
+            }
+            if let back = inbound { flight(back, arrival: false, title: t("Вылет домой", "Flight home", "Uyga uchish", "Уйга учиш"), id: "back") }
+        }
+        if let back = inbound { flight(back, arrival: true, title: t("Возвращение домой", "Arrival home", "Uyga yetish", "Уйга етиш"), id: "home") }
+        return result.sorted { ($0.day, $0.time ?? "99:99", $0.id) < ($1.day, $1.time ?? "99:99", $1.id) }
+    }
+    private var days: [String] {
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX"); f.timeZone = TimeZone(identifier: "Asia/Riyadh"); f.dateFormat = "yyyy-MM-dd"
+        let keys = entries.map(\.day)
+        let start = (keys.min().flatMap(f.date(from:))) ?? trip.departureDate
+        let end = (keys.max().flatMap(f.date(from:))) ?? trip.returnDate
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = f.timeZone
+        let count = max(1, min(90, (cal.dateComponents([.day], from: cal.startOfDay(for: start), to: cal.startOfDay(for: end)).day ?? 0) + 1))
+        return (0..<count).compactMap { cal.date(byAdding: .day, value: $0, to: cal.startOfDay(for: start)).map(f.string(from:)) }
+    }
+    var body: some View {
+        let current = selected.flatMap { days.contains($0) ? $0 : nil } ?? days.first ?? ""
+        VStack(alignment: .leading, spacing: 14) {
+            Text(t("Предварительное расписание · местное время", "Planned schedule · local time", "Taxminiy jadval · mahalliy vaqt", "Тахминий жадвал · маҳаллий вақт")).font(.caption).foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) {
+                ForEach(days, id: \.self) { day in
+                    Button { selected = day; IumrahHaptics.selection() } label: {
+                        VStack(spacing: 5) { Text(String(day.suffix(2))).font(.title3.bold()); Text(IumrahFlightClock.day(day, locale: Locale(identifier: language.localeIdentifier))).font(.caption2).lineLimit(1) }
+                            .padding(10).frame(minWidth: 58).foregroundStyle(current == day ? Color.white : Color.primary).background(current == day ? Color.black : Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 15))
+                    }.buttonStyle(.plain)
+                }
+            } }
+            Divider()
+            let events = entries.filter { $0.day == current }
+            if events.isEmpty { Text(t("Время мероприятий согласовывается", "Activities to be arranged", "Tadbirlar vaqti kelishiladi", "Тадбирлар вақти келишилади")).font(.subheadline).foregroundStyle(.secondary) }
+            ForEach(events) { e in
+                HStack(alignment: .top, spacing: 10) {
+                    Text(e.time ?? "—").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 47, alignment: .leading)
+                    Image(systemName: e.icon).frame(width: 22)
+                    VStack(alignment: .leading, spacing: 3) { Text(e.title).font(.subheadline.bold()); if !e.subtitle.isEmpty { Text(e.subtitle).font(.caption).foregroundStyle(.secondary) } }
+                    Spacer(minLength: 0)
+                }
+            }
+            Text(t("Время трансферов и мероприятий подтверждается перед поездкой.", "Transfer and activity times are confirmed before travel.", "Transfer va tadbir vaqti safardan oldin tasdiqlanadi.", "Трансфер ва тадбир вақти сафардан олдин тасдиқланади.")).font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+}

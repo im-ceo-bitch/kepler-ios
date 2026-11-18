@@ -56,7 +56,8 @@ struct RemotePackageEngineClient {
         haramainTicketCount: Int,
         makkahNightsOverride: Int? = nil,
         madinahNightsOverride: Int? = nil,
-        nuiteeRooms: [BookingNuiteeRoomSelection]? = nil
+        nuiteeRooms: [BookingNuiteeRoomSelection]? = nil,
+        packageApprovalHeaders: [String:String] = [:]
     ) async throws -> PackageQuote {
         let rawProviderItineraryID = pricingOffer.providerItineraryID?.trimmingCharacters(in: .whitespacesAndNewlines)
         let providerItineraryID: String
@@ -143,6 +144,7 @@ struct RemotePackageEngineClient {
         let response: ServerPackageQuoteEnvelope = try await (nuiteeRooms == nil ? api : APIClient.hotelPrices).post(
             "/api/package/quote",
             body: request,
+            headers: packageApprovalHeaders,
             timeoutInterval: nuiteeRooms == nil ? 15 : 604800
         )
         guard response.ok else { throw APIError.invalidResponse }
@@ -190,6 +192,9 @@ private struct ServerPackageQuote: Decodable {
     let stayPlan: PackageStayPlan?
     let bookingAllowed: Bool?
     let resolvedTier: String?
+    let tripSummary: TripSummaryPublicPrice?
+    let roomPolicy: TripSummaryRoomPolicy?
+    let itineraryPreview: [PackageItineraryPreviewItem]?
 
     var publicQuote: PackageQuote {
         var result = PackageQuote(
@@ -203,6 +208,9 @@ private struct ServerPackageQuote: Decodable {
         )
         result.bookingAllowed = bookingAllowed
         result.resolvedTier = resolvedTier
+        result.tripSummary = tripSummary
+        result.roomPolicy = roomPolicy
+        result.itineraryPreview = itineraryPreview
         return result
     }
 }

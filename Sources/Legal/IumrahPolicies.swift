@@ -135,10 +135,10 @@ enum IumrahRefundComponent: String, Identifiable, Hashable {
                              uzCy: "Одатда қайтарилмайди")
         case .transfer:
             return localized(language,
-                             ru: "Бесплатно до 5 дней",
-                             en: "Free until 5 days before",
-                             uz: "5 kun oldin bepul",
-                             uzCy: "5 кун олдин бепул")
+                             ru: "Бесплатно за 24 часа",
+                             en: "Free until 24 hours before",
+                             uz: "24 soat oldin bepul",
+                             uzCy: "24 соат олдин бепул")
         case .services:
             return localized(language,
                              ru: "Возврат до начала услуги",
@@ -170,10 +170,10 @@ enum IumrahRefundComponent: String, Identifiable, Hashable {
                              uzCy: "Асосий пакет нархи, агар аниқ вариантда бепул бекор қилиш кўрсатилмаган бўлса, қайтарилмайдиган меҳмонхона тарифидан фойдаланади. Бекор қилиш мумкин бўлса, аниқ муддат ва ушлаб қолиш тўловдан олдин кўрсатилади.")
         case .transfer:
             return localized(language,
-                             ru: "Отмена не позднее чем за 5 суток (120 часов) до подачи автомобиля — полный возврат стоимости трансфера. Позже удерживается $100, остальная сумма возвращается. После начала услуги или при неявке стоимость трансфера не возвращается.",
-                             en: "Cancel at least 5 days (120 hours) before vehicle pickup for a full transfer refund. Later cancellations carry a $100 fee and the remainder is refunded. After service begins or in case of no-show, the transfer is non-refundable.",
-                             uz: "Avtomobil kelishidan kamida 5 kun (120 soat) oldin bekor qilinsa, transfer summasi to‘liq qaytariladi. Keyinroq bekor qilinsa $100 ushlab qolinadi, qolgan summa qaytariladi. Xizmat boshlanganidan keyin yoki kelinmasa, transfer qaytarilmaydi.",
-                             uzCy: "Автомобиль келишидан камида 5 кун (120 соат) олдин бекор қилинса, трансфер суммаси тўлиқ қайтарилади. Кейинроқ бекор қилинса $100 ушлаб қолинади, қолган сумма қайтарилади. Хизмат бошланганидан кейин ёки келинмаса, трансфер қайтарилмайди.")
+                             ru: "Отмена не позднее чем за 24 часа до подачи автомобиля — полный возврат стоимости трансфера. Позже удерживается $100, остальная сумма возвращается. После начала услуги или при неявке возврат рассматривается отдельно.",
+                             en: "Cancel at least 24 hours before vehicle pickup for a full transfer refund. Later cancellations carry a $100 fee and the remainder is refunded. After service begins or in case of no-show, refunds are reviewed separately.",
+                             uz: "Avtomobil kelishidan kamida 24 soat oldin bekor qilinsa, transfer summasi to‘liq qaytariladi. Keyinroq bekor qilinsa $100 ushlab qolinadi, qolgan summa qaytariladi. Xizmat boshlanganidan keyin yoki kelinmasa, qaytarish alohida ko‘rib chiqiladi.",
+                             uzCy: "Автомобиль келишидан камида 24 соат олдин бекор қилинса, трансфер суммаси тўлиқ қайтарилади. Кейинроқ бекор қилинса $100 ушлаб қолинади, қолган сумма қайтарилади. Хизмат бошланганидан кейин ёки келинмаса, қайтариш алоҳида кўриб чиқилади.")
         case .services:
             return localized(language,
                              ru: "Неиспользованные сервисы iumrah возвращаются полностью до начала соответствующей услуги. Уже оказанная или начатая услуга считается использованной и рассчитывается отдельно.",

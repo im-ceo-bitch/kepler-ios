@@ -7,11 +7,13 @@ struct NuiteeJourneyHotelsView: View {
     var transferAlreadySelected = false
     var smartCity: String? = nil
     var smartConfirm: (() -> Void)? = nil
+    var reviewEditing = false
 
-    init(transferAlreadySelected: Bool = false, smartCity: String? = nil, smartChildAges: [Int] = [], smartConfirm: (() -> Void)? = nil) {
+    init(transferAlreadySelected: Bool = false, smartCity: String? = nil, smartChildAges: [Int] = [], reviewEditing: Bool = false, smartConfirm: (() -> Void)? = nil) {
         self.transferAlreadySelected = transferAlreadySelected
         self.smartCity = smartCity
         self.smartConfirm = smartConfirm
+        self.reviewEditing = reviewEditing
         _city = State(initialValue: smartCity ?? "makkah")
         _ages = State(initialValue: smartChildAges)
     }
@@ -60,7 +62,7 @@ struct NuiteeJourneyHotelsView: View {
                         subtitle: "\(window.checkIn.formatted(date: .abbreviated, time: .omitted)) — \(window.checkOut.formatted(date: .abbreviated, time: .omitted)) · \(roomAdults) взр. · \(roomChildren.count) дет.",
                         priceCaption: "Состав поездки") {
                         if smartCity == nil {
-                        Stepper("Номера: \(journey.trip.rooms)", value: $journey.trip.rooms, in: 1...journey.trip.adults)
+                        if !reviewEditing { Stepper("Номера: \(journey.trip.rooms)", value: $journey.trip.rooms, in: 1...journey.trip.adults) }
                         ForEach(ages.indices, id: \.self) { index in
                             Picker("Возраст ребёнка \(index + 1)", selection: $ages[index]) {
                                 Text("Укажите возраст").tag(-1)
@@ -156,7 +158,7 @@ struct NuiteeJourneyHotelsView: View {
         .navigationDestination(isPresented: $showTransfer) { TransferSelectionView() }
         .navigationDestination(isPresented: $showFinalAfterHotels) { FinalPackageView() }
         .safeAreaInset(edge: .bottom) {
-            if journey.localRoomsComplete {
+            if reviewRoomsComplete {
                 Button(smartCity != nil ? IumrahFlightCopy.text(settings.language, "Подтвердить отель", "Confirm hotel", "Mehmonxonani tasdiqlash", "Меҳмонхонани тасдиқлаш") : transferAlreadySelected ? "Посмотреть итог" : "Выбрать трансфер") { finishRooms() }
                     .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
             }
@@ -175,7 +177,12 @@ struct NuiteeJourneyHotelsView: View {
                 return
             }
         }
-        if journey.localRoomsComplete && smartCity == nil { finishRooms() }
+        if reviewRoomsComplete && smartCity == nil { finishRooms() }
+    }
+
+    private var reviewRoomsComplete: Bool {
+        if let smartCity { return (0..<journey.trip.rooms).allSatisfy { journey.localJourneyRooms["\(smartCity):\($0)"] != nil } }
+        return journey.localRoomsComplete
     }
 
     private func finishRooms() {

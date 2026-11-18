@@ -47,6 +47,7 @@ struct BookingsHomeView: View {
 
     private var bookingTabContent: some View {
         VStack(spacing: 12) {
+            NavigationLink { SavedJourneysView() } label: { HStack { Image(systemName: "bookmark"); Text(IumrahFlightCopy.text(settings.language,"Сохранённые путешествия","Saved journeys","Saqlangan safarlar","Сақланган сафарлар")); Spacer(); Image(systemName:"chevron.right") }.font(.subheadline.weight(.semibold)).padding(14) }.buttonStyle(.plain)
             if let activeSession { AnyView(activeBookingHub(activeSession)) }
             else { AnyView(emptyBookingHome) }
         }

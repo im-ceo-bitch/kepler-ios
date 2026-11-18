@@ -411,6 +411,9 @@ struct PackageQuote: Hashable, Codable {
     let stayPlan: PackageStayPlan?
     var bookingAllowed: Bool? = nil
     var resolvedTier: String? = nil
+    var tripSummary: TripSummaryPublicPrice? = nil
+    var roomPolicy: TripSummaryRoomPolicy? = nil
+    var itineraryPreview: [PackageItineraryPreviewItem]? = nil
     init(
         totalPackagePrice: Decimal,
         pricePerPerson: Decimal,
@@ -435,4 +438,44 @@ private extension String {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
+}
+
+struct TripSummaryPublicPrice: Codable, Hashable {
+    struct Component: Codable, Hashable, Identifiable {
+        var id: String { code }
+        let code: String
+        let label: String
+        let amountUsd: Decimal
+        let cancellationPolicy: String?
+    }
+    let version: String
+    let currency: String
+    let components: [Component]
+    let servicesSubtotalUsd: Decimal
+    let supportRate: Decimal
+    let supportAmountUsd: Decimal
+    let paymentRate: Decimal
+    let paymentAmountUsd: Decimal
+    let roundingUsd: Decimal
+    let totalUsd: Decimal
+    let perPilgrimUsd: Decimal
+}
+
+
+struct TripSummaryRoomPolicy: Codable, Hashable {
+    let minimumRooms: Int
+    let requiresAdultException: Bool
+}
+
+// Quote preview carries no booking identity or private supplier costs.
+struct PackageItineraryPreviewItem: Codable, Hashable {
+    let id: String
+    let dateLocal: String
+    let title: String
+    let subtitle: String
+    let icon: String
+    let location: String
+    let timeLocal: String?
+    let endTimeLocal: String?
+    let kind: String?
 }

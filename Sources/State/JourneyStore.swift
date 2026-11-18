@@ -95,6 +95,9 @@ final class JourneyStore: ObservableObject {
     // Hotel/meal changes can overlap server requests. Only the most recent
     // configuration may publish its total into the generator.
     private var packageQuoteRevision: UInt64 = 0
+    private var quoteTask: Task<Void, Never>?
+    private var quoteTaskKey: String?
+    private var quoteRequestGeneration = UUID()
     private var hotelPricePrefetchTask: Task<Void, Never>?
     private var hotelPricePrefetchGeneration = UUID()
     private var inboundFlightPrefetchTask: Task<Void, Never>?
@@ -1130,22 +1133,25 @@ final class JourneyStore: ObservableObject {
         guard localRoomsComplete, let tier = localPackageTier else {
             quote = nil; errorMessage = "NUITEE_ROOM_SELECTION_INCOMPLETE"; return
         }
-        trip.packageTier = tier
+        if trip.packageTier != tier { trip.packageTier = tier }
         let identity = localBookingInputKey
+        let revision = packageQuoteRevision
         let requestedTrip = trip
         let selectedRooms = localBookingRooms
-        quote = nil
+        quote = nil; errorMessage = nil
         do {
             let pair: (outbound: FlightOffer, inbound: FlightOffer?)
             if let identity = mixedFlightIdentity {
-                guard localJourneyFlights.count == 2 else { throw LocalPricingError.invalidFlightFare }
+                let providerIDs = identity.dropFirst("mixed:".count).components(separatedBy: "~")
+                guard identity.hasPrefix("mixed:"), providerIDs.count == 2,
+                      providerIDs.allSatisfy({ !$0.isEmpty }), localJourneyFlights.count == 2 else { throw LocalPricingError.invalidFlightFare }
                 let offers = try localJourneyFlights.enumerated().map { index, flight -> FlightOffer in
                     guard let departure = aviasalesDate(flight.departureAt) else { throw LocalPricingError.invalidFlightFare }
                     return makeAviasalesFlightOffer(id: flight.id, direction: index == 0 ? .outbound : .inbound,
                         origin: flight.origin, destination: flight.destination, airlineCode: flight.airlineCode,
                         flightNumber: flight.flightNumber, departure: departure, durationMinutes: flight.durationMinutes,
                         stops: flight.stops, price: flight.displayedPrice ?? 0, currency: "USD", bookingURL: nil, providerID: identity,
-                        sourceLabel: identity.dropFirst("mixed:".count).components(separatedBy: "~")[index].hasPrefix("curated:") ? "iumrah Published" : "Aviasales Data")
+                        sourceLabel: providerIDs[index].hasPrefix("curated:") ? "iumrah Published" : "Aviasales Data")
                 }
                 pair = (offers[0], offers[1])
             } else if packageFlightPath == .aviasalesSelected {
@@ -1162,8 +1168,8 @@ final class JourneyStore: ObservableObject {
                 let resolved = try await CuratedFlightRecommendationService.shared.resolvePublishedSelection(trip: requestedTrip, selection: publishedFlightSelection)
                 pair = (resolved.outbound, resolved.inbound)
             }
-            guard localBookingInputKey == identity, !Task.isCancelled,
-                  let makkah = localJourneyRooms["makkah:0"], let inbound = pair.inbound else { return }
+            guard revision == packageQuoteRevision, localBookingInputKey == identity, !Task.isCancelled else { return }
+            guard let makkah = localJourneyRooms["makkah:0"], let inbound = pair.inbound else { throw LocalPricingError.invalidFlightFare }
             let madinah = localJourneyRooms["madinah:0"]
             let resolved = try await packageEngine.packageQuote(trip: requestedTrip, pricingOffer: inbound,
                 outboundOffer: pair.outbound, inboundOffer: inbound, makkahHotelID: makkah.hotel.id,
@@ -1171,20 +1177,40 @@ final class JourneyStore: ObservableObject {
                 includeHaramainTrain: haramainTrainSelected, transferVehicle: selectedTransferVehicle,
                 haramainFareClass: haramainFareClass, haramainTicketCount: haramainTicketCount,
                 nuiteeRooms: selectedRooms, packageApprovalHeaders: tripSummaryApprovalHeaders)
-            guard localBookingInputKey == identity, !Task.isCancelled else { return }
-            guard resolved.resolvedTier == tier.rawValue else { throw APIError.invalidResponse }
+            guard revision == packageQuoteRevision, localBookingInputKey == identity, !Task.isCancelled else { return }
+            guard resolved.resolvedTier == tier.rawValue else { throw APIError.server(409, "PACKAGE_TIER_MISMATCH") }
             selectedOutbound = pair.outbound; selectedInbound = inbound
             selectedHotel = makkah.bookingHotel; selectedRoom = makkah.bookingRoom
             selectedRoomCategory = nil; selectedMadinahRoomCategory = nil
             selectedMadinahHotel = madinah?.bookingHotel; selectedMadinahRoom = madinah?.bookingRoom
             quote = resolved; errorMessage = nil
         } catch {
-            guard localBookingInputKey == identity, !Task.isCancelled else { return }
+            guard revision == packageQuoteRevision, localBookingInputKey == identity, !Task.isCancelled else { return }
             quote = nil; errorMessage = error.localizedDescription
         }
     }
 
     func buildQuote(forceHotelRefresh: Bool = false) async {
+        // Transfer preview, confirmation and final review may request the same quote.
+        // Share a single request instead of repeatedly prebooking the same supplier offers.
+        if usesLocalJourney, let tier = localPackageTier, trip.packageTier != tier { trip.packageTier = tier }
+        let key = usesLocalJourney ? "local|" + localBookingInputKey + "|" + String(packageQuoteRevision) : "catalog|" + String(packageQuoteRevision) + "|" + String(trip.hashValue)
+        if quoteTaskKey == key, let task = quoteTask { await task.value; return }
+        quoteTask?.cancel()
+        let generation = UUID()
+        quoteRequestGeneration = generation
+        quoteTaskKey = key
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performQuote(forceHotelRefresh: forceHotelRefresh)
+        }
+        quoteTask = task
+        await task.value
+        if quoteRequestGeneration == generation { quoteTask = nil; quoteTaskKey = nil }
+    }
+
+    private func performQuote(forceHotelRefresh: Bool) async {
+        guard !Task.isCancelled else { return }
         if usesLocalJourney { await buildNuiteeJourneyQuote(); return }
         let revision = packageQuoteRevision
         let tripForQuote = trip
@@ -1251,7 +1277,7 @@ final class JourneyStore: ObservableObject {
             let vehicle = selectedTransferVehicle
             let fareClass = haramainFareClass
             let tickets = haramainTicketCount
-            guard revision == packageQuoteRevision, !Task.isCancelled else { return }
+            guard revision == packageQuoteRevision, trip == tripForQuote, !Task.isCancelled else { return }
             let resolved = try await packageEngine.packageQuote(
                 trip: tripForQuote,
                 pricingOffer: pricingOffer,
@@ -1266,13 +1292,13 @@ final class JourneyStore: ObservableObject {
                 haramainFareClass: fareClass,
                 haramainTicketCount: tickets
             )
-            guard revision == packageQuoteRevision, !Task.isCancelled else { return }
+            guard revision == packageQuoteRevision, trip == tripForQuote, !Task.isCancelled else { return }
             pricingMakkahRoomID = makkahRoom
             pricingMadinahRoomID = madinahRoom
             quote = resolved
             errorMessage = nil
         } catch {
-            guard revision == packageQuoteRevision, !Task.isCancelled else { return }
+            guard revision == packageQuoteRevision, trip == tripForQuote, !Task.isCancelled else { return }
             quote = nil
             errorMessage = error.localizedDescription
         }
@@ -1634,6 +1660,8 @@ final class JourneyStore: ObservableObject {
 
 @MainActor extension JourneyStore {
     func invalidateTripSummaryQuote() {
+        quoteTask?.cancel(); quoteTask = nil; quoteTaskKey = nil
+        quoteRequestGeneration = UUID()
         tripSummaryRevision &+= 1
         packageQuoteRevision &+= 1
         cachedLocalBookingInputKey = nil

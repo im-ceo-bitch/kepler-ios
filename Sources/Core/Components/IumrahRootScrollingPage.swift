@@ -21,6 +21,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
     private let headerHelp: Bool
     private let helpContext: String?
     private let fixedRefreshHeader: Bool
+    private let scrollingRefresh: Bool
 
     init(
         onRefresh: @escaping () async -> Void,
@@ -29,6 +30,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
         headerHelp: Bool = false,
         helpContext: String? = nil,
         fixedRefreshHeader: Bool = false,
+        scrollingRefresh: Bool = false,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Page
     ) {
@@ -36,6 +38,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
         self.headerHelp = headerHelp || helpContext != nil
         self.helpContext = helpContext
         self.fixedRefreshHeader = fixedRefreshHeader
+        self.scrollingRefresh = scrollingRefresh
         self.onRefresh = onRefresh
         self.searchCardOverlap = searchCardOverlap
         self.masthead = header()
@@ -83,7 +86,7 @@ struct IumrahRootScrollingPage<Header: View, Page: View>: View {
                     .environment(\.iumrahSearchPullActive, false)
             }
             .frame(maxWidth: .infinity, alignment: .top)
-            .background(IumrahNoVerticalBounce())
+            .background { if scrollingRefresh { IumrahNativePullRefresh(action: onRefresh) } else { IumrahNoVerticalBounce() } }
         }
         .ignoresSafeArea(.container, edges: extendsUnderStatusBar ? .top : [])
         .background(Color.iumrahPageBackground.ignoresSafeArea())

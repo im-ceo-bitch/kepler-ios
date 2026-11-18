@@ -3458,7 +3458,7 @@ struct PackageFlightLegDetailCard: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
-                            Text("\(day(leg.departureAt)) · \(clock(leg.departureAt))")
+                            Text("\(IumrahFlightClock.day(IumrahFlightClock.local(leg.departureAt, airport: leg.origin), locale: Locale(identifier: language.localeIdentifier))) · \(IumrahFlightClock.time(IumrahFlightClock.local(leg.departureAt, airport: leg.origin)))")
                                 .font(.caption.monospacedDigit().weight(.semibold))
                                 .foregroundStyle(.primary)
                         }

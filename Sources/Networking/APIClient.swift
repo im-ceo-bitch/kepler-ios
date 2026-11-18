@@ -15,8 +15,15 @@ enum APIError: LocalizedError {
             return "Сервер временно недоступен (\(code))."
         case .server(_, let message):
             return message
-        case .decoding:
-            return "Не удалось прочитать данные сервера."
+        case .decoding(let error):
+            let path: [CodingKey]
+            switch error {
+            case DecodingError.keyNotFound(let key, let context): path = context.codingPath + [key]
+            case DecodingError.typeMismatch(_, let context), DecodingError.valueNotFound(_, let context), DecodingError.dataCorrupted(let context): path = context.codingPath
+            default: path = []
+            }
+            let field = path.map(\.stringValue).joined(separator: ".")
+            return field.isEmpty ? "Не удалось прочитать данные сервера (API_DECODE_ERROR)." : "Не удалось прочитать данные сервера (API_DECODE_ERROR: \(field))."
         case .missingBookingToken:
             return "Booking access token is missing."
         }

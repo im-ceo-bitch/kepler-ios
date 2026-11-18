@@ -21,7 +21,7 @@ checks={
  'isolated edit journey': 'let next = JourneyStore()' in store and 'next.localJourneyRooms = previous.localJourneyRooms' in store,
  'new price before replacing result': store.index('await next.buildQuote()',store.index('func applyEdit')) < store.index('result = next',store.index('func applyEdit')),
  'old rooms refreshed on changed dates': 'refreshPreviousRooms(old, window: window' in store and 'hotelsChangedWithFlights' in flow,
- 'transfer photos and capacity': 'Image(vehicle.assetName)' in flow and 'vehicle.passengerCapacity < candidate.trip.travelerCount' in flow,
+ 'transfer photos and capacity': 'TripSummaryVehicleOverview(vehicle: vehicle' in flow and 'Image(vehicle.assetName)' in (r/'Views/Package/TripSummarySupport.swift').read_text() and 'vehicle.passengerCapacity < candidate.trip.travelerCount' in flow,
  'passport-only booking views': 'passportOnly: true' in hub and 'passportOnly: true' in checkout and 'if !passportOnly { manualCard }' in passport,
  'passport upload verifies identity and response': 'guard hasVerifiedAccess, let token = account.bearerToken' in passport and 'guard response.ok else' in service,
  'passport progress uses uploads': 'value.travelers.filter(\\.hasPassport).count' in checkout,

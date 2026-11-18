@@ -123,6 +123,7 @@ struct IumrahManualPackageView: View {
     @State private var showFinal = false
     @State private var expanded = false
     @State private var retry = 0
+    @State private var estimateError: String?
     private func t(_ ru: String,_ en: String,_ uz: String,_ cy: String) -> String { IumrahFlightCopy.text(settings.language, ru, en, uz, cy) }
     private var currentQuote: PackageQuote? { pricedKey == manual.revisionKey && pricedJourney?.hasFinalGeneratorQuote == true ? pricedJourney?.quote : nil }
     private var currentEstimate: IumrahManualEstimate? { estimateKey == manual.revisionKey ? estimate : nil }
@@ -199,6 +200,10 @@ struct IumrahManualPackageView: View {
                 Text(t("Проверьте даты, тарифы и доступность компонентов.", "Check dates, rates and availability.", "Sanalar, tariflar va mavjudlikni tekshiring.", "Саналар, тарифлар ва мавжудликни текширинг.")).font(.footnote).foregroundStyle(.secondary)
                 Button(t("Повторить расчёт", "Retry quote", "Qayta hisoblash", "Қайта ҳисоблаш")) { retry += 1 }.tint(.primary)
             }
+            if let error = pricedJourney?.errorMessage ?? estimateError {
+                Text(ConfiguratorBookingCopy.message(error, language: settings.language)).font(.footnote).foregroundStyle(.secondary)
+                if currentEstimate != nil { Button(t("Повторить расчёт", "Retry quote", "Qayta hisoblash", "Қайта ҳисоблаш")) { retry += 1 }.tint(.primary) }
+            }
             if !manual.complete { Text(t("Для бронирования выберите все необходимые рейсы, отели и автомобиль.", "Select all required flights, hotels and a vehicle to book.", "Bron uchun barcha reyslar, mehmonxonalar va avtomobilni tanlang.", "Брон учун барча рейслар, меҳмонхоналар ва автомобилни танланг.")).font(.footnote).foregroundStyle(.secondary) }
             Button(t("Перейти к бронированию", "Continue to booking", "Bron qilishga o‘tish", "Брон қилишга ўтиш")) { if canBook { showFinal = true } }
                 .buttonStyle(IumrahPrimaryButtonStyle()).disabled(!canBook).opacity(canBook ? 1 : 0.4)
@@ -209,7 +214,7 @@ struct IumrahManualPackageView: View {
         let trace = IumrahPerformanceTrace.begin("Manual package quote")
         defer { IumrahPerformanceTrace.end("Manual package quote", trace) }
         let key = manual.revisionKey
-        pricedJourney = nil; pricedKey = nil; estimate = nil; estimateKey = nil; busy = false
+        pricedJourney = nil; pricedKey = nil; estimate = nil; estimateKey = nil; estimateError = nil; busy = false
         guard manual.hasPriceComponent else { return }
         busy = true
         defer { if key == manual.revisionKey && !Task.isCancelled { busy = false } }
@@ -225,7 +230,7 @@ struct IumrahManualPackageView: View {
             let value = try await RemotePackageEngineClient().manualEstimate(request)
             guard !Task.isCancelled, key == manual.revisionKey else { return }
             estimate = value; estimateKey = key
-        } catch { /* Never substitute an invented local price. */ }
+        } catch { if !Task.isCancelled, key == manual.revisionKey { estimateError = error.localizedDescription } }
     }
     private func flightCard(_ flight: LocalJourneyFlight?, title: String, direction: Int) -> some View {
         VStack(alignment: .leading, spacing: 15) {

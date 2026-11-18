@@ -141,14 +141,25 @@ struct RemotePackageEngineClient {
                 madinah: trip.scope == .makkahAndMadinah ? madinahHotelID.map { .init(hotelId: $0, roomId: madinahRoomID, nights: stay.madinahNights) } : nil
             )
         )
-        let response: ServerPackageQuoteEnvelope = try await (nuiteeRooms == nil ? api : APIClient.hotelPrices).post(
+        let response: ServerPackageQuoteEnvelope = try await APIClient.hotelPrices.post(
             "/api/package/quote",
             body: request,
             headers: packageApprovalHeaders,
-            timeoutInterval: nuiteeRooms == nil ? 15 : 604800
+            timeoutInterval: 604800
         )
         guard response.ok else { throw APIError.invalidResponse }
-        return response.quote.publicQuote
+        let quote = response.quote.publicQuote
+        guard quote.totalPackagePrice > 0, quote.pricePerPerson > 0,
+              quote.quoteId?.hasPrefix("server-") == true,
+              quote.quoteProof?.isEmpty == false, quote.currency == "USD" else {
+            throw APIError.server(502, "PACKAGE_QUOTE_INVALID")
+        }
+        // An older deployed worker can still return a total, but not the new retail
+        // breakdown. Keep the signed total visible; the review will offer a refresh.
+        if let price = quote.tripSummary, !price.reconciles(with: quote.totalPackagePrice) {
+            throw APIError.server(502, "PACKAGE_PRICE_BREAKDOWN_INVALID")
+        }
+        return quote
     }
 
     func commitPricingReport(bookingID: String, bookingToken: String, quoteProof: String) async throws {
@@ -195,6 +206,24 @@ private struct ServerPackageQuote: Decodable {
     let tripSummary: TripSummaryPublicPrice?
     let roomPolicy: TripSummaryRoomPolicy?
     let itineraryPreview: [PackageItineraryPreviewItem]?
+
+    private enum CodingKeys: String, CodingKey { case totalPackagePrice, pricePerPerson, currency, isEstimated, quoteId, quoteProof, stayPlan, bookingAllowed, resolvedTier, tripSummary, roomPolicy, itineraryPreview }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        totalPackagePrice = try c.decode(Decimal.self, forKey: .totalPackagePrice)
+        pricePerPerson = try c.decode(Decimal.self, forKey: .pricePerPerson)
+        currency = try c.decode(String.self, forKey: .currency)
+        isEstimated = try c.decode(Bool.self, forKey: .isEstimated)
+        quoteId = try c.decode(String.self, forKey: .quoteId)
+        quoteProof = try c.decode(String.self, forKey: .quoteProof)
+        stayPlan = try c.decodeIfPresent(PackageStayPlan.self, forKey: .stayPlan)
+        bookingAllowed = try c.decodeIfPresent(Bool.self, forKey: .bookingAllowed)
+        resolvedTier = try c.decodeIfPresent(String.self, forKey: .resolvedTier)
+        tripSummary = try c.decodeIfPresent(TripSummaryPublicPrice.self, forKey: .tripSummary)
+        roomPolicy = try c.decodeIfPresent(TripSummaryRoomPolicy.self, forKey: .roomPolicy)
+        // A malformed optional calendar must not discard a verified financial quote.
+        itineraryPreview = try? c.decodeIfPresent([PackageItineraryPreviewItem].self, forKey: .itineraryPreview)
+    }
 
     var publicQuote: PackageQuote {
         var result = PackageQuote(

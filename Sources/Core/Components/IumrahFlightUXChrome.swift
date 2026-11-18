@@ -144,6 +144,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
     @Environment(\.iumrahPullHandler) private var pullHandler
     @Environment(\.journeyTopInset) private var topInset
     var showsNotifications: Bool = false
+    let onBack: (() -> Void)?
     let pageBackground: Color
     let summary: Summary
     struct FlightHeading {
@@ -154,8 +155,9 @@ struct IumrahJourneyHeader<Summary: View>: View {
     let flightHeading: FlightHeading?
 
     init(showsNotifications: Bool = false, pageBackground: Color = .iumrahPageBackground,
-         flightHeading: FlightHeading? = nil, @ViewBuilder summary: () -> Summary) {
+         flightHeading: FlightHeading? = nil, onBack: (() -> Void)? = nil, @ViewBuilder summary: () -> Summary) {
         self.showsNotifications = showsNotifications
+        self.onBack = onBack
         self.pageBackground = pageBackground
         self.summary = summary()
         self.flightHeading = flightHeading
@@ -167,7 +169,7 @@ struct IumrahJourneyHeader<Summary: View>: View {
             HStack(spacing: 10) {
                 IumrahGlassIconButton(systemName: "chevron.backward", size: 48,
                     foreground: .white,
-                    accessibilityLabel: IumrahAccessibilityCopy.text(settings.language, ru: "Назад", en: "Back", uz: "Orqaga", cy: "Орқага", tr: "Geri", id: "Kembali")) { dismiss() }
+                    accessibilityLabel: IumrahAccessibilityCopy.text(settings.language, ru: "Назад", en: "Back", uz: "Orqaga", cy: "Орқага", tr: "Geri", id: "Kembali")) { if let onBack { onBack() } else { dismiss() } }
                     .environment(\.colorScheme, .dark)
                 Spacer(minLength: 0)
                 Image("HeaderWordmarkLight")

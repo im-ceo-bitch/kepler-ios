@@ -17,7 +17,10 @@ struct NuiteeHotel: Codable, Identifiable, Hashable {
     var minimumRate: NuiteeHotelMinimumRate?
     var rateStatus: String? = nil
 
-    var roundedStars: Int { max(0, min(5, Int(stars?.rounded() ?? 0))) }
+    var roundedStars: Int {
+        guard let stars, stars.isFinite, (0...5).contains(stars) else { return 0 }
+        return Int(stars.rounded())
+    }
     var imageURL: String? { coverImageURL }
 }
 
@@ -69,7 +72,7 @@ extension NuiteeHotelListEnvelope {
         guard result.total == nil, result.nextOffset == nil else { return result }
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let filtered = result.hotels.filter { hotel in
-            (stars == 0 || hotel.roundedStars == stars) &&
+            (stars == 0 || hotel.roundedStars == stars || hotel.roundedStars == 0) &&
             (favorites == nil || favorites?.contains(hotel.id) == true) &&
             (term.isEmpty || hotel.name.localizedCaseInsensitiveContains(term) || (hotel.address?.localizedCaseInsensitiveContains(term) ?? false))
         }

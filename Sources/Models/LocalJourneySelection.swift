@@ -40,6 +40,7 @@ struct LocalJourneyPriceLine: Identifiable {
 
 extension JourneyStore {
     var localRoomsComplete: Bool {
+        guard trip.rooms > 0, trip.rooms <= max(1, trip.adults) else { return false }
         let cities = trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"]
         return cities.allSatisfy { city in
             (0..<trip.rooms).allSatisfy { localJourneyRooms["\(city):\($0)"] != nil }
@@ -145,7 +146,11 @@ extension JourneyStore {
 enum ConfiguratorBookingCopy {
     static func message(_ code: String, language: AppSettingsStore.Language) -> String {
         let values: [String]
-        if code.contains("AVIASALES_IDENTITY_INVALID") || code.contains("AVIASALES_ROUTE_MISMATCH") || code.contains("MIXED_ROUTE_MISMATCH") || code.contains("MIXED_IDENTITY_INVALID") || code.contains("MIXED_REQUIRES_ONE_WAY_FARES") {
+        if code.contains("PACKAGE_PRICE_BREAKDOWN_MISSING") || code.contains("PACKAGE_PRICE_BREAKDOWN_INVALID") || code.contains("PACKAGE_PRICE_BREAKDOWN_UNAVAILABLE") {
+            values = ["Сервер не вернул полный расчёт стоимости. Обновите расчёт или обратитесь в поддержку (\(code)).", "The server did not return a complete price breakdown. Retry or contact support (\(code)).", "Server narx tafsilotlarini qaytarmadi. Qayta urinib ko‘ring (\(code)).", "Сервер нарх тафсилотларини қайтармади. Қайта уриниб кўринг (\(code))."]
+        } else if code.contains("CORE_CUTOVER_PENDING") || code.contains("QUOTE_SEAL_NOT_CONFIGURED") || code.contains("INVALID_PACKAGE_QUOTE_SEAL_KEY") {
+            values = ["Сервер расчёта пока не готов. Обратитесь в поддержку (\(code)).", "Pricing server is not ready. Contact support (\(code)).", "Narx serveri tayyor emas (\(code)).", "Нарх сервери тайёр эмас (\(code))."]
+        } else if code.contains("AVIASALES_IDENTITY_INVALID") || code.contains("AVIASALES_ROUTE_MISMATCH") || code.contains("MIXED_ROUTE_MISMATCH") || code.contains("MIXED_IDENTITY_INVALID") || code.contains("MIXED_REQUIRES_ONE_WAY_FARES") {
             values = ["Не удалось проверить выбранный маршрут на сервере. Выберите рейсы заново. Если ошибка повторится, обратитесь в поддержку.", "The server could not verify the selected route. Select the flights again. If this continues, contact support.", "Server tanlangan yo‘nalishni tekshira olmadi. Reyslarni qayta tanlang. Xato takrorlansa, yordam xizmatiga murojaat qiling.", "Сервер танланган йўналишни текшира олмади. Рейсларни қайта танланг. Хато такрорланса, ёрдам хизматига мурожаат қилинг."]
         } else if code.contains("AVIASALES_PARTY_FARE_UNAVAILABLE") {
             values = ["Для этого рейса API не подтвердил тарифы детей и младенцев. Выберите опубликованный рейс с тарифом для вашего состава поездки.", "The API has not confirmed child and infant fares for this flight. Choose a published flight priced for your party.", "API bu reys uchun bolalar va chaqaloqlar tariflarini tasdiqlamadi. Guruhingiz uchun tarifi bor e’lon qilingan reysni tanlang.", "API бу рейс учун болалар ва чақалоқлар тарифларини тасдиқламади. Гуруҳингиз учун тарифи бор эълон қилинган рейсни танланг."]

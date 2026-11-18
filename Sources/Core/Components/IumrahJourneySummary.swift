@@ -22,7 +22,7 @@ struct IumrahJourneyDisclosureCard<Details: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.easeInOut(duration: 0.24)) { expanded.toggle() }
+                withAnimation(.easeInOut(duration: 0.22)) { expanded.toggle() }
                 IumrahHaptics.selection()
             } label: {
                 VStack(alignment: .leading, spacing: 8) {
@@ -47,13 +47,15 @@ struct IumrahJourneyDisclosureCard<Details: View>: View {
             .accessibilityValue(expanded ? Text("Expanded") : Text("Collapsed"))
             if expanded {
                 Divider().padding(.vertical, 7)
-                IumrahCompactSearchFields { details }
+                details
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(IumrahAnimatedSearchBorder())
+        .modifier(IumrahAnimatedSearchBorder(animate: false))
         .onChange(of: pulling) { _, active in if active { expanded = false } }
     }
 }

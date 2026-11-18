@@ -459,6 +459,21 @@ struct TripSummaryPublicPrice: Codable, Hashable {
     let roundingUsd: Decimal
     let totalUsd: Decimal
     let perPilgrimUsd: Decimal
+
+    func reconciles(with total: Decimal) -> Bool {
+        func cents(_ value: Decimal) -> Decimal {
+            var scaled = value * 100, rounded = Decimal.zero
+            NSDecimalRound(&rounded, &scaled, 0, .plain)
+            return rounded
+        }
+        guard version == "trip-summary-v2", currency == "USD", supportRate == Decimal(string: "0.09"), paymentRate == Decimal(string: "0.02"),
+              !components.isEmpty, Set(components.map(\.code)).count == components.count,
+              components.allSatisfy({ $0.amountUsd >= 0 }) else { return false }
+        return cents(totalUsd) == cents(total) &&
+            components.reduce(Decimal.zero) { $0 + cents($1.amountUsd) } == cents(servicesSubtotalUsd) &&
+            cents(servicesSubtotalUsd) + cents(supportAmountUsd) + cents(paymentAmountUsd) + cents(roundingUsd) == cents(totalUsd) &&
+            cents(servicesSubtotalUsd * supportRate) == cents(supportAmountUsd) && cents(totalUsd * paymentRate) == cents(paymentAmountUsd)
+    }
 }
 
 

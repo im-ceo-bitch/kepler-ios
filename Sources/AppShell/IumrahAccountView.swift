@@ -114,7 +114,7 @@ struct IumrahAccountView: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, helpContext: account.account == nil ? "account.guest" : "account.signed_in", fixedRefreshHeader: true, header: {
+            IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, helpContext: account.account == nil ? "account.guest" : "account.signed_in", fixedRefreshHeader: false, scrollingRefresh: true, header: {
                 accountHeader
             }, content: {
                 LazyVStack(spacing: 20) {

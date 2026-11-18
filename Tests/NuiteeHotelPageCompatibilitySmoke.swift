@@ -26,6 +26,9 @@ import Foundation
         precondition(page(3, 99).hotels.isEmpty && page(3, 99).nextOffset == nil)
         let modern = NuiteeHotelListEnvelope.normalizedPage(first, stars: 4, offset: 10, pageSize: 1, query: "other", favorites: [])
         precondition(modern.hotels.map(\.id) == ["a", "c"] && modern.total == 3 && modern.nextOffset == 2)
+        let unknown = NuiteeHotel(id: "unknown", name: "Unrated", city: "madinah", address: nil, stars: nil, rating: nil, reviewCount: nil, coverImageURL: nil, previewImages: nil, latitude: nil, longitude: nil, minimumRate: nil)
+        let unrated = NuiteeHotelListEnvelope(ok: true, sandbox: false, city: "madinah", checkin: "2026-11-25", checkout: "2026-11-28", adults: 2, hotelCatalogStale: false, pricesStale: false, pricesUpdatedAt: nil, rateError: nil, hotels: [unknown])
+        for stars in 1...5 { precondition(NuiteeHotelListEnvelope.normalizedPage(unrated, stars: stars, offset: 0, pageSize: 12, query: "", favorites: nil).hotels.map(\.id) == ["unknown"]) }
         // Official and manual share 12-item pages, deduplication and cursor handling.
         let many = (0..<35).map { index in
             NuiteeHotel(id: "h\(index)", name: "Hotel \(index)", city: "makkah", address: nil, stars: 3, rating: nil, reviewCount: nil, coverImageURL: nil, previewImages: nil, latitude: nil, longitude: nil, minimumRate: nil)

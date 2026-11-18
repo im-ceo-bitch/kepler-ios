@@ -14,7 +14,7 @@ private actor NuiteeLegacyPageCache {
 }
 
 struct NuiteeHotelService {
-    private let legacyPages = NuiteeLegacyPageCache()
+    private static let legacyPages = NuiteeLegacyPageCache()
     private let api = APIClient.shared
 
     private static func dateText(_ date: Date) -> String {
@@ -28,7 +28,7 @@ struct NuiteeHotelService {
     }
 
     private func listKey(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool) -> String {
-        "\(city.lowercased())-\(Self.dateText(checkin))-\(Self.dateText(checkout))-\(adults)-\(catalogOnly ? "catalog" : "rates")"
+        catalogOnly ? "catalog-v2-\(city.lowercased())" : "\(city.lowercased())-\(Self.dateText(checkin))-\(Self.dateText(checkout))-\(adults)-rates"
     }
 
     func cachedHotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false) async -> NuiteeHotelListEnvelope? {
@@ -38,13 +38,13 @@ struct NuiteeHotelService {
     func hotels(city: String, checkin: Date, checkout: Date, adults: Int, catalogOnly: Bool = false, forceRefresh: Bool = false, smartTimeout: Bool = false) async throws -> NuiteeHotelListEnvelope {
         let key = listKey(city: city, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: catalogOnly)
         if !forceRefresh, let cached = await NuiteeDailyHotelCache.shared.read(key: key) { return cached }
-        let response: NuiteeHotelListEnvelope = try await (smartTimeout ? APIClient.shared : APIClient.hotelPrices).get("/api/package/nuitee/hotels", query: [
+        let response: NuiteeHotelListEnvelope = try await APIClient.hotelPrices.get("/api/package/nuitee/hotels", query: [
             URLQueryItem(name: "city", value: city),
             URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
             URLQueryItem(name: "checkout", value: Self.dateText(checkout)),
             URLQueryItem(name: "adults", value: String(adults)),
             URLQueryItem(name: "catalogOnly", value: catalogOnly ? "1" : "0")
-         ], timeoutInterval: smartTimeout ? 45 : 604800)
+         ], timeoutInterval: 604800)
         // Cache successful responses while preserving upstream staleness flags.
         // Provider failures are never saved as successful results.
         if response.ok && (catalogOnly || response.rateError == nil) {
@@ -66,15 +66,15 @@ struct NuiteeHotelService {
         var cacheKey = URLComponents()
         cacheKey.queryItems = params.filter { $0.name != "offset" && $0.name != "pageSize" }
         let key = cacheKey.percentEncodedQuery ?? ""
-        if offset == 0 { await legacyPages.remove(key) }
-        if offset > 0, let cached = await legacyPages.read(key) {
+        if offset == 0 { await Self.legacyPages.remove(key) }
+        if offset > 0, let cached = await Self.legacyPages.read(key) {
             return NuiteeHotelListEnvelope.normalizedPage(cached, stars: stars, offset: offset, pageSize: pageSize, query: query, favorites: favorites)
         }
         do {
-            let result: NuiteeHotelListEnvelope = try await api.get("/api/package/nuitee/hotels", query: params, timeoutInterval: 45)
+            let result: NuiteeHotelListEnvelope = try await APIClient.hotelPrices.get("/api/package/nuitee/hotels", query: params, timeoutInterval: 604800)
             guard result.ok else { throw APIError.invalidResponse }
             try Task.checkCancellation()
-            if result.total == nil && result.nextOffset == nil { await legacyPages.write(result, key: key) }
+            if result.total == nil && result.nextOffset == nil { await Self.legacyPages.write(result, key: key) }
             return NuiteeHotelListEnvelope.normalizedPage(result, stars: stars, offset: offset, pageSize: pageSize, query: query, favorites: favorites)
         } catch {
             try Task.checkCancellation()
@@ -90,6 +90,19 @@ struct NuiteeHotelService {
                 hotelCatalogStale: fallback.hotelCatalogStale, pricesStale: false, pricesUpdatedAt: nil,
                 rateError: "RATES_UNAVAILABLE", hotels: rows, total: fallback.total, nextOffset: fallback.nextOffset)
         }
+    }
+
+    struct PriceRow: Decodable { let id: String; let minimumRate: NuiteeHotelMinimumRate?; let rateStatus: String? }
+    struct PricePage: Decodable { let ok: Bool; let sandbox: Bool; let pricesStale: Bool; let rateError: String?; let hotels: [PriceRow] }
+    func pricePage(city: String, checkin: Date, checkout: Date, adults: Int, hotelIDs: [String]) async throws -> PricePage {
+        let response: PricePage = try await APIClient.hotelPrices.get("/api/package/nuitee/hotels", query: [
+            URLQueryItem(name: "city", value: city), URLQueryItem(name: "checkin", value: Self.dateText(checkin)),
+            URLQueryItem(name: "checkout", value: Self.dateText(checkout)), URLQueryItem(name: "adults", value: String(adults)),
+            URLQueryItem(name: "hotelIds", value: hotelIDs.sorted().joined(separator: ",")),
+            URLQueryItem(name: "pageSize", value: String(max(1, hotelIDs.count))), URLQueryItem(name: "ratesOnly", value: "1")
+        ], timeoutInterval: 604800)
+        guard response.ok else { throw APIError.invalidResponse }
+        return response
     }
 
     func detail(hotelID: String, language: String = "en") async throws -> NuiteeHotelDetail {
@@ -116,9 +129,9 @@ struct NuiteeHotelService {
             let children: [Int]
             let language: String
         }
-        return try await (smartTimeout ? APIClient.shared : APIClient.hotelPrices).post("/api/package/nuitee/rates", body: Request(
+        return try await APIClient.hotelPrices.post("/api/package/nuitee/rates", body: Request(
             hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges, language: language
-        ), timeoutInterval: smartTimeout ? 35 : 604800)
+        ), timeoutInterval: 604800)
     }
 
     static func deadlineText(_ value: String, locale: String) -> String {

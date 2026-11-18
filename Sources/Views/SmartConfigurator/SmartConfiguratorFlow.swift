@@ -10,6 +10,9 @@ struct SmartConfiguratorFlow: View {
     @State private var step: Step = .welcome
     @State private var airportPicker = false
     @State private var showReview = false
+    @State private var reviewJourney: JourneyStore?
+    @EnvironmentObject private var bookings: BookingStore
+    @EnvironmentObject private var chrome: AppChromeStore
     @State private var runID = 0
     @State private var showEditor = false
     @State private var editJourney: JourneyStore?
@@ -46,7 +49,7 @@ struct SmartConfiguratorFlow: View {
         switch step {
         case .origin: return !["JED", "MED"].contains(store.preferences.origin) && store.preferences.origin.count == 3
         case .party: return store.preferences.childAges.allSatisfy { (0..<12).contains($0) } && store.preferences.infants <= store.preferences.adults && store.preferences.adults + store.preferences.childAges.count <= 6
-        case .assembly: return store.result != nil
+        case .assembly: return store.reviewReady
         default: return true
         }
     }
@@ -82,8 +85,8 @@ struct SmartConfiguratorFlow: View {
 
     var body: some View {
         Group {
-            if firstLaunch { NavigationStack { flowContent } }
-            else { flowContent }
+            if firstLaunch { NavigationStack { AnyView(activeContent) } }
+            else { AnyView(activeContent) }
         }
         .statusBarHidden(false)
         .environment(\.smartBookingDone, {
@@ -106,7 +109,9 @@ struct SmartConfiguratorFlow: View {
         .onChange(of: step) { _, _ in saveActivity() }
         .onChange(of: store.preferences) { _, _ in saveActivity() }
         .onChange(of: store.result != nil) { _, _ in saveActivity() }
-        .onChange(of: showReview) { _, presented in if !presented { store.syncReview() } }
+        .onChange(of: store.reviewReady) { _, ready in
+            if ready, step == .assembly, !showReview { openReview() }
+        }
         .sheet(isPresented: $airportPicker) {
             AirportPickerView(selection: $store.preferences.airport, fallbackCode: $store.preferences.origin)
                 .environmentObject(settings)
@@ -126,14 +131,28 @@ struct SmartConfiguratorFlow: View {
             await store.assemble()
         }
     }
+    private var activeContent: AnyView {
+        if showReview, let journey = reviewJourney {
+            return AnyView(FinalPackageView(onBack: {
+                showReview = false; reviewJourney = nil; store.syncReview(); previous()
+            }).environmentObject(journey).environmentObject(settings).environmentObject(bookings)
+                .environmentObject(chrome).environmentObject(account))
+        }
+        return AnyView(flowContent)
+    }
+    private func openReview() {
+        guard store.reviewReady, let journey = store.result else { return }
+        // Retain the same store, never push a second instance of the final screen.
+        reviewJourney = journey; showReview = true
+    }
     private var flowContent: some View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
                 topBar
                 ScrollViewReader { scroll in
                     ScrollView(showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: 16) {
-                            orbitHeader(width: proxy.size.width, height: proxy.size.height)
+                        LazyVStack(alignment: .leading, spacing: 16) {
+                            AnyView(step == .assembly ? AnyView(assemblyHeader) : AnyView(orbitHeader(width: proxy.size.width, height: proxy.size.height)))
                                 .id("smart-top")
                             stepContent
                         }
@@ -168,9 +187,7 @@ struct SmartConfiguratorFlow: View {
                 }.environmentObject(candidate)
             }
         }
-        .navigationDestination(isPresented: $showReview) {
-            if let journey = store.result { FinalPackageView().environmentObject(journey) }
-        }
+
     }
     private var topBar: some View {
         HStack(spacing: 12) {
@@ -237,6 +254,14 @@ struct SmartConfiguratorFlow: View {
         }
     }
 
+    private var assemblyHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.system(.title2, design: .rounded).weight(.bold))
+            Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+            if store.busy { ProgressView(value: Double(store.progress.rawValue), total: Double(SmartConfiguratorStore.Progress.ready.rawValue)).tint(.primary) }
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(.white)
+            .background(Color.black, in: RoundedRectangle(cornerRadius: 24))
+    }
     private func orbitHeader(width: CGFloat, height: CGFloat) -> some View {
         // Diameter is constrained by BOTH dimensions; the ring never consumes half a phone.
         let side = min(148, max(76, height * 0.22), max(76, width * 0.36))
@@ -258,22 +283,22 @@ struct SmartConfiguratorFlow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
-    @ViewBuilder private var stepContent: some View {
+    private var stepContent: AnyView {
         switch step {
         case .welcome:
-            VStack(alignment: .leading, spacing: 16) {
+            return AnyView(VStack(alignment: .leading, spacing: 16) {
                 welcomeFeature("airplane", t("Рейсы по вашим датам", "Flights for your dates", "Sanangizga mos reyslar", "Санангизга мос рейслар"))
                 welcomeFeature("building.2.fill", t("Отели с доступными номерами", "Hotels with available rooms", "Bo‘sh xonali mehmonxonalar", "Бўш хонали меҳмонхоналар"))
                 welcomeFeature("checkmark.seal", t("Один пакет и единая стоимость", "One package, one total", "Bitta paket va umumiy narx", "Битта пакет ва умумий нарх"))
-            }.padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
-        case .origin: originContent
-        case .month: monthContent
-        case .duration: durationContent
-        case .route: routeContent
-        case .firstCity: firstCityContent
-        case .party: partyContent
-        case .category: categoryContent
-        case .assembly: assemblyContent
+            }.padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24)))
+        case .origin: return AnyView(originContent)
+        case .month: return AnyView(monthContent)
+        case .duration: return AnyView(durationContent)
+        case .route: return AnyView(routeContent)
+        case .firstCity: return AnyView(firstCityContent)
+        case .party: return AnyView(partyContent)
+        case .category: return AnyView(categoryContent)
+        case .assembly: return AnyView(assemblyContent)
         }
     }
     private var originContent: some View {
@@ -419,9 +444,8 @@ struct SmartConfiguratorFlow: View {
                     .font(.subheadline).foregroundStyle(.secondary).padding(12)
             }
             progressRow(.hotels, title: t("Отели и номера", "Hotels and rooms", "Mehmonxonalar va xonalar", "Меҳмонхоналар ва хоналар"), symbol: "building.2.fill")
-            ForEach(store.roomPreview) { room in
-                hotelCard(room)
-                    .transition(.opacity.combined(with: .offset(y: reduceMotion ? 0 : 12)))
+            ForEach(store.roomCities, id: \.self) { city in
+                AnyView(hotelGroup(city))
             }
             if let city = store.hotelSearchCity, store.busy {
                 Label(t("Подбираем варианты проживания", "Finding stay options", "Yashash variantlarini tanlaymiz", "Яшаш вариантларини танлаймиз") + " · " + cityTitle(city), systemImage: "magnifyingglass")
@@ -463,14 +487,13 @@ struct SmartConfiguratorFlow: View {
                     } else if error.contains("SMART_AVIASALES_PARTY_FARE_UNAVAILABLE") {
                         Text(t("Не удалось подтвердить тарифы для всей семьи. Попробуйте другой месяц или длительность.", "We could not verify fares for the whole family. Try another month or duration.", "Oilaviy safar uchun tariflarni tasdiqlab bo‘lmadi. Boshqa oy yoki muddatni tanlang.", "Оилавий сафар учун тарифларни тасдиқлаб бўлмади. Бошқа ой ёки муддатни танланг.")).font(.subheadline).foregroundStyle(.secondary)
                     } else {
-                    Text(errorText(error)).font(.subheadline).foregroundStyle(.secondary)
+                    Text(ConfiguratorBookingCopy.message(error, language: settings.language)).font(.subheadline).foregroundStyle(.secondary)
                     }
+                    Button(t("Повторить расчёт", "Retry pricing", "Qayta hisoblash", "Қайта ҳисоблаш")) { runID += 1 }.buttonStyle(.borderedProminent).tint(.primary)
                     Button(t("Изменить параметры", "Edit preferences", "Parametrlarni o‘zgartirish", "Параметрларни ўзгартириш")) { move(.month); store.clear() }.buttonStyle(.bordered).tint(.primary)
                 }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
             }
-        }.animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: store.progress)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: store.roomPreview.map(\.id))
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: store.flightPreview.map(\.id))
+        }
     }
     private func welcomeFeature(_ symbol: String, _ title: String) -> some View {
         HStack(spacing: 12) { glassIcon(symbol, size: 44); Text(title).font(.subheadline.weight(.medium)); Spacer(minLength: 0) }
@@ -479,70 +502,22 @@ struct SmartConfiguratorFlow: View {
         city == "madinah" ? t("Медина", "Madinah", "Madina", "Мадина") : t("Мекка", "Makkah", "Makka", "Макка")
     }
     private func flightCard(_ flight: FlightOffer) -> some View {
-        let formatter = ISO8601DateFormatter()
-        let leg = StorefrontFlightLeg(airline: flight.airlinesSummary, flightNumber: flight.flightNumbersSummary,
-            airlineCode: flight.primaryAirlineCode ?? "", origin: flight.origin, destination: flight.destination,
-            departureAt: formatter.string(from: flight.departureAt), arrivalAt: formatter.string(from: flight.arrivalAt),
-            durationMinutes: flight.durationMinutes, stops: flight.stops,
-            cabinClass: flight.cabinClass ?? FlightSearchFilters.default.cabinClass.rawValue)
-        return VStack(alignment: .leading, spacing: 8) {
-            PackageFlightLegDetailCard(leg: leg, direction: flight.direction == .outbound ? t("Туда", "Outbound", "Borish", "Бориш") : t("Обратно", "Return", "Qaytish", "Қайтиш"), language: settings.language)
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(t("Вылет", "Departure", "Uchish", "Учиш")).foregroundStyle(.secondary)
-                    Text(localFlightTime(flight.departureAt, airport: flight.origin)).fontWeight(.semibold)
-                }
-                Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(t("Прилёт", "Arrival", "Kelish", "Келиш")).foregroundStyle(.secondary)
-                    Text(localFlightTime(flight.arrivalAt, airport: flight.destination)).fontWeight(.semibold)
-                }
-            }.font(.caption).padding(.horizontal, 12)
-            IumrahPackageFlightPriceLine(offer: flight,
-                outbound: store.flightPreview.first { $0.direction == .outbound },
-                inbound: store.flightPreview.first { $0.direction == .inbound },
-                travelers: store.preferences.adults + store.preferences.childAges.count, language: settings.language)
-            if let baggage = flight.baggage {
-                HStack(spacing: 14) {
-                    if let checked = baggage.checked { Label("\(checked) kg", systemImage: "suitcase.rolling") }
-                    if let carry = baggage.carryOn { Label("\(carry) kg", systemImage: "bag") }
-                }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
-            }
+        TripSummaryFlightOverview(offer: flight,
+            outbound: store.flightPreview.first { $0.direction == .outbound },
+            inbound: store.flightPreview.first { $0.direction == .inbound },
+            travelers: store.preferences.adults + store.preferences.childAges.count, language: settings.language,
+            title: flight.direction == .outbound ? t("Рейс туда", "Outbound", "Borish reysi", "Бориш рейси") : t("Обратный рейс", "Return", "Qaytish reysi", "Қайтиш рейси"))
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
+    }
+    @ViewBuilder private func hotelGroup(_ city: String) -> some View {
+        let rooms = store.roomPreview.filter { $0.city == city }
+        if !rooms.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                TripSummaryHotelOverview(rooms: rooms, language: settings.language, confirmedTotal: store.hotelTotal(city: city))
+                if store.reviewReady { editButton(t("Изменить отель и номера", "Change hotel and rooms", "Mehmonxona va xonalarni o‘zgartirish", "Меҳмонхона ва хоналарни ўзгартириш"), kind: .hotel(city)) }
+            }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
         }
-    }
-    private func localFlightTime(_ date: Date, airport: String) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: settings.language.localeIdentifier)
-        f.timeZone = FlightReferenceCatalog.timeZone(for: airport) ?? TimeZone(secondsFromGMT: 0)
-        f.setLocalizedDateFormatFromTemplate("d MMM HH:mm")
-        return f.string(from: date)
-    }
-    private func hotelCard(_ room: LocalJourneyRoom) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 14) {
-                AsyncImage(url: room.hotel.coverImageURL.flatMap(URL.init(string:))) { image in image.resizable().scaledToFill() }
-                    placeholder: { Color.secondary.opacity(0.12).overlay { glassIcon("building.2", size: 44) } }
-                    .frame(width: 108, height: 118).clipShape(RoundedRectangle(cornerRadius: 17))
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(cityTitle(room.city)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    Text(room.hotel.name).font(.headline).fixedSize(horizontal: false, vertical: true)
-                    Text(String(repeating: "★", count: room.hotel.roundedStars)).font(.caption)
-                    Text(IumrahHotelRoomTitle.display(rate: room.rate.roomName, fallback: IumrahFlightCopy.text(settings.language, "Номер", "Room", "Xona", "Хона"))).font(.subheadline).fixedSize(horizontal: false, vertical: true)
-                    Label("\(room.adults + room.childrenAges.count)", systemImage: "person.2").font(.caption).foregroundStyle(.secondary)
-                    if !room.rate.mealPlan.isEmpty { Text(room.rate.mealPlan).font(.caption).foregroundStyle(.secondary) }
-                }
-                Spacer(minLength: 0)
-            }
-            Label(room.checkin.formatted(date: .abbreviated, time: .omitted) + " – " + room.checkout.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
-                .font(.subheadline).foregroundStyle(.secondary)
-            if let nightly = IumrahPackageDisplayPrices.nightly(room) {
-                IumrahPackageUnitPriceLine(amount: nightly, currency: room.rate.currency,
-                    caption: t("Ориентировочно за номер / ночь", "Estimated per room / night", "Xona / tun uchun taxminan", "Хона / тун учун тахминан"), language: settings.language)
-            }
-            if store.result != nil && room.id.hasSuffix(":0") {
-                editButton(t("Изменить отель и номер", "Change hotel and room", "Mehmonxona va xonani o‘zgartirish", "Меҳмонхона ва хонани ўзгартириш"), kind: .hotel(room.city))
-            }
-        }.padding(16).frame(maxWidth: .infinity, alignment: .leading).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
     }
     private func openEditor(_ kind: SmartConfiguratorStore.EditKind) {
         guard pendingEdit == nil, let candidate = store.makeEditJourney() else { return }
@@ -568,16 +543,8 @@ struct SmartConfiguratorFlow: View {
     }
 
     private func transferCard(_ vehicle: TransferVehicleKind) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(vehicle.assetName).resizable().scaledToFit()
-                .frame(maxWidth: .infinity).frame(height: 124)
-                .accessibilityLabel(vehicle.modelName)
-            Text(vehicle.modelName).font(.headline)
-            HStack(spacing: 18) {
-                Label("\(vehicle.passengerCapacity)", systemImage: "person.2.fill")
-                Label("\(vehicle.luggageCapacity)", systemImage: "suitcase.rolling")
-            }.font(.subheadline).foregroundStyle(.secondary)
-        }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        TripSummaryVehicleOverview(vehicle: vehicle, language: settings.language)
+            .padding(16).frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
     }
 
@@ -650,14 +617,14 @@ struct SmartConfiguratorFlow: View {
         case .category: return t("Собрать мою Умру", "Build my Umrah", "Umramni tayyorlash", "Умрамни тайёрлаш")
         case .assembly:
             if store.busy || store.replacingCity != nil || pendingEdit != nil { return t("Собираем поездку…", "Building your trip…", "Safarni tayyorlayapmiz…", "Сафарни тайёрлаяпмиз…") }
-            if store.result != nil { return t("Посмотреть пакет", "Review package", "Paketni ko‘rish", "Пакетни кўриш") }
+            if store.reviewReady { return t("Посмотреть пакет", "Review package", "Paketni ko‘rish", "Пакетни кўриш") }
             return t("Повторить поиск", "Retry search", "Qayta qidirish", "Қайта қидириш")
         default: return t("Продолжить", "Continue", "Davom etish", "Давом этиш")
         }
     }
     private var footer: some View {
         VStack(spacing: 12) {
-            if step == .assembly, let journey = store.result, journey.hasFinalGeneratorQuote, let quote = journey.quote {
+            if step == .assembly, store.reviewReady, let journey = store.result, let quote = journey.quote {
                 HStack {
                     Text(t("Предварительно за всех", "Estimated total", "Taxminiy jami", "Тахминий жами")).font(.caption).foregroundStyle(.secondary)
                     Spacer()
@@ -671,7 +638,10 @@ struct SmartConfiguratorFlow: View {
             }
             stepProgress
             Button {
-                if step == .assembly { if store.result != nil { showReview = true } else if !store.busy { runID += 1 } }
+                if step == .assembly {
+                    if store.reviewReady { openReview() }
+                    else if !store.busy { store.clear(); runID += 1 }
+                }
                 else { next() }
             } label: {
                 Text(footerTitle)

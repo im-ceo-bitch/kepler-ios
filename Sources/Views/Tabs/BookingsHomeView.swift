@@ -53,7 +53,7 @@ struct BookingsHomeView: View {
         }
     }
     private var bookingScrollRoot: AnyView {
-        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : bookingPanel == .package ? "bookings.active" : "bookings.schedule", fixedRefreshHeader: true, header: {
+        AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : bookingPanel == .package ? "bookings.active" : "bookings.schedule", fixedRefreshHeader: false, scrollingRefresh: true, header: {
             AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
         }, content: { AnyView(bookingTabContent) })
         .modifier(IumrahPrimaryTabScrollChrome()))

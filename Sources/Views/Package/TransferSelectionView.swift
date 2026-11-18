@@ -68,10 +68,10 @@ struct TransferSelectionView: View {
         .modifier(IumrahTransferNavigationChrome(embedded: manualConfirm != nil))
         .background { if manualConfirm == nil { transferPageBackground } }
         .navigationDestination(isPresented: $showHotelsAfterTransfer) {
-            NuiteeJourneyHotelsView(transferAlreadySelected: true)
+            AnyView(NuiteeJourneyHotelsView(transferAlreadySelected: true))
         }
         .navigationDestination(isPresented: $showFinalPackage) {
-            FinalPackageView(familyFlow: familyFlow)
+            AnyView(FinalPackageView(familyFlow: familyFlow))
         }
         .alert(errorTitle, isPresented: Binding(
             get: { confirmationError != nil },

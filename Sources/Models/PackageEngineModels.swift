@@ -14,6 +14,8 @@ struct PackageEngineHealthResponse: Decodable {
     let roomCategoriesReady: Bool?
     let roomCategoryCount: Int?
     let bookingRoomColumnsReady: Bool?
+    let pricingContract: String?
+    let quoteSealingMode: String?
 }
 
 struct PrimaryHotelResolutionResponse: Decodable, Hashable {

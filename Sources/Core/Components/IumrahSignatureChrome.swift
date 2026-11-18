@@ -288,7 +288,7 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                withAnimation(.easeInOut(duration: 0.22)) {
                     isExpanded.toggle()
                 }
                 IumrahHaptics.selection()
@@ -319,15 +319,16 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
 
             if isExpanded {
                 Rectangle().fill(Color.black.opacity(0.12)).frame(height: 1)
-                IumrahCompactSearchFields { content }
+                content
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity)
             }
         }
         .frame(minHeight: 62)
-        .modifier(IumrahAnimatedSearchBorder())
-        .animation(.easeInOut(duration: 0.20), value: isExpanded)
+        .modifier(IumrahAnimatedSearchBorder(animate: false))
         .onChange(of: pulling || refreshing) { _, active in
             if active { isExpanded = false }
         }
@@ -370,16 +371,21 @@ struct IumrahAnimatedSearchBorder: ViewModifier {
     var radius: CGFloat = 34
     var guidance: Bool = false
     var greenAccent: Bool = false
+    var animate: Bool = true
     func body(content: Content) -> some View {
         content
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
-                IumrahDecorativeTimeline(maxFPS: 24, staticWhenConstrained: true) { date in
+                if animate { IumrahDecorativeTimeline(maxFPS: 24, staticWhenConstrained: true) { date in
                     let rotation = reduceMotion ? 0 : date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * 72
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .strokeBorder(AngularGradient(colors: greenAccent ? [Color(red: 0.08, green: 0.55, blue: 0.30), Color(red: 0.40, green: 0.88, blue: 0.55), .white, Color(red: 0.14, green: 0.65, blue: 0.39), Color(red: 0.08, green: 0.55, blue: 0.30)] : guidance ? [Color(red: 0.96, green: 0.66, blue: 0.08), Color(red: 1, green: 0.83, blue: 0.33), .white, Color(red: 1, green: 0.92, blue: 0.65), Color(red: 0.96, green: 0.66, blue: 0.08)] : [.black, .black, .white, .gray, .black, .white, .black],
                             center: .center, startAngle: .degrees(rotation), endAngle: .degrees(rotation + 360)), lineWidth: 3)
+                        .allowsHitTesting(false)
+                } } else {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.20), lineWidth: 1)
                         .allowsHitTesting(false)
                 }
             }

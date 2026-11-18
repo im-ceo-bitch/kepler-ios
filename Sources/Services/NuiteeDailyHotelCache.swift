@@ -29,13 +29,18 @@ actor NuiteeDailyHotelCache {
         let safe = key.map { $0.isLetter || $0.isNumber || $0 == "-" ? $0 : "_" }
         return directory.appendingPathComponent(String(safe) + ".json")
     }
+    private func fresh(_ entry: Entry, key: String, now: Date) -> Bool {
+        if key.hasPrefix("catalog-v2-") { return now >= entry.savedAt && now.timeIntervalSince(entry.savedAt) < 86_400 }
+        if key.hasSuffix("-rates") { return now >= entry.savedAt && now.timeIntervalSince(entry.savedAt) < 900 }
+        return Self.isFresh(savedAt: entry.savedAt, now: now)
+    }
     func read(key: String, now: Date = Date()) -> NuiteeHotelListEnvelope? {
-        if let entry = hot[key], Self.isFresh(savedAt: entry.savedAt, now: now) {
+        if let entry = hot[key], fresh(entry, key: key, now: now) {
             remember(entry, key: key); return entry.response
         }
         hot.removeValue(forKey: key); order.removeAll { $0 == key }
         let url = file(key)
-        guard let data = try? Data(contentsOf: url), let entry = try? JSONDecoder().decode(Entry.self, from: data), Self.isFresh(savedAt: entry.savedAt, now: now) else {
+        guard let data = try? Data(contentsOf: url), let entry = try? JSONDecoder().decode(Entry.self, from: data), fresh(entry, key: key, now: now) else {
             try? FileManager.default.removeItem(at: url)
             return nil
         }
@@ -54,7 +59,7 @@ actor NuiteeDailyHotelCache {
             // Remove yesterday's records even for searches not revisited today.
             for url in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [] {
                 if let date = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
-                   (date < now && !Self.isFresh(savedAt: date, now: now)) { try? FileManager.default.removeItem(at: url) }
+                   (date < now && now.timeIntervalSince(date) >= 86_400) { try? FileManager.default.removeItem(at: url) }
             }
         } catch { /* Cache failures must never prevent search or booking. */ }
     }

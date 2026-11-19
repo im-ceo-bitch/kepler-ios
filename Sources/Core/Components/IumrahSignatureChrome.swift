@@ -328,7 +328,7 @@ struct IumrahGraphiteSearchSurface<Content: View>: View {
             }
         }
         .frame(minHeight: 62)
-        .modifier(IumrahAnimatedSearchBorder(animate: false))
+        .modifier(IumrahAnimatedSearchBorder(forceOnEfficiency: true))
         .onChange(of: pulling || refreshing) { _, active in
             if active { isExpanded = false }
         }
@@ -372,12 +372,13 @@ struct IumrahAnimatedSearchBorder: ViewModifier {
     var guidance: Bool = false
     var greenAccent: Bool = false
     var animate: Bool = true
+    var forceOnEfficiency = false
     func body(content: Content) -> some View {
         content
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
             .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .overlay {
-                if animate { IumrahDecorativeTimeline(maxFPS: 24, staticWhenConstrained: true) { date in
+                if animate { IumrahDecorativeTimeline(maxFPS: 24, staticWhenConstrained: !forceOnEfficiency) { date in
                     let rotation = reduceMotion ? 0 : date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5) * 72
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .strokeBorder(AngularGradient(colors: greenAccent ? [Color(red: 0.08, green: 0.55, blue: 0.30), Color(red: 0.40, green: 0.88, blue: 0.55), .white, Color(red: 0.14, green: 0.65, blue: 0.39), Color(red: 0.08, green: 0.55, blue: 0.30)] : guidance ? [Color(red: 0.96, green: 0.66, blue: 0.08), Color(red: 1, green: 0.83, blue: 0.33), .white, Color(red: 1, green: 0.92, blue: 0.65), Color(red: 0.96, green: 0.66, blue: 0.08)] : [.black, .black, .white, .gray, .black, .white, .black],

@@ -159,7 +159,7 @@ final class IumrahFlightBrowseModel: ObservableObject {
         var result: [LocalJourneyFlight] = same ? flights : []
         var failures = 0
         do {
-            let items = try await CuratedFlightRecommendationService.shared.load(trip: trip, from: tomorrow, days: 365)
+            let items = try await CuratedFlightRecommendationService.shared.load(trip: trip, from: Date(), days: 365, force: force)
             for item in items where item.cabinClass.lowercased().replacingOccurrences(of: " ", with: "_") == trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() {
                 for leg in [item.outbound, item.inbound].compactMap({ $0 }) where String(leg.departureAt.prefix(10)) >= day {
                     result.append(LocalJourneyFlight(id: "published:\(item.id):\(leg.origin):\(leg.departureAt)",

@@ -1356,6 +1356,7 @@ struct StorefrontUmrahPackageDetailView: View {
                     infoSheet = .trust
                 }
 
+                WhyIumrahCarousel(primaryTitle: bookTripTitle, onPrimary: { if canBook && !isSubmitting { isProfileSheetPresented = true } })
                 priceCard
 
                 if let bookingError {

@@ -113,7 +113,7 @@ struct IumrahHomeHotelSearchView: View {
                 .accessibilityIdentifier("iumrah.home.hotels.find")
                 .padding(12)
             }
-            .modifier(IumrahAnimatedSearchBorder())
+            .modifier(IumrahAnimatedSearchBorder(forceOnEfficiency: true))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

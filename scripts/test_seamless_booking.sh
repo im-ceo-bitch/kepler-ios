@@ -11,7 +11,8 @@ r=Path('Sources')
 shared=(r/'Views/Booking/IumrahBookingConfirmationView.swift').read_text()
 for p in ['Views/Package/FinalPackageView.swift','Views/Tabs/HotelStorefrontCompatibility.swift','Views/Booking/BookingCheckoutView.swift']:
  assert 'IumrahBookingConfirmationView(quote:' in (r/p).read_text(), p
-assert 'FinalPackageView().environmentObject(journey)' in (r/'Views/SmartConfigurator/SmartConfiguratorFlow.swift').read_text()
+smart=(r/'Views/SmartConfigurator/SmartConfiguratorFlow.swift').read_text()
+assert 'FinalPackageView(onBack:' in smart and '.environmentObject(journey)' in smart
 assert shared.index('attachVerifiedEmail(')<shared.index('exchangeProfile(')
 assert shared.index('linkBooking(bookingID:')<shared.index('acceptVerifiedSession(auth')
 assert 'if let savedBooking { committed = savedBooking }' in shared

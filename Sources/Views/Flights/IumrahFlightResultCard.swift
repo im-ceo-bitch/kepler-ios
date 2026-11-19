@@ -17,6 +17,7 @@ struct IumrahFlightResultCard: View {
     let isAviasales: Bool
     var isRoundTripFare = false
     var selected = false
+    var selectionAccent: Color = .primary
     var selectedSearchDay: String? = nil
     var onSelect: (() -> Void)? = nil
     let action: () -> Void
@@ -88,7 +89,7 @@ struct IumrahFlightResultCard: View {
             }
             .foregroundStyle(Color.primary).padding(16)
             .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(selected ? Color.primary : Color.primary.opacity(0.07), lineWidth: selected ? 1.5 : 0.75))
+            .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(selected ? selectionAccent : Color.primary.opacity(0.07), lineWidth: selected ? 1.5 : 0.75))
             .contentShape(RoundedRectangle(cornerRadius: 22))
         }.buttonStyle(.plain)
         .accessibilityHint(tr("Открыть рейс", "Open flight", "Reysni ochish", "Рейсни очиш"))
@@ -97,7 +98,7 @@ struct IumrahFlightResultCard: View {
                 Button(action: onSelect) {
                     Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(selected ? Color.primary : Color.secondary)
+                        .foregroundStyle(selected ? selectionAccent : Color.secondary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }

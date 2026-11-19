@@ -62,6 +62,9 @@ private struct CuratedPublishedFlightResolveResponse: Decodable {
 final class CuratedFlightRecommendationService {
     static let shared = CuratedFlightRecommendationService()
     private let api = APIClient.shared
+    private struct CatalogueCache { let rows: [CuratedFlightRecommendation]; let fetched: Date }
+    private var catalogueCache: [String: CatalogueCache] = [:]
+    private var catalogueRequests: [String: Task<[CuratedFlightRecommendation], Error>] = [:]
 
     private init() {}
 
@@ -69,7 +72,20 @@ final class CuratedFlightRecommendationService {
     /// airport. The service stays origin-wide so route changes do not require a
     /// different data contract; TripBuilder applies the pilgrim's exact JED/MED
     /// route criteria before any card is shown or selected.
-    func load(trip: TripDraft, from: Date = Date(), days: Int = 365) async throws -> [CuratedFlightRecommendation] {
+    func load(trip: TripDraft, from: Date = Date(), days: Int = 365, force: Bool = false) async throws -> [CuratedFlightRecommendation] {
+        let key = "\(trip.originCode.uppercased()):\(Self.requestDay(from)):\(max(1, min(days, 365)))"
+        if let running = catalogueRequests[key] { return try await running.value }
+        if !force, let cached = catalogueCache[key], Date().timeIntervalSince(cached.fetched) < 300 { return cached.rows }
+        let task = Task { @MainActor in try await self.loadUncached(trip: trip, from: from, days: days) }
+        catalogueRequests[key] = task
+        defer { catalogueRequests[key] = nil }
+        let result = try await task.value
+        catalogueCache = catalogueCache.filter { Date().timeIntervalSince($0.value.fetched) < 300 }
+        catalogueCache[key] = .init(rows: result, fetched: Date())
+        return result
+    }
+
+    private func loadUncached(trip: TripDraft, from: Date, days: Int) async throws -> [CuratedFlightRecommendation] {
         let calendar = Calendar(identifier: .gregorian)
         let start = calendar.startOfDay(for: from)
         let end = calendar.date(byAdding: .day, value: max(1, min(days, 365)), to: start) ?? start

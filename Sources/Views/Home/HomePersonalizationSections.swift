@@ -66,7 +66,7 @@ struct HomeRecentActivitySection: View {
         let data = activity
         if data.smart != nil || data.flightSearch != nil || !data.hotels.isEmpty || active != nil {
             VStack(alignment: .leading, spacing: 12) {
-                IumrahHomeSectionHeader(title: c.t("Продолжите с того места, где остановились", "Pick up where you left off", "To‘xtagan joyingizdan davom eting", "Тўхтаган жойингиздан давом этинг"))
+                IumrahHomeSectionHeader(title: c.t("Недавние действия", "Recent activity", "So‘nggi harakatlar", "Сўнгги ҳаракатлар"))
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 12) {
                         if let booking = active {

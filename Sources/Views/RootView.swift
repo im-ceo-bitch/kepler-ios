@@ -549,7 +549,7 @@ struct RootView: View {
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.985)))
             } else {
-                SmartConfiguratorFlow(firstLaunch: true) {
+                IumrahWelcomeOnboarding {
                     withAnimation(.easeInOut(duration: 0.34)) {
                         hasCompletedOnboarding = true
                     }

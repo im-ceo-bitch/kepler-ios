@@ -29,7 +29,7 @@ enum FlightReferenceCatalog { static func airlineName(code: String, fallback: St
 enum IumrahFlightDiscoveryStore { static let dayFormatter = DateFormatter(); static let monthFormatter = DateFormatter() }
 @MainActor final class CuratedFlightRecommendationService {
     static let shared = CuratedFlightRecommendationService()
-    func load(trip: TripDraft, from: Date, days: Int) async throws -> [CuratedFlightRecommendation] { [] }
+    func load(trip: TripDraft, from: Date, days: Int, force: Bool = false) async throws -> [CuratedFlightRecommendation] { [] }
 }
 struct AviasalesFlightDiscoveryService {
     func offers(origin: String, destination: String, departure: String, direct: Bool, limit: Int) async throws -> (offers: [FlightDiscoveryOffer], currency: String, generatedAt: String?) { ([], "USD", nil) }

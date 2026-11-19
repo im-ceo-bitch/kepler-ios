@@ -77,6 +77,7 @@ struct CareHomeView: View {
                     quickAnswers
                         .padding(.bottom, 14)
                 }
+                IumrahSloganCard().padding(.top, 20)
             }
             .padding(.horizontal, IumrahDesign.pagePadding)
             .padding(.top, 10)

@@ -155,6 +155,7 @@ struct IumrahAccountView: View {
                         IumrahBookingAccessCard(bookingID: nil)
                         guestSettingsSection
                     }
+                    IumrahSloganCard()
                 }
                 .padding(.horizontal, IumrahDesign.pagePadding)
                 .padding(.top, 12)

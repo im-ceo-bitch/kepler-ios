@@ -6,7 +6,8 @@ struct IumrahManualFlightDetail: View {
     @Environment(\.dismiss) private var dismiss
     let flight: LocalJourneyFlight
     var onConfirm: (() -> Bool)? = nil
-    private var selected: Bool { manual.outbound?.id == flight.id || manual.inbound?.id == flight.id }
+    var selectedOverride: Bool? = nil
+    private var selected: Bool { selectedOverride ?? (manual.outbound?.id == flight.id || manual.inbound?.id == flight.id) }
     private var leg: IumrahPremiumFlightLeg {
         .init(airline: flight.airline, airlineCode: flight.airlineCode, number: flight.flightNumber,
               origin: flight.origin, destination: flight.destination, departure: flight.departureAt,
@@ -18,7 +19,7 @@ struct IumrahManualFlightDetail: View {
                 IumrahPremiumFlightDetail(leg: leg, language: settings.language, pageHeroInset: 18, headerShareText: leg.share)
                 if let price = flight.displayedPrice, price > 0 {
                     Text(NuiteeHotelService.usd(price)).font(.title.bold())
-                    Text(t("Стоимость на человека", "Fare per person", "Bir kishi uchun narx", "Бир киши учун нарх")).foregroundStyle(.secondary)
+                    Text(flight.publishedIsPair == true ? t("Туда и обратно · на человека", "Round trip · per person", "Borish va qaytish · bir kishi uchun", "Бориш ва қайтиш · бир киши учун") : t("Стоимость на человека", "Fare per person", "Bir kishi uchun narx", "Бир киши учун нарх")).foregroundStyle(.secondary)
                 }
                 if flight.publishedIsPair == true {
                     Text(t("Этот рейс опубликован в паре. Выберите второй рейс из того же маршрута.", "This flight belongs to a published pair. Select its matching leg.", "Bu reys juft yo‘nalishda. Ikkinchi reysni shu yo‘nalishdan tanlang.", "Бу рейс жуфт йўналишда. Иккинчи рейсни шу йўналишдан танланг.")).font(.footnote).foregroundStyle(.secondary)

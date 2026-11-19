@@ -229,7 +229,7 @@ struct LegacyFinalPackageView: View {
         .tint(.black)
     }
     private enum ReviewSection: String, CaseIterable, Identifiable {
-        case guests, pricing, change, flights, hotels, services, support, breakdown, chart, itinerary, conditions, total, actions, error
+        case guests, pricing, change, flights, hotels, services, support, breakdown, chart, itinerary, conditions, why, total, actions, error
         var id: String { rawValue }
     }
     private var reviewSections: some View {
@@ -252,6 +252,7 @@ struct LegacyFinalPackageView: View {
         case .chart: return AnyView(chartCard)
         case .itinerary: return AnyView(itineraryCard)
         case .conditions: return AnyView(conditionsCard)
+        case .why: return AnyView(WhyIumrahCarousel(primaryTitle: copy("Забронировать путешествие", "Book journey", "Safarni bron qilish", "Сафарни брон қилиш"), onPrimary: { handleBookTap() }))
         case .total: return AnyView(summaryTotalCard)
         case .actions: return AnyView(summaryActions)
         case .error: return AnyView(Group { if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) } })

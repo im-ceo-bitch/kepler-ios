@@ -143,6 +143,16 @@ struct HotelsHomeView: View {
                                      "Шаҳар, сана ва меҳмонларни танланг.")
                     )
                 } else {
+                    if mode == .flights {
+                        IumrahPublishedFlightCarousel(trip: browseTrip, direction: flightDirection,
+                            selected: flightDirection == 0 ? manual.outbound : manual.inbound,
+                            other: flightDirection == 0 ? manual.inbound : manual.outbound,
+                            onSelect: { flight in
+                                _ = addManualFlight(flight)
+                            }, onOpen: { openedManualFlight = $0 })
+                            .padding(.horizontal, IumrahDesign.pagePadding)
+                            .padding(.bottom, 20)
+                    }
                     IumrahFlightBrowseCatalog(direction: flightDirection, refreshSignal: flightSearchRevision, model: flightCatalog,
                         tripOverride: browseTrip, requestedDay: requestedFlightDay, requestedSaudiAirport: requestedSaudiAirport,
                         selectedID: pendingFlight?.id ?? (flightDirection == 0 ? manual.outbound?.id : manual.inbound?.id),
@@ -465,7 +475,19 @@ struct HotelsHomeView: View {
     }
 
     @discardableResult private func addManualFlight(_ flight: LocalJourneyFlight) -> Bool {
+        if flight.publishedID != nil {
+            let isOutbound = flight.origin == browseTrip.originCode
+            if isOutbound, let other = manual.inbound, other.publishedID != nil,
+               !IumrahPublishedCarouselCatalog.compatible(flight, other, scope: manual.scope) {
+                manual.inbound = nil
+            } else if !isOutbound, let other = manual.outbound, other.publishedID != nil,
+                      !IumrahPublishedCarouselCatalog.compatible(other, flight, scope: manual.scope) {
+                IumrahHaptics.error(); return false
+            }
+        }
         guard manual.select(flight) else { IumrahHaptics.error(); return false }
+        flightDeparture = manual.plannedDeparture; flightReturn = manual.plannedReturn
+        browseTrip.departureDate = manual.plannedDeparture; browseTrip.returnDate = manual.plannedReturn
         pendingFlight = nil
         showNotice(copy("Рейс добавлен в ваш пакет", "Flight added to your package", "Reys paketingizga qo‘shildi", "Рейс пакетингизга қўшилди"))
         IumrahHaptics.success()

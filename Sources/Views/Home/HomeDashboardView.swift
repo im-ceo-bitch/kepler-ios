@@ -22,6 +22,10 @@ struct HomeDashboardView: View {
     @State private var showGuidedFlightSelection = false
     @State private var focusJourneySearchRevision = 0
     @State private var journeySearchExpanded = false
+    @StateObject private var publishedSelection = IumrahHomePublishedSelection()
+    @State private var publishedDirection = 0
+    @State private var publishedDetail: LocalJourneyFlight?
+    @State private var showPublishedHotels = false
 
     private var activeSession: StoredBookingSession? {
         bookings.sessions.first { $0.effectiveStatus.uppercased() != "COMPLETED" }
@@ -57,8 +61,13 @@ struct HomeDashboardView: View {
             .navigationDestination(isPresented: $showGuidedFlightSelection) {
                 IumrahGuidedFlightSelectionView()
             }
+            .navigationDestination(isPresented: $showPublishedHotels) { NuiteeJourneyHotelsView() }
+            .navigationDestination(item: $publishedDetail) { flight in
+                IumrahManualFlightDetail(flight: flight, onConfirm: { publishedSelection.choose(flight, direction: flight.origin == journey.trip.originCode ? 0 : 1, journey: journey) }, selectedOverride: publishedSelection.outbound?.id == flight.id || publishedSelection.inbound?.id == flight.id)
+            }
+            .onChange(of: journey.trip) { _, next in publishedSelection.reconcile(next) }
             .navigationDestination(isPresented: $showAboutProject) {
-                IumrahStoryView()
+                WhyIumrahView(onPrimary: { showAboutProject = false; journeySearchExpanded = true; focusJourneySearchRevision += 1 })
             }
 
     }
@@ -72,12 +81,16 @@ struct HomeDashboardView: View {
                 IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header, searchExpanded: $journeySearchExpanded)
             }, content: {
                 LazyVStack(spacing: 30) {
-                    IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded)
+                    IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded, flightsSelected: publishedSelection.complete, onContinue: continuePublishedFlights)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
+                publishedFlightSection
+                WhyIumrahCarousel(onPrimary: { focusJourneySearchRevision += 1; journeySearchExpanded = true })
+                IumrahMissionCard()
                 HomeRecentActivitySection(resumeSmart: { draft in
                     smartPresentation = SmartPresentation(draft: draft)
                 }, repeatFlight: { trip in
+                    publishedSelection.clear()
                     journey.resetAfterTripChange()
                     journey.clearStagedUmrahFlights()
                     journey.trip = trip
@@ -94,7 +107,6 @@ struct HomeDashboardView: View {
                 }
                 SmartConfiguratorHomeCard { startNewSmart() }
                 HomeEmotionalJourneyPrompt()
-                HomeWhyAndPreferencesSection(showsPreferences: false)
                 HomeVideoCarousel()
                 HomeDestinationsSection()
                 IumrahHomeServicesSection(
@@ -112,7 +124,6 @@ struct HomeDashboardView: View {
                 HomeRecommendedHotelsSection()
                 HomeRewardsOffersSection(showsRewards: false)
                 confidenceStrip
-                philosophyCard
                 VStack(alignment: .leading, spacing: 15) {
                     IumrahHomeSectionHeader(title: homeProductsTitle)
                     productsCarousel()
@@ -122,6 +133,7 @@ struct HomeDashboardView: View {
                 personalUmrahFAQ
                 homeAboutFooter
                 HomeWhyAndPreferencesSection(showsWhy: false)
+                IumrahSloganCard()
             }
             // Same adaptive page-column rule as Account/Gear. Padding is part of
             // the column first; the outer frame then clamps the whole tree to the viewport.
@@ -144,6 +156,28 @@ struct HomeDashboardView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea())
     }
 
+
+    private var publishedFlightSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            IumrahGlassPillSelector(options: [
+                .init(0, IumrahFlightCopy.text(settings.language, "Туда", "Outbound", "Borish", "Бориш")),
+                .init(1, IumrahFlightCopy.text(settings.language, "Обратно", "Return", "Qaytish", "Қайтиш"))
+            ], selection: publishedDirection, onSelect: { publishedDirection = $0 })
+            IumrahPublishedFlightCarousel(trip: journey.trip, direction: publishedDirection,
+                selected: publishedDirection == 0 ? publishedSelection.outbound : publishedSelection.inbound,
+                other: publishedDirection == 0 ? publishedSelection.inbound : publishedSelection.outbound,
+                showTitle: false, onSelect: { flight in _ = publishedSelection.choose(flight, direction: publishedDirection, journey: journey) }, onOpen: { publishedDetail = $0 })
+            if publishedSelection.complete {
+                Button(IumrahFlightCopy.text(settings.language, "Продолжить и выбрать отель", "Continue and choose hotel", "Davom etish va mehmonxona tanlash", "Давом этиш ва меҳмонхона танлаш"), action: continuePublishedFlights)
+                    .buttonStyle(IumrahPrimaryButtonStyle())
+            }
+        }
+    }
+
+    private func continuePublishedFlights() {
+        guard publishedSelection.commit(journey) else { IumrahHaptics.error(); return }
+        showPublishedHotels = true
+    }
 
     private func startNewSmart() {
         smartPresentation = SmartPresentation(draft: nil)
@@ -1707,13 +1741,17 @@ private struct IumrahHomeJourneySearchHero: View {
     @EnvironmentObject private var chrome: AppChromeStore
     @ObservedObject private var notifications = ClientNotificationCenter.shared
     @Binding var searchExpanded: Bool
+    var flightsSelected: Bool
+    var onContinue: () -> Void
     @State private var showingCalendar = false
     @State private var showingPassengers = false
 
-    init(onSearch: @escaping () -> Void, presentation: Presentation = .search, searchExpanded: Binding<Bool>) {
+    init(onSearch: @escaping () -> Void, presentation: Presentation = .search, searchExpanded: Binding<Bool>, flightsSelected: Bool = false, onContinue: @escaping () -> Void = {}) {
         self.onSearch = onSearch
         self.presentation = presentation
         _searchExpanded = searchExpanded
+        self.flightsSelected = flightsSelected
+        self.onContinue = onContinue
     }
 
     private func tr(_ ru: String, _ en: String, _ uz: String, _ uzCyrl: String) -> String {
@@ -1815,7 +1853,7 @@ private struct IumrahHomeJourneySearchHero: View {
     private var searchCard: some View {
         IumrahGraphiteSearchSurface(isExpanded: $searchExpanded,
             summary: headlineOptions[headlineIndex],
-            subtitle: "\(journey.trip.originCode) · \(journey.trip.departureDate.formatted(date: .abbreviated, time: .omitted))") {
+            subtitle: "\(journey.trip.originCode) · \(journey.trip.departureDate.formatted(.dateTime.day().month(.abbreviated).year().locale(Locale(identifier: settings.language.localeIdentifier))))") {
             searchFields
         }
     }
@@ -1891,9 +1929,9 @@ private struct IumrahHomeJourneySearchHero: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: { searchExpanded = false; findFlights() }) {
+            Button(action: { if flightsSelected { onContinue() } else { searchExpanded = false; findFlights() } }) {
                 HStack(spacing: 10) {
-                    Text(tr("Найти авиабилеты", "Find flights", "Reyslarni topish", "Рейсларни топиш"))
+                    Text(flightsSelected ? tr("Продолжить и выбрать отель", "Continue and choose hotel", "Davom etish va mehmonxona tanlash", "Давом этиш ва меҳмонхона танлаш") : tr("Найти авиабилеты", "Find flights", "Reyslarni topish", "Рейсларни топиш"))
                 }
                 .font(IumrahType.bold(16, relativeTo: .headline))
                 .foregroundStyle(.white)
@@ -1937,7 +1975,7 @@ private struct IumrahHomeJourneySearchHero: View {
     private func dateColumn(title: String, date: Date) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             fieldCaption(title)
-            Text(date.formatted(.dateTime.day().month(.abbreviated)))
+            Text(date.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: settings.language.localeIdentifier))))
                 .font(IumrahType.bold(16, relativeTo: .headline))
                 .foregroundStyle(Color.iumrahInk)
                 .lineLimit(1)

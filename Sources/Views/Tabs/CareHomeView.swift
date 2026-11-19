@@ -10,6 +10,7 @@ struct CareHomeView: View {
 
     @State private var showHeaderChat = false
     @State private var openedChatBookingID: String?
+    @State private var lastHandledChatRoute: Int?
     @State private var careProfile: IumrahPublicProfile?
     @State private var isLoadingCareProfile = false
     @AppStorage("iumrah.care.cachedPhoneSA") private var cachedPhoneSA = ""
@@ -93,7 +94,7 @@ struct CareHomeView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .onChange(of: chrome.requestedChatBookingID) { _, _ in openRequestedChat() }
+        .onChange(of: chrome.chatRouteRevision) { _, _ in openRequestedChat() }
         .onAppear { openRequestedChat() }
         .onChange(of: bookings.defaultCareChatKey) { _, _ in openRequestedChat() }
         .onChange(of: bookings.sessions) { _, _ in
@@ -109,9 +110,9 @@ struct CareHomeView: View {
     }
 
     private func openRequestedChat() {
-        guard let id = chrome.requestedChatBookingID, bookings.canUseCareChat(for: id) else { return }
+        guard chrome.currentTab == .care, lastHandledChatRoute != chrome.chatRouteRevision, let id = chrome.requestedChatBookingID, bookings.canUseCareChat(for: id) else { return }
         openedChatBookingID = bookings.careChatKey(for: id)
-        chrome.requestedChatBookingID = nil
+        lastHandledChatRoute = chrome.chatRouteRevision
         showHeaderChat = true
     }
 

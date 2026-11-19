@@ -23,8 +23,9 @@ struct BookingsHomeView: View {
     @State private var deleteError: String?
     @State private var showZiyarats = false
     @State private var showCareRequestBuilder = false
-    @State private var bookingPanel: BookingPanel = .booking
+    @State private var bookingPanel: BookingPanel = .package
     @State private var selectedBookingID: String?
+    @State private var lastHandledBookingRoute: Int?
     @State private var activeGuideProfile: IumrahPublicProfile?
 
     private let chatService = ChatService()
@@ -96,9 +97,11 @@ struct BookingsHomeView: View {
             FlightFirstPackageFlowView()
         }
         .onAppear { openRequestedPackage() }
-        .onChange(of: chrome.requestedBookingID) { _, _ in openRequestedPackage() }
+        .onChange(of: chrome.currentTab) { _, _ in openRequestedPackage() }
+        .onChange(of: chrome.bookingRouteRevision) { _, _ in openRequestedPackage() }
         .onChange(of: bookings.sessions) { _, _ in
-            if activeSession == nil { bookingPanel = .booking; selectedBookingID = nil }
+            if let id = selectedBookingID, bookings.booking(id: id) == nil { selectedBookingID = nil; bookingPanel = .package }
+            if activeSession == nil { bookingPanel = .package; selectedBookingID = nil }
             openRequestedPackage()
         }
         .navigationDestination(isPresented: $showZiyarats) {
@@ -112,11 +115,11 @@ struct BookingsHomeView: View {
     }
 
     private func openRequestedPackage() {
-        guard chrome.currentTab == .booking, let id = chrome.requestedBookingID,
+        guard chrome.currentTab == .booking, lastHandledBookingRoute != chrome.bookingRouteRevision, let id = chrome.requestedBookingID,
               bookings.booking(id: id) != nil else { return }
         selectedBookingID = id
-        bookingPanel = .package
-        chrome.requestedBookingID = nil
+        bookingPanel = chrome.requestedBookingSchedule ? .schedule : (chrome.requestedBookingStatus ? .status : (chrome.requestedBookingOverview ? .booking : .package))
+        lastHandledBookingRoute = chrome.bookingRouteRevision
     }
 
     @MainActor private func refreshBookings() async {
@@ -157,8 +160,10 @@ struct BookingsHomeView: View {
     private func activeBookingHub(_ session: StoredBookingSession) -> some View {
         VStack(spacing: 0) {
             LazyVStack(spacing: 0) {
-                if bookingPanel == .booking { bookingIdentity(session).padding(.bottom, 18) }
-
+                if bookingPanel != .package {
+                    IumrahCompactBookingIdentity(session: session).padding(.bottom, 12)
+                    IumrahBookingNotificationChannels(session: session).padding(.bottom, 12)
+                }
                 bookingPanelContent(session)
 
                 if activeSessions.count > 1 {
@@ -931,7 +936,16 @@ struct BookingsHomeView: View {
     private func activeStageCard(_ session: StoredBookingSession, stage: BookingProgressStage) -> some View {
         let tint = IumrahBookingStatusVisual.color(for: session.effectiveStatus)
 
-        return VStack(alignment: .leading, spacing: 18) {
+        if session.isCheckingAvailability {
+            return AnyView(VStack(alignment: .leading, spacing: 12) {
+                Label(localized("Проверяем ваше путешествие", "Checking your trip", "Safaringizni tekshiryapmiz", "Сафарингизни текширяпмиз"), systemImage: "hourglass")
+                    .font(.headline)
+                Text(activeCardBody(session, fallback: stage.cardBody)).font(.subheadline).foregroundStyle(.secondary)
+                lifecycleTimerPanel(session, tint: tint)
+            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+             .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 24)).overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(tint.opacity(0.22))))
+        }
+        return AnyView(VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     Circle()
@@ -990,7 +1004,7 @@ struct BookingsHomeView: View {
                     .foregroundStyle(.secondary)
             }
 
-            statusCardActions(session)
+            if !session.isCheckingAvailability { statusCardActions(session) }
         }
         .padding(18)
         .background {
@@ -1008,7 +1022,7 @@ struct BookingsHomeView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .strokeBorder(tint.opacity(0.22), lineWidth: 0.8)
-        }
+        })
     }
 
     @ViewBuilder
@@ -1477,9 +1491,18 @@ struct BookingsHomeView: View {
                 RoundedRectangle(cornerRadius: 25, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.06), lineWidth: 0.7)
             }
-            Button(role: .destructive) { pendingDeleteID = session.id } label: {
-                Label(L10n.text("booking_cancel_and_delete", settings.language), systemImage: "trash").font(.subheadline.weight(.semibold)).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).padding(16)
-            }.buttonStyle(.plain)
+            if session.isCheckingAvailability && session.paymentReceivedAt == nil {
+                Button(role: .destructive) { pendingDeleteID = session.id } label: {
+                    Label(localized("Удалить бронирование", "Delete booking", "Bronni o‘chirish", "Бронни ўчириш"), systemImage: "trash")
+                        .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(14)
+                        .foregroundStyle(.red).overlay(Capsule().strokeBorder(Color.red.opacity(0.45)))
+                }.buttonStyle(.plain)
+            } else {
+                NavigationLink { BookingRefundView(bookingID: session.id, bookingToken: session.accessToken) } label: {
+                    Label(localized("Отмена и возврат", "Cancellation and refund", "Bekor qilish va qaytarish", "Бекор қилиш ва қайтариш"), systemImage: "arrow.uturn.backward.circle")
+                        .frame(maxWidth: .infinity).padding(14).foregroundStyle(.primary).background(Color.iumrahCardBackground, in: Capsule())
+                }.buttonStyle(.plain)
+            }
         }
     }
 
@@ -1840,6 +1863,7 @@ struct BookingsHomeView: View {
             )
         case APIError.server(let code, let message):
             let normalized = message.uppercased()
+            if normalized.contains("USE_CANCELLATION") { return localized("Бронирование уже подтверждено или оплачено. Используйте отмену и возврат.", "This booking is confirmed or paid. Use cancellation and refund.", "Bron tasdiqlangan yoki to‘langan. Bekor qilish bo‘limidan foydalaning.", "Брон тасдиқланган ёки тўланган. Бекор қилиш бўлимидан фойдаланинг.") }
             if code == 401 || code == 403 || normalized.contains("UNAUTHORIZED") || normalized.contains("TOKEN_EXPIRED") {
                 return localized(
                     "Сессия аккаунта устарела. Обновите Account и повторите удаление.",

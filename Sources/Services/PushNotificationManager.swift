@@ -132,7 +132,7 @@ final class PushNotificationManager: ObservableObject {
 
     func receiveRemotePayload(_ userInfo: [AnyHashable: Any], opened: Bool = false) {
         let type = (userInfo["type"] as? String) ?? "notification"
-        let bookingID = userInfo["bookingID"] as? String
+        let bookingID = (userInfo["bookingID"] as? String) ?? (userInfo["bookingId"] as? String) ?? (userInfo["destinationBookingID"] as? String)
         let status = userInfo["status"] as? String
         let notificationID = userInfo["notificationID"] as? String
         let destination = userInfo["destination"] as? String

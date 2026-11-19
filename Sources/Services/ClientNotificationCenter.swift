@@ -51,6 +51,8 @@ final class ClientNotificationCenter: ObservableObject {
     static let shared = ClientNotificationCenter()
 
     @Published private(set) var notifications: [ClientSystemNotification] = []
+    @Published private var bookingReceipts: [ClientSystemNotification] = []
+    private var readReceiptIDs = Set(UserDefaults.standard.stringArray(forKey: "iumrah.booking.receipts.read.v1") ?? [])
     @Published private(set) var latest: ClientSystemNotification?
     @Published private(set) var lastError: String?
     @Published private(set) var dismissedHomeIDs: Set<String> = []
@@ -76,7 +78,23 @@ final class ClientNotificationCenter: ObservableObject {
     }
 
     var inboxNotifications: [ClientSystemNotification] {
-        notifications
+        (bookingReceipts + notifications).sorted(by: notificationSort)
+    }
+
+    func syncBookingReceipts(_ sessions: [StoredBookingSession], language: AppSettingsStore.Language) {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fallback = ISO8601DateFormatter()
+        let next = sessions.compactMap { session -> ClientSystemNotification? in
+            guard session.hasServerIdentity, !session.accessToken.isEmpty || session.displayPilgrimID != nil else { return nil }
+            let id = "local-booking-created:" + session.id
+            let raw = session.booking.createdAt
+            guard let created = formatter.date(from: raw) ?? fallback.date(from: raw), Date().timeIntervalSince(created) < 30 * 86400 else { return nil }
+            let title = IumrahFlightCopy.text(language, "Бронирование создано", "Booking created", "Bron yaratildi", "Брон яратилди") + " " + session.displayBookingNumber
+            let body = IumrahFlightCopy.text(language, "Ваше путешествие сохранено. Откройте бронирование, чтобы узнать актуальный статус.", "Your trip is saved. Open your booking for its current status.", "Safaringiz saqlandi. Bron holatini ko‘rish uchun uni oching.", "Сафарингиз сақланди. Брон ҳолатини кўриш учун уни очинг.")
+            return ClientSystemNotification(id: id, title: title, body: body, targetScope: "booking", destination: "booking", destinationBookingID: session.id, createdBy: "iumrah", status: "published", matchedDevices: 0, pushSentCount: 0, pushFailedCount: 0, createdAt: raw, sentAt: raw, expiresAt: fallback.string(from: created.addingTimeInterval(30 * 86400)), isRead: readReceiptIDs.contains(id))
+        }.sorted(by: notificationSort)
+        if bookingReceipts != next { bookingReceipts = next; latest = homeNotifications.first }
     }
 
     var homeNotifications: [ClientSystemNotification] {
@@ -168,6 +186,13 @@ final class ClientNotificationCenter: ObservableObject {
     }
 
     func markOpened(_ notification: ClientSystemNotification, accountToken: String?) async {
+        if notification.id.hasPrefix("local-booking-created:") {
+            readReceiptIDs.insert(notification.id)
+            UserDefaults.standard.set(Array(readReceiptIDs), forKey: "iumrah.booking.receipts.read.v1")
+            if let index = bookingReceipts.firstIndex(where: { $0.id == notification.id }) { bookingReceipts[index].isRead = true }
+            latest = homeNotifications.first
+            return
+        }
         if let index = notifications.firstIndex(where: { $0.id == notification.id }) {
             notifications[index].isRead = true
             notifications.sort(by: notificationSort)
@@ -199,7 +224,7 @@ final class ClientNotificationCenter: ObservableObject {
     }
 
     func notification(id: String) -> ClientSystemNotification? {
-        notifications.first { $0.id == id }
+        inboxNotifications.first { $0.id == id }
     }
 
     private func normalizedToken(_ token: String?) -> String? {

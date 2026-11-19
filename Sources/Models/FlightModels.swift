@@ -494,3 +494,29 @@ struct PackageItineraryPreviewItem: Codable, Hashable {
     let endTimeLocal: String?
     let kind: String?
 }
+
+// Presentation-only grouping. Financial values are still the server's exact line amounts.
+enum TripReviewPriceGrouping {
+    struct Group: Identifiable {
+        let key: String
+        let representative: TripSummaryPublicPrice.Component
+        var amount: Decimal
+        var id: String { key }
+    }
+    static func groups(_ components: [TripSummaryPublicPrice.Component]) -> [Group] {
+        var result: [Group] = []
+        for component in components {
+            let groupKey = key(component.code)
+            if let index = result.firstIndex(where: { $0.key == groupKey }) { result[index].amount += component.amountUsd }
+            else { result.append(Group(key: groupKey, representative: component, amount: component.amountUsd)) }
+        }
+        return result
+    }
+    static func key(_ code: String) -> String {
+        if code.hasPrefix("flight_") { return "flights" }
+        if code == "meals" || code.hasPrefix("meal_") { return "meals" }
+        if code.hasPrefix("ziyarat_") { return "ziyarats" }
+        if code == "transfers" || code == "vip_transfer_upgrade" { return "transfer" }
+        return code
+    }
+}

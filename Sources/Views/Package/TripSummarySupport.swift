@@ -235,34 +235,39 @@ struct TripSummaryFlightOverview: View {
     let travelers: Int
     let language: AppSettingsStore.Language
     let title: String
+    var compactReview = false
     private func t(_ ru: String,_ en: String,_ uz: String,_ cy: String) -> String { IumrahFlightCopy.text(language,ru,en,uz,cy) }
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.headline)
-            Text(offer.airlinesSummary + " · " + offer.flightNumbersSummary).font(.caption).foregroundStyle(.secondary)
+            if !compactReview {
+                Text(title).font(.headline)
+                Text(offer.airlinesSummary + " · " + offer.flightNumbersSummary).font(.caption).foregroundStyle(.secondary)
+            }
             HStack(alignment: .top, spacing: 6) {
-                endpoint(offer.origin, offer.departureAt, t("Вылет", "Departure", "Uchish", "Учиш"))
+                endpoint(offer.origin, offer.departureAt, t("Вылет", "Departure", "Uchish", "Учиш"), trailing: false)
                 Spacer(minLength: 2)
                 VStack(spacing: 4) {
-                    Image(systemName: "airplane")
-                    Text(offer.stops == 0 ? t("Прямой", "Direct", "To‘g‘ridan to‘g‘ri", "Тўғридан тўғри") : "\(offer.stops) " + t("пересадок", "stops", "bekat", "бекат")).font(.caption2)
+                    Image(systemName: "airplane").font(.title3)
+                    Text(offer.stops == 0 ? t("Прямой", "Direct", "To‘g‘ridan to‘g‘ri", "Тўғридан тўғри") : "\(offer.stops) " + (offer.stops == 1 ? t("пересадка", "stop", "bekat", "бекат") : offer.stops < 5 ? t("пересадки", "stops", "bekat", "бекат") : t("пересадок", "stops", "bekat", "бекат"))).font(.caption2)
                 }.foregroundStyle(.secondary)
                 Spacer(minLength: 2)
-                endpoint(offer.destination, offer.arrivalAt, t("Прилёт", "Arrival", "Kelish", "Келиш"))
+                endpoint(offer.destination, offer.arrivalAt, t("Прилёт", "Arrival", "Kelish", "Келиш"), trailing: true)
             }
+            if !compactReview {
             IumrahPackageFlightPriceLine(offer: offer, outbound: outbound, inbound: inbound, travelers: travelers, language: language)
             Label(IumrahRefundComponent.flight.badge(language), systemImage: "info.circle").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            }
         }
     }
-    private func endpoint(_ code: String, _ date: Date, _ caption: String) -> some View {
+    private func endpoint(_ code: String, _ date: Date, _ caption: String, trailing: Bool) -> some View {
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: language.localeIdentifier)
         formatter.timeZone = FlightReferenceCatalog.timeZone(for: code) ?? TimeZone(secondsFromGMT: 0)
         formatter.setLocalizedDateFormatFromTemplate("d MMM HH:mm")
-        return VStack(alignment: .leading, spacing: 3) {
-            Text(caption).font(.caption2).foregroundStyle(.secondary)
-            Text(code).font(.title2.bold())
-            Text(formatter.string(from: date)).font(.caption2).monospacedDigit().fixedSize(horizontal: false, vertical: true)
-        }
+        return VStack(alignment: trailing ? .trailing : .leading, spacing: 4) {
+            if !compactReview { Text(caption).font(.caption2).foregroundStyle(.secondary) }
+            Text(code).font(.system(.title2, design: .rounded, weight: .bold))
+            Text(formatter.string(from: date)).font(.caption).monospacedDigit().fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, alignment: trailing ? .trailing : .leading)
     }
 }
 
@@ -270,6 +275,7 @@ struct TripSummaryHotelOverview: View {
     let rooms: [LocalJourneyRoom]
     let language: AppSettingsStore.Language
     let confirmedTotal: Decimal?
+    var compactReview = false
     private func t(_ ru: String,_ en: String,_ uz: String,_ cy: String) -> String { IumrahFlightCopy.text(language,ru,en,uz,cy) }
     private var estimate: Decimal? {
         guard !rooms.isEmpty, rooms.allSatisfy({ $0.rate.currency.uppercased() == "USD" && $0.rate.price.isFinite && $0.rate.price > 0 }) else { return nil }
@@ -280,18 +286,20 @@ struct TripSummaryHotelOverview: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 12) {
                     HotelCachedImage(rawURL: first.hotel.coverImageURL, thumbnailPixelDimension: 256)
-                        .frame(width: 82, height: 86).clipped().clipShape(RoundedRectangle(cornerRadius: 16))
+                        .frame(width: compactReview ? 112 : 82, height: compactReview ? 112 : 86).clipped().clipShape(RoundedRectangle(cornerRadius: 16))
                     VStack(alignment: .leading, spacing: 5) {
                         Text(L10n.city(first.city == "madinah" ? "Madinah" : "Makkah", language) + " · \(TripStayWindow(checkIn: first.checkin, checkOut: first.checkout).nights) " + t("ночей", "nights", "tun", "тун")).font(.caption).foregroundStyle(.secondary)
-                        Text(first.hotel.name).font(.headline).fixedSize(horizontal: false, vertical: true)
+                        Text(first.hotel.name).font(.system(.headline, design: .rounded)).fixedSize(horizontal: false, vertical: true)
                         if first.hotel.roundedStars > 0 { Text(String(repeating: "★", count: first.hotel.roundedStars)).font(.caption) }
                         else { Text(t("Категория не указана", "Unrated", "Toifasi ko‘rsatilmagan", "Тоифаси кўрсатилмаган")).font(.caption).foregroundStyle(.secondary) }
+                        if compactReview { Text("\(rooms.count) " + t("ном. · ", "rooms · ", "xona · ", "хона · ") + "\(rooms.reduce(0) { $0 + $1.adults + $1.childrenAges.count }) " + t("гостей", "guests", "mehmon", "меҳмон")).font(.caption).foregroundStyle(.secondary) }
                         if let total = confirmedTotal ?? estimate { Text(IumrahPackageDisplayPrices.money(total, currency: "USD", language: language)).font(.title3.bold()).monospacedDigit() }
                         Text(confirmedTotal == nil ? t("За все номера и ночи", "All rooms and nights", "Barcha xona va tunlar uchun", "Барча хона ва тунлар учун") : t("За все номера и ночи", "All rooms and nights", "Barcha xona va tunlar", "Барча хона ва тунлар")).font(.caption2).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                 }
                 Label(first.checkin.formatted(date: .abbreviated, time: .omitted) + " – " + first.checkout.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar").font(.caption).foregroundStyle(.secondary)
+                if !compactReview {
                 Label("\(rooms.count) " + t("ном. · ", "rooms · ", "xona · ", "хона · ") + "\(rooms.reduce(0) { $0 + $1.adults + $1.childrenAges.count }) " + t("гостей", "guests", "mehmon", "меҳмон"), systemImage: "person.2").font(.caption).foregroundStyle(.secondary)
                 ForEach(Array(rooms.enumerated()), id: \.element.id) { index, room in
                     HStack(alignment: .top) {
@@ -300,7 +308,10 @@ struct TripSummaryHotelOverview: View {
                         Label("\(room.adults + room.childrenAges.count)", systemImage: "person.2").font(.caption)
                     }
                 }
-                Label(rooms.allSatisfy { $0.rate.refundable } ? t("Возврат по условиям тарифа", "Refundable under rate terms", "Tarif shartlari bo‘yicha qaytarish", "Тариф шартлари бўйича қайтариш") : rooms.allSatisfy { !$0.rate.refundable } ? t("Невозвратный тариф", "Non-refundable rate", "Qaytarilmaydigan tarif", "Қайтарилмайдиган тариф") : t("Условия возврата различаются по номерам", "Refund terms vary by room", "Qaytarish shartlari xonaga bog‘liq", "Қайтариш шартлари хонага боғлиқ"), systemImage: "info.circle").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                }
+                if !compactReview {
+                    Label(rooms.allSatisfy { $0.rate.refundable } ? t("Возврат по условиям тарифа", "Refundable under rate terms", "Tarif shartlari bo‘yicha qaytarish", "Тариф шартлари бўйича қайтариш") : rooms.allSatisfy { !$0.rate.refundable } ? t("Невозвратный тариф", "Non-refundable rate", "Qaytarilmaydigan tarif", "Қайтарилмайдиган тариф") : t("Условия возврата различаются по номерам", "Refund terms vary by room", "Qaytarish shartlari xonaga bog‘liq", "Қайтариш шартлари хонага боғлиқ"), systemImage: "info.circle").font(.caption.weight(.medium)).foregroundStyle(.secondary)
+                }
             }
         }
     }

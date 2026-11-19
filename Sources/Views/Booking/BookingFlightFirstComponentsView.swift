@@ -114,7 +114,14 @@ struct BookingFlightFirstComponentsView: View {
             NavigationLink {
                 IumrahGuideTransferView(bookingID: session.id)
             } label: {
-                guideTransferFeatureCard
+                HStack(spacing: 14) {
+                    Image(systemName: "car.fill").font(.title3).frame(width: 44, height: 44).background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 13))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(localized("Гид и трансфер", "Guide and transfer", "Gid va transfer", "Гид ва трансфер")).font(.subheadline.bold())
+                        Text(localized("Индивидуальное сопровождение", "Private service", "Individual xizmat", "Индивидуал хизмат")).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(); Image(systemName: "chevron.forward").font(.caption.bold()).foregroundStyle(.secondary)
+                }.padding(14).foregroundStyle(.primary)
             }
             .buttonStyle(.plain)
 
@@ -142,7 +149,7 @@ struct BookingFlightFirstComponentsView: View {
             includedRow(
                 detail: .care,
                 icon: "heart.fill",
-                title: "iumrah Care",
+                title: localized("iumrah Поддержка", "iumrah Support", "iumrah Yordam", "iumrah Ёрдам"),
                 subtitle: localized("Поддержка по поездке и бронированию", "Trip and booking support", "Safar va bron bo‘yicha yordam", "Сафар ва брон бўйича ёрдам")
             )
 
@@ -216,13 +223,8 @@ struct BookingFlightFirstComponentsView: View {
             serviceDetail = detail
         } label: {
             HStack(spacing: 14) {
-                IumrahIconBadge(
-                    systemName: icon,
-                    role: role(for: icon),
-                    size: 44,
-                    symbolSize: 17,
-                    cornerRadius: 15
-                )
+                Image(systemName: icon).font(.system(size: 18, weight: .medium)).foregroundStyle(.primary)
+                    .frame(width: 44, height: 44).background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 13))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
@@ -526,14 +528,14 @@ private struct BookingFlightFirstLegCard: View {
                     VStack(alignment: .trailing, spacing: 6) {
                         Image(systemName: "airplane")
                             .font(.headline)
-                            .foregroundStyle(IumrahIconRole.travel.color)
+                            .foregroundStyle(.primary)
                         Text(directText)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
-                        Image(systemName: "chevron.down")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.tertiary)
-                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                        Text(localized("Подробнее", "Details", "Batafsil", "Батафсил"))
+                            .font(.caption.weight(.semibold)).foregroundStyle(.primary)
+                            .padding(.horizontal, 10).padding(.vertical, 8)
+                            .background(Color.primary.opacity(0.055), in: Capsule())
                     }
                 }
                 .contentShape(Rectangle())

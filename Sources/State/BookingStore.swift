@@ -1091,33 +1091,11 @@ final class BookingStore: ObservableObject {
     }
 
     func deleteBooking(id: String) async throws {
-        guard let session = booking(id: id) else {
-            purgeLocalBooking(id: id)
-            persist()
-            return
+        guard let session = booking(id: id) else { throw APIError.missingBookingToken }
+        let (response, _) = try await performWithClientAuthorization(for: session) { headers in
+            try await bookingService.deleteBooking(id: id, headers: headers)
         }
-
-        do {
-            _ = try await performWithClientAuthorization(for: session) { headers in
-                try await bookingService.deleteBooking(id: id, headers: headers)
-            }
-        } catch APIError.status(let code) where code == 404 || code == 410 {
-            // Idempotent delete: the canonical server copy is already gone.
-        } catch APIError.server(let code, let message) where isRemoteMissing(code: code, message: message) {
-            // Same as a successful delete from the client's point of view.
-        } catch APIError.status(let code) where code == 405 {
-            throw BookingStoreError.permanentDeleteUnavailable
-        } catch APIError.server(let code, let message) where code == 405 || message.uppercased().contains("METHOD_NOT_ALLOWED") {
-            throw BookingStoreError.permanentDeleteUnavailable
-        } catch {
-            // A stale booking proof used to surface UNAUTHORIZED here even for a
-            // valid signed-in iumrah account. performWithClientAuthorization has
-            // already retried the permanent account session. Only reconcile the
-            // old booking proof after both authorization candidates are exhausted.
-            let token = session.accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !token.isEmpty, await remoteBookingIsMissing(id: id, accessToken: token) else { throw error }
-        }
-
+        guard response.ok == true, response.deleted == true else { throw APIError.invalidResponse }
         purgeLocalBooking(id: id)
         persist()
     }

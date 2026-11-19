@@ -26,14 +26,14 @@ struct IumrahBookingCelebrationView: View {
 
     private var homeTitle: String {
         switch settings.language {
-        case .russian: return "На главную"
-        case .uzbek: return "Bosh sahifaga"
-        case .uzbekCyrillic: return "Бош саҳифага"
-        case .arabic: return "الصفحة الرئيسية"
-        case .turkish: return "Ana sayfa"
-        case .indonesian: return "Beranda"
-        case .malay: return "Laman utama"
-        case .english: return "Home"
+        case .russian: return "Готово"
+        case .uzbek: return "Tayyor"
+        case .uzbekCyrillic: return "Тайёр"
+        case .arabic: return "تم"
+        case .turkish: return "Tamam"
+        case .indonesian: return "Selesai"
+        case .malay: return "Selesai"
+        case .english: return "Done"
         }
     }
 }

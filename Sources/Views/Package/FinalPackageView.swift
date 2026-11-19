@@ -16,6 +16,7 @@ struct LegacyFinalPackageView: View {
     var familyFlow = false
     var restoration: SavedPackageEntry? = nil
     var onBack: (() -> Void)? = nil
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var journey: JourneyStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
@@ -28,6 +29,7 @@ struct LegacyFinalPackageView: View {
     @State private var showCreatedBooking = false
     @State private var pendingBookingSession: StoredBookingSession?
     @State private var errorMessage: String?
+    @State private var bookingBlockMessage: String?
     @State private var infoSheet: StorefrontPackageInfoSheet?
     @State private var showTransferDetails = false
     @State private var localHotelForDetails: LocalJourneyRoom?
@@ -62,7 +64,7 @@ struct LegacyFinalPackageView: View {
         (!needsMadinah || fits(journey.selectedMadinahRoom, journey.selectedMadinahRoomCategory))
     }
     private var canBook: Bool {
-        journey.hasFinalGeneratorQuote && publicPrice != nil && journey.quote?.bookingAllowed != false && !isCalculatingPrice && guestDraft == nil && !adultExceptionRequested && priceChangeAccepted && (journey.trip.adults <= journey.trip.rooms * 5 || journey.quote?.roomPolicy?.requiresAdultException == false) &&
+        journey.hasFinalGeneratorQuote && publicPrice != nil && journey.quote?.bookingAllowed != false && !isCalculatingPrice && guestDraft == nil && priceChangeAccepted && (journey.trip.adults <= journey.trip.rooms * 5 || journey.quote?.roomPolicy?.requiresAdultException == false) &&
         journey.transferSelectionConfirmed && (journey.selectedTransferVehicle?.passengerCapacity ?? 0) >= journey.trip.travelerCount && roomsComplete &&
         journey.selectedHotel != nil &&
         flightSelectionReady &&
@@ -118,6 +120,7 @@ struct LegacyFinalPackageView: View {
             if !journey.hasFinalGeneratorQuote || journey.quote?.tripSummary == nil || journey.quote?.bookingAllowed == false { await recalculatePrice() }
         }
         .task { await push.refreshAndRegisterIfAllowed(); await refreshRoomApproval() }
+        .alert(copy("Проверьте путешествие", "Review journey", "Safarni tekshiring", "Сафарни текширинг"), isPresented: Binding(get: { bookingBlockMessage != nil }, set: { if !$0 { bookingBlockMessage = nil } })) { Button("OK") { bookingBlockMessage = nil } } message: { Text(bookingBlockMessage ?? "") }
     }
     private var reviewSheets: some View {
         AnyView(reviewBase)
@@ -150,6 +153,7 @@ struct LegacyFinalPackageView: View {
                     nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights,
                     adults: room.adults, sandbox: journey.quote?.bookingAllowed == false,
                     childrenAges: room.childrenAges, onSelectRate: { rate in
+                        beginPriceChange()
                         journey.localJourneyRooms[room.id] = LocalJourneyRoom(id: room.id, city: room.city,
                             hotel: room.hotel, rate: rate, checkin: room.checkin, checkout: room.checkout,
                             adults: room.adults, childrenAges: room.childrenAges,
@@ -157,6 +161,7 @@ struct LegacyFinalPackageView: View {
                         journey.invalidateTripSummaryQuote()
                         localHotelForDetails = nil
                     }, onSelectMeals: { meals in
+                        beginPriceChange()
                         journey.localJourneyRooms[room.id]?.meals = meals
                         journey.invalidateTripSummaryQuote()
                     }, selectedMeals: room.meals ?? HotelMealChoices())
@@ -203,7 +208,7 @@ struct LegacyFinalPackageView: View {
                     onHome: {
                         chrome.shouldStartTripBuilder = false
                         journey.resetAfterTripChange()
-                        chrome.navigate(to: .home)
+                        chrome.openBooking(id: createdSession.id)
                     }))
             } else {
                 AnyView(reviewScroll)
@@ -213,15 +218,18 @@ struct LegacyFinalPackageView: View {
     private var reviewScroll: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                AnyView(IumrahJourneyHeader(showsNotifications: true, onBack: onBack) { AnyView(summaryHero) })
+                AnyView(summaryHeader)
+                AnyView(summaryHero).padding(.horizontal, 16).padding(.top, 12)
                 AnyView(reviewSections)
             }.background(IumrahNoVerticalBounce())
         }
-        .modifier(IumrahJourneyRefresh { await recalculatePrice() })
-        .background(Color.iumrahPageBackground)
+        .background(Color(red: 0.95, green: 0.95, blue: 0.96))
+        .environment(\.colorScheme, .light)
+        .fontDesign(.rounded)
+        .tint(.black)
     }
     private enum ReviewSection: String, CaseIterable, Identifiable {
-        case guests, pricing, change, flights, hotels, services, support, breakdown, itinerary, conditions, total, actions, error
+        case guests, pricing, change, flights, hotels, services, support, breakdown, chart, itinerary, conditions, total, actions, error
         var id: String { rawValue }
     }
     private var reviewSections: some View {
@@ -229,18 +237,19 @@ struct LegacyFinalPackageView: View {
             ForEach(ReviewSection.allCases) { section in
                 TripSummaryLazySection { sectionView(section) }
             }
-        }.padding(IumrahDesign.pagePadding).padding(.bottom, 20)
+        }.padding(16).padding(.bottom, 20)
     }
     private func sectionView(_ section: ReviewSection) -> AnyView {
         switch section {
         case .guests: return AnyView(guestCard)
-        case .pricing: return AnyView(Group { if !journey.hasFinalGeneratorQuote || publicPrice == nil || errorMessage != nil { AnyView(pricingStatus) } })
+        case .pricing: return AnyView(Group { if !journey.hasFinalGeneratorQuote || publicPrice == nil { AnyView(pricingStatus) } })
         case .change: return AnyView(Group { if let previousTotal, let quote = journey.quote, previousTotal != quote.totalPackagePrice, !priceChangeAccepted { AnyView(priceChangeCard(previousTotal, quote: quote)) } })
         case .flights: return AnyView(compactFlights)
         case .hotels: return AnyView(compactHotels)
         case .services: return AnyView(compactServices)
         case .support: return AnyView(supportCard)
         case .breakdown: return AnyView(priceBreakdownCard)
+        case .chart: return AnyView(chartCard)
         case .itinerary: return AnyView(itineraryCard)
         case .conditions: return AnyView(conditionsCard)
         case .total: return AnyView(summaryTotalCard)
@@ -509,12 +518,13 @@ struct LegacyFinalPackageView: View {
                 let acceptedInput = journey.localBookingInputKey
                 await journey.buildQuote()
                 guard let fresh = journey.quote, journey.hasFinalGeneratorQuote,
-                      fresh.bookingAllowed == true, acceptedInput == journey.localBookingInputKey, canBook else {
+                      acceptedInput == journey.localBookingInputKey else {
                     throw BookingStoreError.authoritativeQuoteRequired
                 }
                 guard fresh.totalPackagePrice == acceptedTotal else {
                     throw ConfiguratorBookingError.priceChanged(tr("Цена изменилась. Вернитесь к итогу поездки и проверьте новую сумму.", "The price changed. Return to the trip review and check the new total.", "Narx o‘zgardi. Safar yakuniga qaytib, yangi summani tekshiring.", "Нарх ўзгарди. Сафар якунига қайтиб, янги суммани текширинг."))
                 }
+                guard fresh.bookingAllowed == true, acceptedInput == journey.localBookingInputKey, canBook else { throw BookingStoreError.authoritativeQuoteRequired }
                 quote = fresh
             }
             if savedPackage != nil {
@@ -724,7 +734,8 @@ private extension LegacyFinalPackageView {
     func surface<Content: View>(@ViewBuilder _ content: () -> Content) -> AnyView {
         AnyView(VStack(alignment: .leading, spacing: 12) { AnyView(content()) }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24)))
+            .foregroundStyle(Color.black)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 24)))
     }
     func disclosure<Content: View>(_ id: String, _ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -757,41 +768,92 @@ private extension LegacyFinalPackageView {
             .font(.caption.weight(.medium)).foregroundStyle(refundable ? Color.green : Color.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
+    var summaryHeader: some View {
+        HStack(spacing: 12) {
+            IumrahGlassIconButton(systemName: "chevron.backward", size: 44, foreground: .white,
+                accessibilityLabel: copy("Назад", "Back", "Orqaga", "Орқага")) { if let onBack { onBack() } else { dismiss() } }
+            Spacer(minLength: 0)
+            Image("HeaderWordmarkLight").resizable().renderingMode(.template).scaledToFit().frame(width: 138, height: 44).accessibilityLabel("iumrah")
+            Spacer(minLength: 0)
+            IumrahGlassIconButton(systemName: "questionmark", size: 44, foreground: .white,
+                accessibilityLabel: copy("Поддержка", "Support", "Yordam", "Ёрдам")) { showPackageSupport = true }
+        }.padding(.horizontal, 16).padding(.vertical, 12)
+            .foregroundStyle(Color.white).environment(\.colorScheme, .dark)
+            .background { IumrahWorldDotsHeaderBackground(mapOpacity: 0.30, isAnimating: false).background(Color.black) }
+    }
+    var perPersonText: String {
+        guard let price = publicPrice else { return "—" }
+        return usd(price.perPilgrimUsd)
+    }
     var summaryHero: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(copy("Ваше путешествие", "Your journey", "Safaringiz", "Сафарингиз")).font(.title2.bold())
-            Text(journey.trip.packageTier.title(settings.language) + " · " + journey.trip.scope.title(settings.language)).font(.subheadline)
-            Text(dateRange(journey.trip.departureDate, journey.trip.returnDate)).font(.caption)
-            HStack(alignment: .top, spacing: 8) {
-                heroMetric(summaryStay.totalDays, copy("Дней", "Days", "Kun", "Кун"))
-                heroMetric(summaryStay.makkahNights, copy("Ночей · Мекка", "Nights · Makkah", "Tun · Makka", "Тун · Макка"))
-                if needsMadinah { heroMetric(summaryStay.madinahNights, copy("Ночей · Медина", "Nights · Madinah", "Tun · Madina", "Тун · Мадина")) }
-            }
-            Text(partyText).font(.caption).fixedSize(horizontal: false, vertical: true)
-            Divider().overlay(.white.opacity(0.2))
-            Text(copy("Общая стоимость", "Total price", "Jami narx", "Жами нарх")).font(.caption)
-            Text(totalText).font(.largeTitle.bold()).monospacedDigit()
-            if let q = journey.quote, journey.hasFinalGeneratorQuote, !isCalculatingPrice {
-                Text(IumrahPackageDisplayPrices.money(q.pricePerPerson, currency: q.currency, language: settings.language) + " · " + copy("на паломника", "per pilgrim", "ziyoratchi uchun", "зиёратчи учун")).font(.subheadline)
-            }
-        }.padding(18).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(.white)
-            .background(Color.black.opacity(0.9), in: RoundedRectangle(cornerRadius: 28))
+        VStack(alignment: .leading, spacing: 0) {
+            GeometryReader { geo in
+                Image("AboutIumrahKaabaCorner").resizable().scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height).clipped()
+                    .overlay(alignment: .bottom) {
+                        LinearGradient(colors: [.clear, .black.opacity(0.45), .black], startPoint: .top, endPoint: .bottom).frame(height: 90).allowsHitTesting(false)
+                    }
+            }.frame(height: 168).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 12) {
+                Text(copy("Индивидуальная умра", "Individual Umrah", "Individual umra", "Индивидуал умра").uppercased() + " · " + journey.trip.packageTier.title(settings.language).uppercased())
+                    .font(.system(.caption2, design: .rounded, weight: .semibold)).foregroundStyle(Color.white.opacity(0.72))
+                Text(copy("Ваше путешествие", "Your journey", "Safaringiz", "Сафарингиз")).font(.system(.title2, design: .rounded, weight: .bold))
+                Text(dateRange(journey.trip.departureDate, journey.trip.returnDate) + " · " + String(Calendar.current.component(.year, from: journey.trip.returnDate))).font(.subheadline).foregroundStyle(Color.white.opacity(0.8))
+                if let out = journey.selectedOutbound {
+                    Text(out.origin + " → " + out.destination + (journey.selectedInbound.map { " · " + $0.origin + " → " + $0.destination } ?? ""))
+                        .font(.caption).foregroundStyle(Color.white.opacity(0.72))
+                }
+                HStack(alignment: .top, spacing: 8) {
+                    heroMetric(summaryStay.totalDays, copy("дней", "days", "kun", "кун"))
+                    heroMetric(summaryStay.makkahNights, copy("ночей в Мекке", "nights in Makkah", "Makkada tun", "Маккада тун"))
+                    if needsMadinah { heroMetric(summaryStay.madinahNights, copy("ночей в Медине", "nights in Madinah", "Madinada tun", "Мадинада тун")) }
+                }
+                Divider().overlay(Color.white.opacity(0.18))
+                summaryPricePair(dark: true)
+            }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+        }.foregroundStyle(Color.white).background {
+            LinearGradient(colors: [.black, Color(white: 0.12), Color(white: 0.04)], startPoint: .top, endPoint: .bottom)
+        }.clipShape(RoundedRectangle(cornerRadius: 24)).environment(\.colorScheme, .dark)
     }
     func heroMetric(_ n: Int, _ title: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("\(n)").font(.title2.bold()).monospacedDigit()
-            Text(title).font(.caption2).fixedSize(horizontal: false, vertical: true)
-        }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
-            .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+            Text("\(n)").font(.system(.title2, design: .rounded, weight: .bold)).monospacedDigit()
+            Text(title).font(.caption2).foregroundStyle(Color.white.opacity(0.75)).fixedSize(horizontal: false, vertical: true)
+        }.padding(10).frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+            .background(Color.white.opacity(0.09), in: RoundedRectangle(cornerRadius: 14))
     }
+    func summaryPricePair(dark: Bool = false) -> some View {
+        HStack(alignment: .bottom, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(copy("За всех паломников", "For all pilgrims", "Barcha ziyoratchilar", "Барча зиёратчилар")).font(.caption).foregroundStyle(dark ? Color.white.opacity(0.72) : Color.secondary)
+                Text(totalText).font(.system(.title, design: .rounded, weight: .bold)).monospacedDigit().minimumScaleFactor(0.65).lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(copy("На человека", "Per person", "Kishi uchun", "Киши учун")).font(.caption).foregroundStyle(dark ? Color.white.opacity(0.72) : Color.secondary)
+                Text(perPersonText).font(.system(.title3, design: .rounded, weight: .bold)).monospacedDigit().minimumScaleFactor(0.65).lineLimit(1)
+            }
+        }.foregroundStyle(dark ? Color.white : Color.black)
+    }
+    func capsuleAction(_ title: String, outline: Bool = false, fill: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Text(title) }.buttonStyle(TripReviewCapsuleStyle(outline: outline, fillsWidth: fill))
+    }
+    func capsuleToggle(_ id: String, _ title: String, fill: Bool = false) -> some View {
+        capsuleAction(title, outline: true, fill: fill) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                if expandedSummary.contains(id) { expandedSummary.remove(id) } else { expandedSummary.insert(id) }
+            }
+        }.accessibilityValue(expandedSummary.contains(id) ? "Expanded" : "Collapsed")
+    }
+
     var guestCard: some View {
         surface {
             HStack {
-                Label(copy("Паломники и размещение", "Guests and rooms", "Ziyoratchilar va xonalar", "Зиёратчилар ва хоналар"), systemImage: "person.2").font(.headline)
+                VStack(alignment: .leading, spacing: 4) { Text(copy("Паломники и размещение", "Guests and rooms", "Ziyoratchilar va xonalar", "Зиёратчилар ва хоналар")).font(.system(.headline, design: .rounded)); Text(partyText).font(.caption).foregroundStyle(.secondary) }
                 Spacer(minLength: 4)
-                Button(changeTitle) { guestDraft = TripSummaryGuestDraft(journey: journey); expandedSummary.insert("guest") }.font(.subheadline.weight(.semibold))
+                capsuleAction(changeTitle) { guestDraft = TripSummaryGuestDraft(journey: journey); expandedSummary.insert("guest") }
             }
-            Text(partyText).font(.subheadline).foregroundStyle(.secondary)
+            if guestDraft != nil || expandedSummary.contains("guest") {
             disclosure("guest", copy("Состав семьи и номера", "Family and rooms", "Oila va xonalar", "Оила ва хоналар")) {
                 if guestDraft == nil {
                     Button(copy("Изменить состав", "Edit guests", "Tarkibni o‘zgartirish", "Таркибни ўзгартириш")) { guestDraft = TripSummaryGuestDraft(journey: journey) }.buttonStyle(IumrahSecondaryButtonStyle())
@@ -799,6 +861,7 @@ private extension LegacyFinalPackageView {
                 if let draft = guestDraft { guestControls(draft) }
                 else { roomDistribution(journey.trip) }
                 Text(copy("Обычно до четырёх взрослых; некоторые номера вмещают пять. Вместимость с детьми проверяется отдельно по тарифу отеля.", "Usually up to four adults; some rooms sleep five. Hotel occupancy including children is checked separately.", "Odatda to‘rt katta, ayrim xonalarda beshta. Bolalar bilan sig‘im tarif bo‘yicha tekshiriladi.", "Одатда тўрт катта, айрим хоналарда бешта. Болалар билан сиғим тариф бўйича текширилади.")).font(.caption).foregroundStyle(.secondary)
+            }
             }
             if let approved = approvedRoomRequest, approved.adults == journey.trip.adults, approved.rooms < journey.trip.rooms, journey.usesLocalJourney {
                 Button(copy("Выбрать согласованное размещение", "Select approved occupancy", "Kelishilgan joylashuvni tanlash", "Келишилган жойлашувни танлаш")) {
@@ -915,17 +978,37 @@ private extension LegacyFinalPackageView {
             else { missingFlight }
             if journey.trip.isRoundTripFlight, let back = journey.selectedInbound { compactFlight(back, id: "back", title: copy("Обратный рейс", "Return flight", "Qaytish reysi", "Қайтиш рейси")) }
             else if journey.trip.isRoundTripFlight { missingFlight }
-            detailLine(copy("Все авиабилеты", "All flights", "Barcha chiptalar", "Барча чипталар"), componentText(["flight_roundtrip", "flight_outbound", "flight_inbound"]))
+            if journey.selectedOutbound.map({ IumrahPackageDisplayPrices.flight($0, outbound: journey.selectedOutbound, inbound: journey.selectedInbound, travelers: journey.trip.travelerCount) == nil }) == true {
+                detailLine(copy("Все авиабилеты", "All flights", "Barcha chiptalar", "Барча чипталар"), componentText(["flight_roundtrip", "flight_outbound", "flight_inbound"]))
+            }
         }
     }
     var missingFlight: some View {
         surface { Button(copy("Выбрать рейсы", "Choose flights", "Reyslarni tanlash", "Рейсларни танлаш")) { editSession = TripSummaryEditSession(kind: .flights, journey: journey) }.buttonStyle(IumrahSecondaryButtonStyle()) }
     }
     func compactFlight(_ offer: FlightOffer, id: String, title: String) -> some View {
-        return surface {
-            TripSummaryFlightOverview(offer: offer, outbound: journey.selectedOutbound, inbound: journey.selectedInbound, travelers: journey.trip.travelerCount, language: settings.language, title: title)
-            Button(changeTitle) { editSession = TripSummaryEditSession(kind: .flights, journey: journey) }.font(.subheadline.weight(.semibold))
-            disclosure("flight-" + id, copy("Багаж, тариф и условия", "Baggage, fare and terms", "Bagaj, tarif va shartlar", "Багаж, тариф ва шартлар")) {
+        surface {
+            HStack(alignment: .center, spacing: 8) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title + " · " + flightHeaderDate(offer)).font(.caption).foregroundStyle(.secondary)
+                    Text(offer.airlinesSummary + " · " + offer.flightNumbersSummary).font(.system(.headline, design: .rounded)).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                capsuleAction(changeTitle) { editSession = TripSummaryEditSession(kind: .flights, journey: journey) }
+            }
+            TripSummaryFlightOverview(offer: offer, outbound: journey.selectedOutbound, inbound: journey.selectedInbound, travelers: journey.trip.travelerCount, language: settings.language, title: title, compactReview: true)
+            HStack(alignment: .center) {
+                if let fare = IumrahPackageDisplayPrices.flight(offer, outbound: journey.selectedOutbound, inbound: journey.selectedInbound, travelers: journey.trip.travelerCount) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(IumrahPackageDisplayPrices.money(fare.amount, currency: fare.currency, language: settings.language)).font(.system(.title3, design: .rounded, weight: .bold)).monospacedDigit()
+                        Text((fare.roundTrip ? copy("Туда и обратно · ", "Round trip · ", "Borish va qaytish · ", "Бориш ва қайтиш · ") : "") + copy("на человека", "per person", "kishi uchun", "киши учун")).font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 0)
+                capsuleToggle("flight-" + id, copy("Тариф и багаж", "Fare and baggage", "Tarif va bagaj", "Тариф ва багаж"))
+            }
+            policyLabel(IumrahRefundComponent.flight.badge(settings.language))
+            if expandedSummary.contains("flight-" + id) {
                 detailLine(copy("Класс", "Cabin", "Klass", "Класс"), offer.cabinClass ?? journey.trip.effectiveFlightFilters.cabinClass.rawValue)
                 if let b = offer.baggage {
                     if let checked = b.checked { detailLine(copy("Багаж", "Checked baggage", "Bagaj", "Багаж"), "\(checked) kg") }
@@ -934,6 +1017,13 @@ private extension LegacyFinalPackageView {
                 Text(IumrahRefundComponent.flight.summary(settings.language)).font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+
+    func flightHeaderDate(_ offer: FlightOffer) -> String {
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: settings.language.localeIdentifier)
+        formatter.timeZone = FlightReferenceCatalog.timeZone(for: offer.origin) ?? TimeZone(secondsFromGMT: 0)
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter.string(from: offer.departureAt)
     }
     var compactHotels: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -973,9 +1063,17 @@ private extension LegacyFinalPackageView {
     func compactLocalHotelGroup(_ city: String) -> some View {
         let rooms = journey.localJourneyRooms.values.filter { $0.city == city }.sorted { $0.id < $1.id }
         return surface {
-            TripSummaryHotelOverview(rooms: rooms, language: settings.language, confirmedTotal: componentAmount([city == "madinah" ? "madinah_hotel" : "makkah_hotel"]))
-            Button(changeTitle) { editSession = TripSummaryEditSession(kind: .hotel(city), journey: journey) }.font(.subheadline.weight(.semibold))
-            disclosure("hotel-group-" + city, copy("Номера, питание и условия", "Rooms, meals and terms", "Xonalar, ovqat va shartlar", "Хоналар, овқат ва шартлар")) {
+            TripSummaryHotelOverview(rooms: rooms, language: settings.language, confirmedTotal: componentAmount([city == "madinah" ? "madinah_hotel" : "makkah_hotel"]), compactReview: true)
+            HStack(spacing: 8) {
+                capsuleAction(copy("Изменить отель", "Change hotel", "Mehmonxonani o‘zgartirish", "Меҳмонхонани ўзгартириш"), fill: true) { editSession = TripSummaryEditSession(kind: .hotel(city), journey: journey) }
+                if rooms.count == 1, let room = rooms.first {
+                    capsuleAction(copy("Номер и питание", "Room and meals", "Xona va ovqat", "Хона ва овқат"), outline: true, fill: true) { localHotelForDetails = room }
+                } else {
+                    capsuleToggle("hotel-group-" + city, copy("Номер и питание", "Room and meals", "Xona va ovqat", "Хона ва овқат"), fill: true)
+                }
+            }
+            policyLabel(rooms.allSatisfy { $0.rate.refundable } ? copy("Возврат по условиям тарифа", "Refundable under rate terms", "Tarif bo‘yicha qaytarish", "Тариф бўйича қайтариш") : rooms.allSatisfy { !$0.rate.refundable } ? copy("Невозвратный тариф", "Non-refundable rate", "Qaytarilmaydigan tarif", "Қайтарилмайдиган тариф") : copy("Условия возврата различаются по номерам", "Refund terms vary by room", "Qaytarish shartlari xonaga bog‘liq", "Қайтариш шартлари хонага боғлиқ"), refundable: rooms.allSatisfy { $0.rate.refundable })
+            if expandedSummary.contains("hotel-group-" + city) {
                 ForEach(rooms) { room in
                     Text(room.rate.roomName).font(.subheadline.bold())
                     IumrahHotelStaySummary(checkin: room.checkin, checkout: room.checkout, nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights, adults: room.adults, children: room.childrenAges.count, checkinTime: plannedHotelTime(city, kind: "hotelCheckIn"), checkoutTime: plannedHotelTime(city, kind: "hotelCheckOut"))
@@ -983,7 +1081,7 @@ private extension LegacyFinalPackageView {
                     policyLabel(room.rate.refundable ? copy("Возврат по условиям тарифа", "Refundable under rate terms", "Tarif shartlari bo‘yicha qaytarish", "Тариф шартлари бўйича қайтариш") : copy("Невозвратный тариф", "Non-refundable rate", "Qaytarilmaydigan tarif", "Қайтарилмайдиган тариф"), refundable: room.rate.refundable)
                     if !room.rate.cancellationDescription.isEmpty { Text(room.rate.cancellationDescription).font(.caption).foregroundStyle(.secondary) }
                     if let nightly = IumrahPackageDisplayPrices.nightly(room) { detailLine(copy("Средняя цена за ночь", "Average per night", "Tun uchun o‘rtacha", "Тун учун ўртача"), IumrahPackageDisplayPrices.money(nightly, currency: room.rate.currency, language: settings.language)) }
-                    Button(copy("Изменить номер и питание", "Change room and meals", "Xona va ovqatni o‘zgartirish", "Хона ва овқатни ўзгартириш")) { beginPriceChange(); localHotelForDetails = room }.buttonStyle(IumrahSecondaryButtonStyle())
+                    Button(copy("Изменить номер и питание", "Change room and meals", "Xona va ovqatni o‘zgartirish", "Хона ва овқатни ўзгартириш")) { localHotelForDetails = room }.buttonStyle(IumrahSecondaryButtonStyle())
                     IumrahHotelMealsEditor(selection: Binding(get: { journey.localJourneyRooms[room.id]?.meals ?? HotelMealChoices() }, set: { value in
                         beginPriceChange(); journey.localJourneyRooms[room.id]?.meals = value; journey.invalidateTripSummaryQuote()
                     }), stars: room.hotel.roundedStars, city: city, included: room.rate.supplierMeals)
@@ -1009,9 +1107,13 @@ private extension LegacyFinalPackageView {
                 Spacer(minLength: 0)
             }
             detailLine(copy("Даты", "Dates", "Sanalar", "Саналар"), dateRange(window.checkIn, window.checkOut))
-            HStack { Text(roomName(role)).font(.subheadline); Spacer(); Button(changeTitle) { editSession = TripSummaryEditSession(kind: .catalog(role), journey: journey) }.font(.subheadline.weight(.semibold)) }
+            Text(roomName(role)).font(.subheadline)
+            HStack(spacing: 8) {
+                capsuleAction(copy("Изменить отель", "Change hotel", "Mehmonxonani o‘zgartirish", "Меҳмонхонани ўзгартириш"), fill: true) { editSession = TripSummaryEditSession(kind: .catalog(role), journey: journey) }
+                capsuleAction(copy("Номер и питание", "Room and meals", "Xona va ovqat", "Хона ва овқат"), outline: true, fill: true) { beginPriceChange(); hotelForDetails = hotel }
+            }
             policyLabel(IumrahRefundComponent.hotel.badge(settings.language))
-            disclosure("catalog-" + role.rawValue, copy("Номер, питание и условия", "Room, meals and terms", "Xona, ovqat va shartlar", "Хона, овқат ва шартлар")) {
+            if expandedSummary.contains("catalog-" + role.rawValue) {
                 Text(mealsText).font(.caption)
                 Text(IumrahRefundComponent.hotel.summary(settings.language)).font(.caption).foregroundStyle(.secondary)
                 Button(copy("Изменить номер", "Change room", "Xonani o‘zgartirish", "Хонани ўзгартириш")) { beginPriceChange(); hotelForDetails = hotel }.buttonStyle(IumrahSecondaryButtonStyle())
@@ -1024,20 +1126,27 @@ private extension LegacyFinalPackageView {
             surface {
                 if let vehicle = journey.selectedTransferVehicle { TripSummaryVehicleOverview(vehicle: vehicle, language: settings.language, price: componentText(["transfers", "vip_transfer_upgrade"])) }
                 else { Text(copy("Выберите автомобиль", "Select vehicle", "Avtomobilni tanlang", "Автомобилни танланг")).font(.headline) }
+                HStack(spacing: 8) {
+                    capsuleAction(changeTitle, fill: true) { editSession = TripSummaryEditSession(kind: .transfer, journey: journey) }
+                    capsuleToggle("transfer", copy("Условия отмены", "Cancellation terms", "Bekor qilish shartlari", "Бекор қилиш шартлари"), fill: true)
+                }
+                Divider()
                 if let deadline = transferDeadline { policyLabel(copy("Плановый срок бесплатной отмены: ", "Planned free cancellation deadline: ", "Bepul bekor qilishning taxminiy muddati: ", "Бепул бекор қилишнинг тахминий муддати: ") + deadline, refundable: true) }
                 else { policyLabel(copy("Полный возврат при отмене за 24 часа", "Full refund when cancelled 24h before pickup", "24 soat oldin bekor qilishda to‘liq qaytarish", "24 соат олдин бекор қилишда тўлиқ қайтариш"), refundable: true) }
                 Text(copy("Позже, до начала: штраф до $100, возврат остатка.", "Later, before service: up to $100 penalty, remainder refunded.", "Keyin, xizmatdan oldin: $100 gacha jarima, qoldiq qaytariladi.", "Кейин, хизматдан олдин: $100 гача жарима, қолдиқ қайтарилади.")).font(.caption).foregroundStyle(.secondary)
                 if let vehicle = journey.selectedTransferVehicle, vehicle.passengerCapacity < journey.trip.travelerCount { policyLabel(copy("Нужен автомобиль подходящей вместимости", "Select a vehicle with enough seats", "Yetarli o‘rinli avtomobilni tanlang", "Етарли ўринли автомобилни танланг")) }
-                Button(changeTitle) { editSession = TripSummaryEditSession(kind: .transfer, journey: journey) }.font(.subheadline.weight(.semibold))
-                disclosure("transfer", copy("Маршрут и условия", "Route and terms", "Yo‘nalish va shartlar", "Йўналиш ва шартлар")) { IumrahTransferRouteDetails(); Text(IumrahRefundComponent.transfer.summary(settings.language)).font(.caption).foregroundStyle(.secondary) }
+                if expandedSummary.contains("transfer") { IumrahTransferRouteDetails(); Text(IumrahRefundComponent.transfer.summary(settings.language)).font(.caption).foregroundStyle(.secondary) }
             }
             simpleService("guide", title: copy("Персональный гид", "Personal guide", "Shaxsiy gid", "Шахсий гид"), subtitle: copy("Один гид для вашей семьи", "One guide for your family", "Oilangiz uchun bitta gid", "Оилангиз учун битта гид"), icon: "person.crop.circle.badge.checkmark", asset: "AboutIumrahPilgrims", codes: ["accompaniment"], policy: fullRefundText, refundable: true) {
                 Text(copy("Встреча в аэропорту, заселение, сопровождение при умре и зияратах, помощь до возвращения домой.", "Airport welcome, check-in, Umrah and ziyarat accompaniment, help until the return home.", "Aeroportda kutib olish, joylashish, umra va ziyoratlarda hamrohlik, qaytishgacha yordam.", "Аэропортда кутиб олиш, жойлашиш, умра ва зиёратларда ҳамроҳлик, қайтишгача ёрдам.")).font(.subheadline)
                 Button(copy("Подробнее о гиде", "Guide details", "Gid haqida", "Гид ҳақида")) { infoSheet = .guide }.buttonStyle(IumrahSecondaryButtonStyle())
             }
-            simpleService("ziyarat-m", title: copy("Зияраты в Мекке", "Makkah ziyarat", "Makka ziyoratlari", "Макка зиёратлари"), subtitle: copy("Индивидуальная программа", "Private program", "Individual dastur", "Индивидуал дастур"), icon: "mappin.and.ellipse", asset: nil, codes: ["ziyarat_makkah"], policy: fullRefundText, refundable: true) { Text(copy("Маршрут и время согласовываются с гидом.", "Route and time arranged with the guide.", "Yo‘nalish va vaqt gid bilan kelishiladi.", "Йўналиш ва вақт гид билан келишилади.")).font(.caption) }
-            if needsMadinah { simpleService("ziyarat-d", title: copy("Зияраты в Медине", "Madinah ziyarat", "Madina ziyoratlari", "Мадина зиёратлари"), subtitle: copy("Индивидуальная программа", "Private program", "Individual dastur", "Индивидуал дастур"), icon: "mappin.and.ellipse", asset: "ZiyaratQuba1", codes: ["ziyarat_madinah"], policy: fullRefundText, refundable: true) { Text(copy("Маршрут и время согласовываются с гидом.", "Route and time arranged with the guide.", "Yo‘nalish va vaqt gid bilan kelishiladi.", "Йўналиш ва вақт гид билан келишилади.")).font(.caption) } }
-            simpleService("visa", title: copy("Визы и документы", "Visas and documents", "Viza va hujjatlar", "Виза ва ҳужжатлар"), subtitle: copy("Туристические визы", "Tourist visas", "Turistik vizalar", "Туристик визалар"), icon: "doc.text", asset: nil, codes: ["visa"], policy: copy("Полный возврат до подачи; после подачи — без возврата", "Full refund before submission; non-refundable after submission", "Topshirishdan oldin to‘liq qaytarish; keyin qaytarilmaydi", "Топширишдан олдин тўлиқ қайтариш; кейин қайтарилмайди"), refundable: true) {
+            simpleService("ziyarat", title: copy("Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар"), subtitle: journey.trip.scope.title(settings.language), icon: "mappin.and.ellipse", asset: needsMadinah ? "ZiyaratQuba1" : nil, codes: ["ziyarat_makkah", "ziyarat_madinah"], policy: fullRefundText, refundable: true) {
+                if let amount = componentAmount(["ziyarat_makkah"]) { detailLine(copy("Мекка", "Makkah", "Makka", "Макка"), usd(amount)) }
+                if let amount = componentAmount(["ziyarat_madinah"]) { detailLine(copy("Медина", "Madinah", "Madina", "Мадина"), usd(amount)) }
+                Text(copy("Маршрут и время согласовываются с гидом.", "Route and time arranged with the guide.", "Yo‘nalish va vaqt gid bilan kelishiladi.", "Йўналиш ва вақт гид билан келишилади.")).font(.caption)
+            }
+            simpleService("visa", title: copy("Туристические визы", "Tourist visas", "Turistik vizalar", "Туристик визалар"), subtitle: "\(journey.trip.travelerCount) " + copy("паломников", "pilgrims", "ziyoratchi", "зиёратчи"), icon: "doc.text", asset: nil, codes: ["visa"], policy: copy("Полный возврат до подачи; после подачи — без возврата", "Full refund before submission; non-refundable after submission", "Topshirishdan oldin to‘liq qaytarish; keyin qaytarilmaydi", "Топширишдан олдин тўлиқ қайтариш; кейин қайтарилмайди"), refundable: true) {
                 Text(copy("Сначала оформляются визы. После успешного получения виз начинается покупка авиабилетов.", "Visas are processed first. Ticket purchase starts after the visas are issued.", "Avval vizalar rasmiylashtiriladi. Vizalar olingach aviachiptalar xaridi boshlanadi.", "Аввал визалар расмийлаштирилади. Визалар олингач авиачипталар хариди бошланади.")).font(.subheadline)
             }
             if journey.haramainTrainSelected { simpleService("train", title: "Haramain", subtitle: trainText, icon: "tram", asset: nil, codes: ["haramain_train_addon"], policy: copy("По условиям тарифа", "Subject to fare terms", "Tarif shartlariga ko‘ra", "Тариф шартларига кўра"), refundable: false) { Text(trainText).font(.caption) } }
@@ -1047,13 +1156,20 @@ private extension LegacyFinalPackageView {
     func simpleService<Content: View>(_ id: String, title: String, subtitle: String, icon: String, asset: String?, codes: [String], policy: String, refundable: Bool, @ViewBuilder content: () -> Content) -> some View {
         surface {
             HStack(alignment: .center, spacing: 12) {
-                if let asset { Image(asset).resizable().scaledToFill().frame(width: 72, height: 72).clipShape(RoundedRectangle(cornerRadius: 14)) }
-                else { Image(systemName: icon).font(.title2).frame(width: 38) }
-                VStack(alignment: .leading, spacing: 4) { Text(title).font(.headline); Text(subtitle).font(.caption).foregroundStyle(.secondary) }
-                Spacer(minLength: 4); Text(componentText(codes)).font(.headline).monospacedDigit()
+                if let asset { Image(asset).resizable().scaledToFill().frame(width: 88, height: 88).clipShape(RoundedRectangle(cornerRadius: 16)) }
+                else { Image(systemName: icon).font(.title2).frame(width: 48, height: 48).background(Color(white: 0.94), in: RoundedRectangle(cornerRadius: 14)) }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title).font(.system(.headline, design: .rounded)).fixedSize(horizontal: false, vertical: true)
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    Text(componentText(codes)).font(.system(.title3, design: .rounded, weight: .bold)).monospacedDigit()
+                }
+                Spacer(minLength: 4)
             }
-            policyLabel(policy, refundable: refundable)
-            disclosure("service-" + id, copy("Подробнее", "Details", "Batafsil", "Батафсил"), content: content)
+            HStack(alignment: .center, spacing: 8) {
+                policyLabel(policy, refundable: refundable).frame(maxWidth: .infinity, alignment: .leading)
+                capsuleToggle("service-" + id, id == "ziyarat" ? copy("Программа", "Program", "Dastur", "Дастур") : copy("Подробнее", "Details", "Batafsil", "Батафсил"))
+            }
+            if expandedSummary.contains("service-" + id) { AnyView(content()) }
         }
     }
     var transferDeadline: String? {
@@ -1065,15 +1181,22 @@ private extension LegacyFinalPackageView {
     }
     var supportCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack { Label(copy("iumrah Поддержка", "iumrah Support", "iumrah Yordam", "iumrah Ёрдам"), systemImage: "headset").font(.title3.bold()); Spacer(); Text("9%").font(.title2.bold()) }
-            Text(copy("Мы с вами на каждом этапе", "With you at every stage", "Har bosqichda yoningizdamiz", "Ҳар босқичда ёнингиздамиз")).font(.headline)
-            Text(copy("До поездки, во время путешествия и до возвращения домой.", "Before, during and until your return home.", "Safardan oldin, safarda va uyga qaytguncha.", "Сафардан олдин, сафарда ва уйга қайтгунча.")).font(.caption)
-            Divider().overlay(.white.opacity(0.2))
-            detailLine(copy("Поддержка и комиссия", "Support and platform fee", "Yordam va platforma haqi", "Ёрдам ва платформа ҳақи"), publicPrice.map { usd($0.supportAmountUsd) } ?? "—")
-            disclosure("support", copy("Что входит", "What is included", "Nimalar kiradi", "Нималар киради")) { Text(copy("Координация бронирований, помощь с документами, гидом, трансферами и поддержка 24/7.", "Booking coordination, help with documents, guide, transfers and 24/7 support.", "Bronlar, hujjatlar, gid, transferlar va 24/7 yordam.", "Бронлар, ҳужжатлар, гид, трансферлар ва 24/7 ёрдам.")).font(.subheadline) }
-            Button(copy("Задать вопрос о путешествии", "Ask about your trip", "Safar haqida so‘rash", "Сафар ҳақида сўраш")) { showPackageSupport = true }.buttonStyle(.bordered).tint(.white)
-        }.padding(18).foregroundStyle(.white).environment(\.colorScheme, .dark).background(Color.black, in: RoundedRectangle(cornerRadius: 24))
+            Label(copy("iumrah Поддержка", "iumrah Support", "iumrah Yordam", "iumrah Ёрдам"), systemImage: "headset").font(.system(.title3, design: .rounded, weight: .bold))
+            Text(copy("На всех этапах путешествия.", "At every stage of your journey.", "Safarning barcha bosqichlarida.", "Сафарнинг барча босқичларида.")).font(.subheadline).foregroundStyle(Color.white.opacity(0.75))
+            Divider().overlay(Color.white.opacity(0.2))
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(copy("Поддержка и комиссия", "Support and platform fee", "Yordam va platforma haqi", "Ёрдам ва платформа ҳақи")).font(.caption).foregroundStyle(Color.white.opacity(0.72))
+                    Text("9%").font(.system(.title, design: .rounded, weight: .bold))
+                }
+                Spacer(minLength: 8)
+                Text(publicPrice.map { usd($0.supportAmountUsd) } ?? "—").font(.system(.title3, design: .rounded, weight: .bold)).monospacedDigit()
+            }
+            Button(copy("Задать вопрос", "Ask a question", "Savol berish", "Савол бериш")) { showPackageSupport = true }
+                .buttonStyle(TripReviewCapsuleStyle(outline: true, fillsWidth: true, dark: true))
+        }.padding(16).foregroundStyle(Color.white).environment(\.colorScheme, .dark).background(Color(white: 0.07), in: RoundedRectangle(cornerRadius: 24))
     }
+
     func componentLabel(_ c: TripSummaryPublicPrice.Component) -> String {
         switch c.code {
         case "flight_roundtrip": return copy("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")
@@ -1093,27 +1216,61 @@ private extension LegacyFinalPackageView {
         default: return c.label
         }
     }
+    struct ReviewPriceRow: Identifiable {
+        let key: String
+        let label: String
+        let amount: Decimal
+        var id: String { key }
+    }
+    func displayPriceRows(_ price: TripSummaryPublicPrice) -> [ReviewPriceRow] {
+        TripReviewPriceGrouping.groups(price.components).map { group in
+            let label: String
+            switch group.key {
+            case "flights": label = copy("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")
+            case "meals": label = copy("Питание", "Meals", "Ovqatlanish", "Овқатланиш")
+            case "ziyarats": label = copy("Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар")
+            case "transfer": label = copy("Трансфер", "Transfer", "Transfer", "Трансфер")
+            default: label = componentLabel(group.representative)
+            }
+            return ReviewPriceRow(key: group.key, label: label, amount: group.amount)
+        }
+    }
+    func priceRow(_ label: String, _ value: String, strong: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 4)
+            Text(value).monospacedDigit().fontWeight(strong ? .bold : .medium).multilineTextAlignment(.trailing).fixedSize(horizontal: true, vertical: false)
+        }.font(.system(.subheadline, design: .rounded)).foregroundStyle(Color.black)
+    }
     var priceBreakdownCard: some View {
         surface {
-            sectionTitle(copy("Детализация стоимости", "Price breakdown", "Narx tafsilotlari", "Нарх тафсилотлари"))
+            sectionTitle(copy("Стоимость путешествия", "Trip cost", "Safar narxi", "Сафар нархи"))
+            Text(copy("За всех паломников · USD", "For all pilgrims · USD", "Barcha ziyoratchilar · USD", "Барча зиёратчилар · USD")).font(.caption).foregroundStyle(.secondary)
             if let price = publicPrice {
-                ForEach(price.components) { c in
-                    disclosure("price-" + c.code, componentLabel(c) + " · " + usd(c.amountUsd)) { componentDetails(c) }
-                    Divider()
-                }
-                detailLine(copy("Стоимость услуг", "Services subtotal", "Xizmatlar jami", "Хизматлар жами"), usd(price.servicesSubtotalUsd))
-                disclosure("price-support", copy("Поддержка и комиссия · 9%", "Support and fee · 9%", "Yordam va komissiya · 9%", "Ёрдам ва комиссия · 9%") + " · " + usd(price.supportAmountUsd)) { detailLine(usd(price.servicesSubtotalUsd) + " × 9%", usd(price.supportAmountUsd)) }
-                disclosure("price-payment", copy("Комиссия оплаты · 2%", "Payment fee · 2%", "To‘lov komissiyasi · 2%", "Тўлов комиссияси · 2%") + " · " + usd(price.paymentAmountUsd)) { detailLine(usd(price.totalUsd) + " × 2%", usd(price.paymentAmountUsd)) }
-                if price.roundingUsd != 0 { detailLine(copy("Округление", "Rounding", "Yaxlitlash", "Яхлитлаш"), usd(price.roundingUsd)) }
+                ForEach(displayPriceRows(price)) { row in priceRow(row.label, usd(row.amount)) }
                 Divider()
-                disclosure("chart", copy("Диаграмма стоимости", "Price distribution", "Narx diagrammasi", "Нарх диаграммаси")) { priceChart(price) }
+                priceRow(copy("Стоимость услуг", "Services subtotal", "Xizmatlar jami", "Хизматлар жами"), usd(price.servicesSubtotalUsd), strong: true)
+                priceRow(copy("Поддержка и комиссия · 9%", "Support and fee · 9%", "Yordam va komissiya · 9%", "Ёрдам ва комиссия · 9%"), usd(price.supportAmountUsd), strong: true)
+                priceRow(copy("Комиссия оплаты · 2%", "Payment fee · 2%", "To‘lov komissiyasi · 2%", "Тўлов комиссияси · 2%"), usd(price.paymentAmountUsd), strong: true)
+                priceRow(copy("Округление", "Rounding", "Yaxlitlash", "Яхлитлаш"), usd(price.roundingUsd))
                 Divider()
-                detailLine(copy("Итого", "Total", "Jami", "Жами"), usd(price.totalUsd))
+                summaryPricePair()
             } else {
-                Text(copy("Подробный расчёт пока недоступен. Стоимость подтверждается сервером; отдельные цены не вычисляются на устройстве.", "Detailed pricing is not available yet. The server confirms the total; individual prices are not calculated on the device.", "Batafsil narx hozircha mavjud emas. Jami serverda tasdiqlanadi.", "Батафсил нарх ҳозирча мавжуд эмас. Жами серверда тасдиқланади.")).font(.caption).foregroundStyle(.secondary)
+                Text(copy("Расчёт стоимости пока недоступен. Обновите расчёт.", "Pricing is unavailable. Refresh the price.", "Narx mavjud emas. Hisobni yangilang.", "Нарх мавжуд эмас. Ҳисобни янгиланг.")).font(.caption).foregroundStyle(.secondary)
             }
         }
     }
+    var chartCard: some View {
+        surface {
+            HStack {
+                Text(copy("Диаграмма стоимости", "Price distribution", "Narx diagrammasi", "Нарх диаграммаси")).font(.system(.headline, design: .rounded))
+                Spacer(minLength: 4)
+                capsuleToggle("chart", expandedSummary.contains("chart") ? copy("Скрыть", "Hide", "Yashirish", "Яшириш") : copy("Смотреть", "View", "Ko‘rish", "Кўриш"))
+            }
+            if expandedSummary.contains("chart"), let price = publicPrice { priceChart(price) }
+        }
+    }
+
     @ViewBuilder func componentDetails(_ c: TripSummaryPublicPrice.Component) -> some View {
         if c.code == "visa" {
             detailLine(copy("Количество виз", "Visa count", "Vizalar soni", "Визалар сони"), "\(journey.trip.travelerCount)")
@@ -1132,7 +1289,7 @@ private extension LegacyFinalPackageView {
         detailLine(copy("Итого", "Total", "Jami", "Жами"), usd(c.amountUsd))
     }
     func priceChart(_ price: TripSummaryPublicPrice) -> some View {
-        let values = price.components.map { (componentLabel($0), $0.amountUsd) } + [(copy("Поддержка", "Support", "Yordam", "Ёрдам"), price.supportAmountUsd), (copy("Оплата", "Payment", "To‘lov", "Тўлов"), price.paymentAmountUsd), (copy("Округление", "Rounding", "Yaxlitlash", "Яхлитлаш"), price.roundingUsd)]
+        let values = displayPriceRows(price).map { ($0.label, $0.amount) } + [(copy("Поддержка", "Support", "Yordam", "Ёрдам"), price.supportAmountUsd), (copy("Оплата", "Payment", "To‘lov", "Тўлов"), price.paymentAmountUsd), (copy("Округление", "Rounding", "Yaxlitlash", "Яхлитлаш"), price.roundingUsd)]
         return VStack(alignment: .leading, spacing: 8) {
             GeometryReader { geo in
                 HStack(spacing: 0) {
@@ -1155,6 +1312,8 @@ private extension LegacyFinalPackageView {
     }
     var conditionsCard: some View {
         surface {
+            sectionTitle(copy("Условия путешествия", "Travel terms", "Safar shartlari", "Сафар шартлари"))
+            Divider()
             disclosure("booking-terms", copy("Условия бронирования", "Booking terms", "Bron shartlari", "Брон шартлари")) { Text(copy("После заявки мы проверяем наличие. Оплата после подтверждения. Сначала оформляем визы, затем покупаем авиабилеты.", "We check availability after your request. Pay after confirmation. Visas first, then ticket purchase.", "Arizadan keyin mavjudlik tekshiriladi. Tasdiqdan keyin to‘lov. Avval viza, keyin chipta.", "Аризадан кейин мавжудлик текширилади. Тасдиқдан кейин тўлов. Аввал виза, кейин чипта.")).font(.subheadline) }
             Divider()
             disclosure("refund-terms", copy("Условия отмены и возврата", "Cancellation and refunds", "Bekor qilish va qaytarish", "Бекор қилиш ва қайтариш")) {
@@ -1166,35 +1325,66 @@ private extension LegacyFinalPackageView {
         }
     }
     var summaryTotalCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("iumrah").font(.title2.bold())
-            Text(copy("Итого за путешествие", "Trip total", "Safar jami", "Сафар жами")).font(.caption)
-            Text(totalText).font(.largeTitle.bold()).monospacedDigit()
-            if let q = journey.quote, journey.hasFinalGeneratorQuote, !isCalculatingPrice { Text(IumrahPackageDisplayPrices.money(q.pricePerPerson, currency: q.currency, language: settings.language) + " · " + copy("на паломника", "per pilgrim", "ziyoratchi uchun", "зиёратчи учун")).font(.subheadline) }
-            Divider().overlay(.white.opacity(0.2))
-            Label(copy("Индивидуальное обслуживание", "Private service", "Individual xizmat", "Индивидуал хизмат"), systemImage: "checkmark.circle")
-            Label(copy("Поддержка на всех этапах", "Support at every stage", "Har bosqichda yordam", "Ҳар босқичда ёрдам"), systemImage: "checkmark.circle")
-        }.padding(20).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(.white).background(Color.black, in: RoundedRectangle(cornerRadius: 28))
+        VStack(alignment: .leading, spacing: 12) {
+            Text("iumrah").font(.system(.title3, design: .rounded, weight: .bold))
+            Text(copy("Индивидуальная умра", "Individual Umrah", "Individual umra", "Индивидуал умра") + " · " + "\(journey.trip.travelerCount) " + copy("паломников", "pilgrims", "ziyoratchi", "зиёратчи")).font(.caption).foregroundStyle(Color.white.opacity(0.75))
+            summaryPricePair(dark: true)
+        }.padding(16).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(Color.white).background(Color(white: 0.07), in: RoundedRectangle(cornerRadius: 24)).environment(\.colorScheme, .dark)
     }
-    var canSavePackage: Bool { journey.hasFinalGeneratorQuote && journey.quote?.bookingAllowed != false && publicPrice != nil && !isCalculatingPrice && !savingPackage && guestDraft == nil && priceChangeAccepted && roomsComplete && flightSelectionReady }
+
+    var canSavePackage: Bool { journey.hasFinalGeneratorQuote && journey.quote?.bookingAllowed != false && publicPrice != nil && !isCalculatingPrice && !savingPackage && guestDraft == nil && priceChangeAccepted && roomsComplete && flightSelectionReady && journey.selectedHotel != nil && (!needsMadinah || journey.selectedMadinahHotel != nil) }
     var summaryActions: some View {
         VStack(spacing: 10) {
-            Button { Task { await saveCurrentPackage() } } label: { Label(savedQuoteID == journey.quote?.quoteId && savedPackage != nil ? copy("Пакет сохранён", "Package saved", "Paket saqlandi", "Пакет сақланди") : copy("Сохранить пакет", "Save package", "Paketni saqlash", "Пакетни сақлаш"), systemImage: "bookmark") }.buttonStyle(IumrahSecondaryButtonStyle()).disabled(!canSavePackage)
-            Button(copy("Забронировать путешествие", "Book journey", "Safarni bron qilish", "Сафарни брон қилиш")) { isProfileSheetPresented = true }.buttonStyle(IumrahPrimaryButtonStyle()).disabled(!canBook || isSubmitting)
-            Button { Task { await saveCurrentPackage(); if savedQuoteID == journey.quote?.quoteId, savedPackage != nil { prepareShareImage(); showSharePreview = true } } } label: { Label(copy("Сохранить и поделиться", "Save and share", "Saqlash va ulashish", "Сақлаш ва улашиш"), systemImage: "square.and.arrow.up") }.buttonStyle(IumrahSecondaryButtonStyle()).disabled(!canSavePackage)
+            Button { requestSave(share: false) } label: { Label(savedQuoteID == journey.quote?.quoteId && savedPackage != nil ? copy("Пакет сохранён", "Package saved", "Paket saqlandi", "Пакет сақланди") : copy("Сохранить пакет", "Save package", "Paketni saqlash", "Пакетни сақлаш"), systemImage: "bookmark") }.buttonStyle(TripReviewCapsuleStyle(outline: true, fillsWidth: true)).disabled(savingPackage || isCalculatingPrice)
+            Button(copy("Забронировать путешествие", "Book journey", "Safarni bron qilish", "Сафарни брон қилиш")) { handleBookTap() }.buttonStyle(TripReviewCapsuleStyle(fillsWidth: true, primary: true)).disabled(isSubmitting || isCalculatingPrice)
+            Button { requestSave(share: true) } label: { Label(copy("Сохранить и поделиться", "Save and share", "Saqlash va ulashish", "Сақлаш ва улашиш"), systemImage: "square.and.arrow.up") }.buttonStyle(TripReviewCapsuleStyle(outline: true, fillsWidth: true)).disabled(savingPackage || isCalculatingPrice)
             if savingPackage { ProgressView() }
+            if let errorMessage { Text(errorMessage).font(.caption).foregroundStyle(.red).multilineTextAlignment(.center) }
             if let receipt = savedPackage, savedQuoteID == journey.quote?.quoteId { Text(receipt.packageID).font(.caption.monospaced()).foregroundStyle(.secondary) }
-            Text(copy("Сначала подтверждаем наличие, затем оплата.", "Availability first, payment after confirmation.", "Avval mavjudlik, keyin to‘lov.", "Аввал мавжудлик, кейин тўлов.")).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(copy("Наличие и стоимость проверим после заявки, до оплаты.", "Availability and price will be checked after your request, before payment.", "Mavjudlik va narx arizadan keyin, to‘lovdan oldin tekshiriladi.", "Мавжудлик ва нарх аризадан кейин, тўловдан олдин текширилади.")).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }
+    }
+    func requestSave(share: Bool) {
+        guard canSavePackage else {
+            bookingBlockMessage = copy("Для сохранения завершите выбор услуг, расчёт и подтверждение новой цены.", "Complete the service selection and accept the current price before saving.", "Saqlashdan oldin xizmatlarni tanlang va narxni tasdiqlang.", "Сақлашдан олдин хизматларни танланг ва нархни тасдиқланг.")
+            return
+        }
+        Task {
+            await saveCurrentPackage()
+            if savedQuoteID == journey.quote?.quoteId, savedPackage != nil {
+                if share { prepareShareImage(); showSharePreview = true }
+            } else if let errorMessage { bookingBlockMessage = errorMessage }
         }
     }
     var compactBookingBar: some View {
-        VStack(spacing: 6) {
-            HStack { Text(totalText).font(.title3.bold()).monospacedDigit(); Spacer(); if let q = journey.quote, journey.hasFinalGeneratorQuote, !isCalculatingPrice { Text(IumrahPackageDisplayPrices.money(q.pricePerPerson, currency: q.currency, language: settings.language) + " / " + copy("чел.", "person", "kishi", "киши")).font(.caption).foregroundStyle(.secondary) } }
-            if !journey.transferSelectionConfirmed { Button(copy("Подтвердить трансфер", "Confirm transfer", "Transferni tasdiqlash", "Трансферни тасдиқлаш")) { editSession = TripSummaryEditSession(kind: .transfer, journey: journey) }.buttonStyle(IumrahPrimaryButtonStyle()) }
-            else if !journey.hasFinalGeneratorQuote || publicPrice == nil { Button(copy("Обновить расчёт", "Refresh price", "Narxni yangilash", "Нархни янгилаш")) { Task { await recalculatePrice() } }.buttonStyle(IumrahPrimaryButtonStyle()).disabled(isCalculatingPrice) }
-            else { Button(copy("Забронировать путешествие", "Book journey", "Safarni bron qilish", "Сафарни брон қилиш")) { isProfileSheetPresented = true }.buttonStyle(IumrahPrimaryButtonStyle()).disabled(!canBook || isSubmitting) }
-        }.padding(.horizontal, 18).padding(.vertical, 8).background(.regularMaterial)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(totalText).font(.system(.title3, design: .rounded, weight: .bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
+                Text(perPersonText + " / " + copy("чел.", "person", "kishi", "киши")).font(.caption).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading)
+            Button(copy("Забронировать", "Book", "Bron qilish", "Брон қилиш")) { handleBookTap() }
+                .buttonStyle(TripReviewCapsuleStyle(primary: true)).disabled(isSubmitting || isCalculatingPrice)
+        }.padding(.horizontal, 16).padding(.vertical, 10).foregroundStyle(Color.black).background(Color.white).environment(\.colorScheme, .light)
     }
+    func handleBookTap() {
+        guard !isSubmitting, !isCalculatingPrice else { return }
+        if canBook { isProfileSheetPresented = true; return }
+        if guestDraft != nil { bookingBlockMessage = copy("Примените изменения состава паломников.", "Apply your guest changes first.", "Avval tarkibni qo‘llang.", "Аввал таркибни қўлланг."); return }
+        if !journey.transferSelectionConfirmed || (journey.selectedTransferVehicle?.passengerCapacity ?? 0) < journey.trip.travelerCount {
+            editSession = TripSummaryEditSession(kind: .transfer, journey: journey); return
+        }
+        if !roomsComplete || journey.selectedHotel == nil || (needsMadinah && journey.selectedMadinahHotel == nil) {
+            editSession = TripSummaryEditSession(kind: journey.usesLocalJourney ? .allHotels : .catalog(journey.selectedHotel == nil || journey.selectedRoom == nil && journey.selectedRoomCategory == nil ? .makkah : .madinah), journey: journey); return
+        }
+        if !journey.hasFinalGeneratorQuote || publicPrice == nil {
+            Task { await recalculatePrice() }; return
+        }
+        if journey.quote?.bookingAllowed == false { bookingBlockMessage = copy("Сервер не разрешил оформить заявку с этим расчётом. Обновите расчёт или обратитесь в поддержку.", "The server did not allow a request for this quote. Refresh the price or contact support.", "Server bu hisob bilan ariza yuborishga ruxsat bermadi. Narxni yangilang yoki yordamga murojaat qiling.", "Сервер бу ҳисоб билан ариза юборишга рухсат бермади. Нархни янгиланг ёки ёрдамга мурожаат қилинг."); return }
+        if !priceChangeAccepted { bookingBlockMessage = copy("Подтвердите новую стоимость в карточке изменения цены.", "Accept the updated total in the price change card.", "Yangi narxni tasdiqlang.", "Янги нархни тасдиқланг."); return }
+        if !flightSelectionReady { editSession = TripSummaryEditSession(kind: .flights, journey: journey); return }
+        bookingBlockMessage = copy("Проверьте размещение или обратитесь в поддержку.", "Review accommodation or contact support.", "Joylashuvni tekshiring yoki yordamga murojaat qiling.", "Жойлашувни текширинг ёки ёрдамга мурожаат қилинг.")
+    }
+
     @ViewBuilder func summaryEditor(_ session: TripSummaryEditSession) -> some View {
         NavigationStack {
             Group {
@@ -1292,5 +1482,25 @@ private extension LegacyFinalPackageView {
                 } else { Text(copy("Ссылка недоступна. Повторите сохранение.", "Link unavailable. Save again.", "Havola mavjud emas.", "Ҳавола мавжуд эмас.")).font(.caption) }
             }
         }.padding(20) }.toolbar { ToolbarItem(placement: .cancellationAction) { Button(copy("Закрыть", "Close", "Yopish", "Ёпиш")) { showSharePreview = false } } } }
+    }
+}
+
+private struct TripReviewCapsuleStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    var outline = false
+    var fillsWidth = false
+    var dark = false
+    var primary = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 12).padding(.vertical, 9)
+            .frame(maxWidth: fillsWidth ? .infinity : nil, minHeight: 44)
+            .foregroundStyle(primary || dark ? Color.white : Color.black)
+            .background(primary ? Color.black : outline ? Color.clear : Color(red: 0.94, green: 0.94, blue: 0.95), in: Capsule())
+            .overlay { if outline { Capsule().strokeBorder(dark ? Color.white.opacity(0.36) : Color.black.opacity(0.16), lineWidth: 1) } }
+            .opacity(!isEnabled ? 0.45 : configuration.isPressed ? 0.75 : 1)
+            .contentShape(Capsule())
     }
 }

@@ -229,6 +229,13 @@ final class IumrahAccountStore: ObservableObject {
         return profile
     }
 
+    func deleteAccount() async throws {
+        guard let token else { throw APIError.status(401) }
+        try await service.deleteAccount(token: token)
+        guard self.token == token else { return }
+        await logout()
+    }
+
     func logout() async {
         let previousToken = token
         IumrahGoogleSignInSupport.signOutProviderSession()

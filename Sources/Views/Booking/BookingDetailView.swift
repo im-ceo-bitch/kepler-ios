@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 struct BookingDetailView: View {
     @EnvironmentObject private var bookings: BookingStore
@@ -60,6 +61,10 @@ struct BookingDetailView: View {
             }
         }
         .background(Color.iumrahPageBackground)
+        .confirmationDialog(localizedDetail("Удалить бронирование?", "Delete booking?", "Bron o‘chirilsinmi?", "Брон ўчирилсинми?"), isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button(localizedDetail("Удалить бронирование", "Delete booking", "Bronni o‘chirish", "Бронни ўчириш"), role: .destructive) { Task { await deleteBooking() } }
+            Button(L10n.text("cancel", settings.language), role: .cancel) { }
+        } message: { Text(localizedDetail("Заявка будет удалена. Восстановить её невозможно.", "The request will be deleted permanently.", "Ariza butunlay o‘chiriladi.", "Ариза бутунлай ўчирилади.")) }
         .task(id: bookingID) {
             await bookings.syncHotelSelectionIfNeeded(bookingID: bookingID)
             loadZiyaratDraft()
@@ -87,12 +92,8 @@ struct BookingDetailView: View {
                 PilgrimCheckoutView(bookingID: bookingID, presentation: .bookingStatus)
             } else {
                 VStack(alignment: .leading, spacing: 16) {
-                    IumrahBookingDomeCard(
-                        bookingNumber: session.displayBookingNumber,
-                        travelerName: bookingTravelerName(session),
-                        language: settings.language,
-                        isFlipped: $bookingCardFlipped
-                    )
+                    IumrahCompactBookingIdentity(session: session)
+                    IumrahBookingNotificationChannels(session: session)
                     bookingMetaCard(session.booking)
                     BookingFlightFirstComponentsView(
                         session: session,
@@ -100,11 +101,19 @@ struct BookingDetailView: View {
                         onChangeMadinahHotel: { showMadinahHotelChange = true }
                     )
                     contactCard(session)
-                    NavigationLink { BookingRefundView(bookingID: bookingID, bookingToken: session.accessToken) } label: {
-                        HStack { Image(systemName: "arrow.uturn.backward.circle"); Text(localizedDetail("Отмена и возврат", "Cancellation and refund", "Bekor qilish va qaytarish", "Бекор қилиш ва қайтариш")); Spacer(); Image(systemName: "chevron.forward").font(.caption) }.font(.headline).iumrahCard()
-                    }.buttonStyle(.plain)
+                    if session.isCheckingAvailability && session.paymentReceivedAt == nil {
+                        Button(role: .destructive) { showDeleteConfirmation = true } label: {
+                            Label(localizedDetail("Удалить бронирование", "Delete booking", "Bronni o‘chirish", "Бронни ўчириш"), systemImage: "trash")
+                                .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(14)
+                                .foregroundStyle(.red).overlay(Capsule().strokeBorder(Color.red.opacity(0.45)))
+                        }.buttonStyle(.plain).disabled(isDeleting)
+                        if let deleteError { Text(deleteError).font(.footnote).foregroundStyle(.red) }
+                    } else {
+                        NavigationLink { BookingRefundView(bookingID: bookingID, bookingToken: session.accessToken) } label: {
+                            HStack { Image(systemName: "arrow.uturn.backward.circle"); Text(localizedDetail("Отмена и возврат", "Cancellation and refund", "Bekor qilish va qaytarish", "Бекор қилиш ва қайтариш")); Spacer(); Image(systemName: "chevron.forward").font(.caption) }.font(.headline).iumrahCard()
+                        }.buttonStyle(.plain)
+                    }
                     if session.pendingChangeConfirmation == true || confirmationSent { confirmationCard(session) }
-                    IumrahTelegramConnectCard(session: session, accountToken: account.bearerToken, style: .compact)
                 }
             }
         } else {
@@ -616,29 +625,37 @@ struct BookingDetailView: View {
     }
 
     private func bookingMetaCard(_ booking: RemoteBooking) -> some View {
-        VStack(spacing: 13) {
-            summaryRow(
-                title: L10n.text("detail_dates", settings.language),
-                value: "\(L10n.date(booking.input.startDate, settings.language)) — \(L10n.date(booking.input.endDate, settings.language))"
-            )
-            summaryRow(
-                title: L10n.text("travelers", settings.language),
-                value: "\(booking.input.travelers.totalPeople)"
-            )
+        VStack(alignment: .leading, spacing: 14) {
+            Text(localizedDetail("Ваше путешествие", "Your journey", "Safaringiz", "Сафарингиз")).font(.title3.bold())
+            Label("\(L10n.date(booking.input.startDate, settings.language)) – \(L10n.date(booking.input.endDate, settings.language))", systemImage: "calendar").font(.subheadline)
+            Label("\(booking.input.travelers.totalPeople) · " + L10n.text("travelers", settings.language), systemImage: "person.2").font(.subheadline)
+            HStack(spacing: 8) {
+                tripMetric(booking.stay.totalDays, localizedDetail("дней", "days", "kun", "кун"))
+                tripMetric(booking.stay.makkahNights, localizedDetail("ночей · Мекка", "nights · Makkah", "tun · Makka", "тун · Макка"))
+                if let nights = booking.stay.madinahNights, nights > 0 {
+                    tripMetric(nights, localizedDetail("ночей · Медина", "nights · Madinah", "tun · Madina", "тун · Мадина"))
+                }
+            }
             Divider()
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L10n.text("booking_total_package", settings.language))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(L10n.text("booking_all_in_one_price", settings.language))
-                        .font(.subheadline.weight(.semibold))
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(localizedDetail("Общая стоимость", "Total price", "Jami", "Жами")).font(.caption).foregroundStyle(.secondary)
+                    PackagePriceView(amount: Decimal(booking.totalUsd), currency: "USD", showsPerPerson: false)
                 }
                 Spacer()
-                PackagePriceView(amount: Decimal(booking.totalUsd), currency: "USD", showsPerPerson: false)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(localizedDetail("На человека", "Per person", "Bir kishiga", "Бир кишига")).font(.caption).foregroundStyle(.secondary)
+                    Text(booking.perPilgrimUsd, format: .currency(code: "USD")).font(.headline.monospacedDigit())
+                }
             }
-        }
-        .iumrahCard()
+        }.iumrahCard()
+    }
+    private func tripMetric(_ value: Int, _ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(value)").font(.title2.bold())
+            Text(title).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(10)
+         .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private func hotelCard(_ session: StoredBookingSession, role: HotelSelectionRole, isExpanded: Binding<Bool>) -> some View {
@@ -1367,7 +1384,7 @@ struct BookingDetailView: View {
         do {
             try await bookings.deleteBooking(id: bookingID)
             IumrahHaptics.success()
-            dismiss()
+            if !embedded { dismiss() }
         } catch {
             deleteError = bookingAccessErrorMessage(error)
             IumrahHaptics.error()
@@ -1709,6 +1726,87 @@ private enum BookingDetailLifecyclePhase {
         case .priceLock: return "lock.fill"
         case .paymentConfirmation: return "checkmark.seal.fill"
         case .documents: return "doc.text.fill"
+        }
+    }
+}
+
+// Booking 2.0 — a static miniature keeps the scrolling list cheap. The original
+// animated card is mounted only on explicit expansion.
+struct IumrahCompactBookingIdentity: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    let session: StoredBookingSession
+    @State private var expanded = false
+    @State private var flipped = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button { withAnimation(.easeInOut(duration: 0.22)) { expanded.toggle() } } label: {
+                HStack(spacing: 14) {
+                    ZStack(alignment: .topLeading) {
+                        RoundedRectangle(cornerRadius: 14).fill(Color.black)
+                        IumrahBookingDomeAnimation(paused: true).padding(6)
+                        Text("iumrah").font(.system(size: 11, weight: .bold, design: .rounded)).foregroundStyle(.white).padding(8)
+                    }.frame(width: 108, height: 70).clipped()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Booking ID Card").font(.subheadline.weight(.semibold))
+                        Text(session.displayBookingNumber).font(.title2.bold().monospacedDigit())
+                        Text("\(session.booking.input.travelers.totalPeople) · " + L10n.text("travelers", settings.language)).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption.bold()).foregroundStyle(.secondary)
+                }.foregroundStyle(.primary)
+            }.buttonStyle(.plain)
+            if expanded {
+                IumrahBookingDomeCard(bookingNumber: session.displayBookingNumber, travelerName: session.travelerName ?? "iumrah", language: settings.language, isFlipped: $flipped)
+                Button { UIPasteboard.general.string = session.displayBookingNumber } label: {
+                    Label(IumrahFlightCopy.text(settings.language, "Копировать номер", "Copy number", "Raqamni nusxalash", "Рақамни нусхалаш"), systemImage: "doc.on.doc").frame(maxWidth: .infinity)
+                }.buttonStyle(.bordered).tint(.primary)
+            }
+        }.iumrahCard()
+    }
+}
+struct IumrahBookingNotificationChannels: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var bookings: BookingStore
+    @EnvironmentObject private var account: IumrahAccountStore
+    @ObservedObject private var push = PushNotificationManager.shared
+    let session: StoredBookingSession
+    private var checking: Bool { session.isCheckingAvailability }
+    private func t(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String { IumrahFlightCopy.text(settings.language, ru, en, uz, cy) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(checking ? t("Проверка наличия", "Checking availability", "Mavjudlik tekshirilmoqda", "Мавжудлик текширилмоқда") : t("Статус путешествия", "Trip status", "Safar holati", "Сафар ҳолати"), systemImage: checking ? "hourglass" : "suitcase")
+                .font(.headline)
+            if checking { Text(t("Обычно около 30 минут. Оплата пока не требуется.", "Usually about 30 minutes. No payment needed yet.", "Odatda 30 daqiqa. Hozir to‘lov shart emas.", "Одатда 30 дақиқа. Ҳозир тўлов шарт эмас.")).font(.footnote).foregroundStyle(.secondary) }
+            Divider()
+            Label(t("Вы получите уведомление", "You will receive an update", "Bildirishnoma olasiz", "Билдиришнома оласиз"), systemImage: "bell").font(.subheadline.weight(.semibold))
+            if let phone = session.verifiedBookingPhone, !phone.isEmpty { channel("SMS", "message", phone) }
+            if let email = session.verifiedBookingEmail, !email.isEmpty { channel("Email", "envelope", email) }
+            if session.verifiedBookingPhone == nil && session.verifiedBookingEmail == nil {
+                Text(t("Подтверждённый контакт не сохранён на этом устройстве.", "No verified contact saved on this device.", "Tasdiqlangan aloqa saqlanmagan.", "Тасдиқланган алоқа сақланмаган.")).font(.caption).foregroundStyle(.secondary)
+            }
+            HStack {
+                Image(systemName: "bell.badge").frame(width: 24)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(t("Push-уведомления", "Push notifications", "Push bildirishnomalar", "Push билдиришномалар")).font(.subheadline.weight(.medium))
+                    Text(push.isAuthorized ? (bookings.pushRegistrationReady == true ? t("Подключены", "Connected", "Ulangan", "Уланган") : t("Ожидает подключения", "Waiting for connection", "Ulanish kutilmoqda", "Уланиш кутилмоқда")) : push.statusText(language: settings.language)).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                if !push.isAuthorized {
+                    Button(t("Включить", "Enable", "Yoqish", "Ёқиш")) { Task { if push.authorizationStatus == .denied { if let url = URL(string: UIApplication.openSettingsURLString) { await UIApplication.shared.open(url) } } else { await push.requestAuthorization() } } }.font(.caption.weight(.semibold)).buttonStyle(.bordered).tint(.primary)
+                } else if bookings.pushRegistrationReady == true { Image(systemName: "checkmark.circle").foregroundStyle(.secondary) }
+            }
+            IumrahTelegramConnectCard(session: session, accountToken: account.bearerToken, style: .confirmation)
+        }.iumrahCard()
+    }
+    private func channel(_ name: String, _ icon: String, _ value: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon).frame(width: 24)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(name).font(.subheadline.weight(.medium))
+                Text(value).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer()
+            Image(systemName: "checkmark.circle").foregroundStyle(.secondary)
         }
     }
 }

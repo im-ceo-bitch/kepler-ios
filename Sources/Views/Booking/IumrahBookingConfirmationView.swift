@@ -521,7 +521,7 @@ struct IumrahBookingConfirmationView: View {
             .buttonStyle(IumrahPrimaryButtonStyle())
             Button {
                 if let smartBookingDone { smartBookingDone() } else { dismiss() }
-                chrome.navigate(to: .booking)
+                chrome.openBooking(id: session.id)
             } label: {
                 Text(copy("Готово", "Done", "Tayyor", "Тайёр", "تم"))
             }

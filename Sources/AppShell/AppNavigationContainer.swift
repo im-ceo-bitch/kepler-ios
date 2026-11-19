@@ -40,6 +40,7 @@ struct AppNavigationContainer<Content: View>: View {
             // setImmersive(true) swapped two branches, dismissing Umrah Flow right
             // after the language picker and occasionally resetting other routes.
             navigationStack
+                .id(tab == .booking ? chrome.bookingRouteRevision : (tab == .care ? chrome.chatRouteRevision : 0))
                 .iumrahAdaptiveReadableWidth(unconstrained: chrome.isImmersiveMode)
                 .environment(\.iumrahTabIsActive, tab == nil || chrome.currentTab == tab)
         }

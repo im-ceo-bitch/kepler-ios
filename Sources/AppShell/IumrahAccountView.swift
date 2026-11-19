@@ -49,6 +49,9 @@ struct IumrahAccountView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.iumrahTabIsActive) private var activeTab
     @AppStorage("iumrah.autoPageHelp") private var automaticPageHelp = true
+    @State private var showDeleteAccountConfirmation = false
+    @State private var accountDeleteError: String?
+    @State private var deletingAccount = false
     @State private var identityLinkOwner: String?
     @State private var identityLinkDate: Date?
     @ObservedObject private var clientNotifications = ClientNotificationCenter.shared
@@ -145,6 +148,7 @@ struct IumrahAccountView: View {
                         servicesSection
                         settingsSection
                         signOutButton
+                        deleteAccountButton
                     } else {
                         seamlessGuestProfile
                         automaticHelpCard
@@ -222,6 +226,17 @@ struct IumrahAccountView: View {
         } message: {
             Text(walletAlertMessage ?? "")
         }
+        .confirmationDialog(tr("Delete account permanently?", "Удалить аккаунт навсегда?", "Akkaunt butunlay o‘chirilsinmi?", "Аккаунт бутунлай ўчирилсинми?"), isPresented: $showDeleteAccountConfirmation, titleVisibility: .visible) {
+            Button(tr("Delete account", "Удалить аккаунт", "Akkauntni o‘chirish", "Аккаунтни ўчириш"), role: .destructive) {
+                Task { deletingAccount = true; defer { deletingAccount = false }; do { try await account.deleteAccount(); bookings.setAccountToken(nil); accountDeleteError = nil } catch {
+                    let code = error.localizedDescription.uppercased()
+                    if code.contains("ACCOUNT_HAS_TRIPS") || code.contains("ACCOUNT_HAS_FINANCIAL_HISTORY") || code.contains("ACCOUNT_SECURITY_REVIEW_REQUIRED") {
+                        accountDeleteError = tr("Contact support to close your existing trips or financial and security obligations before deleting the account.", "Для удаления аккаунта с поездками или финансовыми обязательствами обратитесь в поддержку.", "Safarlar yoki moliyaviy majburiyatlar mavjud bo‘lsa, yordamga murojaat qiling.", "Сафарлар ёки молиявий мажбуриятлар мавжуд бўлса, ёрдамга мурожаат қилинг.")
+                    } else { accountDeleteError = error.localizedDescription }
+                } }
+            }
+            Button(tr("Cancel", "Отмена", "Bekor qilish", "Бекор қилиш"), role: .cancel) { }
+        } message: { Text(tr("Your account access will be deleted. Existing trips must be resolved first.", "Доступ к аккаунту будет удалён. Сначала необходимо урегулировать существующие поездки.", "Akkaunt o‘chiriladi. Avval mavjud safarlarni yakunlang.", "Аккаунт ўчирилади. Аввал мавжуд сафарларни якунланг.")) }
         .sheet(isPresented: $showSignOutConfirmation) {
             IumrahActionConfirmationSheet(
                 title: tr("Sign out of iumrah?", "Выйти из iumrah?", "iumrah akkauntidan chiqasizmi?", "iumrah аккаунтидан чиқасизми?"),
@@ -1262,17 +1277,27 @@ struct IumrahAccountView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "rectangle.portrait.and.arrow.right")
-                Text(tr("Disconnect this device", "Отключить профиль на устройстве", "Profilni qurilmadan uzish", "Профилни қурилмадан узиш"))
+                Text(tr("Sign out", "Выйти из аккаунта", "Akkauntdan chiqish", "Аккаунтдан чиқиш"))
                 Spacer()
             }
             .padding(.horizontal, 18)
             .frame(height: 56)
-            .foregroundStyle(.red)
-            .background(Color.red.opacity(0.075), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .foregroundStyle(.primary)
+            .background(Color.primary.opacity(0.055), in: Capsule())
         }
         .buttonStyle(.plain)
     }
 
+    private var deleteAccountButton: some View {
+        VStack(spacing: 8) {
+            Button(role: .destructive) { showDeleteAccountConfirmation = true } label: {
+                Label(tr("Delete account", "Удалить аккаунт", "Akkauntni o‘chirish", "Аккаунтни ўчириш"), systemImage: "trash")
+                    .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(16)
+                    .foregroundStyle(.red).overlay(Capsule().strokeBorder(Color.red.opacity(0.5)))
+            }.buttonStyle(.plain).disabled(deletingAccount)
+            if let accountDeleteError { Text(accountDeleteError).font(.footnote).foregroundStyle(.red) }
+        }
+    }
     private var guestCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             IumrahIconBadge(systemName: "person.crop.circle.badge.key.fill", role: .security, size: 54, symbolSize: 25, cornerRadius: 18)

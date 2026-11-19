@@ -222,7 +222,13 @@ struct PilgrimCheckoutView: View {
 
     @ViewBuilder
     private func checkoutContent(includeProgress: Bool) -> some View {
-        if isLoading && checkout == nil {
+        if session?.isCheckingAvailability == true && (checkout == nil || isAvailabilityChecking) {
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: "clock").font(.title2).padding(12).background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+                Text(tr("Nothing to do yet", "Пока ничего делать не нужно", "Hozircha hech narsa qilish shart emas", "Ҳозирча ҳеч нарса қилиш шарт эмас")).font(.title2.bold())
+                Text(tr("We are checking your trip. Passport and payment actions will appear after confirmation.", "Проверяем наличие. После подтверждения здесь появятся паспорта и оплата.", "Safar tekshirilmoqda. Tasdiqdan keyin pasport va to‘lov ochiladi.", "Сафар текширилмоқда. Тасдиқдан кейин паспорт ва тўлов очилади.")).font(.subheadline).foregroundStyle(.secondary)
+            }.frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
+        } else if isLoading && checkout == nil {
             loadingCard
         } else if let checkout {
             if accountMatchesTrip {

@@ -18,6 +18,8 @@ struct RootView: View {
     @State private var hasBootstrappedAfterOnboarding = false
     @State private var isSupportQuickActionDialogPresented = false
     @State private var lastHandledLaunchLink: URL?
+    @State private var handledPushRevision = 0
+    @State private var pendingExternalBookingID: String?
 
     init(chrome: AppChromeStore, launchLink: URL? = nil) {
         self.chrome = chrome
@@ -72,11 +74,13 @@ struct RootView: View {
                 guard !Task.isCancelled else { return }
 
                 await bootstrapAfterOnboardingIfNeeded()
+                clientNotifications.syncBookingReceipts(bookings.sessions, language: settings.language)
                 syncWidgets()
                 await push.ensureAuthorizationForClientNotifications()
                 await syncPushSubscriptions()
                 await syncClientNotifications()
                 handleOpenedPushIfNeeded()
+                resolveExternalBookingIfAuthorized()
             }
             .onChange(of: push.deviceToken) { _, _ in
                 guard hasCompletedOnboarding else { return }
@@ -86,6 +90,9 @@ struct RootView: View {
                 }
             }
             .onChange(of: bookings.sessions) { _, _ in
+                clientNotifications.syncBookingReceipts(bookings.sessions, language: settings.language)
+                handleOpenedPushIfNeeded()
+                resolveExternalBookingIfAuthorized()
                 syncWidgets()
                 quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
                 Task {
@@ -114,6 +121,7 @@ struct RootView: View {
                 }
             }
             .onChange(of: settings.language.rawValue) { _, _ in
+                clientNotifications.syncBookingReceipts(bookings.sessions, language: settings.language)
                 syncWidgets()
                 quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
                 guard hasCompletedOnboarding else { return }
@@ -280,7 +288,8 @@ struct RootView: View {
                 guard components.count >= 2 else { return }
                 let bookingID = components[1].removingPercentEncoding ?? components[1]
                 guard !bookingID.isEmpty else { return }
-                chrome.openBooking(id: bookingID)
+                pendingExternalBookingID = bookingID
+                resolveExternalBookingIfAuthorized()
             case "planned":
                 chrome.openUmrahPlan()
             case "account":
@@ -306,6 +315,11 @@ struct RootView: View {
             guard components.count == 2 else { return }
             let rawValue = components[1].removingPercentEncoding ?? components[1]
             switch components[0] {
+            case "booking":
+                guard !rawValue.isEmpty else { return }
+                pendingExternalBookingID = rawValue
+                resolveExternalBookingIfAuthorized()
+                return
             case "h":
                 hotelID = HotelStorefrontService.decodePublicHotelToken(rawValue)
             case "hotel":
@@ -403,6 +417,7 @@ struct RootView: View {
     @MainActor
     private func syncPushSubscriptions() async {
         guard let token = push.deviceToken, !token.isEmpty else { return }
+        await syncClientNotifications()
         await bookings.syncPushSubscriptions(deviceToken: token, locale: settings.language.rawValue)
     }
 
@@ -418,11 +433,11 @@ struct RootView: View {
 
     @MainActor
     private func handleOpenedPushIfNeeded() {
-        guard let event = push.lastOpenedEvent else { return }
+        guard hasCompletedOnboarding, handledPushRevision != push.openRevision, let event = push.lastOpenedEvent else { return }
         if event.type.hasPrefix("chat_") {
             guard let key = bookings.careChatKey(for: event) else { return }
-            chrome.requestedChatBookingID = key
-            chrome.navigate(to: .care)
+            handledPushRevision = push.openRevision
+            chrome.openChat(bookingID: key)
             return
         }
         if let pilgrimID = event.pilgrimID, !IumrahSeamlessBookingPolicy.sameIdentity(pilgrimID, account.account?.iumrahID) {
@@ -431,6 +446,8 @@ struct RootView: View {
                   IumrahSeamlessBookingPolicy.sameIdentity(owner, pilgrimID) else { return }
         }
         if event.type == "system_notification" {
+            if event.destination == "booking", let id = event.destinationBookingID, !bookings.canOpenBookingFromPush(id: id) { return }
+            handledPushRevision = push.openRevision
             routeNotification(destination: event.destination, bookingID: event.destinationBookingID)
             if let id = event.notificationID, let notification = clientNotifications.notification(id: id) {
                 Task { await clientNotifications.markOpened(notification, accountToken: account.bearerToken) }
@@ -439,11 +456,17 @@ struct RootView: View {
         }
         if let bookingID = event.bookingID ?? event.destinationBookingID {
             if bookings.canOpenBookingFromPush(id: bookingID) {
+                handledPushRevision = push.openRevision
                 chrome.openBooking(id: bookingID)
-            } else {
-                chrome.navigate(to: .booking)
             }
         }
+    }
+
+    @MainActor
+    private func resolveExternalBookingIfAuthorized() {
+        guard let id = pendingExternalBookingID, bookings.canOpenBookingFromPush(id: id) else { return }
+        pendingExternalBookingID = nil
+        chrome.openBooking(id: id)
     }
 
     @MainActor
@@ -451,7 +474,9 @@ struct RootView: View {
         switch destination {
         case "hotels": chrome.navigate(to: .hotels)
         case "bookings": chrome.navigate(to: .booking)
-        case "care": chrome.navigate(to: .care)
+        case "care", "chat":
+            if let bookingID, bookings.canUseCareChat(for: bookingID) { chrome.openChat(bookingID: bookings.careChatKey(for: bookingID)) }
+            else if bookingID == nil { chrome.navigate(to: .care) }
         case "account": chrome.navigate(to: .account)
         case "booking":
             if let bookingID, bookings.canOpenBookingFromPush(id: bookingID) { chrome.openBooking(id: bookingID) }

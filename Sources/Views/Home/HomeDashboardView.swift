@@ -167,13 +167,15 @@ struct HomeDashboardView: View {
         switch notification.destination {
         case "hotels": chrome.navigate(to: .hotels)
         case "bookings": chrome.navigate(to: .booking)
-        case "care": chrome.navigate(to: .care)
+        case "care", "chat":
+            if let id = notification.destinationBookingID {
+                guard bookings.canUseCareChat(for: id) else { return }
+                chrome.openChat(bookingID: bookings.careChatKey(for: id))
+            } else { chrome.navigate(to: .care) }
         case "account": chrome.navigate(to: .account)
         case "booking":
-            if let bookingID = notification.destinationBookingID, bookings.booking(id: bookingID) != nil {
+            if let bookingID = notification.destinationBookingID, bookings.canOpenBookingFromPush(id: bookingID) {
                 chrome.openBooking(id: bookingID)
-            } else {
-                chrome.navigate(to: .booking)
             }
         default: chrome.navigate(to: .home)
         }

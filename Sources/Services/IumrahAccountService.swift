@@ -197,6 +197,11 @@ struct IumrahAccountService {
         return value.account
     }
 
+    func deleteAccount(token: String) async throws {
+        let response: IumrahSimpleResponse = try await api.delete("/api/catalog/hotels/client/account/profile", headers: ["Authorization": "Bearer \(token)"])
+        guard response.ok else { throw APIError.invalidResponse }
+    }
+
     func logout(token: String) async {
         let _: IumrahSimpleResponse? = try? await api.post(
             "/api/catalog/hotels/client/account/logout",

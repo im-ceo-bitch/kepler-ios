@@ -1,0 +1,11 @@
+# Trip Summary Design 13
+
+Cumulative iOS patch, based on build-fix-12. Apply at the repository root using the existing `iumrah-beta-update-*.zip` workflow. Backend remains at Unified Catalog 11; no server changes in this patch.
+
+- Shared final review page: dark photo hero using existing Kaaba asset, image-to-black lower gradient, separate compact brand header, equal metrics, side-by-side total and per-person amount.
+- White rounded 24pt cards with 16pt horizontal page inset, 16pt internal card inset, actual monochrome capsule buttons with 44pt minimum touch targets. Shared Smart overview preserves its default mode; final screen uses the compact mode.
+- Flat price rows, no per-component disclosure. Flight legs, per-room meal items and ziyarats grouped presentation-only; VIP transfer combined with transfer. The chart is a separate optional card. All server amounts and both fee rates preserved. No invented prices.
+- Retained actual editing sheets and server-backed save/share/booking actions, including the room detail sheet for one selected room. Added explicit feedback or corrective navigation when booking cannot proceed. The prior top safe-area ignoring modifier is not used on the review screen. Final total and fixed booking bar are compact.
+- Existing conditional Haramain and included eSIM content retained. Images and values use project assets and selected package data. No external design assets added.
+
+Validation on Linux: parsed 346 Swift source files; passed executable price grouping tests and static design integration checks (17 total); shared quote contract (16 checks); Smart review stability (15 checks); mixed itinerary gate (18 checks); Smart package editing (14 static checks); flight browse semantic compilation with mocked UI/network; booking notification and guest Care smoke checks. Legacy seamless booking script's 12 executable policy checks pass, but its old exact-source Smart navigation assertion already fails on input patch 12 (expects `FinalPackageView().environmentObject(journey)`, actual Smart route uses explicit retained store and callback). No Xcode SDK or iOS simulator available: no full SwiftUI typecheck, release build, on-device visual comparison, tap or network end-to-end test. No claim of pixel-perfect rendered equality.

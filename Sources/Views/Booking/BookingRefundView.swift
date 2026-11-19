@@ -13,14 +13,14 @@ struct BookingRefundView: View {
     private var headers:[String:String] { var h:[String:String]=[:]; if !bookingToken.isEmpty { h["x-booking-token"]=bookingToken }; if let token=account.bearerToken { h["Authorization"]="Bearer "+token }; return h }
     var body: some View {
         ScrollView { VStack(alignment:.leading,spacing:16) {
-            Text(t("Предварительный расчёт возврата","Preliminary refund estimate","Qaytarishning dastlabki hisobi","Қайтаришнинг дастлабки ҳисоби")).font(.title2.bold())
+            Text(t("Расчёт возврата","Refund calculation","Qaytarishning dastlabki hisobi","Қайтаришнинг дастлабки ҳисоби")).font(.title2.bold())
             if let preview {
                 if preview.available {
                     VStack(alignment:.leading,spacing:12) {
                         ForEach(preview.items) { item in
                             HStack { VStack(alignment:.leading,spacing:4) { Text(item.label).font(.subheadline); Text(money(item.amountCents)).font(.caption).foregroundStyle(.secondary) }; Spacer(); Text(item.refundCents.map(money) ?? t("Уточняется","Review required","Aniqlanadi","Аниқланади")).font(.subheadline.weight(.semibold)) }; Divider()
                         }
-                        if let support=preview.supportCents { HStack { Text(t("Комиссия 9% · предварительно","9% fee · estimated","9% komissiya · taxminiy","9% комиссия · тахминий")); Spacer(); Text(money(support)) }.font(.subheadline) }
+                        if let support=preview.supportCents { HStack { Text(t("Комиссия 9%","9% fee · estimated","9% komissiya · taxminiy","9% комиссия · тахминий")); Spacer(); Text(money(support)) }.font(.subheadline) }
                         if let estimate=preview.estimateCents { Text(money(estimate)).font(.largeTitle.bold()) }
                         Text(t("Итог проверит менеджер. Комиссия оплаты и тарифы поставщиков уточняются отдельно.","A manager will verify the final amount, payment fee and supplier rules.","Yakuniy summani menejer tekshiradi.","Якуний суммани менежер текширади.")).font(.caption).foregroundStyle(.secondary)
                     }.iumrahCard()

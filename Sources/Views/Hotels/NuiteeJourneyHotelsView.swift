@@ -8,12 +8,14 @@ struct NuiteeJourneyHotelsView: View {
     var smartCity: String? = nil
     var smartConfirm: (() -> Void)? = nil
     var reviewEditing = false
+    var familyFlow = false
 
-    init(transferAlreadySelected: Bool = false, smartCity: String? = nil, smartChildAges: [Int] = [], reviewEditing: Bool = false, smartConfirm: (() -> Void)? = nil) {
+    init(transferAlreadySelected: Bool = false, smartCity: String? = nil, smartChildAges: [Int] = [], reviewEditing: Bool = false, familyFlow: Bool = false, smartConfirm: (() -> Void)? = nil) {
         self.transferAlreadySelected = transferAlreadySelected
         self.smartCity = smartCity
         self.smartConfirm = smartConfirm
         self.reviewEditing = reviewEditing
+        self.familyFlow = familyFlow
         _city = State(initialValue: smartCity ?? "makkah")
         _ages = State(initialValue: smartChildAges)
     }
@@ -21,6 +23,7 @@ struct NuiteeJourneyHotelsView: View {
     @State private var city = "makkah"
     @State private var roomIndex = 0
     @State private var stars = 0
+    @State private var hotelQuery = ""
     @State private var favorites: Set<String> = []
     @StateObject private var catalog = NuiteeCatalogModel()
     @State private var opened: NuiteeHotel?
@@ -38,17 +41,17 @@ struct NuiteeJourneyHotelsView: View {
         journey.trip.adults / max(1, journey.trip.rooms) + (roomIndex < journey.trip.adults % max(1, journey.trip.rooms) ? 1 : 0)
     }
     private var roomChildren: [Int] { ages.enumerated().filter { $0.offset % max(1, journey.trip.rooms) == roomIndex }.map(\.element) }
-    private var ready: Bool { ages.count == journey.trip.children + journey.trip.infants && !ages.contains(-1) && roomAdults > 0 }
+    private var ready: Bool { ages.count == journey.trip.children + journey.trip.infants && !ages.contains(-1) && roomAdults > 0 && window.checkOut > window.checkIn }
     private var catalogCity: NuiteeCity { city == "madinah" ? .madinah : .makkah }
     private var catalogMatches: Bool {
         catalog.matches(city: catalogCity, checkin: window.checkIn, checkout: window.checkOut,
-                        adults: max(1, roomAdults), stars: stars, query: "", favorites: nil)
+                        adults: max(1, roomAdults), childrenAges: roomChildren, stars: stars, query: "", favorites: nil)
     }
-    private var filtered: [NuiteeHotel] { catalogMatches ? catalog.hotels.filter { stars == 0 || $0.roundedStars == stars || $0.roundedStars == 0 } : [] }
-    private var loading: Bool { catalog.busy || !catalogMatches }
+    private var filtered: [NuiteeHotel] { ready && catalogMatches ? catalog.visibleHotels(stars: stars, query: hotelQuery) : [] }
+    private var loading: Bool { ready && (catalog.busy || !catalogMatches) }
     private var error: String? { catalogMatches ? catalog.errorMessage ?? catalog.rateError : nil }
     private var sandbox: Bool { catalog.sandbox }
-    private var searchID: String { "\(city):\(roomAdults):\(window.checkIn):\(window.checkOut):\(stars)" }
+    private var searchID: String { "\(city):\(roomAdults):\(roomChildren):\(ready):\(window.checkIn):\(window.checkOut)" }
 
     var body: some View {
         let results = filtered
@@ -56,7 +59,7 @@ struct NuiteeJourneyHotelsView: View {
         let adults = roomAdults
         ScrollViewReader { proxy in
         ScrollView {
-            VStack(spacing: 18) {
+            LazyVStack(spacing: 18) {
                 IumrahJourneyHeader {
                     IumrahJourneyDisclosureCard(title: "Отели и номера", total: "\(journey.trip.travelerCount) чел. · \(journey.trip.rooms) ном.",
                         subtitle: "\(window.checkIn.formatted(date: .abbreviated, time: .omitted)) — \(window.checkOut.formatted(date: .abbreviated, time: .omitted)) · \(roomAdults) взр. · \(roomChildren.count) дет.",
@@ -75,7 +78,7 @@ struct NuiteeJourneyHotelsView: View {
                     }
                 }
                 .id("hotels-top")
-                LazyVStack(alignment: .leading, spacing: 14) {
+                Group {
                     IumrahPageHelpCard(!ready ? "hotels.child_ages" : journey.localRoomsComplete ? "hotels.complete" : journey.trip.rooms > 1 ? "hotels.multiple_rooms" : city == "madinah" ? "hotels.madinah" : "hotels.makkah")
                     if smartCity == nil && journey.trip.scope == .makkahAndMadinah {
                         Picker("Город", selection: $city) {
@@ -88,54 +91,73 @@ struct NuiteeJourneyHotelsView: View {
                             ForEach(0..<journey.trip.rooms, id: \.self) { Text("Номер \($0 + 1)").tag($0) }
                         }.pickerStyle(.segmented)
                     }
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                        TextField(NuiteeCopy.text("Название отеля", "Mehmonxona nomi", "Hotel name", settings.language), text: $hotelQuery)
+                            .autocorrectionDisabled()
+                        if !hotelQuery.isEmpty { Button { hotelQuery = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.buttonStyle(.plain) }
+                    }.padding(12).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 16))
                     Picker("Звёзды", selection: $stars) {
                         Text("Все").tag(0)
                         ForEach(1...5, id: \.self) { Text("\($0) ★").tag($0) }
                     }.pickerStyle(.segmented)
-                    if !ready { Text("Раскройте карточку сверху и укажите возраст детей для точного тарифа.").font(.footnote) }
+                    if window.checkOut <= window.checkIn {
+                        Text(NuiteeCopy.text("Измените даты поездки: для каждого города нужна минимум одна ночь.", "Safar sanalarini o‘zgartiring: har bir shahar uchun kamida bir tun kerak.", "Change trip dates: each city requires at least one night.", settings.language)).font(.footnote)
+                    } else if !ready { Text("Раскройте карточку сверху и укажите возраст детей для точного тарифа.").font(.footnote) }
                     if let selection = journey.localJourneyRooms[key] {
                         Label(selection.hotel.name + " · " + IumrahHotelRoomTitle.display(rate: selection.rate.roomName, fallback: NuiteeCopy.text("Номер", "Xona", "Room", settings.language)), systemImage: "checkmark.circle.fill")
                             .font(.subheadline).foregroundStyle(Color.iumrahJourneyGreen)
-                        Text(NuiteeHotelService.usd(selection.rate.price) + " · " + NuiteeCopy.text("ориентировочно за номер, весь срок", "butun muddat uchun xona narxi, taxminan", "estimated per room, entire stay", settings.language)).font(.caption)
+                        Text(NuiteeHotelService.usd(selection.rate.price) + " · " + NuiteeCopy.text("за номер, весь срок", "butun muddat uchun xona narxi", "per room, entire stay", settings.language)).font(.caption)
                     }
-                    if loading { ProgressView().frame(maxWidth: .infinity) }
-                    if error != nil && !loading { Text(NuiteeCopy.text("Не удалось проверить наличие", "Mavjudlikni tekshirib bo‘lmadi", "Could not check availability", settings.language)).font(.footnote).foregroundStyle(.secondary) }
+                    if loading && results.isEmpty { ProgressView().frame(maxWidth: .infinity) }
+
+                    if error != nil && !loading && !catalog.pricesLoading { Text(NuiteeCopy.text("Не удалось проверить наличие", "Mavjudlikni tekshirib bo‘lmadi", "Could not check availability", settings.language)).font(.footnote).foregroundStyle(.secondary) }
                     if !results.isEmpty {
                         Text(IumrahFlightCopy.text(settings.language, "Показано \(results.count) отелей", "Showing \(results.count) hotels", "\(results.count) ta mehmonxona ko‘rsatildi", "\(results.count) та меҳмонхона кўрсатилди"))
                             .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
                     }
                     ForEach(results) { hotel in
-                        NuiteeHotelListingCard(hotel: hotel, nights: stay.nights, adults: adults, sandbox: sandbox,
+                        NuiteeHotelListingCard(hotel: hotel, nights: stay.nights, adults: adults, childrenCount: roomChildren.count, sandbox: sandbox,
                             favorite: favorites.contains(hotel.id), onOpen: { if ready { opened = hotel } }, onFavorite: {
                                 if favorites.contains(hotel.id) { favorites.remove(hotel.id) } else { favorites.insert(hotel.id) }
                             })
 
                     }
-                    IumrahHotelPageButton(remaining: max(0, catalog.total - catalog.hotels.count), loading: catalog.loadingMore, failed: catalog.pageError, hasMore: catalogMatches && catalog.nextOffset != nil && !loading) {
-                        Task { await loadMore() }
+                    if ready && !loading && results.isEmpty && error == nil && catalog.nextOffset == nil { Text("На эти даты отели не найдены.").foregroundStyle(.secondary) }
+                    if ready && !loading && error != nil && !catalog.pricesLoading {
+                        Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) {
+                            Task {
+                                if catalog.errorMessage != nil { await load(forceRefresh: true) }
+                                else { await catalog.retryMissingPrices(city: catalogCity, checkin: window.checkIn, checkout: window.checkOut, adults: max(1, roomAdults), childrenAges: roomChildren) }
+                            }
+                        }.buttonStyle(IumrahSecondaryButtonStyle())
                     }
-                    if !loading && results.isEmpty && error == nil && catalog.nextOffset == nil { Text("На эти даты отели не найдены.").foregroundStyle(.secondary) }
-                    if !loading && error != nil { Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await load(forceRefresh: true) } }.buttonStyle(IumrahSecondaryButtonStyle()) }
-                }.padding(.horizontal, 18).padding(.bottom, 24)
-            }
+                }.padding(.horizontal, 18)
+            }.padding(.bottom, 24)
         }
-        .onChange(of: key) { _, _ in proxy.scrollTo("hotels-top", anchor: .top) }
+        .onChange(of: key) { _, _ in hotelQuery = ""; proxy.scrollTo("hotels-top", anchor: .top) }
         }
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .modifier(IumrahJourneyRefresh {
-            await journey.refreshLocalJourneyRoomRates()
             await load(forceRefresh: true)
         })
         .task(id: searchID) { await load() }
         .onAppear {
             if smartCity == nil && ages.count != journey.trip.children + journey.trip.infants {
-                ages = Array(repeating: -1, count: journey.trip.children + journey.trip.infants)
+                let saved = journey.tripSummaryChildAges
+                ages = saved.count == journey.trip.children + journey.trip.infants ? saved : Array(repeating: -1, count: journey.trip.children + journey.trip.infants)
             }
         }
         .onChange(of: journey.trip.rooms) { _, _ in invalidateRooms() }
-        .onChange(of: ages) { _, _ in if smartCity == nil { journey.localJourneyRooms = [:]; journey.quote = nil } }
+        .onChange(of: ages) { _, value in
+            guard smartCity == nil else { return }
+            if journey.tripSummaryChildAges != value {
+                journey.tripSummaryChildAges = value
+                if !journey.localJourneyRooms.isEmpty { journey.localJourneyRooms = [:]; journey.invalidateLocalJourneyQuote() }
+            }
+        }
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: window.checkIn, nights: window.nights,
                 adults: roomAdults, sandbox: sandbox, childrenAges: roomChildren, onSelectRate: { rate in
@@ -149,7 +171,7 @@ struct NuiteeJourneyHotelsView: View {
                     journey.invalidateLocalJourneyQuote()
                     advanceAfterRoomSelection = true
                 }, onSelectMeals: { selectedMeals = $0 }, onRatesLoaded: { start, end, guests, rates in
-                    catalog.acceptDetailRates(hotelID: hotel.id, city: city, checkin: start, checkout: end, adults: guests, rates: rates)
+                    catalog.acceptDetailRates(hotelID: hotel.id, city: city, checkin: start, checkout: end, adults: guests, childrenAges: roomChildren, rates: rates)
                 })
                 .onDisappear {
                     guard advanceAfterRoomSelection else { return }
@@ -157,10 +179,10 @@ struct NuiteeJourneyHotelsView: View {
                     advanceToNextSelection()
                 }
         }
-        .navigationDestination(isPresented: $showTransfer) { AnyView(TransferSelectionView()) }
-        .navigationDestination(isPresented: $showFinalAfterHotels) { AnyView(FinalPackageView()) }
+        .navigationDestination(isPresented: $showTransfer) { AnyView(TransferSelectionView(familyFlow: familyFlow)) }
+        .navigationDestination(isPresented: $showFinalAfterHotels) { AnyView(FinalPackageView(familyFlow: familyFlow)) }
         .safeAreaInset(edge: .bottom) {
-            if reviewRoomsComplete {
+            if ready && reviewRoomsComplete {
                 Button(smartCity != nil ? IumrahFlightCopy.text(settings.language, "Подтвердить отель", "Confirm hotel", "Mehmonxonani tasdiqlash", "Меҳмонхонани тасдиқлаш") : transferAlreadySelected ? "Посмотреть итог" : "Выбрать трансфер") { finishRooms() }
                     .buttonStyle(IumrahPrimaryButtonStyle()).padding(.horizontal, 18).padding(.vertical, 8)
             }
@@ -179,7 +201,7 @@ struct NuiteeJourneyHotelsView: View {
                 return
             }
         }
-        if reviewRoomsComplete && smartCity == nil { finishRooms() }
+        // Keep the completed selection visible; only the explicit CTA advances.
     }
 
     private var reviewRoomsComplete: Bool {
@@ -201,13 +223,15 @@ struct NuiteeJourneyHotelsView: View {
         journey.transferSelectionConfirmed = false
     }
     @MainActor private func load(forceRefresh: Bool = false) async {
+        guard ready else { return }
         let trace = IumrahPerformanceTrace.begin("Journey hotel load")
         defer { IumrahPerformanceTrace.end("Journey hotel load", trace) }
         await catalog.reload(city: catalogCity, checkin: window.checkIn, checkout: window.checkOut,
-                             adults: max(1, roomAdults), stars: stars, forceRefresh: forceRefresh)
+                             adults: max(1, roomAdults), childrenAges: roomChildren, stars: stars, forceRefresh: forceRefresh)
     }
     @MainActor private func loadMore() async {
+        guard ready else { return }
         await catalog.loadMore(city: catalogCity, checkin: window.checkIn, checkout: window.checkOut,
-                               adults: max(1, roomAdults), stars: stars)
+                               adults: max(1, roomAdults), childrenAges: roomChildren, stars: stars)
     }
 }

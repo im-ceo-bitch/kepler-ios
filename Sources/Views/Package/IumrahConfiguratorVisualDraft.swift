@@ -205,7 +205,7 @@ struct IumrahConfiguratorSummaryView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(t("Ваша индивидуальная умра", "Your personalized Umrah", "Sizning shaxsiy umrangiz"))
                     .font(.system(size: 26, weight: .bold, design: .rounded))
-                Text(t("Состав поездки · подробный предварительный просмотр", "Trip components · detailed preview", "Safar tarkibi · batafsil ko‘rish"))
+                Text(t("Состав поездки · подробный просмотр", "Trip components · detailed preview", "Safar tarkibi · batafsil ko‘rish"))
                     .font(.subheadline).foregroundStyle(.secondary)
             }
 
@@ -246,7 +246,7 @@ struct IumrahConfiguratorSummaryView: View {
                 Text(t("Итоговая стоимость", "Total package price", "Paket umumiy narxi")).font(.headline)
                 Text(t("Расчёт будет подключён позже", "Price calculation is not connected yet", "Narx hisobi keyin ulanadi"))
                     .font(.title3.weight(.bold)).foregroundStyle(.secondary)
-                Text(t("Все данные — предварительный план, не подтверждённая бронь. Никаких списаний и заявок не создаётся.", "This is a draft, not a confirmed booking. No payments or booking requests are submitted.", "Bu tasdiqlangan bron emas, dastlabki reja. To‘lov yoki buyurtma yaratilmaydi."))
+                Text(t("Это состав поездки. Никаких списаний и заявок не создаётся.", "This is a draft, not a confirmed booking. No payments or booking requests are submitted.", "Bu tasdiqlangan bron emas, dastlabki reja. To‘lov yoki buyurtma yaratilmaydi."))
                     .font(.caption).foregroundStyle(.secondary)
                 Button {} label: {
                     Text(t("Забронировать умру · скоро", "Book Umrah · coming soon", "Umrani bron qilish · tez orada"))

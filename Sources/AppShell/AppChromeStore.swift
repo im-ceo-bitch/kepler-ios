@@ -29,6 +29,7 @@ struct IumrahHotelTabSearch: Equatable {
     let checkin: Date
     let nights: Int
     let adults: Int
+    var childrenAges: [Int] = []
 }
 
 final class AppChromeStore: ObservableObject {

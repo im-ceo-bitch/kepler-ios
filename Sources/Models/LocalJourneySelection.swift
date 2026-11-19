@@ -42,8 +42,22 @@ extension JourneyStore {
     var localRoomsComplete: Bool {
         guard trip.rooms > 0, trip.rooms <= max(1, trip.adults) else { return false }
         let cities = trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"]
+        let windows = TripStayPlanner.windows(for: trip)
+        let calendar = Calendar.current
         return cities.allSatisfy { city in
-            (0..<trip.rooms).allSatisfy { localJourneyRooms["\(city):\($0)"] != nil }
+            guard let window = city == "makkah" ? Optional(windows.makkah) : windows.madinah,
+                  window.checkOut > window.checkIn else { return false }
+            let selected = (0..<trip.rooms).compactMap { localJourneyRooms["\(city):\($0)"] }
+            guard selected.count == trip.rooms,
+                  selected.reduce(0, { $0 + $1.adults }) == trip.adults,
+                  selected.reduce(0, { $0 + $1.childrenAges.count }) == trip.children + trip.infants,
+                  Set(selected.map { $0.hotel.id }).count == 1 else { return false }
+            return selected.allSatisfy { room in
+                room.city == city && room.adults > 0 && room.childrenAges.allSatisfy { (0...17).contains($0) } &&
+                calendar.isDate(room.checkin, inSameDayAs: window.checkIn) &&
+                calendar.isDate(room.checkout, inSameDayAs: window.checkOut) &&
+                room.rate.price.isFinite && room.rate.price > 0 && room.rate.currency.uppercased() == "USD" && !room.rate.offerId.isEmpty
+            }
         }
     }
 
@@ -71,7 +85,8 @@ extension JourneyStore {
     }
     var localPackageTier: PackageTier? {
         let stars = localJourneyRooms.values.map { $0.hotel.roundedStars }
-        guard !stars.isEmpty, stars.allSatisfy({ (1...5).contains($0) }), let highest = stars.max() else { return nil }
+        guard !stars.isEmpty else { return nil }
+        let highest = stars.map { (1...5).contains($0) ? $0 : 3 }.max() ?? 3
         return highest <= 2 ? .economy : highest <= 4 ? .standard : .luxury
     }
 
@@ -122,7 +137,7 @@ extension JourneyStore {
                     $0.offerId == room.rate.offerId && $0.roomId == room.rate.roomId
                 }), current.currency.uppercased() == "USD", current.price.isFinite,
                     current.price > 0 else {
-                    localJourneyRooms.removeValue(forKey: key)
+                    // The selected price is a quote input, not a held room. Keep the choice.
                     continue
                 }
                 // Never overwrite a newly edited choice with a previous request.
@@ -133,9 +148,7 @@ extension JourneyStore {
                     childrenAges: room.childrenAges, meals: room.meals)
             } catch {
                 // A provider error is not proof of availability or of price.
-                if localJourneyRooms[key]?.rate.offerId == room.rate.offerId {
-                    localJourneyRooms.removeValue(forKey: key)
-                }
+                // A transport/provider failure must not erase the selected room.
             }
         }
         invalidateLocalJourneyQuote()

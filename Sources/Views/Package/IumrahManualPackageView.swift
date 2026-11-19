@@ -18,7 +18,7 @@ struct IumrahManualFlightDetail: View {
                 IumrahPremiumFlightDetail(leg: leg, language: settings.language, pageHeroInset: 18, headerShareText: leg.share)
                 if let price = flight.displayedPrice, price > 0 {
                     Text(NuiteeHotelService.usd(price)).font(.title.bold())
-                    Text(t("Ориентировочный тариф за человека", "Indicative fare per person", "Bir kishi uchun taxminiy narx", "Бир киши учун тахминий нарх")).foregroundStyle(.secondary)
+                    Text(t("Стоимость на человека", "Fare per person", "Bir kishi uchun narx", "Бир киши учун нарх")).foregroundStyle(.secondary)
                 }
                 if flight.publishedIsPair == true {
                     Text(t("Этот рейс опубликован в паре. Выберите второй рейс из того же маршрута.", "This flight belongs to a published pair. Select its matching leg.", "Bu reys juft yo‘nalishda. Ikkinchi reysni shu yo‘nalishdan tanlang.", "Бу рейс жуфт йўналишда. Иккинчи рейсни шу йўналишдан танланг.")).font(.footnote).foregroundStyle(.secondary)
@@ -182,7 +182,7 @@ struct IumrahManualPackageView: View {
     }
     private var totalCard: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text(currentQuote != nil ? t("Итоговая цена", "Package total", "Yakuniy narx", "Якуний нарх") : t("Предварительная цена", "Estimated total", "Taxminiy narx", "Тахминий нарх")).font(.headline)
+            Text(currentQuote != nil ? t("Итоговая цена", "Package total", "Yakuniy narx", "Якуний нарх") : t("Стоимость пакета", "Package total", "Paket narxi", "Пакет нархи")).font(.headline)
             if let quote = currentQuote {
                 Text(money(quote.totalPackagePrice)).font(.largeTitle.bold().monospacedDigit())
                 if quote.bookingAllowed != true { Text(t("Бронирование пока недоступно.", "Booking is not available yet.", "Bron hali ochilmagan.", "Брон ҳали очилмаган.")).foregroundStyle(.secondary) }
@@ -190,7 +190,7 @@ struct IumrahManualPackageView: View {
                 Text(money(preview.totalPackagePrice)).font(.largeTitle.bold().monospacedDigit())
                 Text(t("С учётом выбранных компонентов и обязательных услуг. Невыбранные отели и рейсы не входят в расчёт.", "Includes selected components and mandatory services. Unselected hotels and flights are excluded.", "Tanlangan qismlar va majburiy xizmatlar kiritilgan. Tanlanmagan mehmonxona va reyslar hisobga olinmagan.", "Танланган қисмлар ва мажбурий хизматлар киритилган. Танланмаган меҳмонхона ва рейслар ҳисобга олинмаган.")).font(.footnote).foregroundStyle(.secondary)
                 if preview.pairedFareIncluded { Text(t("Включена полная стоимость связанного тарифа туда и обратно.", "The full paired round-trip fare is included.", "Juft borish-qaytish tarifi to‘liq kiritilgan.", "Жуфт бориш-қайтиш тарифи тўлиқ киритилган.")).font(.footnote).foregroundStyle(.secondary) }
-                if preview.provisionalTier { Text(t("До выбора отеля расчёт предварительно использует тариф Standard.", "Standard tier is assumed until a hotel is selected.", "Mehmonxona tanlanguncha Standard tarif qo‘llanadi.", "Меҳмонхона танлангунча Standard тариф қўлланади.")).font(.footnote).foregroundStyle(.secondary) }
+                if preview.provisionalTier { Text(t("До выбора отеля применяется тариф Standard.", "Standard tier is assumed until a hotel is selected.", "Mehmonxona tanlanguncha Standard tarif qo‘llanadi.", "Меҳмонхона танлангунча Standard тариф қўлланади.")).font(.footnote).foregroundStyle(.secondary) }
             } else if busy { ProgressView().tint(.primary) }
             else if !manual.hasPriceComponent {
                 Text("$0.00").font(.largeTitle.bold().monospacedDigit())

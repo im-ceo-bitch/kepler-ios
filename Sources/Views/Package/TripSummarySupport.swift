@@ -200,7 +200,7 @@ struct TripSummaryCalendar: View {
     var body: some View {
         let current = selected.flatMap { days.contains($0) ? $0 : nil } ?? days.first ?? ""
         VStack(alignment: .leading, spacing: 14) {
-            Text(t("Предварительное расписание · местное время", "Planned schedule · local time", "Taxminiy jadval · mahalliy vaqt", "Тахминий жадвал · маҳаллий вақт")).font(.caption).foregroundStyle(.secondary)
+            Text(t("Расписание поездки · местное время", "Planned schedule · local time", "Taxminiy jadval · mahalliy vaqt", "Тахминий жадвал · маҳаллий вақт")).font(.caption).foregroundStyle(.secondary)
             ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 8) {
                 ForEach(days, id: \.self) { day in
                     Button { selected = day; IumrahHaptics.selection() } label: {
@@ -287,7 +287,7 @@ struct TripSummaryHotelOverview: View {
                         if first.hotel.roundedStars > 0 { Text(String(repeating: "★", count: first.hotel.roundedStars)).font(.caption) }
                         else { Text(t("Категория не указана", "Unrated", "Toifasi ko‘rsatilmagan", "Тоифаси кўрсатилмаган")).font(.caption).foregroundStyle(.secondary) }
                         if let total = confirmedTotal ?? estimate { Text(IumrahPackageDisplayPrices.money(total, currency: "USD", language: language)).font(.title3.bold()).monospacedDigit() }
-                        Text(confirmedTotal == nil ? t("Предварительно за все номера и ночи", "Estimated for all rooms and nights", "Barcha xona va tunlar uchun taxminiy", "Барча хона ва тунлар учун тахминий") : t("За все номера и ночи", "All rooms and nights", "Barcha xona va tunlar", "Барча хона ва тунлар")).font(.caption2).foregroundStyle(.secondary)
+                        Text(confirmedTotal == nil ? t("За все номера и ночи", "All rooms and nights", "Barcha xona va tunlar uchun", "Барча хона ва тунлар учун") : t("За все номера и ночи", "All rooms and nights", "Barcha xona va tunlar", "Барча хона ва тунлар")).font(.caption2).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
                 }

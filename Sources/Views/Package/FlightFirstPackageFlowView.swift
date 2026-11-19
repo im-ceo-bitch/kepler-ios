@@ -4,6 +4,6 @@ import SwiftUI
 // Use the consolidated Nuitee journey, not the retired 16-file flow.
 struct FlightFirstPackageFlowView: View {
     var body: some View {
-        NuiteeJourneyHotelsView()
+        PrimaryHotelView(entryMode: .flightFirst)
     }
 }

@@ -145,7 +145,7 @@ struct RemotePackageEngineClient {
             "/api/package/quote",
             body: request,
             headers: packageApprovalHeaders,
-            timeoutInterval: 604800
+            timeoutInterval: 180
         )
         guard response.ok else { throw APIError.invalidResponse }
         let quote = response.quote.publicQuote

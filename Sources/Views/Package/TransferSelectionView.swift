@@ -124,7 +124,7 @@ struct TransferSelectionView: View {
                             subtitle: "\(journey.trip.travelerCount) · " + routeTitle,
                             priceCaption: journey.hasFinalGeneratorQuote
                                 ? localized("Итого за пакет", "Package total", "Paket jami", "Пакет жами")
-                                : localized("Предварительно за пакет", "Estimated package total", "Taxminiy paket jami", "Тахминий пакет жами")
+                                : localized("За пакет", "Package total", "Paket jami", "Пакет жами")
                         ) {
                             IumrahTransferRouteDetails()
                         }
@@ -165,7 +165,6 @@ struct TransferSelectionView: View {
                 .background(IumrahNoVerticalBounce())
             }
             .modifier(IumrahJourneyRefresh {
-                await journey.refreshLocalJourneyRoomRates()
                 await refreshBasePackagePrice()
             })
             .scrollBounceBehavior(.basedOnSize)
@@ -438,7 +437,7 @@ struct TransferSelectionView: View {
                 if let hotel = journey.selectedMadinahHotel, includesMadinah { Label(hotel.name, systemImage: "bed.double") }
                 Label(selectedVehicle.rawValue.capitalized, systemImage: "car")
                 if journey.haramainTrainSelected { Label("Haramain", systemImage: "tram") }
-                Text(localized("Предварительная стоимость","Estimated total","Taxminiy narx","Тахминий нарх")).font(.caption)
+                Text(localized("Стоимость пакета","Package total","Paket narxi","Пакет нархи")).font(.caption)
                 Text(currentPackagePriceTitle).font(.title2.bold())
                 Button(localized("Изменить услуги","Edit services","Xizmatlarni o‘zgartirish","Хизматларни ўзгартириш")) { reviewing = false }
                 confirmationButton

@@ -37,14 +37,11 @@ struct HotelsHomeView: View {
     @State private var searchExpanded = false
     @State private var flightDirection = 0
     @StateObject private var hotelCatalog = NuiteeCatalogModel()
-    @State private var manualHotelLimit = NuiteeHotelPaging.pageSize
     @StateObject private var flightCatalog = IumrahFlightBrowseModel()
     @State private var appliedHotelName = ""
     @State private var manualQuoteRequired = false
-    @State private var manualHotels: [NuiteeHotel] = []
-    @State private var manualHotelsBusy = false
-    @State private var manualHotelsError: String?
-    @State private var manualHotelsRequestID = UUID()
+    @State private var familyJourney: JourneyStore?
+    @State private var showFamilyJourney = false
 
     @State private var flightDestination: SaudiArrivalAirport = .jeddah
     @State private var flightDeparture = Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date()
@@ -125,24 +122,17 @@ struct HotelsHomeView: View {
                 }
 
                 if mode == .hotels && showHotelResults {
-                    if manualQuoteRequired {
-                        manualHotelQuote
-                        manualHotelList
-                    } else {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            NuiteeHotelsCatalogView(
-                                refreshSignal: hotelSearchRevision,
-                                initialHotelQuery: appliedHotelName,
-                                searchOverride: hotelRequest,
-                                showsSearchControls: false, model: hotelCatalog, onManualRoom: { room in
-                                    guard manual.select(room) else { return }
-                                    showNotice(copy("Отель добавлен в ваш пакет", "Hotel added to your package", "Mehmonxona paketingizga qo‘shildi", "Меҳмонхона пакетингизга қўшилди"))
-                                    IumrahHaptics.success()
-                                }
-                            )
+                    if manualQuoteRequired { manualHotelQuote }
+                    NuiteeHotelsCatalogView(
+                        refreshSignal: hotelSearchRevision,
+                        initialHotelQuery: appliedHotelName,
+                        searchOverride: hotelRequest,
+                        showsSearchControls: false, model: hotelCatalog, onManualRoom: manualQuoteRequired ? nil : { room in
+                            guard manual.select(room) else { return }
+                            showNotice(copy("Отель добавлен в ваш пакет", "Hotel added to your package", "Mehmonxona paketingizga qo‘shildi", "Меҳмонхона пакетингизга қўшилди"))
+                            IumrahHaptics.success()
                         }
-                        .padding(.horizontal, IumrahDesign.pagePadding)
-                    }
+                    ).padding(.horizontal, IumrahDesign.pagePadding)
                 } else if mode == .hotels {
                     discoveryPrompt(
                         icon: "building.2.crop.circle",
@@ -192,6 +182,9 @@ struct HotelsHomeView: View {
                     .transition(.move(edge: .top).combined(with: .opacity)).allowsHitTesting(false)
             }
         }
+        .navigationDestination(isPresented: $showFamilyJourney) {
+            if let familyJourney { IumrahGuidedFlightSelectionView().environmentObject(familyJourney) }
+        }
         .navigationDestination(item: $openedManualFlight) { flight in
             IumrahManualFlightDetail(flight: flight, onConfirm: { addManualFlight(flight) })
         }
@@ -222,7 +215,9 @@ struct HotelsHomeView: View {
         .onChange(of: hotelCity) { _, city in
             guard hotelRequest?.city != city else { return }
             let applied = hotelRequest
-            if let window = manual.expectedWindow(city) {
+            if manualQuoteRequired {
+                hotelRequest = roomSearch(city: city, checkin: applied?.checkin ?? hotelCheckin, nights: applied?.nights ?? hotelNights)
+            } else if let window = manual.expectedWindow(city) {
                 hotelCheckin = window.checkIn; hotelNights = window.nights
                 hotelAdults = manual.adults
                 hotelRequest = IumrahHotelTabSearch(city: city, checkin: window.checkIn, nights: window.nights, adults: manual.adults)
@@ -231,9 +226,7 @@ struct HotelsHomeView: View {
                     checkin: applied?.checkin ?? hotelCheckin,
                     nights: applied?.nights ?? hotelNights, adults: applied?.adults ?? hotelAdults)
             }
-            if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
         }
-        .onChange(of: hotelName) { _, _ in manualHotelLimit = NuiteeHotelPaging.pageSize }
         .onChange(of: hotelChildren) { _, count in
             if count > childAges.count { childAges += Array(repeating: 6, count: count - childAges.count) }
             if count < childAges.count { childAges = Array(childAges.prefix(count)) }
@@ -280,8 +273,8 @@ struct HotelsHomeView: View {
                         .font(.subheadline)
                 }
             }
-            if hotelRooms > 1 || hotelChildren > 0 || hotelAdults > 6 {
-                Label(copy("Для нескольких номеров или детей требуется отдельное подтверждение цены. Не показываем взрослый тариф как семейный.",
+            if hotelRooms > 1 || hotelChildren > 0 || hotelAdults > 5 {
+                Label(copy("Для семьи покажем цену первого номера. Остальные номера можно выбрать в конфигураторе.",
                            "Multiple rooms or children require a separately verified quote.",
                            "Ko‘p xona yoki bolalar uchun narx alohida tasdiqlanishi kerak.",
                            "Кўп хона ёки болалар учун нарх алоҳида тасдиқланиши керак."), systemImage: "info.circle")
@@ -362,61 +355,38 @@ struct HotelsHomeView: View {
         .accessibilityIdentifier("discovery.search.\(mode.rawValue)")
     }
 
-    private var manualHotelQuote: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(copy("Нужна проверка размещения", "Accommodation requires confirmation", "Joylashuv tasdiqlanishi kerak", "Жойлашув тасдиқланиши керак"), systemImage: "person.crop.rectangle.stack")
-                .font(.headline)
-            Text(copy("Для нескольких номеров, детей или более шести взрослых цены и наличие зависят от состава каждого номера. Для точного расчёта обратитесь в iumrah Care.",
-                      "Multiple rooms, children and larger groups need an individually verified room quotation.",
-                      "Ko‘p xonalar va bolalar uchun individual hisob talab etiladi.",
-                      "Кўп хоналар ва болалар учун индивидуал ҳисоб талаб этилади."))
-                .font(.subheadline).foregroundStyle(.secondary)
-            Button {
-                chrome.navigate(to: .care)
-            } label: {
-                Label(copy("Связаться с iumrah Care", "Contact iumrah Care", "iumrah Care bilan bog‘lanish", "iumrah Care билан боғланиш"), systemImage: "phone.fill")
-                    .frame(maxWidth: .infinity).frame(height: 52)
-            }
-            .buttonStyle(.borderedProminent).tint(.black)
-            .buttonBorderShape(.capsule)
-        }
-        .padding(22)
-        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .padding(.horizontal, IumrahDesign.pagePadding)
+    // The legacy manual basket supports one adult-only room per city. Families
+    // use the same full catalogue and the existing multi-room journey, not a second list.
+    private func roomSearch(city: String, checkin: Date, nights: Int) -> IumrahHotelTabSearch {
+        let count = min(hotelAdults, max(hotelRooms, (hotelAdults + 4) / 5))
+        let adults = (hotelAdults + count - 1) / count
+        let children = childAges.enumerated().filter { $0.offset % count == 0 }.map(\.element)
+        return IumrahHotelTabSearch(city: city, checkin: checkin, nights: nights, adults: adults, childrenAges: children)
     }
 
-    private var manualHotelList: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if manualHotelsBusy {
-                ProgressView().frame(maxWidth: .infinity).padding(22)
-            } else if let manualHotelsError {
-                Text(manualHotelsError).font(.footnote).foregroundStyle(.secondary)
-            } else {
-                let matching = manualHotels.filter { hotelName.isEmpty || $0.name.localizedStandardContains(hotelName) }
-                ForEach(Array(matching.prefix(manualHotelLimit))) { hotel in
-                    Button { chrome.navigate(to: .care) } label: {
-                        HStack(spacing: 12) {
-                            HotelCachedImage(rawURL: hotel.coverImageURL, thumbnailPixelDimension: 768)
-                                .frame(width: 74, height: 74).clipped()
-                                .clipShape(RoundedRectangle(cornerRadius: 15))
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(hotel.name).font(.headline).foregroundStyle(.primary)
-                                Text(hotel.city).font(.caption).foregroundStyle(.secondary)
-                                Text(copy("Цена для вашей семьи — по запросу", "Your group quote — on request", "Narx — so‘rov asosida", "Нарх — сўров асосида"))
-                                    .font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right").font(.footnote).foregroundStyle(.secondary)
-                        }
-                        .padding(11)
-                        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 23))
-                    }
-                    .buttonStyle(.plain)
+    private var manualHotelQuote: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(copy("Цена за первый номер", "Price for the first room", "Birinchi xona narxi", "Биринчи хона нархи")).font(.headline)
+            Text(copy("Для всей семьи выберите номера в общем конфигураторе. Цены здесь относятся к составу первого номера.", "Choose rooms for the whole family in the trip builder. Prices here are for the first room.", "Barcha oila uchun xonalarni safar konstruktorida tanlang.", "Барча оила учун хоналарни сафар конструкторида танланг.")).font(.caption).foregroundStyle(.secondary)
+            Button {
+                let store = JourneyStore()
+                var draft = manual.plannedTrip
+                draft.adults = hotelAdults
+                draft.children = childAges.filter { $0 >= 2 }.count
+                draft.infants = childAges.filter { $0 < 2 }.count
+                draft.rooms = min(hotelAdults, max(hotelRooms, (hotelAdults + 4) / 5))
+                if !manual.routeConfigured {
+                    draft.departureDate = hotelCheckin
+                    draft.returnDate = Calendar.current.date(byAdding: .day, value: max(hotelNights, 2), to: hotelCheckin) ?? hotelCheckin
                 }
-                IumrahLoadMoreButton(remaining: matching.count - manualHotelLimit, pageSize: NuiteeHotelPaging.pageSize) { manualHotelLimit += NuiteeHotelPaging.pageSize }
-            }
-        }
-        .padding(.horizontal, IumrahDesign.pagePadding)
+                store.trip = draft
+                store.tripSummaryChildAges = childAges
+                familyJourney = store
+                showFamilyJourney = true
+            } label: {
+                Text(copy("Настроить путешествие", "Build your trip", "Safarni sozlash", "Сафарни созлаш")).frame(maxWidth: .infinity).frame(height: 48)
+            }.buttonStyle(.borderedProminent).tint(.black)
+        }.padding(18).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24)).padding(.horizontal, IumrahDesign.pagePadding)
     }
 
     private func discoveryPrompt(icon: String, title: String, detail: String) -> some View {
@@ -445,12 +415,10 @@ struct HotelsHomeView: View {
         withAnimation(.easeInOut(duration: 0.22)) { searchExpanded = false }
         appliedHotelName = hotelName
         if mode == .hotels {
-            manualQuoteRequired = hotelRooms != 1 || hotelChildren > 0 || hotelAdults > 6
+            manualQuoteRequired = hotelRooms != 1 || hotelChildren > 0 || hotelAdults > 5
             if !manualQuoteRequired { manual.adults = hotelAdults }
-            hotelRequest = IumrahHotelTabSearch(city: hotelCity, checkin: hotelCheckin,
-                nights: hotelNights, adults: hotelAdults)
+            hotelRequest = roomSearch(city: hotelCity, checkin: hotelCheckin, nights: hotelNights)
             showHotelResults = true
-            if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
             return
         }
         guard mode == .flights || mode == .weekends else { return }
@@ -522,37 +490,12 @@ struct HotelsHomeView: View {
         if mode == .flights || mode == .weekends { flightSearchRevision += 1; return }
         guard mode == .hotels else { return }
         if mode == .hotels && showHotelResults {
-            if manualQuoteRequired { await loadManualHotelCatalog() }
-            else if let request = hotelRequest {
+            if let request = hotelRequest {
                 await hotelCatalog.reload(city: request.city == "madinah" ? .madinah : .makkah,
                     checkin: request.checkin,
                     checkout: Calendar.current.date(byAdding: .day, value: request.nights, to: request.checkin) ?? request.checkin,
-                    adults: request.adults, forceRefresh: true)
+                    adults: request.adults, childrenAges: request.childrenAges, forceRefresh: true)
             }
-        }
-    }
-
-    @MainActor private func loadManualHotelCatalog() async {
-        manualHotelLimit = NuiteeHotelPaging.pageSize
-        let requestID = UUID()
-        manualHotelsRequestID = requestID
-        manualHotelsBusy = true
-        manualHotelsError = nil
-        manualHotels = []
-        defer { if manualHotelsRequestID == requestID { manualHotelsBusy = false } }
-        do {
-            // A catalogue search is allowed, but not a room rate quotation.
-            // Suppress supplier prices until every room's occupancy is verified.
-            let checkOut = Calendar.current.date(byAdding: .day, value: hotelNights, to: hotelCheckin) ?? hotelCheckin
-            let response = try await NuiteeHotelService().hotels(
-                city: hotelCity, checkin: hotelCheckin, checkout: checkOut,
-                adults: min(6, hotelAdults), catalogOnly: true
-            )
-            guard manualHotelsRequestID == requestID, !Task.isCancelled else { return }
-            manualHotels = response.hotels
-        } catch {
-            guard manualHotelsRequestID == requestID, !Task.isCancelled else { return }
-            manualHotelsError = error.localizedDescription
         }
     }
 
@@ -578,7 +521,7 @@ struct HotelsHomeView: View {
             mode = .hotels
             if let city = (manual.routeConfigured && manual.scope == .makkahOnly ? "makkah" : chrome.requestedManualHotelCity) ?? (switchingFromOtherBoard && (manual.trip != nil || manual.routeConfigured) ? hotelCity : nil) {
                 chrome.requestedManualHotelCity = nil
-                hotelCity = city; hotelAdults = manual.adults; hotelRooms = 1; hotelChildren = 0; manualQuoteRequired = false
+                hotelCity = city; hotelAdults = manual.adults; hotelRooms = 1; hotelChildren = 0; childAges = []; manualQuoteRequired = false
                 if let window = manual.expectedWindow(city) { hotelCheckin = window.checkIn; hotelNights = window.nights }
                 hotelRequest = IumrahHotelTabSearch(city: city, checkin: hotelCheckin, nights: hotelNights, adults: hotelAdults)
                 showHotelResults = true
@@ -596,11 +539,11 @@ struct HotelsHomeView: View {
         hotelAdults = request.adults
         hotelRooms = 1
         hotelChildren = 0
-        manualQuoteRequired = request.adults > 6
-        hotelRequest = IumrahHotelTabSearch(city: hotelCity, checkin: request.checkin, nights: request.nights, adults: request.adults)
+        childAges = []
+        manualQuoteRequired = request.adults > 5
+        hotelRequest = roomSearch(city: hotelCity, checkin: request.checkin, nights: request.nights)
         hotelSearchRevision += 1
         showHotelResults = true
-        if manualQuoteRequired { Task { await loadManualHotelCatalog() } }
         chrome.requestedHotelTabSearch = nil
     }
 

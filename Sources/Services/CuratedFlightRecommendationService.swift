@@ -113,7 +113,10 @@ final class CuratedFlightRecommendationService {
             for item in fallback where item.nonstop {
                 // The recommendations projection has richer canonical metadata, so
                 // keep it when both endpoints describe the same publication.
-                if merged[item.id] == nil { merged[item.id] = item }
+                if var existing = merged[item.id] {
+                    existing.fareUsdPerTraveler = existing.fareUsdPerTraveler ?? item.fareUsdPerTraveler
+                    merged[item.id] = existing
+                } else { merged[item.id] = item }
             }
         } catch {
             if firstError == nil { firstError = error }
@@ -190,7 +193,8 @@ final class CuratedFlightRecommendationService {
                 nonstop: option.outbound.stops == 0 && (option.inbound?.stops ?? 0) == 0,
                 recommendationLabel: "iumrah recommends",
                 offerType: isOneWay ? "one_way" : "paired_one_way",
-                journeyRole: role
+                journeyRole: role,
+                fareUsdPerTraveler: option.currency.uppercased() == "USD" && option.perTravelerFare.isFinite && option.perTravelerFare > 0 ? option.perTravelerFare : nil
             )
         }
     }

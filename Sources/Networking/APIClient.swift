@@ -47,8 +47,8 @@ actor APIClient {
 
     init(longRunning: Bool = false) {
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.timeoutIntervalForRequest = longRunning ? 604800 : 25
-        configuration.timeoutIntervalForResource = longRunning ? 604800 : 60
+        configuration.timeoutIntervalForRequest = longRunning ? 120 : 25
+        configuration.timeoutIntervalForResource = longRunning ? 180 : 60
         configuration.waitsForConnectivity = true
         session = URLSession(configuration: configuration, delegate: IumrahAPIOriginDelegate(), delegateQueue: nil)
         decoder = JSONDecoder()

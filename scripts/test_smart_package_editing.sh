@@ -16,7 +16,7 @@ checks={
  'flight editor returns to Smart': 'if let smartConfirm { smartConfirm() } else { showHotelPicker = true }' in flight,
  'Smart keeps guest composition in flight search': 'lockParty: smartConfirm != nil' in flight and 'next.trip.adults == previous.trip.adults' in store,
  'hotel editor targets only chosen city and uses real star picker': 'smartCity.map { [$0] }' in hotel and 'ForEach(1...5' in hotel,
- 'hotel editor preserves child ages': '_ages = State(initialValue: smartChildAges)' in hotel and 'if smartCity == nil { journey.localJourneyRooms = [:]' in hotel,
+ 'hotel editor preserves child ages': '_ages = State(initialValue: smartChildAges)' in hotel and 'guard smartCity == nil else { return }' in hotel and 'journey.tripSummaryChildAges != value' in hotel,
  'hotel confirmation returns to Smart': 'if let smartConfirm { smartConfirm(); return }' in hotel,
  'isolated edit journey': 'let next = JourneyStore()' in store and 'next.localJourneyRooms = previous.localJourneyRooms' in store,
  'new price before replacing result': store.index('await next.buildQuote()',store.index('func applyEdit')) < store.index('result = next',store.index('func applyEdit')),

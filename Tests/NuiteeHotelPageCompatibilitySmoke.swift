@@ -52,6 +52,14 @@ import Foundation
         var cursorOnly = first; cursorOnly.total = nil
         precondition(NuiteeHotelListEnvelope.normalizedPage(cursorOnly, stars: 3, offset: 0, pageSize: 1, query: "", favorites: nil).hotels.count == 2)
         precondition(NuiteeHotelPaging.nextOffset(cursorOnly, requestedOffset: 0) == 2)
-        print("PASS: legacy decoding, filters, pagination, outage and modern response compatibility")
+        let rateJSON = """
+        {"ok":true,"sandbox":false,"checkin":"2026-11-25","checkout":"2026-11-28","adults":2,"cached":false,"availabilityConfirmed":true,"rates":[{"offerId":"offer","roomId":"","roomName":"Room without photo mapping","mealPlan":"Room Only","price":245,"currency":"USD","refundable":false,"cancellationTag":"","cancellationDescription":"","cancellationDeadlines":[],"chargeOnArrival":[]}]}
+        """
+        let rateEnvelope = try JSONDecoder().decode(NuiteeRatesEnvelope.self, from: Data(rateJSON.utf8))
+        precondition(rateEnvelope.availabilityConfirmed == true && rateEnvelope.rates.first?.price == 245 && rateEnvelope.rates.first?.roomId == "")
+        let oldRateJSON = rateJSON.replacingOccurrences(of: ",\"availabilityConfirmed\":true", with: "")
+        let oldRateEnvelope = try JSONDecoder().decode(NuiteeRatesEnvelope.self, from: Data(oldRateJSON.utf8))
+        precondition(oldRateEnvelope.availabilityConfirmed == nil && oldRateEnvelope.rates.count == 1)
+        print("PASS: legacy decoding, filters, pagination, outage, unmapped room rates and modern response compatibility")
     }
 }

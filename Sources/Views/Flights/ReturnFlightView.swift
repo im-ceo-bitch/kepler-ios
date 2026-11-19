@@ -28,8 +28,7 @@ struct ReturnFlightView: View {
             }
         }
         .background(shouldShowImmersive ? Color.black : Color.iumrahPageBackground)
-        .task { await search(continueExisting: false) }
-        .task(id: packagePreviewSignature) { await refreshPackagePrices() }
+        .task { if offers.isEmpty { await search(continueExisting: true) } }
         .onAppear { updateImmersive() }
         .onChange(of: isInitialLoading) { _, _ in updateImmersive() }
         .onDisappear { chrome.setImmersive(false) }
@@ -133,7 +132,7 @@ struct ReturnFlightView: View {
                         packagePricePerPerson: packagePrices[offer.id],
                         referencePackagePricePerPerson: referenceOffer.flatMap { packagePrices[$0.id] },
                         usesProvisionalOppositeLeg: false,
-                        isPackagePriceLoading: journey.isSearchingHotelPrices
+                        isPackagePriceLoading: false
                     )
                 }
                 .buttonStyle(.plain)
@@ -279,13 +278,12 @@ struct ReturnFlightView: View {
         if !continueExisting {
             candidates = []
             offers = []
-            journey.selectedInbound = nil
-            journey.quote = nil
         }
 
         let generation = UUID()
         searchGeneration = generation
         isSearching = true
+        defer { if searchGeneration == generation { isSearching = false; isInitialLoading = false } }
         fatalErrorText = nil
         journey.errorMessage = nil
         if candidates.isEmpty && offers.isEmpty { isInitialLoading = true }
@@ -298,7 +296,7 @@ struct ReturnFlightView: View {
                 madinahHotel: madinahHotel,
                 outbound: outbound,
                 onUpdate: { progress in
-                    guard searchGeneration == generation else { return }
+                    guard searchGeneration == generation, !Task.isCancelled else { return }
                     candidates = mergeCandidates(candidates, progress.discoveredCandidates)
                     offers = mergeOffers(offers, progress.pricedOffers)
                     searchStatus = progress.status
@@ -308,15 +306,15 @@ struct ReturnFlightView: View {
                     }
                 }
             )
-            guard searchGeneration == generation else { return }
+            guard searchGeneration == generation, !Task.isCancelled else { return }
             offers = mergeOffers(offers, final)
         } catch {
-            guard searchGeneration == generation else { return }
+            guard searchGeneration == generation, !Task.isCancelled else { return }
             fatalErrorText = L10n.error(error, settings.language)
             journey.errorMessage = error.localizedDescription
         }
 
-        guard searchGeneration == generation else { return }
+        guard searchGeneration == generation, !Task.isCancelled else { return }
         isSearching = false
         isInitialLoading = false
         selectRecommendedIfNeeded()
@@ -324,18 +322,27 @@ struct ReturnFlightView: View {
     }
 
     private var packagePreviewSignature: String {
-        let hotelKey = journey.hotelPriceSnapshot.map { String($0.hashValue) } ?? "-"
+        let snapshotKey = journey.hotelPriceSnapshot.map { String($0.hashValue) } ?? "-"
+        let makkahRoom = journey.selectedRoom?.id ?? journey.selectedRoomCategory?.id ?? "-"
+        let madinahRoom = journey.selectedMadinahRoom?.id ?? journey.selectedMadinahRoomCategory?.id ?? "-"
+        let hotelKey = [snapshotKey, String(journey.trip.hashValue), journey.selectedHotel?.id ?? "-",
+                        journey.selectedMadinahHotel?.id ?? "-", makkahRoom, madinahRoom].joined(separator: "|")
         let outboundKey = journey.selectedOutbound?.id ?? "-"
         return [offers.map(\.id).joined(separator: ","), hotelKey, outboundKey].joined(separator: "|")
     }
 
     private func refreshPackagePrices() async {
+        let requestKey = packagePreviewSignature
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled, requestKey == packagePreviewSignature else { return }
         guard !offers.isEmpty, let outbound = journey.selectedOutbound else { packagePrices = [:]; return }
-        packagePrices = await journey.packagePricePreviews(
+        let result = await journey.packagePricePreviews(
             offers: offers,
             direction: .inbound,
             oppositeLeg: outbound
         )
+        guard !Task.isCancelled, requestKey == packagePreviewSignature else { return }
+        packagePrices = result
     }
 
     private var hasVerifiedResults: Bool { !offers.isEmpty }

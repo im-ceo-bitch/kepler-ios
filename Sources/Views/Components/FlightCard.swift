@@ -196,7 +196,10 @@ struct FlightCard: View {
     }
 
     private var deltaDisplay: String {
-        guard let delta = packageDelta else { return "—" }
+        guard let delta = packageDelta else {
+            guard let fare = offer.fareAmount, fare > 0, offer.fareScope != nil, offer.fareScope != .unknown else { return "—" }
+            return NSDecimalNumber(decimal: fare).doubleValue.formatted(.currency(code: offer.currency).precision(.fractionLength(0...2)))
+        }
         let rounded = abs(NSDecimalNumber(decimal: delta).doubleValue).rounded()
         let number = NumberFormatter()
         number.numberStyle = .decimal
@@ -209,6 +212,13 @@ struct FlightCard: View {
     }
 
     private var deltaLabel: String {
+        if packageDelta == nil {
+            let party = offer.fareScope == .totalParty
+            if offer.pairedLeg != nil {
+                return NuiteeCopy.text(party ? "Туда и обратно · за всех" : "Туда и обратно · за пассажира", party ? "Borish va qaytish · barchasi" : "Borish va qaytish · yo‘lovchiga", party ? "Round trip · all travelers" : "Round trip · per traveler", settings.language)
+            }
+            return NuiteeCopy.text(party ? "За всех пассажиров" : "За пассажира", party ? "Barcha yo‘lovchilar uchun" : "Yo‘lovchiga", party ? "All travelers" : "Per traveler", settings.language)
+        }
         switch settings.language {
         case .russian: return "к пакету / 1 человек"
         case .english, .turkish, .indonesian, .malay, .arabic: return "package difference / traveler"

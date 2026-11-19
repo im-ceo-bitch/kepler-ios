@@ -24,7 +24,7 @@ struct NuiteeHotel: Codable, Identifiable, Hashable {
     var imageURL: String? { coverImageURL }
 }
 
-struct NuiteeHotelMinimumRate: Codable, Hashable {
+struct NuiteeHotelMinimumRate: Codable, Hashable, Sendable {
     let hotelId: String
     let price: Double
     let currency: String
@@ -163,6 +163,7 @@ struct NuiteeRatesEnvelope: Decodable {
     let adults: Int
     let rates: [NuiteeRoomRate]
     let cached: Bool
+    var availabilityConfirmed: Bool? = nil
 }
 
 struct NuiteeSelectedStay: Codable {

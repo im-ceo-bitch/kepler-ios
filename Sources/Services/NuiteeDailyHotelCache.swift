@@ -30,7 +30,7 @@ actor NuiteeDailyHotelCache {
         return directory.appendingPathComponent(String(safe) + ".json")
     }
     private func fresh(_ entry: Entry, key: String, now: Date) -> Bool {
-        if key.hasPrefix("catalog-v2-") { return now >= entry.savedAt && now.timeIntervalSince(entry.savedAt) < 86_400 }
+        if key.hasPrefix("catalog-v2-") || key.hasPrefix("catalog-v3-") { return now >= entry.savedAt && now.timeIntervalSince(entry.savedAt) < 86_400 }
         if key.hasSuffix("-rates") { return now >= entry.savedAt && now.timeIntervalSince(entry.savedAt) < 900 }
         return Self.isFresh(savedAt: entry.savedAt, now: now)
     }

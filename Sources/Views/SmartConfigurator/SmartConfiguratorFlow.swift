@@ -473,10 +473,10 @@ struct SmartConfiguratorFlow: View {
                     Text(journey.trip.departureDate.formatted(date: .abbreviated, time: .omitted) + " — " + journey.trip.returnDate.formatted(date: .abbreviated, time: .omitted)).font(.subheadline)
                     Text(store.connecting ? t("Есть пересадка", "Includes a connection", "Ulanish reysi bor", "Уланиш рейси бор") : t("Прямые рейсы", "Nonstop flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар")).font(.subheadline.weight(.semibold))
                     Text(IumrahPackageDisplayPrices.money(quote.totalPackagePrice, currency: quote.currency, language: settings.language)).font(.largeTitle.bold())
-                    Text(t("Предварительно за всех путешественников", "Estimated total for all travelers", "Barcha sayohatchilar uchun taxminiy jami", "Барча саёҳатчилар учун тахминий жами")).font(.caption).foregroundStyle(.secondary)
+                    Text(t("За всех путешественников", "Total for all travelers", "Barcha sayohatchilar uchun jami", "Барча саёҳатчилар учун жами")).font(.caption).foregroundStyle(.secondary)
                     Text(IumrahPackageDisplayPrices.money(quote.pricePerPerson, currency: quote.currency, language: settings.language) + " · " + t("на одного паломника", "per pilgrim", "bir ziyoratchi uchun", "бир зиёратчи учун"))
                         .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                    Text(t("Наличие и окончательную стоимость подтвердим вручную перед оплатой.", "Availability and final price will be confirmed manually before payment.", "Mavjudlik va yakuniy narx to‘lovdan oldin tasdiqlanadi.", "Мавжудлик ва якуний нарх тўловдан олдин тасдиқланади.")).font(.caption).foregroundStyle(.secondary)
+                    Text(t("Наличие и стоимость проверим после заявки, до оплаты.", "Availability and final price will be confirmed manually before payment.", "Mavjudlik va yakuniy narx to‘lovdan oldin tasdiqlanadi.", "Мавжудлик ва якуний нарх тўловдан олдин тасдиқланади.")).font(.caption).foregroundStyle(.secondary)
                 }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
             }
             if let error = store.error {
@@ -626,7 +626,7 @@ struct SmartConfiguratorFlow: View {
         VStack(spacing: 12) {
             if step == .assembly, store.reviewReady, let journey = store.result, let quote = journey.quote {
                 HStack {
-                    Text(t("Предварительно за всех", "Estimated total", "Taxminiy jami", "Тахминий жами")).font(.caption).foregroundStyle(.secondary)
+                    Text(t("Итого за всех", "Total", "Jami", "Жами")).font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text(IumrahPackageDisplayPrices.money(quote.totalPackagePrice, currency: quote.currency, language: settings.language)).font(.title3.bold()).monospacedDigit()
                 }

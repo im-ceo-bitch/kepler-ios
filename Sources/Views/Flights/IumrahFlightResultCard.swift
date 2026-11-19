@@ -15,6 +15,7 @@ struct IumrahFlightResultCard: View {
     let stops: Int
     let price: Double?
     let isAviasales: Bool
+    var isRoundTripFare = false
     var selected = false
     var selectedSearchDay: String? = nil
     var onSelect: (() -> Void)? = nil
@@ -48,7 +49,7 @@ struct IumrahFlightResultCard: View {
                         Text(airline).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(2)
                         HStack(spacing: 6) {
                             if let number { Text(number).font(IumrahType.bold(12, relativeTo: .caption)).monospacedDigit().lineLimit(1) }
-                            Text(isAviasales ? tr("Цена уточняется", "Fare subject to confirmation", "Narx tasdiqlanadi", "Нарх тасдиқланади") : "iumrah Direct")
+                            Text(isAviasales ? tr("Авиабилет", "Flight", "Aviachipta", "Авиачипта") : "iumrah Direct")
                                 .font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
@@ -73,7 +74,7 @@ struct IumrahFlightResultCard: View {
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1)
                 HStack(alignment: .center, spacing: 8) {
                     if usablePrice != nil {
-                        Text(tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун"))
+                        Text(isRoundTripFare ? tr("Туда и обратно · за пассажира", "Round trip · per passenger", "Borib qaytish · bir yo‘lovchi", "Бориб қайтиш · бир йўловчи") : tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун"))
                             .font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 6)

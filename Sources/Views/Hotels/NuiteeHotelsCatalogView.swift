@@ -55,121 +55,241 @@ final class NuiteeCatalogModel: ObservableObject {
 
     // Metadata is city-scoped; prices are bound to stay dates and occupancy.
     private var catalogues: [String: (Date, NuiteeHotelListEnvelope)] = [:]
-    private var filteredRows: [NuiteeHotel] = []
+
     private var priceCache: [String: (Date, [String: NuiteeHotelService.PriceRow])] = [:]
     private var priceKey = ""
+    @Published private(set) var pricesLoading = false
+    private var priceWorkGeneration: UUID?
 
-    func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, stars: Int = 0,
-                query: String = "", favorites: Set<String>? = nil, forceRefresh: Bool = false) async {
-        let requestedKey = key(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites)
-        if activeKey == requestedKey && !forceRefresh && hasLoadedPage && errorMessage == nil && !busy && !hotels.contains(where: { $0.rateStatus == "loading" || $0.rateStatus == "not_requested" }) { return }
-        let version = UUID(); generation = version
-        activeKey = requestedKey
-        priceKey = priceScope(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults)
-        if forceRefresh { priceCache[priceKey] = nil }
-        busy = true; loadingMore = false; pageError = false; errorMessage = nil; rateError = nil
-        hasLoadedPage = false
-        defer { if generation == version { busy = false } }
-        do {
-            let snapshot: NuiteeHotelListEnvelope
-            if let existing = catalogues[city.rawValue], Date().timeIntervalSince(existing.0) < 86_400 { snapshot = existing.1 }
-            else {
-                snapshot = try await service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: true)
-                guard snapshot.ok else { throw APIError.invalidResponse }
-                catalogues[city.rawValue] = (Date(), snapshot)
-            }
-            guard generation == version, !Task.isCancelled else { return }
-            sandbox = snapshot.sandbox; catalogStale = snapshot.hotelCatalogStale
-            let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            filteredRows = snapshot.hotels.filter { row in
-                (stars == 0 || row.roundedStars == stars || row.roundedStars == 0) &&
-                (favorites == nil || favorites?.contains(row.id) == true) &&
-                (term.isEmpty || row.name.localizedCaseInsensitiveContains(term) || (row.address?.localizedCaseInsensitiveContains(term) ?? false))
-            }.map { hotel in
-                var row = hotel; row.minimumRate = nil; row.rateStatus = "not_requested"; return row
-            }
-            total = filteredRows.count
-            hotels = Array(filteredRows.prefix(NuiteeHotelPaging.pageSize))
-            nextOffset = hotels.count < total ? hotels.count : nil
-            hasLoadedPage = true; busy = false
-            await hydrate(city: city, checkin: checkin, checkout: checkout, adults: adults, rows: hotels, version: version)
-        } catch {
-            guard generation == version, !Task.isCancelled else { return }
-            hotels = []; nextOffset = nil; total = 0; hasLoadedPage = true; errorMessage = "HOTEL_CATALOG_UNAVAILABLE"
+
+    // Search identity is only dates, city and occupancy. Visual filters never own network work.
+    private var work: Task<Void, Never>?
+
+    func visibleHotels(stars: Int, query: String = "", favorites: Set<String>? = nil) -> [NuiteeHotel] {
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rows = hotels.filter { row in
+            (stars == 0 || row.roundedStars == stars || row.roundedStars == 0) &&
+            (favorites == nil || favorites?.contains(row.id) == true) &&
+            (term.isEmpty || row.name.localizedCaseInsensitiveContains(term) || (row.address?.localizedCaseInsensitiveContains(term) ?? false))
         }
+        // Preserve the order inside each group, including while prices arrive.
+        return stars == 0 ? rows : rows.filter { $0.roundedStars == stars } + rows.filter { $0.roundedStars == 0 }
     }
 
-    func loadMore(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, stars: Int = 0,
-                  query: String = "", favorites: Set<String>? = nil) async {
-        guard !busy, !loadingMore, let offset = nextOffset,
-              activeKey == key(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites) else { return }
-        let version = generation; loadingMore = true; pageError = false
-        defer { if generation == version { loadingMore = false } }
-        let end = min(filteredRows.count, offset + NuiteeHotelPaging.pageSize)
-        guard offset < end else { nextOffset = nil; return }
-        let rows = Array(filteredRows[offset..<end])
-        hotels = NuiteeHotelPaging.append(hotels, rows)
-        nextOffset = end < filteredRows.count ? end : nil
-        await hydrate(city: city, checkin: checkin, checkout: checkout, adults: adults, rows: rows, version: version)
+    func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], stars: Int = 0,
+                query: String = "", favorites: Set<String>? = nil, forceRefresh: Bool = false) async {
+        let requestedKey = priceScope(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges)
+        if activeKey == requestedKey, let work { await work.value; return }
+        if activeKey == requestedKey, hasLoadedPage, errorMessage == nil, !forceRefresh, !catalogStale { return }
+        let sameScope = activeKey == requestedKey && hasLoadedPage && !hotels.isEmpty
+        let refreshMetadata = catalogStale || errorMessage != nil
+        work?.cancel()
+        let version = UUID(); generation = version
+        activeKey = requestedKey; priceKey = requestedKey
+        if forceRefresh { priceCache[requestedKey] = nil }
+        busy = !sameScope; errorMessage = nil; rateError = nil
+        if !sameScope {
+            hasLoadedPage = false
+            // A city switch or occupancy change can reuse metadata immediately.
+            // Never carry a price from a different stay or group of guests.
+            if let snapshot = catalogues[city.rawValue], !snapshot.1.hotelCatalogStale, Date().timeIntervalSince(snapshot.0) < 86_400 {
+                hotels = snapshot.1.hotels.map { hotel in var row = hotel; row.minimumRate = nil; row.rateStatus = "not_requested"; return row }
+                total = hotels.count; hasLoadedPage = true; busy = false
+                if let cached = priceCache[requestedKey], Date().timeIntervalSince(cached.0) < 900 {
+                    merge(cached.1, requested: Set(hotels.map(\.id)), missingStatus: "not_requested")
+                }
+            } else { hotels = []; total = 0 }
+        }
+        nextOffset = nil; loadingMore = false; pageError = false
+        pricesLoading = false
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.generation == version { self.busy = false; self.pricesLoading = false; self.work = nil } }
+            do {
+                if refreshMetadata || (!sameScope && !self.hasLoadedPage) {
+                    let snapshot: NuiteeHotelListEnvelope
+                    if let existing = self.catalogues[city.rawValue], !existing.1.hotelCatalogStale, Date().timeIntervalSince(existing.0) < 86_400 { snapshot = existing.1 }
+                    else {
+                        snapshot = try await self.service.hotels(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, catalogOnly: true)
+                        guard snapshot.ok else { throw APIError.invalidResponse }
+                        self.catalogues[city.rawValue] = (Date(), snapshot)
+                    }
+                    guard self.generation == version, !Task.isCancelled else { return }
+                    self.sandbox = snapshot.sandbox; self.catalogStale = snapshot.hotelCatalogStale
+                    let old = sameScope ? Dictionary(uniqueKeysWithValues: self.hotels.map { ($0.id, $0) }) : [:]
+                    var seen = Set<String>()
+                    self.hotels = snapshot.hotels.filter { seen.insert($0.id).inserted }.map { hotel in
+                        var row = hotel; row.minimumRate = old[hotel.id]?.minimumRate; row.rateStatus = old[hotel.id]?.rateStatus ?? "not_requested"; return row
+                    }
+                    self.total = self.hotels.count; self.hasLoadedPage = true
+                    if let cached = self.priceCache[requestedKey], Date().timeIntervalSince(cached.0) < 900 {
+                        self.merge(cached.1, requested: Set(self.hotels.map(\.id)), missingStatus: "not_requested")
+                    }
+                }
+                self.busy = false
+                await self.hydrate(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, rows: self.hotels, version: version)
+            } catch {
+                guard self.generation == version, !Task.isCancelled else { return }
+                if sameScope { self.catalogStale = true; self.rateError = "HOTEL_CATALOG_UNAVAILABLE" }
+                else { self.errorMessage = "HOTEL_CATALOG_UNAVAILABLE" }; self.hasLoadedPage = true
+            }
+        }
+        work = task
+        await task.value
     }
 
-    private func hydrate(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, rows: [NuiteeHotel], version: UUID) async {
+    func retryMissingPrices(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = []) async {
+        guard !busy, work == nil, priceKey == priceScope(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges) else { return }
+        let version = generation
+        let rows = hotels.filter { $0.minimumRate == nil && $0.rateStatus != "no_availability" }
+        rateError = nil
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer { if self.generation == version { self.work = nil; self.pricesLoading = false } }
+            await self.hydrate(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, rows: rows, version: version)
+        }
+        work = task
+        await task.value
+    }
+
+    // Compatibility for callers of the old 12-item paginator. All metadata is already visible.
+    func loadMore(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], stars: Int = 0,
+                  query: String = "", favorites: Set<String>? = nil) async {}
+
+    private func hydrate(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int], rows: [NuiteeHotel], version: UUID) async {
         guard generation == version, !Task.isCancelled, !rows.isEmpty else { return }
+        pricesLoading = true
+        defer { if generation == version { pricesLoading = false } }
+        // Fetch every group's bulk prices first. A single slow hotel must not block all later groups.
+        var unresolved: [String] = []
+        for start in stride(from: 0, to: rows.count, by: 80) {
+            guard generation == version, !Task.isCancelled else { return }
+            let middle = min(start + 40, rows.count)
+            let first = Array(rows[start..<middle])
+            let second = Array(rows[middle..<min(start + 80, rows.count)])
+            async let left = hydrateBatch(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, rows: first, version: version)
+            async let right = hydrateBatch(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, rows: second, version: version)
+            unresolved += await left + right
+            if rateError == "NUITEE_RATE_LIMIT" { merge([:], requested: Set(hotels.filter { $0.minimumRate == nil && $0.rateStatus != "no_availability" }.map(\.id)), missingStatus: "provider_error"); return }
+        }
+        await recoverMissing(unresolved, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, version: version)
+    }
+
+    private func hydrateBatch(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int], rows: [NuiteeHotel], version: UUID) async -> [String] {
+        guard generation == version, !Task.isCancelled, !rows.isEmpty else { return [] }
         let search = priceKey
-        let cached = priceCache[search].flatMap { Date().timeIntervalSince($0.0) < 120 ? $0.1 : nil } ?? [:]
+        let cached = priceCache[search].flatMap { Date().timeIntervalSince($0.0) < 900 ? $0.1 : nil } ?? [:]
         let ids = rows.map(\.id).filter { cached[$0] == nil }
         merge(cached, requested: Set(rows.map(\.id)), missingStatus: "loading")
-        guard !ids.isEmpty else { return }
+        guard !ids.isEmpty else { return [] }
+        var unresolved = ids
+        var providerLimited = false
         do {
-            let response = try await service.pricePage(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, hotelIDs: ids)
-            guard generation == version, !Task.isCancelled else { return }
-            var indexed: [String: NuiteeHotelService.PriceRow] = [:]
-            for row in response.hotels { indexed[row.id] = row }
-            sandbox = response.sandbox; rateError = response.rateError
-            merge(indexed, requested: Set(ids), missingStatus: response.rateError == nil ? "not_returned" : "provider_error")
-            if response.rateError == nil && !response.pricesStale {
-                var combined = priceCache[search].flatMap { Date().timeIntervalSince($0.0) < 120 ? $0.1 : nil } ?? [:]
-                for (id, row) in indexed where row.minimumRate != nil { combined[id] = row }
-                if priceCache.count >= 8 && priceCache[search] == nil { priceCache.removeAll() }
-                priceCache[search] = (priceCache[search].flatMap { Date().timeIntervalSince($0.0) < 120 ? $0.0 : nil } ?? Date(), combined)
+            let response = try await service.pricePage(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, hotelIDs: ids, childrenAges: childrenAges)
+            guard generation == version, !Task.isCancelled else { return [] }
+            sandbox = response.sandbox
+            let indexed = response.hotels.reduce(into: [String: NuiteeHotelService.PriceRow]()) { $0[$1.id] = $1 }
+            let positive = indexed.filter { Self.validPrice($0.value) }
+            // A batch omission is not a final status. Keep its spinner until the
+            // individual, mapped room-rate search completes.
+            merge(positive, requested: Set(ids), missingStatus: "loading")
+            if !response.pricesStale { remember(positive, scope: search) }
+            unresolved = ids.filter { id in
+                positive[id] == nil || indexed[id]?.rateStatus == "cached"
             }
+            providerLimited = response.rateError == "NUITEE_RATE_LIMIT"
         } catch {
-            guard generation == version, !Task.isCancelled else { return }
-            rateError = "RATES_UNAVAILABLE"
-            merge([:], requested: Set(ids), missingStatus: "provider_error")
+            guard generation == version, !Task.isCancelled else { return [] }
+            providerLimited = NuiteeHotelService.isRateLimited(error)
         }
+        guard !providerLimited else {
+            rateError = "NUITEE_RATE_LIMIT"
+            merge([:], requested: Set(unresolved), missingStatus: "provider_error")
+            return []
+        }
+        return unresolved
     }
-    func acceptDetailRates(hotelID: String, city: String, checkin: Date, checkout: Date, adults: Int, rates: [NuiteeRoomRate]) {
-        let scope = priceScope(city: city, checkin: checkin, checkout: checkout, adults: adults)
-        guard scope == priceKey, let best = rates.filter({ $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 }).min(by: { $0.price < $1.price }) else { return }
+
+    private func recoverMissing(_ unresolved: [String], checkin: Date, checkout: Date, adults: Int, childrenAges: [Int], version: UUID) async {
+        let search = priceKey
+        var providerLimited = false
+        // Each missing ID uses exactly the same endpoint/occupancy as the hotel
+        // detail page. Small bounded groups avoid flooding the supplier.
+        let rateService = service
+        for start in stride(from: 0, to: unresolved.count, by: 3) {
+            guard generation == version, !Task.isCancelled else { return }
+            let groupIDs = Array(unresolved[start..<min(start + 3, unresolved.count)])
+            await withTaskGroup(of: NuiteeHotelService.CatalogRateResult.self) { group in
+                for id in groupIDs {
+                    group.addTask {
+                        await rateService.catalogRate(hotelID: id, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges)
+                    }
+                }
+                for await result in group {
+                    guard generation == version, !Task.isCancelled else { group.cancelAll(); break }
+                    if result.rateLimited { providerLimited = true }
+                    let row = result.row
+                    merge([row.id: row], requested: [row.id], missingStatus: "provider_error")
+                    if Self.validPrice(row) { remember([row.id: row], scope: search) }
+                }
+            }
+            if providerLimited {
+                guard generation == version, !Task.isCancelled else { return }
+                merge([:], requested: Set(unresolved.dropFirst(start + groupIDs.count)), missingStatus: "provider_error")
+                break
+            }
+        }
+        guard generation == version, !Task.isCancelled else { return }
+        rateError = providerLimited ? "NUITEE_RATE_LIMIT" : hotels.contains { $0.rateStatus == "provider_error" || $0.rateStatus == "not_returned" } ? "RATES_INCOMPLETE" : nil
+    }
+    private static func validPrice(_ row: NuiteeHotelService.PriceRow) -> Bool {
+        guard let rate = row.minimumRate else { return false }
+        return rate.hotelId == row.id && rate.price.isFinite && rate.price > 0 && rate.currency.uppercased() == "USD"
+    }
+    private func remember(_ rows: [String: NuiteeHotelService.PriceRow], scope: String) {
+        guard !rows.isEmpty else { return }
+        var combined = priceCache[scope].flatMap { Date().timeIntervalSince($0.0) < 900 ? $0.1 : nil } ?? [:]
+        for (id, row) in rows where Self.validPrice(row) { combined[id] = row }
+        if priceCache.count >= 8 && priceCache[scope] == nil { priceCache.removeAll() }
+        priceCache[scope] = (priceCache[scope].flatMap { Date().timeIntervalSince($0.0) < 900 ? $0.0 : nil } ?? Date(), combined)
+    }
+    func acceptDetailRates(hotelID: String, city: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], rates: [NuiteeRoomRate]) {
+        let scope = priceScope(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges)
+        guard scope == priceKey, let best = rates.filter({ $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty }).min(by: { $0.price < $1.price }) else { return }
         let row = NuiteeHotelService.PriceRow(id: hotelID, minimumRate: .init(hotelId: hotelID, price: best.price, currency: best.currency, offerId: nil), rateStatus: "available")
-        var values = priceCache[scope].flatMap { Date().timeIntervalSince($0.0) < 120 ? $0.1 : nil } ?? [:]
+        var values = priceCache[scope].flatMap { Date().timeIntervalSince($0.0) < 900 ? $0.1 : nil } ?? [:]
         values[hotelID] = row
-        priceCache[scope] = (priceCache[scope].flatMap { Date().timeIntervalSince($0.0) < 120 ? $0.0 : nil } ?? Date(), values)
+        priceCache[scope] = (priceCache[scope].flatMap { Date().timeIntervalSince($0.0) < 900 ? $0.0 : nil } ?? Date(), values)
         merge([hotelID: row], requested: [hotelID], missingStatus: "not_returned")
     }
     private func merge(_ indexed: [String: NuiteeHotelService.PriceRow], requested: Set<String>, missingStatus: String) {
         // Preserve metadata and stable IDs; only the price fields are replaced.
-        hotels = hotels.map { hotel in
+        let updated = hotels.map { hotel in
             guard requested.contains(hotel.id) else { return hotel }
             var row = hotel
             if let price = indexed[hotel.id] {
-                if row.minimumRate != nil && price.minimumRate == nil { return row }
-                row.minimumRate = price.minimumRate.flatMap { $0.price.isFinite && $0.price > 0 && $0.currency.uppercased() == "USD" ? $0 : nil }
+                if row.minimumRate != nil && price.minimumRate == nil {
+                    if price.rateStatus == "no_availability" {
+                        row.minimumRate = nil; row.rateStatus = "no_availability"
+                        if var entry = priceCache[priceKey] { entry.1[hotel.id] = nil; priceCache[priceKey] = entry }
+                    }
+                    return row
+                }
+                row.minimumRate = Self.validPrice(price) ? price.minimumRate : nil
                 row.rateStatus = price.rateStatus ?? (row.minimumRate == nil ? "not_returned" : "available")
             } else if row.minimumRate == nil { row.rateStatus = missingStatus }
             return row
         }
+        if updated != hotels { hotels = updated }
     }
-    func matches(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, stars: Int, query: String, favorites: Set<String>?) -> Bool {
-        activeKey == key(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: query, favorites: favorites) && hasLoadedPage
+    func matches(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], stars: Int, query: String, favorites: Set<String>?) -> Bool {
+        activeKey == priceScope(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges) && hasLoadedPage
     }
-    private func priceScope(city: String, checkin: Date, checkout: Date, adults: Int) -> String {
-        let calendar = Calendar.current
-        return "\(city)|\(calendar.startOfDay(for: checkin).timeIntervalSince1970)|\(calendar.startOfDay(for: checkout).timeIntervalSince1970)|\(adults)"
+    private func priceScope(city: String, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = []) -> String {
+        return "\(city)|\(NuiteeHotelService.dateText(checkin))|\(NuiteeHotelService.dateText(checkout))|\(adults)|\(childrenAges)"
     }
-    private func key(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, stars: Int, query: String, favorites: Set<String>?) -> String {
-        "\(city.rawValue)|\(checkin.timeIntervalSince1970)|\(checkout.timeIntervalSince1970)|\(adults)|\(stars)|\(query)|\(favorites?.sorted().joined(separator: ",") ?? "*")"
+    private func key(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], stars: Int, query: String, favorites: Set<String>?) -> String {
+        "\(priceScope(city: city.rawValue, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges))|\(stars)|\(query)|\(favorites?.sorted().joined(separator: ",") ?? "*")"
     }
 
 }
@@ -195,6 +315,7 @@ struct NuiteeHotelsCatalogView: View {
     @State private var checkin = Calendar.current.date(byAdding: .day, value: 10, to: Date()) ?? Date()
     @State private var nights = 1
     @State private var adults = 2
+    @State private var childrenAges: [Int] = []
     @State private var draftCheckin = Calendar.current.date(byAdding: .day, value: 10, to: Date()) ?? Date()
     @State private var draftNights = 1
     @State private var draftAdults = 2
@@ -219,6 +340,7 @@ struct NuiteeHotelsCatalogView: View {
             _checkin = State(initialValue: request.checkin)
             _nights = State(initialValue: min(28, max(1, request.nights)))
             _adults = State(initialValue: min(6, max(1, request.adults)))
+            _childrenAges = State(initialValue: request.childrenAges)
             _draftCheckin = State(initialValue: request.checkin)
             _draftNights = State(initialValue: min(28, max(1, request.nights)))
             _draftAdults = State(initialValue: min(6, max(1, request.adults)))
@@ -228,12 +350,12 @@ struct NuiteeHotelsCatalogView: View {
 
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
     private var reloadIdentity: String {
-        [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults), String(homeSearchRevision), String(refreshSignal), String(stars), normalizedQuery, favoritesOnly ? favorites.sorted().joined(separator: ",") : "*"].joined(separator: ":")
+        [city.rawValue, String(checkin.timeIntervalSince1970), String(nights), String(adults), String(describing: childrenAges), String(homeSearchRevision), String(refreshSignal)].joined(separator: ":")
     }
     private var normalizedQuery: String { hotelQuery.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        let matches = model.hotels
+        let matches = model.visibleHotels(stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil)
         LazyVStack(alignment: .leading, spacing: 16) {
             if showsSearchControls {
             IumrahGraphiteSearchSurface(
@@ -293,9 +415,7 @@ struct NuiteeHotelsCatalogView: View {
                         checkin = draftCheckin
                         nights = draftNights
                         adults = draftAdults
-                        withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
-                            searchExpanded = false
-                        }
+                        searchExpanded = false
                         IumrahHaptics.selection()
                         // Search by name operates on the already loaded catalogue; only
                         // stay parameters trigger a supplier rate refresh.
@@ -328,7 +448,7 @@ struct NuiteeHotelsCatalogView: View {
             .pickerStyle(.segmented)
             .frame(minHeight: 44)
 
-            if (model.busy && model.hotels.isEmpty) || !model.matches(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil) {
+            if (model.busy && model.hotels.isEmpty) || !model.matches(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil) {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 48)
             } else if model.errorMessage != nil {
                 VStack(spacing: 10) {
@@ -341,9 +461,9 @@ struct NuiteeHotelsCatalogView: View {
                     .buttonStyle(.borderedProminent).tint(Color.iumrahPrimaryButtonBackground)
                 }
                 .frame(maxWidth: .infinity).padding(25)
-            } else if favoritesOnly && model.total == 0 && !model.busy {
+            } else if favoritesOnly && matches.isEmpty && !model.busy {
                 ContentUnavailableView(NuiteeCopy.text("Нет сохранённых отелей в этом городе", "Bu shaharda saqlangan mehmonxonalar yo‘q", "No saved hotels in this city", settings.language), systemImage: "heart", description: Text(NuiteeCopy.text("Отмечайте понравившиеся отели сердечком в каталоге.", "Katalogda yoqqan mehmonxonalarni yurakcha bilan belgilang.", "Tap the heart on hotels you like in the catalog.", settings.language)))
-            } else if model.total == 0 && !model.busy {
+            } else if matches.isEmpty && !model.busy {
                 ContentUnavailableView(NuiteeCopy.text("Нет отелей", "Mehmonxonalar topilmadi", "No hotels", settings.language), systemImage: "building.2", description: Text(NuiteeCopy.text("Попробуйте другой фильтр или даты", "Filtr yoki sanani almashtiring", "Change stars or dates", settings.language)))
                 if !normalizedQuery.isEmpty {
                     Button(NuiteeCopy.text("Показать все отели города", "Shahardagi barcha mehmonxonalar", "Show all hotels in this city", settings.language)) { hotelQuery = "" }
@@ -354,30 +474,27 @@ struct NuiteeHotelsCatalogView: View {
                     Text(NuiteeCopy.text("Результаты поиска", "Qidiruv natijalari", "Search results", settings.language))
                         .font(.headline)
                 }
-                if model.rateError != nil {
+                if model.rateError != nil && !model.pricesLoading {
                     HStack {
                         Text(NuiteeCopy.text("Не удалось проверить наличие", "Mavjudlikni tekshirib bo‘lmadi", "Could not check availability", settings.language)).font(.footnote).foregroundStyle(.secondary)
                         Spacer()
-                        Button(NuiteeCopy.text("Повторить", "Qayta", "Retry", settings.language)) { Task { await reload() } }.font(.footnote.weight(.semibold)).tint(.primary)
+                        Button(NuiteeCopy.text("Повторить", "Qayta", "Retry", settings.language)) { Task { await model.retryMissingPrices(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges) } }.font(.footnote.weight(.semibold)).tint(.primary).disabled(model.pricesLoading)
                     }
                 }
                 HStack {
-                    Text("\(model.total) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))
+                    Text("\(matches.count) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary)
                     Spacer()
-                    if model.busy { ProgressView().controlSize(.small) }
                 }
-                LazyVStack(spacing: 12) {
+                Group {
                     ForEach(matches) { hotel in
                         NuiteeHotelListingCard(
-                            hotel: hotel, nights: nights, adults: adults, sandbox: model.sandbox,
+                            hotel: hotel, nights: nights, adults: adults, childrenCount: childrenAges.count, sandbox: model.sandbox,
                             favorite: favorites.contains(hotel.id),
                             onOpen: { opened = hotel }, onFavorite: { toggleFavorite(hotel.id) }
                         )
                     }
-                    IumrahHotelPageButton(remaining: max(0, model.total - model.hotels.count), loading: model.loadingMore, failed: model.pageError, hasMore: model.nextOffset != nil) {
-                        Task { await model.loadMore(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil) }
-                    }
+
                 }
 
             }
@@ -394,9 +511,7 @@ struct NuiteeHotelsCatalogView: View {
         }
         .onAppear {
             favorites = Set(UserDefaults.standard.stringArray(forKey: "iumrah.nuitee.favorites.v1") ?? [])
-            hotelQuery = initialHotelQuery
             consumeHomeSearch(searchOverride ?? chrome.requestedHotelTabSearch)
-            if !initialHotelQuery.isEmpty { hotelQuery = initialHotelQuery }
         }
         .onChange(of: searchOverride) { _, search in
             consumeHomeSearch(search)
@@ -412,16 +527,16 @@ struct NuiteeHotelsCatalogView: View {
         }
         .navigationDestination(item: $opened) { hotel in
             if let onManualRoom {
-                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox,
+                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox, childrenAges: childrenAges,
                     onSelectRate: { rate in
                         guard rate.currency == "USD", rate.price.isFinite, rate.price > 0 else { return }
-                        onManualRoom(LocalJourneyRoom(id: "\(city.rawValue):0", city: city.rawValue, hotel: hotel, rate: rate, checkin: checkin, checkout: checkout, adults: adults, childrenAges: [], meals: manualMeals))
+                        onManualRoom(LocalJourneyRoom(id: "\(city.rawValue):0", city: city.rawValue, hotel: hotel, rate: rate, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, meals: manualMeals))
                     }, onSelectMeals: { manualMeals = $0 }, onRatesLoaded: { start, end, guests, rates in
-                        model.acceptDetailRates(hotelID: hotel.id, city: city.rawValue, checkin: start, checkout: end, adults: guests, rates: rates)
+                        model.acceptDetailRates(hotelID: hotel.id, city: city.rawValue, checkin: start, checkout: end, adults: guests, childrenAges: childrenAges, rates: rates)
                     })
             } else {
-                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox, onRatesLoaded: { start, end, guests, rates in
-                    model.acceptDetailRates(hotelID: hotel.id, city: city.rawValue, checkin: start, checkout: end, adults: guests, rates: rates)
+                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox, childrenAges: childrenAges, onRatesLoaded: { start, end, guests, rates in
+                    model.acceptDetailRates(hotelID: hotel.id, city: city.rawValue, checkin: start, checkout: end, adults: guests, childrenAges: childrenAges, rates: rates)
                 })
             }
         }
@@ -437,6 +552,7 @@ struct NuiteeHotelsCatalogView: View {
         checkin = request.checkin
         nights = min(28, max(1, request.nights))
         adults = min(6, max(1, request.adults))
+        childrenAges = request.childrenAges
         draftCheckin = checkin
         draftNights = nights
         draftAdults = adults
@@ -453,7 +569,7 @@ struct NuiteeHotelsCatalogView: View {
 
     private func reload(forceRefresh: Bool = true) async {
         lastLoadedDay = Date()
-        await model.reload(city: city, checkin: checkin, checkout: checkout, adults: adults, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil, forceRefresh: forceRefresh)
+        await model.reload(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, stars: stars, query: normalizedQuery, favorites: favoritesOnly ? favorites : nil, forceRefresh: forceRefresh)
     }
     private func toggleFavorite(_ id: String) {
         if favorites.contains(id) { favorites.remove(id) } else { favorites.insert(id) }
@@ -466,17 +582,22 @@ struct NuiteeHotelListingCard: View {
     let hotel: NuiteeHotel
     let nights: Int
     let adults: Int
+    var childrenCount: Int = 0
     let sandbox: Bool
     let favorite: Bool
     let onOpen: () -> Void
     let onFavorite: () -> Void
+    @State private var additionalPhotos: [String] = []
+    @State private var verifiedPhotoHotelID: String?
+
+    private var cataloguePhotos: [String] { IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 }) }
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width * 0.43
             HStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    NuiteeHotelCollage(images: Array(IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 }).prefix(3)))
+                    NuiteeHotelCollage(images: verifiedPhotoHotelID == hotel.id && !additionalPhotos.isEmpty ? additionalPhotos : Array(cataloguePhotos.prefix(3)))
                         .frame(width: width, height: 232)
                     HStack(spacing: 5) {
                         Button(action: onFavorite) {
@@ -507,28 +628,23 @@ struct NuiteeHotelListingCard: View {
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(Color.primary)
                         } else { Text(NuiteeCopy.text("Без категории", "Toifasi ko‘rsatilmagan", "Unrated", settings.language)).font(.caption2).foregroundStyle(.secondary) }
-                        if let rating = hotel.rating { Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary) }
+                        if let rating = hotel.rating, rating.isFinite, rating > 0 { Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary) }
                     }
                     Label(L10n.city(hotel.city, settings.language), systemImage: "mappin.and.ellipse")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                     if let rate = hotel.minimumRate, rate.currency.uppercased() == "USD", rate.price.isFinite, rate.price > 0 {
-                        if sandbox {
-                            Text(NuiteeCopy.text("Ориентировочная цена", "Taxminiy narx", "Indicative price", settings.language)).font(.caption2).foregroundStyle(.secondary)
-                        } else if hotel.rateStatus == "cached" {
-                            Text(NuiteeCopy.text("Сохранённая цена", "Saqlangan narx", "Cached price", settings.language)).font(.caption2)
-                        }
+                        Text(NuiteeCopy.text("От", "Dan", "From", settings.language)).font(.caption2).foregroundStyle(.secondary)
                         Text(NuiteeHotelService.usd(rate.price))
                             .font(.system(size: 23, weight: .bold, design: .rounded))
                             .lineLimit(1).minimumScaleFactor(0.7)
-                        Text("\(nights) " + NuiteeCopy.text("ночь · 1 номер · ", "tun · 1 xona · ", "nights · 1 room · ", settings.language) + "\(adults) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language))
+                        Text("\(nights) " + NuiteeCopy.text("ночь · 1 номер · ", "tun · 1 xona · ", "nights · 1 room · ", settings.language) + "\(adults + childrenCount) " + NuiteeCopy.text("гостя", "mehmon", "guests", settings.language))
                             .font(.caption2).foregroundStyle(.secondary)
                     } else {
                         if hotel.rateStatus == nil || hotel.rateStatus == "not_requested" || hotel.rateStatus == "loading" {
-                            ProgressView().controlSize(.small)
-                            Text(NuiteeCopy.text("Загружаем цену…", "Narx yuklanmoqda…", "Loading price…", settings.language)).font(.caption)
+                            RoundedRectangle(cornerRadius: 5).fill(Color.secondary.opacity(0.12)).frame(width: 80, height: 16).accessibilityLabel(NuiteeCopy.text("Цена ещё не получена", "Narx hali olinmagan", "Price not yet received", settings.language))
                         } else if hotel.rateStatus == "not_returned" {
-                            Text(NuiteeCopy.text("Откройте отель для проверки тарифов", "Tariflarni tekshirish uchun mehmonxonani oching", "Open hotel to check room rates", settings.language)).font(.caption)
+                            Text(NuiteeCopy.text("Тариф не получен · повторите поиск", "Tarif olinmadi · qayta qidiring", "Rate not returned · retry search", settings.language)).font(.caption)
                         } else {
                             Text(hotel.rateStatus == "no_availability"
                                  ? (sandbox ? NuiteeCopy.text("Проверить тарифы в отеле", "Mehmonxona tariflarini tekshirish", "Check room rates", settings.language) : NuiteeCopy.text("На эти даты распродано", "Bu sanalarga barcha xonalar band", "Sold out for these dates", settings.language))
@@ -548,6 +664,27 @@ struct NuiteeHotelListingCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .onTapGesture(perform: onOpen)
+        .task(id: hotel.id) {
+            guard verifiedPhotoHotelID != hotel.id || additionalPhotos.count < 3 else { return }
+            let existing = cataloguePhotos
+            var candidates = existing
+            if candidates.count < 3 {
+                let extra = await NuiteePreviewPhotoLoader.shared.photos(hotelID: hotel.id)
+                candidates = IumrahHotelPhotoIdentity.unique(existing + extra)
+            }
+            guard !Task.isCancelled else { return }
+            if candidates.count > additionalPhotos.count {
+                additionalPhotos = Array(candidates.prefix(3)); verifiedPhotoHotelID = hotel.id
+            }
+            var result = await IumrahDistinctHotelPhotos.shared.select(candidates)
+            if result.count < 3 && existing.count >= 3 {
+                let extra = await NuiteePreviewPhotoLoader.shared.photos(hotelID: hotel.id)
+                result = await IumrahDistinctHotelPhotos.shared.select(result + extra + candidates)
+            }
+            guard !Task.isCancelled else { return }
+            if !result.isEmpty { additionalPhotos = result; verifiedPhotoHotelID = hotel.id }
+            // Failed image/detail requests remain retryable when the card reappears.
+        }
     }
 }
 
@@ -679,8 +816,9 @@ struct NuiteeHotelDetailView: View {
                 IumrahHotelReviewsSection(hotelID: hotel.id, rating: detail?.rating ?? hotel.rating,
                                           reviewCount: detail?.reviewCount ?? hotel.reviewCount)
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language)).id("nuitee.rooms")
-                if ratesLoading { ProgressView().frame(maxWidth: .infinity).padding(22) }
-                else if ratesError != nil {
+                Text(NuiteeCopy.text("Наличие и стоимость проверим после заявки, до оплаты.", "Mavjudlik va narx arizadan keyin, to‘lovdan oldin tekshiriladi.", "Availability and price are checked after your request, before payment.", settings.language)).font(.caption).foregroundStyle(.secondary)
+                if ratesLoading && rates.isEmpty { ProgressView().frame(maxWidth: .infinity).padding(22) }
+                else if ratesError != nil && rates.isEmpty {
                     Label(NuiteeCopy.text("Не удалось загрузить цены", "Narxlarni yuklab bo‘lmadi", "Could not load prices", settings.language), systemImage: "exclamationmark.circle")
                         .font(.footnote).foregroundStyle(.secondary)
                     Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await refreshRates() } }.tint(.primary)
@@ -688,6 +826,9 @@ struct NuiteeHotelDetailView: View {
                     Text(ratesSandbox ? NuiteeCopy.text("Тарифы не получены. Повторите поиск.", "Tariflar olinmadi. Qayta qidiring.", "No rates returned. Try again.", settings.language) : NuiteeCopy.text("На эти даты распродано.", "Bu sanalarda xona mavjud emas.", "No rooms available for these dates.", settings.language))
                         .font(.subheadline).foregroundStyle(.secondary)
                 } else {
+                    if ratesError != nil {
+                        Button(NuiteeCopy.text("Обновить цены", "Narxlarni yangilash", "Refresh prices", settings.language)) { Task { await refreshRates() } }.tint(.primary)
+                    }
                     ForEach(rates) { rate in
                         rateCard(rate)
                     }
@@ -838,6 +979,10 @@ struct NuiteeHotelDetailView: View {
     }
 
     private func saveRate(_ rate: NuiteeRoomRate) {
+        guard loadedRatesKey == reloadID, rates.contains(rate), rate.price.isFinite, rate.price > 0,
+              ratesSandbox || (loadedRatesAt.map { Date().timeIntervalSince($0) < 300 } ?? false) else {
+            Task { await refreshRates(force: true) }; return
+        }
         if let onSelectRate { onSelectMeals?(selectedMeals); onSelectRate(rate); dismiss(); return }
         NuiteeStaySelectionStore.shared.save(NuiteeSelectedStay(
             provider: "nuitee", hotelId: hotel.id, hotelName: hotel.name, city: hotel.city,
@@ -872,9 +1017,7 @@ struct NuiteeHotelDetailView: View {
                 Label(rate.mealPlan, systemImage: "fork.knife")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if ratesSandbox {
-                Text(NuiteeCopy.text("Стоимость, наличие и условия уточним перед оплатой.", "Narx, mavjudlik va shartlar to‘lovdan oldin tasdiqlanadi.", "Price, availability and terms will be confirmed before payment.", settings.language)).font(.caption).foregroundStyle(.secondary)
-            } else { cancellationView(rate) }
+            cancellationView(rate)
             Text(NuiteeHotelService.usd(rate.price))
                 .font(.title2.weight(.bold))
             Text("\(nights) " + NuiteeCopy.text("ночей · за номер", "tun · xona uchun", "nights · per room", settings.language))
@@ -993,7 +1136,7 @@ struct NuiteeHotelDetailView: View {
     }
     private func refreshRates(force: Bool = true) async {
         let key = reloadID
-        if !force, loadedRatesKey == key, ratesCompleted, ratesError == nil,
+        if !force, loadedRatesKey == key, ratesCompleted, ratesError == nil, !rates.isEmpty,
            let loadedRatesAt, Date().timeIntervalSince(loadedRatesAt) < 300 { return }
         let requestID = UUID()
         ratesRequestID = requestID
@@ -1003,15 +1146,27 @@ struct NuiteeHotelDetailView: View {
         ratesLoading = true
         ratesCompleted = false
         ratesError = nil
-        rates = []
+        if loadedRatesKey != key { rates = [] }
+        defer { if ratesRequestID == requestID { ratesLoading = false; ratesCompleted = true } }
         do {
-            let result = try await service.rates(hotelID: hotel.id, checkin: requestedCheckin, checkout: requestedCheckout, adults: requestedAdults, childrenAges: childrenAges, language: settings.language.hotelContentCode)
+            let requestedChildren = childrenAges
+            let requestedLanguage = settings.language.hotelContentCode
+            var result = try await service.rates(hotelID: hotel.id, checkin: requestedCheckin, checkout: requestedCheckout, adults: requestedAdults, childrenAges: requestedChildren, language: requestedLanguage, forceRefresh: force)
             guard ratesRequestID == requestID, !Task.isCancelled else { return }
+            if result.ok && result.rates.isEmpty && result.availabilityConfirmed != true {
+                // A partial/empty supplier response is not confirmed unavailability.
+                // Retry once, keeping the price loader visible and the same dates.
+                result = try await service.rates(hotelID: hotel.id, checkin: requestedCheckin, checkout: requestedCheckout, adults: requestedAdults, childrenAges: requestedChildren, language: requestedLanguage, forceRefresh: true)
+                guard ratesRequestID == requestID, !Task.isCancelled else { return }
+            }
             ratesSandbox = result.sandbox
-            guard result.ok else { throw APIError.invalidResponse }
-            rates = result.rates.filter { $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty && !$0.roomId.isEmpty }
-            if rates.isEmpty && !result.rates.isEmpty { throw APIError.invalidResponse }
-            if childrenAges.isEmpty { onRatesLoaded?(requestedCheckin, requestedCheckout, requestedAdults, rates) }
+            guard result.ok, result.checkin == NuiteeHotelService.dateText(requestedCheckin),
+                  result.checkout == NuiteeHotelService.dateText(requestedCheckout), result.adults == requestedAdults else { throw APIError.invalidResponse }
+            let received = result.rates.filter { $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty }
+            if received.isEmpty && (!result.rates.isEmpty || result.availabilityConfirmed != true) { throw APIError.invalidResponse }
+            var seen = Set<String>()
+            rates = received.filter { seen.insert($0.id).inserted }
+            onRatesLoaded?(requestedCheckin, requestedCheckout, requestedAdults, rates)
             loadedRatesKey = key; loadedRatesAt = Date()
         } catch {
             guard ratesRequestID == requestID, !Task.isCancelled else { return }
@@ -1216,7 +1371,7 @@ private struct NuiteeRoomDetailsPage: View {
                         .font(.system(size: 30, weight: .bold, design: .rounded))
                     Text("\(nights) " + NuiteeCopy.text("ночей · 1 номер", "tun · 1 xona", "nights · 1 room", settings.language))
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(NuiteeCopy.text("Предварительная стоимость, не подтверждённое бронирование", "Taxminiy narx, tasdiqlangan bron emas", "Indicative price, not a confirmed reservation", settings.language))
+                    Text(NuiteeCopy.text("Наличие и стоимость проверим после заявки, до оплаты", "Mavjudlik va narx arizadan keyin, to‘lovdan oldin tekshiriladi", "We check availability and price after your request, before payment", settings.language))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
                 .padding(20)

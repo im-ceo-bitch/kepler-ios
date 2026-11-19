@@ -367,7 +367,7 @@ struct IumrahOTAFlightDetailPage: View {
                     IumrahPremiumFlightDetail(leg: leg, language: language, pageHeroInset: index == 0 ? IumrahDesign.pagePadding : nil)
                 }
                 if flight.hasUsablePrice, let price = flight.priceUSD {
-                    Text(t("Ориентировочный тариф · ", "Indicative fare · ", "Taxminiy tarif · ", "Тахминий тариф · ") + IumrahOTAText.price(price)).font(IumrahType.bold(18))
+                    Text(t("Стоимость · ", "Fare · ", "Tarif · ", "Тариф · ") + IumrahOTAText.price(price)).font(IumrahType.bold(18))
                 }
                 Text(t("Перед оплатой подтверждаются цена, багаж и наличие мест.", "Final fare, baggage and availability are confirmed before payment.", "Narx, bagaj va joylar to‘lovdan oldin tasdiqlanadi.", "Нарх, багаж ва жойлар тўловдан олдин тасдиқланади.")).font(IumrahType.regular(13)).foregroundStyle(.secondary)
             if onChoose != nil || externalURL != nil {

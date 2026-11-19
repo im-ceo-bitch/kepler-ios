@@ -149,7 +149,7 @@ struct AviasalesFlightDiscoveryService {
         let response: FlightDiscoveryOffersEnvelope = try await api.get(
             "/api/package/flights/data",
             query: query,
-            timeoutInterval: 15
+            timeoutInterval: 45
         )
         guard response.ok else { throw APIError.invalidResponse }
         return (response.offers, response.currency ?? currency, response.generatedAt)
@@ -174,7 +174,7 @@ struct AviasalesFlightDiscoveryService {
                 URLQueryItem(name: "direct", value: direct ? "true" : "false"),
                 URLQueryItem(name: "fresh", value: forceRefresh ? "1" : "0")
             ],
-            timeoutInterval: 15
+            timeoutInterval: 45
         )
         guard response.ok else { throw APIError.invalidResponse }
         return (response.days, response.currency ?? currency, response.generatedAt)

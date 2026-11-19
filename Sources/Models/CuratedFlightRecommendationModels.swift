@@ -38,6 +38,7 @@ struct CuratedFlightRecommendation: Decodable, Identifiable, Hashable {
     let recommendationLabel: String
     let offerType: String?
     let journeyRole: String?
+    var fareUsdPerTraveler: Double? = nil
 
     var effectiveOfferType: String {
         if let offerType, !offerType.isEmpty { return offerType }

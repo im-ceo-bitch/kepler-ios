@@ -97,6 +97,8 @@ final class JourneyStore: ObservableObject {
     private var packageQuoteRevision: UInt64 = 0
     private var quoteTask: Task<Void, Never>?
     private var quoteTaskKey: String?
+    private var completedQuoteKey: String?
+    private var completedQuoteAt: Date?
     private var quoteRequestGeneration = UUID()
     private var hotelPricePrefetchTask: Task<Void, Never>?
     private var hotelPricePrefetchGeneration = UUID()
@@ -119,6 +121,7 @@ final class JourneyStore: ObservableObject {
     }
 
     func loadMakkahHotels() async {
+        guard !isLoadingHotels else { return }
         isLoadingHotels = true
         errorMessage = nil
         defer { isLoadingHotels = false }
@@ -129,6 +132,7 @@ final class JourneyStore: ObservableObject {
             // 48h price may be stale even though hotel detail can already expose
             // the refreshed price. Filtering here was the reason the selector
             // could incorrectly become completely empty.
+            guard !Task.isCancelled else { return }
             hotels = all
             if selectedHotel == nil {
                 // `primary_hotels.star_category` is the generator/editorial category.
@@ -136,8 +140,9 @@ final class JourneyStore: ObservableObject {
                 // resolving the Business Primary Hotel: a curated Luxury slot may
                 // legitimately point to a hotel whose catalog `stars` metadata is
                 // missing or differs from the editorial category.
-                selectedHotel = await resolvedPrimaryHotel(from: all, city: "Makkah")
-                    ?? primaryHotelCandidate(from: all)
+                let primary = await resolvedPrimaryHotel(from: all, city: "Makkah")
+                guard !Task.isCancelled, selectedHotel == nil else { return }
+                selectedHotel = primary ?? primaryHotelCandidate(from: all)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -153,46 +158,26 @@ final class JourneyStore: ObservableObject {
             return
         }
 
+        guard !isLoadingMadinahHotels else { return }
         isLoadingMadinahHotels = true
         errorMessage = nil
         defer { isLoadingMadinahHotels = false }
-
-        // The Business catalogue has historically used several spellings for
-        // Madinah. Merge them instead of stopping after the first non-empty alias;
-        // otherwise valid hotels stored under another spelling disappear.
-        let aliases = [
-            "Madinah", "Medina", "Madina", "Medinah",
-            "Al Madinah", "Al Medina",
-            "Madinah Al Munawwarah", "Al Madinah Al Munawwarah"
-        ]
-        var merged: [String: HotelSummary] = [:]
-        var lastError: Error?
-
-        for city in aliases {
-            do {
-                let values = try await hotelService.listHotels(city: city)
-                for hotel in values { merged[hotel.id] = hotel }
-            } catch {
-                lastError = error
+        do {
+            // The catalogue endpoint now normalizes historical city aliases in SQL.
+            let all = try await hotelService.listHotels(city: "Madinah")
+            guard !Task.isCancelled, trip.scope == .makkahAndMadinah else { return }
+            madinahHotels = all.sorted {
+                if $0.stars != $1.stars { return ($0.stars ?? 0) > ($1.stars ?? 0) }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
-        }
-
-        let all = Array(merged.values).sorted {
-            if $0.stars != $1.stars { return ($0.stars ?? 0) > ($1.stars ?? 0) }
-            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-        }
-        madinahHotels = all
-
-        if selectedMadinahHotel == nil, !all.isEmpty {
-            // Resolve the Business Primary Hotel against the complete Madinah
-            // catalogue. `star_category` is editorial and must not be reduced to
-            // `HotelSummary.stars` before the server's selected hotel ID is matched.
-            selectedMadinahHotel = await resolvedPrimaryHotel(from: all, cityAliases: aliases)
-                ?? primaryHotelCandidate(from: all)
-        }
-
-        if all.isEmpty, let lastError {
-            errorMessage = lastError.localizedDescription
+            if selectedMadinahHotel == nil, !all.isEmpty {
+                let primary = await resolvedPrimaryHotel(from: all, city: "Madinah")
+                guard !Task.isCancelled, trip.scope == .makkahAndMadinah, selectedMadinahHotel == nil else { return }
+                selectedMadinahHotel = primary ?? primaryHotelCandidate(from: all)
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -990,6 +975,7 @@ final class JourneyStore: ObservableObject {
     /// hotel/room and travel dates are known. This is a cheap D1-backed cache lookup;
     /// Beta never opens Booking/Expedia or runs hotel price bots on the pilgrim device.
     func scheduleHotelPricePrefetch(forceRefresh: Bool = false) {
+        guard !usesLocalJourney else { return } // Nuitee owns hotel pricing in the unified flow.
         if !forceRefresh, hotelPricePrefetchTask != nil { return }
         if !forceRefresh, let snapshot = hotelPriceSnapshot, isCompleteHotelSnapshot(snapshot) { return }
         guard let components = flightService as? GeneratorComponentProviding,
@@ -1099,25 +1085,35 @@ final class JourneyStore: ObservableObject {
         guard !offers.isEmpty, let hotel = selectedHotel else { return [:] }
         if trip.scope == .makkahAndMadinah, selectedMadinahHotel == nil { return [:] }
 
+        let requestedTrip = trip
+        let makkahRoomID = selectedRoom?.id ?? selectedRoomCategory?.id
+        let madinahHotelID = selectedMadinahHotel?.id
+        let madinahRoomID = selectedMadinahRoom?.id ?? selectedMadinahRoomCategory?.id
+        let train = haramainTrainSelected
+        let vehicle = selectedTransferVehicle
+        let fareClass = haramainFareClass
+        let tickets = haramainTicketCount
         var output: [String: Decimal] = [:]
         for offer in offers where offer.isVerifiedForBooking {
+            guard !Task.isCancelled else { return [:] }
             let outbound = direction == .outbound ? offer : oppositeLeg
             guard let outbound, outbound.isVerifiedForBooking else { continue }
             let inbound = direction == .inbound ? offer : nil
             if let preview = try? await packageEngine.packageQuote(
-                trip: trip,
+                trip: requestedTrip,
                 pricingOffer: offer,
                 outboundOffer: outbound,
                 inboundOffer: inbound,
                 makkahHotelID: hotel.id,
-                makkahRoomID: selectedRoom?.id ?? selectedRoomCategory?.id,
-                madinahHotelID: selectedMadinahHotel?.id,
-                madinahRoomID: selectedMadinahRoom?.id ?? selectedMadinahRoomCategory?.id,
-                includeHaramainTrain: haramainTrainSelected,
-                transferVehicle: selectedTransferVehicle,
-                haramainFareClass: haramainFareClass,
-                haramainTicketCount: haramainTicketCount
+                makkahRoomID: makkahRoomID,
+                madinahHotelID: madinahHotelID,
+                madinahRoomID: madinahRoomID,
+                includeHaramainTrain: train,
+                transferVehicle: vehicle,
+                haramainFareClass: fareClass,
+                haramainTicketCount: tickets
             ) {
+                guard !Task.isCancelled else { return [:] }
                 output[offer.id] = preview.pricePerPerson
             }
         }
@@ -1196,6 +1192,8 @@ final class JourneyStore: ObservableObject {
         if usesLocalJourney, let tier = localPackageTier, trip.packageTier != tier { trip.packageTier = tier }
         let key = usesLocalJourney ? "local|" + localBookingInputKey + "|" + String(packageQuoteRevision) : "catalog|" + String(packageQuoteRevision) + "|" + String(trip.hashValue)
         if quoteTaskKey == key, let task = quoteTask { await task.value; return }
+        if usesLocalJourney, !forceHotelRefresh, completedQuoteKey == key, hasFinalGeneratorQuote, quote?.tripSummary != nil, quote?.bookingAllowed == true,
+           let completedQuoteAt, Date().timeIntervalSince(completedQuoteAt) < 300 { return }
         quoteTask?.cancel()
         let generation = UUID()
         quoteRequestGeneration = generation
@@ -1206,7 +1204,10 @@ final class JourneyStore: ObservableObject {
         }
         quoteTask = task
         await task.value
-        if quoteRequestGeneration == generation { quoteTask = nil; quoteTaskKey = nil }
+        if quoteRequestGeneration == generation {
+            if hasFinalGeneratorQuote { completedQuoteKey = key; completedQuoteAt = Date() }
+            quoteTask = nil; quoteTaskKey = nil
+        }
     }
 
     private func performQuote(forceHotelRefresh: Bool) async {
@@ -1659,6 +1660,54 @@ final class JourneyStore: ObservableObject {
 }
 
 @MainActor extension JourneyStore {
+    /// Resolve the already selected itinerary once, without touching the retired hotel-price catalogue.
+    func prepareUnifiedHotelSelection() async throws {
+        let requested = trip
+        let path = packageFlightPath
+        let selection = publishedFlightSelection
+        let staged = stagedAviasalesOffers
+        let pair: (outbound: FlightOffer, inbound: FlightOffer?)
+        if path == .publishedDirect {
+            let value = try await CuratedFlightRecommendationService.shared.resolvePublishedSelection(trip: requested, selection: selection)
+            pair = (value.outbound, value.inbound)
+        } else if path == .aviasalesSelected, let value = makeAviasalesFlightPair() {
+            pair = value
+        } else { throw LocalPricingError.invalidFlightFare }
+        try Task.checkCancellation()
+        guard trip == requested, packageFlightPath == path,
+              let back = pair.inbound, pair.outbound.isVerifiedForBooking, back.isVerifiedForBooking,
+              back.departureAt > pair.outbound.arrivalAt else { throw LocalPricingError.invalidFlightFare }
+        // The identities themselves can change while dates stay unchanged.
+        if path == .publishedDirect {
+            guard publishedFlightSelection.completeID == selection.completeID,
+                  publishedFlightSelection.outboundID == selection.outboundID,
+                  publishedFlightSelection.returnID == selection.returnID else { throw CancellationError() }
+        } else { guard stagedAviasalesOffers == staged else { throw CancellationError() } }
+        let start = travelCalendarDay(for: pair.outbound.arrivalAt, airportCode: pair.outbound.destination)
+        let end = travelCalendarDay(for: back.departureAt, airportCode: back.origin)
+        let nights = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: start), to: Calendar.current.startOfDay(for: end)).day ?? 0
+        guard nights >= (trip.scope == .makkahAndMadinah ? 2 : 1) else { throw LocalPricingError.invalidFlightFare }
+        cancelHotelPricePrefetch()
+        invalidateTripSummaryQuote()
+        usesLocalJourney = true
+        trip.departureDate = travelCalendarDay(for: pair.outbound.departureAt, airportCode: pair.outbound.origin)
+        trip.saudiArrivalDate = start; trip.returnDate = end
+        trip.arrivalAirport = pair.outbound.destination.uppercased() == "MED" ? .madinah : .jeddah
+        trip.selectedReturnAirport = back.origin.uppercased() == "MED" ? .madinah : .jeddah
+        trip.flightTripType = .roundTrip
+        selectedOutbound = pair.outbound; selectedInbound = back
+        let iso = ISO8601DateFormatter()
+        localJourneyFlights = [pair.outbound, back].map { offer in
+            LocalJourneyFlight(id: offer.id, origin: offer.origin, destination: offer.destination, airline: offer.airline,
+                flightNumber: offer.flightNumber, airlineCode: offer.airlineCode ?? "", durationMinutes: offer.durationMinutes,
+                stops: offer.stops, departureAt: iso.string(from: offer.departureAt), arrivalAt: iso.string(from: offer.arrivalAt),
+                displayedPrice: offer.fareAmount.map { NSDecimalNumber(decimal: $0).doubleValue })
+        }
+        localJourneyRooms = [:]
+        selectedHotel = nil; selectedRoom = nil; selectedRoomCategory = nil
+        selectedMadinahHotel = nil; selectedMadinahRoom = nil; selectedMadinahRoomCategory = nil
+    }
+
     func invalidateTripSummaryQuote() {
         quoteTask?.cancel(); quoteTask = nil; quoteTaskKey = nil
         quoteRequestGeneration = UUID()

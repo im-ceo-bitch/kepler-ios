@@ -253,7 +253,7 @@ struct LegacyFinalPackageView: View {
         IumrahJourneyDisclosureCard(
             title: tr("Ваша умра", "Your Umrah", "Sizning Umrangiz", "Сизнинг Умрангиз"),
             total: totalText, subtitle: partyText,
-            priceCaption: journey.usesLocalJourney ? tr("Предварительно за всех", "Estimated total", "Taxminiy jami", "Тахминий жами") : tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")
+            priceCaption: journey.usesLocalJourney ? tr("Итого за всех", "Total", "Jami", "Жами") : tr("Итого за всех", "Total for everyone", "Hamma uchun jami", "Ҳамма учун жами")
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(journey.trip.packageTier.title(settings.language)).font(.headline)
@@ -326,7 +326,7 @@ struct LegacyFinalPackageView: View {
                 nights: TripStayWindow(checkIn: room.checkin, checkOut: room.checkout).nights)
             if let nightly = IumrahPackageDisplayPrices.nightly(room) {
                 IumrahPackageUnitPriceLine(amount: nightly, currency: room.rate.currency,
-                    caption: tr("Ориентировочно за номер / ночь", "Estimated per room / night", "Xona / tun uchun taxminan", "Хона / тун учун тахминан"), language: settings.language)
+                    caption: tr("За номер / ночь", "Per room / night", "Xona / tun uchun", "Хона / тун учун"), language: settings.language)
             }
             Button(tr("Изменить номер", "Change room", "Xonani o‘zgartirish", "Хонани ўзгартириш")) { localHotelForDetails = room }
                 .buttonStyle(IumrahSecondaryButtonStyle())
@@ -865,7 +865,7 @@ private extension LegacyFinalPackageView {
                 let minors = count / max(1, trip.rooms) + (index < count % max(1, trip.rooms) ? 1 : 0)
                 detailLine(copy("Номер", "Room", "Xona", "Хона") + " \(index + 1)", "\(adults) " + copy("взр.", "adults", "katta", "катта") + " · \(minors) " + copy("дет.", "children", "bola", "бола"))
             }
-            Text(copy("Предварительное распределение", "Proposed room distribution", "Taxminiy joylashuv", "Тахминий жойлашув")).font(.caption2).foregroundStyle(.secondary)
+            Text(copy("Распределение по номерам", "Proposed room distribution", "Taxminiy joylashuv", "Тахминий жойлашув")).font(.caption2).foregroundStyle(.secondary)
         }
     }
     var adultWarning: some View {

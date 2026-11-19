@@ -843,7 +843,7 @@ struct IumrahFlightDiscoveryView: View {
                 partnerGatewayCard
             } else if !rankedOffers.isEmpty {
                 LazyVStack(spacing: 10) {
-                    ForEach(Array(rankedOffers.prefix(visibleOfferCount))) { offer in
+                    ForEach(rankedOffers) { offer in
                         FlightDiscoveryTicketCard(
                             language: settings.language,
                             offer: offer,
@@ -857,7 +857,6 @@ struct IumrahFlightDiscoveryView: View {
                     }
                 }
 
-                IumrahLoadMoreButton(remaining: rankedOffers.count - visibleOfferCount) { offerLimit += 20 }
 
                 if hasSearched && !store.isLoading && rankedOffers.count < 2 {
                     partnerGatewayCard
@@ -2284,7 +2283,7 @@ private struct FlightDiscoveryPassengersSheet: View {
                             .foregroundStyle(Color.primary)
                     }
                     Text(tr(
-                        "Data API используется для ориентировочной цены. Другие классы и точный тариф выбираются при финальной проверке.",
+                        "Наличие и стоимость проверим после заявки, до оплаты.",
                         "Data API is used for indicative pricing. Other cabins and the exact fare are selected during the final check.",
                         "Data API taxminiy narx uchun ishlatiladi. Boshqa klasslar va aniq tarif yakuniy tekshiruvda tanlanadi.",
                         "Data API тахминий нарх учун ишлатилади. Бошқа класслар ва аниқ тариф якуний текширувда танланади."

@@ -30,7 +30,7 @@ checks={
  'single-flight pricing requests': 'if quoteTaskKey == key, let task = quoteTask { await task.value; return }' in s and 'quoteTask?.cancel()' in s,
  'stale local results guarded': 'revision == packageQuoteRevision, localBookingInputKey == identity, !Task.isCancelled' in s,
  'stale catalog results guarded': 'revision == packageQuoteRevision, trip == tripForQuote, !Task.isCancelled' in s,
- 'no 15-second quote deadline': 'timeoutInterval: 604800' in r and 'nuiteeRooms == nil ? 15' not in r,
+ 'no 15-second quote deadline': 'timeoutInterval: 180' in r and 'nuiteeRooms == nil ? 15' not in r,
  'optional calendar cannot discard valid price': 'itineraryPreview = try? c.decodeIfPresent' in r,
  'shared review refuses booking without breakdown': 'journey.hasFinalGeneratorQuote && publicPrice != nil' in f,
  'missing breakdown can be refreshed': 'journey.quote?.tripSummary == nil' in f and 'PACKAGE_PRICE_BREAKDOWN_MISSING' in f,

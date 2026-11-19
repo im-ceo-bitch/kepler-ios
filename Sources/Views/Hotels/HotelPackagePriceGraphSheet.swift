@@ -128,7 +128,7 @@ struct HotelPackagePriceGraphSheet: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                             if quote.isEstimated {
-                                Label(localized("Предварительная опубликованная цена — подтвердится при бронировании", "Published estimate — confirmed at booking", "E’lon qilingan taxminiy narx — band qilishda tasdiqlanadi", "Эълон қилинган тахминий нарх — банд қилишда тасдиқланади", "Yayınlanan tahmini fiyat — rezervasyonda doğrulanır", "Estimasi harga — dikonfirmasi saat pemesanan", "Anggaran harga — disahkan semasa tempahan"), systemImage: "info.circle")
+                                Label(localized("Наличие и стоимость проверим после заявки, до оплаты", "Availability and price checked after your request, before payment", "E’lon qilingan taxminiy narx — band qilishda tasdiqlanadi", "Эълон қилинган тахминий нарх — банд қилишда тасдиқланади", "Yayınlanan tahmini fiyat — rezervasyonda doğrulanır", "Estimasi harga — dikonfirmasi saat pemesanan", "Anggaran harga — disahkan semasa tempahan"), systemImage: "info.circle")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -276,7 +276,7 @@ struct HotelPackagePriceGraphSheet: View {
             "Other dates": "تواريخ أخرى",
             "Available on selected date": "متاح في التاريخ المحدد",
             "Complete package price per pilgrim, including flights, hotel and services. Not a room-night rate.": "سعر الباقة الكاملة لكل معتمر، بما يشمل الطيران والفندق والخدمات، وليس سعر الغرفة لليلة واحدة.",
-            "Published estimate — confirmed at booking": "سعر تقديري منشور — يتم تأكيده عند الحجز",
+            "Availability and price checked after your request, before payment": "سعر تقديري منشور — يتم تأكيده عند الحجز",
             "View package": "عرض الباقة",
             "No published price for this date": "لا يوجد سعر منشور لهذا التاريخ",
             "Swipe to another date or refresh offers. Missing prices are never estimated.": "اسحب لاختيار تاريخ آخر أو حدّث العروض. لا نعرض أسعارًا غير متوفرة.",

@@ -150,8 +150,6 @@ final class IumrahFlightBrowseModel: ObservableObject {
         activeScope = key
         let trace = IumrahPerformanceTrace.begin("Flight catalogue load")
         defer { IumrahPerformanceTrace.end("Flight catalogue load", trace) }
-        let dayKey = scope(trip) + ":" + String(direction) + ":" + day
-        if loadedDays.contains(dayKey), let loadedAt, Date().timeIntervalSince(loadedAt) < 300 { return }
         let token = UUID(); requestID = token
         loading = true; error = nil
         defer { if requestID == token { loading = false } }

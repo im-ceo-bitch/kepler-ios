@@ -51,17 +51,8 @@ function generateToken(): string {
   // base64url with no padding, exactly 43 characters.
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-async function ensureSchema(db: NonNullable<Env["BOOKINGS_DB"]>) {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS booking_public_shares (
-    token_hash TEXT PRIMARY KEY NOT NULL,
-    booking_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL,
-    revoked_at TEXT
-  )`).run();
-  await db.prepare("CREATE INDEX IF NOT EXISTS idx_booking_public_shares_booking ON booking_public_shares (booking_id)").run();
-}
-async function ownerBooking(request: Request, db: NonNullable<Env["BOOKINGS_DB"]>, bookingId: string): Promise<boolean> {
+// Schema is installed by the unified backend deployment migration, never on each viewer request.
+async function ownerBooking(request: Request, db: NonNullable<Env["BOOKINGS_DB"]>, hotelsDb: Env["HOTELS_DB"], bookingId: string): Promise<boolean> {
   if (!BOOKING_ID.test(bookingId)) return false;
   const token = request.headers.get("x-booking-token")?.trim() ?? "";
   if (token.length >= 24 && token.length <= 128) {
@@ -69,20 +60,25 @@ async function ownerBooking(request: Request, db: NonNullable<Env["BOOKINGS_DB"]
       .bind(bookingId, await sha256(token)).first<{ id: string }>();
     if (row) return true;
   }
-  // The existing BookingControl authorization contract also accepts an
-  // account-linked trip after its owner session is verified by HotelsWorker.
-  // Share access is never granted from a booking ID or public share token.
+  // Verify the account session against the same D1 ownership model used by
+  // itinerary-planner. Do not make a network call to a public host or trust
+  // a successful arbitrary GET response as evidence of ownership.
   const authorization = request.headers.get("authorization")?.trim() ?? "";
-  if (!/^Bearer\s+\S{16,}$/i.test(authorization)) return false;
-  try {
-    const ownerCheck = new URL(`/api/catalog/hotels/client/trips/${encodeURIComponent(bookingId)}`, request.url);
-    const result = await fetch(ownerCheck, {
-      method: "GET", headers: { Authorization: authorization, Accept: "application/json" }, redirect: "manual",
-    });
-    if (!result.ok) return false;
-    const row = await db.prepare("SELECT id FROM bookings WHERE id=?1 LIMIT 1").bind(bookingId).first<{ id: string }>();
-    return Boolean(row);
-  } catch { return false; }
+  if (!/^Bearer\s+\S+$/i.test(authorization) || !hotelsDb) return false;
+  const accountToken = authorization.replace(/^Bearer\s+/i, "").trim();
+  if (accountToken.length < 16 || accountToken.length > 256) return false;
+  const session = await hotelsDb.prepare(
+    `SELECT pilgrim_id FROM iumrah_account_sessions
+     WHERE token_hash=?1 AND revoked_at IS NULL AND expires_at>?2 LIMIT 1`,
+  ).bind(await sha256(accountToken), new Date().toISOString()).first<{ pilgrim_id: number }>();
+  const pilgrimId = Number(session?.pilgrim_id ?? 0);
+  if (!Number.isSafeInteger(pilgrimId) || pilgrimId <= 0) return false;
+  const linked = await hotelsDb.prepare(
+    "SELECT booking_id FROM pilgrim_trips WHERE booking_id=?1 AND pilgrim_id=?2 LIMIT 1",
+  ).bind(bookingId, pilgrimId).first<{ booking_id: string }>();
+  if (!linked) return false;
+  const row = await db.prepare("SELECT id FROM bookings WHERE id=?1 LIMIT 1").bind(bookingId).first<{ id: string }>();
+  return Boolean(row);
 }
 
 /** Only explicitly whitelisted, public itinerary fields. Never spread a booking payload. */
@@ -153,7 +149,6 @@ export async function handleBookingShare(request: Request, env: Env, url: URL): 
   if (publicMatch && request.method !== "GET") return response({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   if (match && !["POST","DELETE"].includes(request.method)) return response({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
   try {
-    await ensureSchema(db);
     if (publicMatch) {
       const token = publicMatch[1];
       if (!SHARE_TOKEN.test(token)) return response({ ok: false, error: "NOT_FOUND" }, 404);
@@ -166,7 +161,7 @@ export async function handleBookingShare(request: Request, env: Env, url: URL): 
       return response({ ok: true, trip: publicBookingProjection(booking) });
     }
     const id = match![1];
-    if (!await ownerBooking(request, db, id)) return response({ ok: false, error: "NOT_FOUND" }, 404);
+    if (!await ownerBooking(request, db, env.HOTELS_DB, id)) return response({ ok: false, error: "NOT_FOUND" }, 404);
     if (request.method === "DELETE") {
       await db.prepare("UPDATE booking_public_shares SET revoked_at=?1 WHERE booking_id=?2 AND revoked_at IS NULL")
         .bind(new Date().toISOString(), id).run();

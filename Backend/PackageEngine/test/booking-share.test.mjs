@@ -121,23 +121,41 @@ test('expired and revoked shares are unavailable',async()=>{
  assert.equal((await handleBookingShare(req(endpoint),env,new URL('https://iumrah.app'+endpoint))).status,404);
 });
 
-test('account-linked owner requires a validated account session', async () => {
-  const db=database(), env={BOOKINGS_DB:db};
-  const originalFetch=globalThis.fetch;
-  let checks=0;
-  try {
-    globalThis.fetch=async (url, init) => {
-      checks++;
-      assert.match(String(url), /\/api\/catalog\/hotels\/client\/trips\/IUM-2026-AB23456$/);
-      assert.equal(init?.headers?.Authorization,'Bearer validated-owner-session-token');
-      return Response.json({ok:true},{status:200});
-    };
-    const authorized = new Request('https://iumrah.app'+path,{method:'POST',headers:{Authorization:'Bearer validated-owner-session-token'}});
-    assert.equal((await handleBookingShare(authorized,env,new URL(authorized.url))).status,201);
-    assert.equal(checks,1);
-    globalThis.fetch=async()=>new Response('Forbidden',{status:403});
-    assert.equal((await handleBookingShare(authorized,env,new URL(authorized.url))).status,404);
-    const unauthorized = new Request('https://iumrah.app'+path,{method:'POST',headers:{Authorization:'Bearer public-share-token-not-a-session'}});
-    assert.equal((await handleBookingShare(unauthorized,env,new URL(unauthorized.url))).status,404);
-  } finally { globalThis.fetch=originalFetch; }
+test('account-linked owner requires the current D1 session and correct booking link', async () => {
+  const bookings=database();
+  const accountToken='validated-owner-session-token';
+  const accountHash=createHash('sha256').update(accountToken).digest('hex');
+  let sessionLive=true, linkedToBooking=true, operations=0;
+  const hotelsDb={
+    prepare(sql) {
+      let args=[];
+      return {
+        bind(...values){args=values; return this;},
+        async first(){
+          operations++;
+          if(sql.includes('FROM iumrah_account_sessions')) {
+            return sessionLive && args[0]===accountHash ? {pilgrim_id:123456} : null;
+          }
+          if(sql.includes('FROM pilgrim_trips')) {
+            assert.equal(args[0],bookingId);
+            assert.equal(args[1],123456);
+            return linkedToBooking ? {booking_id:bookingId} : null;
+          }
+          return null;
+        },
+      };
+    },
+  };
+  const env={BOOKINGS_DB:bookings,HOTELS_DB:hotelsDb};
+  const authorized=new Request('https://iumrah.app'+path,{method:'POST',headers:{Authorization:`Bearer ${accountToken}`}});
+  assert.equal((await handleBookingShare(authorized,env,new URL(authorized.url))).status,201);
+  assert.ok(operations>=2);
+  sessionLive=false;
+  assert.equal((await handleBookingShare(authorized,env,new URL(authorized.url))).status,404);
+  sessionLive=true;linkedToBooking=false;
+  assert.equal((await handleBookingShare(authorized,env,new URL(authorized.url))).status,404);
+  linkedToBooking=true;
+  assert.equal((await handleBookingShare(authorized,{BOOKINGS_DB:bookings},new URL(authorized.url))).status,404);
+  const outsider=new Request('https://iumrah.app'+path,{method:'POST',headers:{Authorization:'Bearer public-share-token-not-a-session'}});
+  assert.equal((await handleBookingShare(outsider,env,new URL(outsider.url))).status,404);
 });

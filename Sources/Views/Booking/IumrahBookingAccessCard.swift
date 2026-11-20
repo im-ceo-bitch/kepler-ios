@@ -8,6 +8,13 @@ struct IumrahBookingAccessCard: View {
     @EnvironmentObject private var bookings: BookingStore
     @EnvironmentObject private var settings: AppSettingsStore
     let bookingID: String?
+    private let initiallyExpanded: Bool
+
+    init(bookingID: String?, initiallyExpanded: Bool = false) {
+        self.bookingID = bookingID
+        self.initiallyExpanded = initiallyExpanded
+        self._expanded = State(initialValue: initiallyExpanded)
+    }
 
     private enum Channel: String { case email, sms }
     private enum Mode { case existing, booking }
@@ -91,6 +98,9 @@ struct IumrahBookingAccessCard: View {
                 }
             }
         }.frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
+            .onAppear {
+                if initiallyExpanded && challenge == nil && email.isEmpty && phone == "+998" { prefill() }
+            }
     }
 
     private func prefill() {
@@ -185,5 +195,34 @@ struct IumrahBookingAccessCard: View {
         case .malay: return MalayLocalization.phrase(en)
         case .english: return en
         }
+    }
+}
+
+/// Standalone verified-contact entry point, shared by empty bookings and Profile.
+/// A booking is never exposed merely by knowing a number or opening a URL.
+struct IumrahFindBookingView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(IumrahFlightCopy.text(settings.language,
+                     "Найдите свою поездку по телефону или email, который вы указали при бронировании.",
+                     "Use the phone or email you provided when booking to find your trip.",
+                     "Safaringizni bron qilishda ko‘rsatgan telefon yoki emailingiz orqali toping.",
+                     "Сафарингизни брон қилишда кўрсатган телефон ёки emailингиз орқали топинг."))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                IumrahBookingAccessCard(bookingID: nil, initiallyExpanded: true)
+            }
+            .padding(.horizontal, IumrahDesign.pagePadding)
+            .padding(.top, 20)
+            .padding(.bottom, 40)
+        }
+        .background(Color.iumrahPageBackground.ignoresSafeArea())
+        .navigationTitle(IumrahFlightCopy.text(settings.language,
+            "Найти бронирование", "Find booking", "Bronni topish", "Бронни топиш"))
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

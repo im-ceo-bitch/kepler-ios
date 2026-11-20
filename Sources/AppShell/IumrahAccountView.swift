@@ -143,6 +143,26 @@ struct IumrahAccountView: View {
                         }
                         IumrahAccountSavedHotelsEntry(language: settings.language)
                         tripsSection
+                        NavigationLink {
+                            IumrahFindBookingView()
+                        } label: {
+                            HStack(spacing: 13) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 17, weight: .medium))
+                                    .frame(width: 24)
+                                Text(tr("Find booking", "Найти бронирование", "Bronni topish", "Бронни топиш"))
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .foregroundStyle(.primary)
+                            .padding(16)
+                            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                         telegramIntegrationSection
                         paymentSecuritySection
                         servicesSection

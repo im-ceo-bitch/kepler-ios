@@ -48,11 +48,58 @@ struct BookingsHomeView: View {
 
     private var bookingTabContent: some View {
         VStack(spacing: 12) {
-            NavigationLink { SavedJourneysView() } label: { HStack { Image(systemName: "bookmark"); Text(IumrahFlightCopy.text(settings.language,"Сохранённые путешествия","Saved journeys","Saqlangan safarlar","Сақланган сафарлар")); Spacer(); Image(systemName:"chevron.right") }.font(.subheadline.weight(.semibold)).padding(14) }.buttonStyle(.plain)
-            if let activeSession { AnyView(activeBookingHub(activeSession)) }
-            else { AnyView(emptyBookingHome) }
+            if let activeSession {
+                NavigationLink { SavedJourneysView() } label: {
+                    HStack {
+                        Image(systemName: "bookmark")
+                        Text(localized("Сохранённые путешествия", "Saved journeys", "Saqlangan safarlar", "Сақланган сафарлар"))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .padding(14)
+                }
+                .buttonStyle(.plain)
+                AnyView(activeBookingHub(activeSession))
+            } else if account.account != nil && bookings.accountTripsRestoreState == .failed {
+                AnyView(accountBookingRestoreNotice(failed: true))
+            } else if account.account != nil && bookings.accountTripsRestoreState != .loaded {
+                AnyView(accountBookingRestoreNotice(failed: false))
+            } else {
+                AnyView(emptyBookingHome)
+            }
         }
     }
+
+    private func accountBookingRestoreNotice(failed: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label(failed
+                ? localized("Не удалось загрузить бронирования", "Could not load bookings", "Bronlarni yuklab bo‘lmadi", "Бронларни юклаб бўлмади")
+                : localized("Проверяем ваши поездки", "Checking your trips", "Safarlaringizni tekshiryapmiz", "Сафарларингизни текширяпмиз"),
+                systemImage: failed ? "wifi.exclamationmark" : "clock")
+                .font(.headline)
+            Text(failed
+                ? localized("Проверьте интернет и попробуйте снова.", "Check your connection and try again.", "Internetni tekshirib qayta urinib ko‘ring.", "Интернетни текшириб қайта уриниб кўринг.")
+                : localized("Данные бронирований появятся здесь после синхронизации.", "Your bookings will appear here when synchronization finishes.", "Bronlar sinxronlashdan so‘ng shu yerda ko‘rinadi.", "Бронлар синхронлашдан сўнг шу ерда кўринади."))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if failed {
+                Button(localized("Повторить", "Try again", "Qayta urinish", "Қайта уриниш")) {
+                    if let token = account.bearerToken {
+                        Task { await bookings.restoreAccountTrips(token: token) }
+                    }
+                }
+                .buttonStyle(IumrahPrimaryButtonStyle())
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, IumrahDesign.pagePadding)
+        .padding(.top, 28)
+        .padding(.bottom, 38)
+    }
+
     private var bookingScrollRoot: AnyView {
         AnyView(IumrahRootScrollingPage(onRefresh: { await refreshBookings() }, helpContext: activeSession == nil ? "bookings.empty" : bookingPanel == .booking ? "bookings.active" : bookingPanel == .status ? "bookings.status" : bookingPanel == .package ? "bookings.active" : "bookings.schedule", fixedRefreshHeader: false, scrollingRefresh: true, header: {
             AnyView(bookingHeader(hasActiveBooking: activeSession != nil))
@@ -1640,28 +1687,97 @@ struct BookingsHomeView: View {
         .buttonStyle(.plain)
     }
 
+    // A genuinely empty booking tab is a destination, not a promotional feed.
+    // Keep access to existing guest bookings and saved journeys without asking
+    // people to create an account or navigate through several large cards.
     private var emptyBookingHome: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 18) {
-                bookingEmptyStatusCard
+            VStack(spacing: 16) {
+                Image(systemName: "suitcase.rolling")
+                    .font(.system(size: 31, weight: .medium))
+                    .foregroundStyle(Color.primary.opacity(0.78))
+                    .frame(width: 76, height: 76)
+                    .background(Color.primary.opacity(0.055), in: Circle())
+                    .accessibilityHidden(true)
 
-                NavigationLink {
-                    IumrahTelegramIntegrationView()
+                Text(emptyBookingTitle)
+                    .font(.system(size: 23, weight: .bold, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.primary)
+
+                Text(emptyBookingNote)
+                    .font(.system(size: 15, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    IumrahHaptics.soft()
+                    startNewTrip()
                 } label: {
-                    IumrahTelegramEntryCard(language: settings.language, large: false)
+                    HStack(spacing: 10) {
+                        Spacer()
+                        Text(localized("Создать путешествие", "Create a trip", "Safar yaratish", "Сафар яратиш"))
+                        Image(systemName: "arrow.right")
+                        Spacer()
+                    }
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(height: 56)
+                    .background(Color.black, in: Capsule())
                 }
                 .buttonStyle(.plain)
-
-                explorePackagesButton
-
-                emptyConfiguratorCard
-                emptyCareCard
+                .padding(.top, 10)
             }
-            .padding(.horizontal, IumrahDesign.pagePadding)
-            .padding(.top, 10)
-            .padding(.bottom, 42)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 18)
+            .padding(.top, 68)
+            .padding(.bottom, 48)
+
+            VStack(spacing: 0) {
+                NavigationLink {
+                    IumrahFindBookingView()
+                } label: {
+                    emptyBookingLink(
+                        title: localized("Найти бронирование", "Find booking", "Bronni topish", "Бронни топиш"),
+                        symbol: "magnifyingglass"
+                    )
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.leading, 34)
+                NavigationLink {
+                    SavedJourneysView()
+                } label: {
+                    emptyBookingLink(
+                        title: localized("Сохранённые путешествия", "Saved journeys", "Saqlangan safarlar", "Сақланган сафарлар"),
+                        symbol: "bookmark"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .padding(.bottom, 44)
         }
+        .padding(.horizontal, IumrahDesign.pagePadding)
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
+    }
+
+    private func emptyBookingLink(title: String, symbol: String) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .medium))
+                .frame(width: 23)
+            Text(title)
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .foregroundStyle(.primary)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 54)
+        .contentShape(Rectangle())
     }
 
     private var bookingEmptyStatusCard: some View {
@@ -2060,8 +2176,8 @@ struct BookingsHomeView: View {
     private var explorePackagesTitle: String { localized("Смотреть готовые пакеты", "Explore Packages", "Tayyor paketlarni ko‘rish", "Тайёр пакетларни кўриш") }
     private var noPastBookingsTitle: String { localized("Прошлых поездок пока нет", "No past trips yet", "O‘tgan safarlar hozircha yo‘q", "Ўтган сафарлар ҳозирча йўқ") }
     private var noPastBookingsBody: String { localized("Завершённые и отменённые поездки будут храниться здесь.", "Completed and cancelled trips will appear here.", "Yakunlangan va bekor qilingan safarlar shu yerda ko‘rinadi.", "Якунланган ва бекор қилинган сафарлар шу ерда кўринади.") }
-    private var emptyBookingTitle: String { localized("Пока бронирований нет", "No bookings yet", "Hozircha bron yo‘q", "Ҳозирча брон йўқ") }
-    private var emptyBookingNote: String { localized("Пока здесь нет активных бронирований. Начните с Конфигуратора или передайте сборку iumrah Care.", "There are no active bookings here yet. Start with the Configurator or let iumrah Care prepare the trip for you.", "Hozircha bu yerda faol bronlar yo‘q. Konfiguratorni oching yoki safarni iumrah Care’ga topshiring.", "Ҳозирча бу ерда фаол бронлар йўқ. Конфигураторни очинг ёки сафарни iumrah Care’га топширинг.") }
+    private var emptyBookingTitle: String { localized("Пока нет активных бронирований", "No active bookings yet", "Hozircha faol bronlar yo‘q", "Ҳозирча фаол бронлар йўқ") }
+    private var emptyBookingNote: String { localized("Здесь будут ваши путешествия, статусы и документы.", "Your trips, updates and documents will appear here.", "Safarlaringiz, holatlar va hujjatlar shu yerda ko‘rinadi.", "Сафарларингиз, ҳолатлар ва ҳужжатлар шу ерда кўринади.") }
     private var careBookingCardTitle: String { localized("Соберите Umrah за меня", "Build my Umrah for me", "Umramni men uchun yig‘ing", "Умрамни мен учун йиғинг") }
     private var careBookingCardBody: String { localized("Расскажите даты, бюджет и пожелания. Iumrah Care соберёт для вас персональный вариант поездки.", "Tell us your dates, budget and preferences. Iumrah Care will prepare a personal Umrah option for you.", "Sanalar, budjet va istaklaringizni ayting. Iumrah Care siz uchun shaxsiy Umra variantini tayyorlaydi.", "Саналар, бюджет ва истакларингизни айтинг. Iumrah Care сиз учун шахсий Умра вариантини тайёрлайди.") }
     private var careBookingCardCTA: String { localized("Собрать мою Umrah", "Build my Umrah", "Mening Umramni yig‘ish", "Менинг Умрамни йиғиш") }

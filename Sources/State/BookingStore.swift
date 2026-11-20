@@ -19,8 +19,13 @@ enum BookingStoreError: LocalizedError {
     }
 }
 
+enum IumrahAccountTripsRestoreState: Equatable {
+    case notRequested, loading, loaded, failed
+}
+
 @MainActor
 final class BookingStore: ObservableObject {
+    @Published private(set) var accountTripsRestoreState: IumrahAccountTripsRestoreState = .notRequested
     @Published private(set) var sessions: [StoredBookingSession] = []
     @Published private(set) var chats: [String: [ChatMessage]] = [:]
     @Published private var travelESIMCache: [String: [ClientESIMProfile]] = [:]
@@ -589,6 +594,7 @@ final class BookingStore: ObservableObject {
         let nextOwner = next?.isEmpty == false ? owner : nil
         if careAccountOwner != nextOwner { careAccountOwner = nextOwner }
         if next != accountToken {
+            accountTripsRestoreState = .notRequested
             bookingScopeGeneration = UUID()
             for request in checkoutRequests.values { request.task.cancel() }
             checkoutRequests.removeAll()
@@ -619,9 +625,21 @@ final class BookingStore: ObservableObject {
     func restoreAccountTrips(token: String) async {
         guard accountToken == token else { return }
         let generation = bookingScopeGeneration
-        guard let trips = try? await accountService.trips(token: token), generation == bookingScopeGeneration else { return }
+        accountTripsRestoreState = .loading
+        guard let trips = try? await accountService.trips(token: token) else {
+            // A transient network failure must not masquerade as "no bookings".
+            if generation == bookingScopeGeneration && accountToken == token && accountTripsRestoreState != .loaded {
+                accountTripsRestoreState = .failed
+            }
+            return
+        }
+        guard generation == bookingScopeGeneration, accountToken == token else { return }
+        var failedTripDetails = false
         for trip in trips {
-            guard let detail = try? await accountService.tripDetail(bookingID: trip.bookingID, token: token) else { continue }
+            guard let detail = try? await accountService.tripDetail(bookingID: trip.bookingID, token: token) else {
+                failedTripDetails = true
+                continue
+            }
             guard generation == bookingScopeGeneration, accountToken == token else { return }
             if let index = sessions.firstIndex(where: { $0.id == trip.bookingID }) {
                 sessions[index].booking = detail.booking
@@ -649,6 +667,7 @@ final class BookingStore: ObservableObject {
             }
         }
         sessions.sort { $0.booking.createdAt > $1.booking.createdAt }
+        accountTripsRestoreState = failedTripDetails && sessions.isEmpty ? .failed : .loaded
         persist()
     }
 

@@ -1,4 +1,5 @@
 import { handleGuestBookingEmail } from "./booking-email-verification";
+import { handleBookingShare } from "./booking-share";
 import { flushBookingStatusEmails } from "./booking-email";
 import { bookingLogoResponse } from "./booking-email-logo";
 import { requirePackageAdmin } from "./admin-auth";
@@ -130,6 +131,11 @@ export default {
 
     if (request.method === "GET" && (/^\/hotel\/[^/]+$/.test(url.pathname) || /^\/h\/[^/]+$/.test(url.pathname))) {
       return hotelWebFallback(url);
+    }
+
+    // Read-only public share tokens, or owner-authorized link creation/revocation.
+    if (/^\/api\/package\/shares\//.test(url.pathname) || /^\/api\/package\/booking\/[^/]+\/share$/.test(url.pathname)) {
+      return handleBookingShare(request, env, url);
     }
 
     if (url.pathname.startsWith("/api/package/public/id/")) {

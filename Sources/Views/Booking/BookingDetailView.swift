@@ -40,6 +40,10 @@ struct BookingDetailView: View {
     @State private var bookingCardFlipped = false
     @State private var securityConfirmation: IumrahSecurityConfirmation?
     @State private var selectedPrimaryPage: BookingPrimaryPage = .booking
+    @State private var viewOnlyURL: URL?
+    @State private var isShareBusy = false
+    @State private var publicShareError: String?
+    @State private var publicShareRevoked = false
 
     private let bookingService = BookingService()
     private var session: StoredBookingSession? { bookings.booking(id: bookingID) }
@@ -86,6 +90,69 @@ struct BookingDetailView: View {
         }
     }
 
+    @ViewBuilder private func publicSharingCard(session: StoredBookingSession) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(localizedDetail("Поделиться поездкой", "Share trip", "Safarni ulashish", "Сафарни улашиш"), systemImage: "link")
+                .font(.headline)
+            Text(localizedDetail(
+                "По ссылке доступны отели, рейсы, маршрут и статусы — без личных данных и права управления.",
+                "The link shows hotels, flights, itinerary and status — never personal data or booking controls.",
+                "Havolada mehmonxona, reys, marshrut va holatlar ko‘rinadi — shaxsiy hujjatlarsiz.",
+                "Ҳаволада меҳмонхона, рейс, йўналиш ва ҳолатлар кўринади — шахсий ҳужжатларсиз."
+            )).font(.subheadline).foregroundStyle(.secondary)
+            if let viewOnlyURL {
+                ShareLink(item: viewOnlyURL) {
+                    Label(localizedDetail("Отправить ссылку", "Share link", "Havolani yuborish", "Ҳаволани юбориш"), systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity).padding(13)
+                }
+                .buttonStyle(.borderedProminent).tint(.primary)
+                Button(role: .destructive) {
+                    Task { await revokePublicShare(session: session) }
+                } label: {
+                    Text(localizedDetail("Отключить все общие ссылки", "Revoke all share links", "Barcha havolalarni bekor qilish", "Барча ҳаволаларни бекор қилиш"))
+                        .font(.footnote.weight(.semibold))
+                }.disabled(isShareBusy)
+            } else {
+                Button {
+                    Task { await createPublicShare(session: session) }
+                } label: {
+                    Label(localizedDetail("Создать ссылку для просмотра", "Create view-only link", "Ko‘rish havolasini yaratish", "Кўриш ҳаволасини яратиш"), systemImage: "eye")
+                        .frame(maxWidth: .infinity).padding(13)
+                }.buttonStyle(.bordered).tint(.primary).disabled(isShareBusy || (session.accessToken.isEmpty && account.bearerToken == nil))
+            }
+            if isShareBusy { ProgressView() }
+            if publicShareRevoked { Text(localizedDetail("Общие ссылки отключены", "Share links revoked", "Havolalar bekor qilindi", "Ҳаволалар бекор қилинди")).font(.caption).foregroundStyle(.secondary) }
+            if let publicShareError { Text(publicShareError).font(.caption).foregroundStyle(.red) }
+        }.iumrahCard()
+    }
+
+    @MainActor private func createPublicShare(session: StoredBookingSession) async {
+        guard !isShareBusy else { return }
+        isShareBusy = true
+        publicShareError = nil
+        publicShareRevoked = false
+        defer { isShareBusy = false }
+        do {
+            viewOnlyURL = try await bookingService.createPublicShare(id: bookingID, accessToken: session.accessToken, accountToken: account.bearerToken)
+        } catch {
+            publicShareError = localizedDetail("Не удалось создать ссылку", "Could not create share link", "Havola yaratilmadi", "Ҳавола яратилмади")
+        }
+    }
+
+    @MainActor private func revokePublicShare(session: StoredBookingSession) async {
+        guard !isShareBusy else { return }
+        isShareBusy = true
+        publicShareError = nil
+        defer { isShareBusy = false }
+        do {
+            try await bookingService.revokePublicShares(id: bookingID, accessToken: session.accessToken, accountToken: account.bearerToken)
+            viewOnlyURL = nil
+            publicShareRevoked = true
+        } catch {
+            publicShareError = localizedDetail("Не удалось отключить ссылки", "Could not revoke links", "Havolalar bekor qilinmadi", "Ҳаволалар бекор қилинмади")
+        }
+    }
+
     @ViewBuilder private var content: some View {
         if let session {
             if !embedded && selectedPrimaryPage == .status {
@@ -101,6 +168,7 @@ struct BookingDetailView: View {
                         onChangeMadinahHotel: { showMadinahHotelChange = true }
                     )
                     contactCard(session)
+                    publicSharingCard(session: session)
                     if session.isCheckingAvailability && session.paymentReceivedAt == nil {
                         Button(role: .destructive) { showDeleteConfirmation = true } label: {
                             Label(localizedDetail("Удалить бронирование", "Delete booking", "Bronni o‘chirish", "Бронни ўчириш"), systemImage: "trash")

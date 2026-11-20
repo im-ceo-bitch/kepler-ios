@@ -1,5 +1,16 @@
 import Foundation
 
+struct BookingPublicShareResponse: Decodable {
+    let ok: Bool
+    let shareURL: URL
+    let expiresAt: String
+}
+
+struct BookingPublicRevokeResponse: Decodable {
+    let ok: Bool
+    let revoked: Bool
+}
+
 struct BookingService {
     private let api = APIClient.shared
 
@@ -7,6 +18,34 @@ struct BookingService {
         let bookingNumber: String
         let channel: String
         let verificationToken: String
+    }
+
+    private struct EmptyShareRequest: Encodable {}
+
+    /// Public shares are view-only. A booking token OR a verified account session
+    /// authenticates the owner, but neither credential is embedded in the URL.
+    private func ownerHeaders(accessToken: String, accountToken: String?) throws -> [String: String] {
+        if !accessToken.isEmpty { return ["x-booking-token": accessToken] }
+        if let accountToken, !accountToken.isEmpty { return ["Authorization": "Bearer \(accountToken)"] }
+        throw APIError.missingBookingToken
+    }
+
+    func createPublicShare(id: String, accessToken: String, accountToken: String? = nil) async throws -> URL {
+        let headers = try ownerHeaders(accessToken: accessToken, accountToken: accountToken)
+        let result: BookingPublicShareResponse = try await api.post(
+            "/api/package/booking/\(id)/share",
+            body: EmptyShareRequest(), headers: headers
+        )
+        guard result.ok else { throw APIError.invalidResponse }
+        return result.shareURL
+    }
+
+    func revokePublicShares(id: String, accessToken: String, accountToken: String? = nil) async throws {
+        let headers = try ownerHeaders(accessToken: accessToken, accountToken: accountToken)
+        let result: BookingPublicRevokeResponse = try await api.delete(
+            "/api/package/booking/\(id)/share", headers: headers
+        )
+        if !result.ok || !result.revoked { throw APIError.invalidResponse }
     }
 
     func recoverBooking(number: String, channel: String, proof: String) async throws -> BookingCreateResponse {

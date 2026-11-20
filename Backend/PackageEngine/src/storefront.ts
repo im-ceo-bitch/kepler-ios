@@ -241,6 +241,8 @@ export function appleAppSiteAssociation(): Response {
         components: [
           { "/": "/h/*", comment: "Open public iumrah hotel links in the iOS app without exposing supplier identifiers." },
           { "/": "/hotel/*", comment: "Backward compatibility for hotel links shared by older beta builds." },
+          { "/": "/s/*", comment: "Read-only public booking links: never allow modification from a shared URL." },
+          { "/": "/flights/package/*", comment: "Public package previews, also available on web." },
         ],
       }],
     },

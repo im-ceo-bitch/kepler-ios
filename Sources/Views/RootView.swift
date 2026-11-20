@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import SafariServices
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
@@ -20,6 +21,7 @@ struct RootView: View {
     @State private var lastHandledLaunchLink: URL?
     @State private var handledPushRevision = 0
     @State private var pendingExternalBookingID: String?
+    @State private var openedPublicTrip: IumrahReadOnlyWebTrip?
 
     init(chrome: AppChromeStore, launchLink: URL? = nil) {
         self.chrome = chrome
@@ -36,6 +38,9 @@ struct RootView: View {
         IumrahAdaptiveLayoutHost {
             rootContent
         }
+            .sheet(item: $openedPublicTrip) { item in
+                IumrahReadOnlyWebView(url: item.url).ignoresSafeArea()
+            }
             .preferredColorScheme(settings.appearance.colorScheme)
             .environment(\.layoutDirection, settings.language.isRightToLeft ? .rightToLeft : .leftToRight)
             .environmentObject(settings)
@@ -310,6 +315,11 @@ struct RootView: View {
                components[1] == "package",
                components[2].range(of: "^\\d{10}$", options: .regularExpression) != nil {
                 chrome.openPackage(id: components[2])
+                return
+            }
+            if components.count == 2, components[0] == "s",
+               components[1].range(of: "^[A-Za-z0-9_-]{43}$", options: .regularExpression) != nil {
+                openedPublicTrip = IumrahReadOnlyWebTrip(url: url)
                 return
             }
             guard components.count == 2 else { return }
@@ -674,4 +684,21 @@ private enum RootLaunchURLAdapter {
         default: return false
         }
     }
+}
+
+// The exact same public, read-only page is available in Safari and native apps.
+// No booking access token is injected into the web view.
+private struct IumrahReadOnlyWebTrip: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct IumrahReadOnlyWebView: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let controller = SFSafariViewController(url: url)
+        controller.dismissButtonStyle = .close
+        return controller
+    }
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }

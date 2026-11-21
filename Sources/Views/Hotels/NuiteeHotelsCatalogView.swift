@@ -72,9 +72,20 @@ final class NuiteeCatalogModel: ObservableObject {
             (favorites == nil || favorites?.contains(row.id) == true) &&
             (term.isEmpty || row.name.localizedCaseInsensitiveContains(term) || (row.address?.localizedCaseInsensitiveContains(term) ?? false))
         }
-        // Preserve the order inside each group, including while prices arrive.
+        // IMPORTANT: Never sort by minimumRate or rateStatus here. Rates stream
+        // in asynchronously; sorting when pricesLoading flips to false moves
+        // cards under the user's finger and can dismiss an in-flight tap.
+        // Keep supplier order and the explicit stars / unrated grouping stable.
         return stars == 0 ? rows : rows.filter { $0.roundedStars == stars } + rows.filter { $0.roundedStars == 0 }
     }
+
+    // A provider response can repeat IDs. SwiftUI ForEach and the dictionary
+    // used when refreshing both require one unique, nonempty ID per card.
+    private static func uniqueHotels(_ rows: [NuiteeHotel]) -> [NuiteeHotel] {
+        var seen = Set<String>()
+        return rows.filter { !$0.id.isEmpty && seen.insert($0.id).inserted }
+    }
+
 
     func reload(city: NuiteeCity, checkin: Date, checkout: Date, adults: Int, childrenAges: [Int] = [], stars: Int = 0,
                 query: String = "", favorites: Set<String>? = nil, forceRefresh: Bool = false) async {
@@ -93,7 +104,11 @@ final class NuiteeCatalogModel: ObservableObject {
             // A city switch or occupancy change can reuse metadata immediately.
             // Never carry a price from a different stay or group of guests.
             if let snapshot = catalogues[city.rawValue], !snapshot.1.hotelCatalogStale, Date().timeIntervalSince(snapshot.0) < 86_400 {
-                hotels = snapshot.1.hotels.map { hotel in var row = hotel; row.minimumRate = nil; row.rateStatus = "not_requested"; return row }
+                sandbox = snapshot.1.sandbox
+                catalogStale = snapshot.1.hotelCatalogStale
+                hotels = Self.uniqueHotels(snapshot.1.hotels).map { hotel in
+                    var row = hotel; row.minimumRate = nil; row.rateStatus = "not_requested"; return row
+                }
                 total = hotels.count; hasLoadedPage = true; busy = false
                 if let cached = priceCache[requestedKey], Date().timeIntervalSince(cached.0) < 900 {
                     merge(cached.1, requested: Set(hotels.map(\.id)), missingStatus: "not_requested")
@@ -104,7 +119,16 @@ final class NuiteeCatalogModel: ObservableObject {
         pricesLoading = false
         let task = Task { [weak self] in
             guard let self else { return }
-            defer { if self.generation == version { self.busy = false; self.pricesLoading = false; self.work = nil } }
+            defer {
+                if self.generation == version {
+                    // Canceled searches must not leave indefinite price skeletons.
+                    if Task.isCancelled && self.hotels.contains(where: { $0.rateStatus == "loading" }) {
+                        self.merge([:], requested: Set(self.hotels.filter { $0.minimumRate == nil && $0.rateStatus == "loading" }.map(\.id)), missingStatus: "provider_error")
+                        self.rateError = "RATES_INCOMPLETE"
+                    }
+                    self.busy = false; self.pricesLoading = false; self.work = nil
+                }
+            }
             do {
                 if refreshMetadata || (!sameScope && !self.hasLoadedPage) {
                     let snapshot: NuiteeHotelListEnvelope
@@ -116,10 +140,23 @@ final class NuiteeCatalogModel: ObservableObject {
                     }
                     guard self.generation == version, !Task.isCancelled else { return }
                     self.sandbox = snapshot.sandbox; self.catalogStale = snapshot.hotelCatalogStale
-                    let old = sameScope ? Dictionary(uniqueKeysWithValues: self.hotels.map { ($0.id, $0) }) : [:]
-                    var seen = Set<String>()
-                    self.hotels = snapshot.hotels.filter { seen.insert($0.id).inserted }.map { hotel in
-                        var row = hotel; row.minimumRate = old[hotel.id]?.minimumRate; row.rateStatus = old[hotel.id]?.rateStatus ?? "not_requested"; return row
+                    // Preserve the current order on a same-stay refresh. A
+                    // provider metadata reorder must not jump a scrolled list.
+                    let old = Dictionary(self.hotels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                    let oldOrder = Dictionary(self.hotels.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
+                    let fresh = Self.uniqueHotels(snapshot.hotels)
+                    let ordered = sameScope
+                        ? fresh.enumerated().sorted {
+                            let a = oldOrder[$0.element.id] ?? Int.max
+                            let b = oldOrder[$1.element.id] ?? Int.max
+                            return a == b ? $0.offset < $1.offset : a < b
+                        }.map(\.element)
+                        : fresh
+                    self.hotels = ordered.map { hotel in
+                        var row = hotel
+                        row.minimumRate = sameScope ? old[hotel.id]?.minimumRate : nil
+                        row.rateStatus = sameScope ? (old[hotel.id]?.rateStatus ?? "not_requested") : "not_requested"
+                        return row
                     }
                     self.total = self.hotels.count; self.hasLoadedPage = true
                     if let cached = self.priceCache[requestedKey], Date().timeIntervalSince(cached.0) < 900 {
@@ -145,7 +182,15 @@ final class NuiteeCatalogModel: ObservableObject {
         rateError = nil
         let task = Task { [weak self] in
             guard let self else { return }
-            defer { if self.generation == version { self.work = nil; self.pricesLoading = false } }
+            defer {
+                if self.generation == version {
+                    if Task.isCancelled && self.hotels.contains(where: { $0.rateStatus == "loading" }) {
+                        self.merge([:], requested: Set(self.hotels.filter { $0.minimumRate == nil && $0.rateStatus == "loading" }.map(\.id)), missingStatus: "provider_error")
+                        self.rateError = "RATES_INCOMPLETE"
+                    }
+                    self.work = nil; self.pricesLoading = false
+                }
+            }
             await self.hydrate(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, rows: rows, version: version)
         }
         work = task
@@ -170,7 +215,10 @@ final class NuiteeCatalogModel: ObservableObject {
             async let left = hydrateBatch(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, rows: first, version: version)
             async let right = hydrateBatch(city: city, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, rows: second, version: version)
             unresolved += await left + right
-            if rateError == "NUITEE_RATE_LIMIT" { merge([:], requested: Set(hotels.filter { $0.minimumRate == nil && $0.rateStatus != "no_availability" }.map(\.id)), missingStatus: "provider_error"); return }
+            if rateError == "NUITEE_RATE_LIMIT" {
+                merge([:], requested: Set(hotels.filter { $0.minimumRate == nil && $0.rateStatus != "no_availability" }.map(\.id)), missingStatus: "provider_error")
+                return
+            }
         }
         await recoverMissing(unresolved, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, version: version)
     }
@@ -219,6 +267,7 @@ final class NuiteeCatalogModel: ObservableObject {
         for start in stride(from: 0, to: unresolved.count, by: 3) {
             guard generation == version, !Task.isCancelled else { return }
             let groupIDs = Array(unresolved[start..<min(start + 3, unresolved.count)])
+            var received: [String: NuiteeHotelService.PriceRow] = [:]
             await withTaskGroup(of: NuiteeHotelService.CatalogRateResult.self) { group in
                 for id in groupIDs {
                     group.addTask {
@@ -228,11 +277,14 @@ final class NuiteeCatalogModel: ObservableObject {
                 for await result in group {
                     guard generation == version, !Task.isCancelled else { group.cancelAll(); break }
                     if result.rateLimited { providerLimited = true }
-                    let row = result.row
-                    merge([row.id: row], requested: [row.id], missingStatus: "provider_error")
-                    if Self.validPrice(row) { remember([row.id: row], scope: search) }
+                    received[result.row.id] = result.row
                 }
             }
+            guard generation == version, !Task.isCancelled else { return }
+            // One state publication per three supplier responses, rather
+            // than rebuilding the complete LazyVStack for every single rate.
+            merge(received, requested: Set(groupIDs), missingStatus: "provider_error")
+            remember(received.filter { Self.validPrice($0.value) }, scope: search)
             if providerLimited {
                 guard generation == version, !Task.isCancelled else { return }
                 merge([:], requested: Set(unresolved.dropFirst(start + groupIDs.count)), missingStatus: "provider_error")
@@ -482,9 +534,12 @@ struct NuiteeHotelsCatalogView: View {
                     }
                 }
                 HStack {
-                    Text("\(matches.count) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language))
+                    let priced = matches.filter { $0.minimumRate != nil }.count
+                    Text("\(matches.count) " + NuiteeCopy.text("отелей", "mehmonxona", "hotels", settings.language)
+                         + (model.pricesLoading ? "" : " · \(priced) " + NuiteeCopy.text("с ценой", "narxli", "with prices", settings.language)))
                         .font(.caption.weight(.medium)).foregroundStyle(.secondary)
                     Spacer()
+                    if model.pricesLoading { ProgressView().controlSize(.mini) }
                 }
                 Group {
                     ForEach(matches) { hotel in
@@ -589,6 +644,7 @@ struct NuiteeHotelListingCard: View {
     let onFavorite: () -> Void
     @State private var additionalPhotos: [String] = []
     @State private var verifiedPhotoHotelID: String?
+    @State private var lastPhotoAttempt: Date?
 
     private var cataloguePhotos: [String] { IumrahHotelPhotoIdentity.unique((hotel.previewImages ?? []) + [hotel.coverImageURL].compactMap { $0 }) }
 
@@ -628,7 +684,13 @@ struct NuiteeHotelListingCard: View {
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(Color.primary)
                         } else { Text(NuiteeCopy.text("Без категории", "Toifasi ko‘rsatilmagan", "Unrated", settings.language)).font(.caption2).foregroundStyle(.secondary) }
-                        if let rating = hotel.rating, rating.isFinite, rating > 0 { Text(String(format: "%.1f", rating)).font(.caption).foregroundStyle(.secondary) }
+                        // A score with zero reviews (e.g. "10.0" on every unrated apartment)
+                        // looks fabricated. Show it only with at least one review, plus the count.
+                        if let rating = hotel.rating, rating.isFinite, rating > 0,
+                           let reviewCount = hotel.reviewCount, reviewCount > 0 {
+                            Text(String(format: "%.1f", rating) + " (\(reviewCount))")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                     Label(L10n.city(hotel.city, settings.language), systemImage: "mappin.and.ellipse")
                         .font(.caption).foregroundStyle(.secondary)
@@ -643,12 +705,17 @@ struct NuiteeHotelListingCard: View {
                     } else {
                         if hotel.rateStatus == nil || hotel.rateStatus == "not_requested" || hotel.rateStatus == "loading" {
                             RoundedRectangle(cornerRadius: 5).fill(Color.secondary.opacity(0.12)).frame(width: 80, height: 16).accessibilityLabel(NuiteeCopy.text("Цена ещё не получена", "Narx hali olinmagan", "Price not yet received", settings.language))
+                        } else if hotel.rateStatus == "no_availability" {
+                            // Supplier explicitly answered: no offers for these dates/guests.
+                            // Same wording for sandbox and production keys; no "test" text in UI.
+                            Label(NuiteeCopy.text("Нет номеров на эти даты", "Bu sanalarga bo‘sh xona yo‘q", "No rooms for these dates", settings.language), systemImage: "calendar.badge.exclamationmark")
+                                .font(.caption.weight(.medium)).foregroundStyle(.secondary)
                         } else if hotel.rateStatus == "not_returned" {
-                            Text(NuiteeCopy.text("Тариф не получен · повторите поиск", "Tarif olinmadi · qayta qidiring", "Rate not returned · retry search", settings.language)).font(.caption)
+                            Label(NuiteeCopy.text("Цена не получена", "Narx olinmadi", "Price not received", settings.language), systemImage: "arrow.clockwise")
+                                .font(.caption).foregroundStyle(.secondary)
                         } else {
-                            Text(hotel.rateStatus == "no_availability"
-                                 ? (sandbox ? NuiteeCopy.text("Проверить тарифы в отеле", "Mehmonxona tariflarini tekshirish", "Check room rates", settings.language) : NuiteeCopy.text("На эти даты распродано", "Bu sanalarga barcha xonalar band", "Sold out for these dates", settings.language))
-                                 : NuiteeCopy.text("Не удалось проверить наличие", "Mavjudlikni tekshirib bo‘lmadi", "Could not check availability", settings.language)).font(.caption)
+                            Label(NuiteeCopy.text("Не удалось проверить наличие", "Mavjudlikni tekshirib bo‘lmadi", "Could not check availability", settings.language), systemImage: "exclamationmark.circle")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                     HStack { Spacer(); Image(systemName: "chevron.right").font(.caption2.weight(.bold)).foregroundStyle(.secondary) }
@@ -665,7 +732,10 @@ struct NuiteeHotelListingCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
         .onTapGesture(perform: onOpen)
         .task(id: hotel.id) {
-            guard verifiedPhotoHotelID != hotel.id || additionalPhotos.count < 3 else { return }
+            // A card can reappear many times during scrolling. Do not restart
+            // several image requests each time it enters the visible window.
+            if verifiedPhotoHotelID == hotel.id,
+               let lastPhotoAttempt, Date().timeIntervalSince(lastPhotoAttempt) < 300 { return }
             let existing = cataloguePhotos
             var candidates = existing
             if candidates.count < 3 {
@@ -673,17 +743,16 @@ struct NuiteeHotelListingCard: View {
                 candidates = IumrahHotelPhotoIdentity.unique(existing + extra)
             }
             guard !Task.isCancelled else { return }
-            if candidates.count > additionalPhotos.count {
-                additionalPhotos = Array(candidates.prefix(3)); verifiedPhotoHotelID = hotel.id
-            }
             var result = await IumrahDistinctHotelPhotos.shared.select(candidates)
             if result.count < 3 && existing.count >= 3 {
                 let extra = await NuiteePreviewPhotoLoader.shared.photos(hotelID: hotel.id)
                 result = await IumrahDistinctHotelPhotos.shared.select(result + extra + candidates)
             }
             guard !Task.isCancelled else { return }
-            if !result.isEmpty { additionalPhotos = result; verifiedPhotoHotelID = hotel.id }
-            // Failed image/detail requests remain retryable when the card reappears.
+            // Publish only the final collage to avoid two visible photo swaps.
+            additionalPhotos = result.isEmpty ? Array(candidates.prefix(3)) : result
+            verifiedPhotoHotelID = hotel.id
+            lastPhotoAttempt = Date()
         }
     }
 }
@@ -823,7 +892,11 @@ struct NuiteeHotelDetailView: View {
                         .font(.footnote).foregroundStyle(.secondary)
                     Button(NuiteeCopy.text("Повторить", "Qayta urinish", "Retry", settings.language)) { Task { await refreshRates() } }.tint(.primary)
                 } else if rates.isEmpty {
-                    Text(ratesSandbox ? NuiteeCopy.text("Тарифы не получены. Повторите поиск.", "Tariflar olinmadi. Qayta qidiring.", "No rates returned. Try again.", settings.language) : NuiteeCopy.text("На эти даты распродано.", "Bu sanalarda xona mavjud emas.", "No rooms available for these dates.", settings.language))
+                    // Reaching this branch means the server confirmed an empty answer
+                    // (availabilityConfirmed == true); ambiguous empties throw above.
+                    Text(NuiteeCopy.text("На эти даты свободных номеров нет. Попробуйте другие даты или число гостей.",
+                                         "Bu sanalarda bo‘sh xona yo‘q. Boshqa sana yoki mehmonlar sonini tanlang.",
+                                         "No rooms available for these dates. Try other dates or guest count.", settings.language))
                         .font(.subheadline).foregroundStyle(.secondary)
                 } else {
                     if ratesError != nil {
@@ -1262,15 +1335,15 @@ private struct NuiteePhotoViewer: View {
 // Only missing catalogue media triggers a bounded, shared hotel-detail request.
 private actor NuiteePreviewPhotoLoader {
     static let shared = NuiteePreviewPhotoLoader()
-    private var cache: [String: [String]] = [:]
+    private var cache: [String: (date: Date, images: [String])] = [:]
     private var inFlight: [String: Task<[String], Never>] = [:]
     func photos(hotelID: String) async -> [String] {
-        if let cached = cache[hotelID] { return cached }
+        if let cached = cache[hotelID], Date().timeIntervalSince(cached.date) < (cached.images.isEmpty ? 120 : 1800) { return cached.images }
         if let pending = inFlight[hotelID] { return await pending.value }
         while inFlight.count >= 3 {
             try? await Task.sleep(for: .milliseconds(180))
             if Task.isCancelled { return [] }
-            if let cached = cache[hotelID] { return cached }
+            if let cached = cache[hotelID], Date().timeIntervalSince(cached.date) < (cached.images.isEmpty ? 120 : 1800) { return cached.images }
             if let pending = inFlight[hotelID] { return await pending.value }
         }
         guard !Task.isCancelled else { return [] }
@@ -1281,7 +1354,8 @@ private actor NuiteePreviewPhotoLoader {
         inFlight[hotelID] = task
         let result = await task.value
         inFlight[hotelID] = nil
-        if !result.isEmpty { cache[hotelID] = result }
+        if cache.count >= 250 && cache[hotelID] == nil { cache.removeAll() }
+        cache[hotelID] = (Date(), result)
         return result
     }
 }

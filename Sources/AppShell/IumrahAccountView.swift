@@ -292,9 +292,13 @@ struct IumrahAccountView: View {
                 }.buttonStyle(.plain)
                 compactAccountDivider
                 NavigationLink {
-                    AccountRewardsPage(title: tr("Saved hotels", "Избранные отели", "Saqlangan mehmonxonalar", "Сақланган меҳмонхоналар")) {
+                    ScrollView {
                         NuiteeHotelsCatalogView(refreshSignal: 0, favoritesOnly: true)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                     }
+                    .navigationTitle(tr("Saved hotels", "Избранные отели", "Saqlangan mehmonxonalar", "Сақланган меҳмонхоналар"))
+                    .navigationBarTitleDisplayMode(.inline)
                 } label: {
                     compactAccountRow("heart", tr("Saved hotels", "Избранные отели", "Saqlangan mehmonxonalar", "Сақланган меҳмонхоналар"))
                 }.buttonStyle(.plain)

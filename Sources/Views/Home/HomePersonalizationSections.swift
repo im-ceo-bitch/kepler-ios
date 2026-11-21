@@ -270,35 +270,55 @@ struct HomeAvailablePackagesSection: View {
     @Environment(\.iumrahTabIsActive) private var activeTab
     @State private var packages: [StorefrontServerPackageSnapshot] = []
     @State private var loadedOrigin: String?
+    var showsFallback = true
     let startSmart: () -> Void
+    init(showsFallback: Bool = true, startSmart: @escaping () -> Void) {
+        self.showsFallback = showsFallback
+        self.startSmart = startSmart
+    }
     private var c: HomeSectionCopy { .init(language: settings.language) }
     var body: some View {
-        let points = loadedOrigin == journey.trip.originCode ? packages.filter { String($0.startDate.prefix(10)) >= SmartConfiguratorPreferences.key(Date()) } : []
+        let points = loadedOrigin == journey.trip.originCode
+            ? packages.filter { String($0.startDate.prefix(10)) >= SmartConfiguratorPreferences.key(Date()) }
+            : []
         VStack(alignment: .leading, spacing: 12) {
-            IumrahHomeSectionHeader(title: c.t("Актуальные пакеты Умры", "Umrah packages", "Umra paketlari", "Умра пакетлари"))
-            if points.isEmpty {
-                Button(action: startSmart) {
-                    HStack(spacing: 13) {
-                        Image(systemName: "suitcase.fill").font(.title2).frame(width: 48, height: 48).iumrahGlass(in: Circle(), allowsStaticGlass: true)
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(c.t("Подобрать пакет по вашим датам", "Find a package for your dates", "Sanalaringizga mos paket", "Саналарингизга мос пакет")).font(.headline)
-                            Text(c.t("Рейсы, отели и услуги — единая стоимость", "Flights, hotels and services — one total", "Reys, mehmonxona va xizmatlar — bitta narx", "Рейс, меҳмонхона ва хизматлар — битта нарх")).font(.caption).foregroundStyle(.secondary)
+            if !points.isEmpty || showsFallback {
+                IumrahHomeSectionHeader(title: c.t("Готовые предложения", "Ready-made offers", "Tayyor takliflar", "Тайёр таклифлар"))
+                if points.isEmpty {
+                    Button(action: startSmart) {
+                        HStack(spacing: 13) {
+                            Image(systemName: "suitcase.fill")
+                                .font(.title2).frame(width: 48, height: 48)
+                                .iumrahGlass(in: Circle(), allowsStaticGlass: true)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(c.t("Подобрать пакет по вашим датам", "Find a package for your dates", "Sanalaringizga mos paket", "Саналарингизга мос пакет"))
+                                    .font(.headline)
+                                Text(c.t("Рейсы, отели и услуги — единая стоимость", "Flights, hotels and services — one total", "Reys, mehmonxona va xizmatlar — bitta narx", "Рейс, меҳмонхона ва хизматлар — битта нарх"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").foregroundStyle(.secondary)
                         }
-                        Spacer(minLength: 0); Image(systemName: "chevron.right").foregroundStyle(.secondary)
-                    }.padding(16).foregroundStyle(.primary).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
-                }.buttonStyle(.plain)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(points) { point in
-                            Button { chrome.openPackage(id: point.id) } label: {
-                                HomeSmallCard(symbol: "calendar", label: String(point.startDate.prefix(10))) {
-                                    Text(point.hotelName).font(.subheadline.bold()).lineLimit(2)
-                                    Text(point.pricePerPerson?.formatted(.currency(code: "USD")) ?? "—").font(.title2.bold())
-                                    Text(c.t("На одного паломника", "Per traveler", "Bir ziyoratchiga", "Бир зиёратчига")).font(.caption).foregroundStyle(.secondary)
-                                    Text(c.t("Тариф требует проверки", "Subject to recheck", "Tarif tekshiriladi", "Тариф текширилади")).font(.caption2).foregroundStyle(.secondary)
+                        .padding(16).foregroundStyle(.primary)
+                        .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 12) {
+                            ForEach(points) { point in
+                                Button { chrome.openPackage(id: point.id) } label: {
+                                    HomeSmallCard(symbol: "calendar", label: String(point.startDate.prefix(10))) {
+                                        Text(point.hotelName).font(.subheadline.bold()).lineLimit(2)
+                                        Text(point.pricePerPerson?.formatted(.currency(code: "USD")) ?? "—").font(.title2.bold())
+                                        Text(c.t("На одного паломника", "Per traveler", "Bir ziyoratchiga", "Бир зиёратчига"))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                        Text(c.t("Тариф требует проверки", "Subject to recheck", "Tarif tekshiriladi", "Тариф текширилади"))
+                                            .font(.caption2).foregroundStyle(.secondary)
+                                    }
                                 }
-                            }.buttonStyle(.plain)
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
@@ -309,9 +329,11 @@ struct HomeAvailablePackagesSection: View {
             let origin = journey.trip.originCode
             let values = await HomePublicContentCache.shared.packages(origin: origin)
             guard !Task.isCancelled, origin == journey.trip.originCode else { return }
-            packages = values; loadedOrigin = origin
+            packages = values
+            loadedOrigin = origin
         }
     }
+
 }
 
 struct HomeRecommendedHotelsSection: View {

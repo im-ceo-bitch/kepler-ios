@@ -20,7 +20,7 @@ status=(r/'Views/Booking/PilgrimCheckoutView.swift').read_text().split('private 
 assert 'if accountMatchesTrip' in status and 'IumrahBookingAccessCard' in status
 assert 'activationCard(checkout)' not in status and 'loginCard(checkout)' not in status
 profile=(r/'AppShell/IumrahAccountView.swift').read_text().split('var body: some View',1)[1].split('private var accountHeader',1)[0]
-assert 'seamlessGuestProfile' in profile and 'IumrahBookingAccessCard(bookingID: nil)' in profile
+assert 'seamlessGuestProfile' in profile and 'compactGuestActions' in profile and 'IumrahFindBookingView()' in (r/'AppShell/IumrahAccountView.swift').read_text()
 assert 'loginCard\n' not in profile
 root=(r/'Views/RootView.swift').read_text().split('private func linkLocalBookingsToAccount()',1)[1].split('private func syncLocalProfileFromAccount()',1)[0]
 assert 'sameIdentity(owner, current)' in root

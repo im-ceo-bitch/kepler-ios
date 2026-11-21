@@ -49,6 +49,8 @@ struct IumrahAccountView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.iumrahTabIsActive) private var activeTab
     @AppStorage("iumrah.autoPageHelp") private var automaticPageHelp = true
+    @ObservedObject private var homeHistory = HomePersonalizationStore.shared
+    @State private var showClearRecentConfirmation = false
     @State private var showDeleteAccountConfirmation = false
     @State private var accountDeleteError: String?
     @State private var deletingAccount = false
@@ -120,60 +122,13 @@ struct IumrahAccountView: View {
             IumrahRootScrollingPage(onRefresh: { await refreshAccountContent() }, helpContext: account.account == nil ? "account.guest" : "account.signed_in", fixedRefreshHeader: false, scrollingRefresh: true, header: {
                 accountHeader
             }, content: {
-                LazyVStack(spacing: 20) {
-
+                LazyVStack(spacing: 16) {
                     if let profile = account.account {
-                        IumrahAccountBalanceEntry(language: settings.language, refreshRevision: balanceRefreshRevision)
-                        IumrahAccountFriendsEntry(language: settings.language)
-                        automaticHelpCard
-                        IumrahAccountRewardsCarousel(language: settings.language) {
-                            IumrahAccountIdentityHeroCard(
-                                profile: profile,
-                                language: settings.language,
-                                publicIdentityURL: (identityLinkOwner == account.bearerToken ? identityPublicURL : nil) ?? fallbackIdentityURL(profile.iumrahID),
-                                copyMessage: identityCopyMessage,
-                                onCopy: { copyIdentityID(profile) }
-                            )
-                        }
-                        travelCompanionsEntryCard
-                        walletSection(profile)
-
-                        if let active = activeTrip {
-                            IumrahTripWalletEntry(session: active, profile: profile, language: settings.language)
-                        }
-                        IumrahAccountSavedHotelsEntry(language: settings.language)
-                        tripsSection
-                        NavigationLink {
-                            IumrahFindBookingView()
-                        } label: {
-                            HStack(spacing: 13) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 17, weight: .medium))
-                                    .frame(width: 24)
-                                Text(tr("Find booking", "Найти бронирование", "Bronni topish", "Бронни топиш"))
-                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .foregroundStyle(.primary)
-                            .padding(16)
-                            .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                        telegramIntegrationSection
-                        paymentSecuritySection
-                        servicesSection
-                        settingsSection
-                        signOutButton
-                        deleteAccountButton
+                        compactAccountContent(profile)
                     } else {
                         seamlessGuestProfile
-                        automaticHelpCard
-                        IumrahBookingAccessCard(bookingID: nil)
-                        guestSettingsSection
+                        compactGuestActions
+                        compactGuestSettings
                     }
                     IumrahSloganCard()
                 }
@@ -258,6 +213,16 @@ struct IumrahAccountView: View {
             }
             Button(tr("Cancel", "Отмена", "Bekor qilish", "Бекор қилиш"), role: .cancel) { }
         } message: { Text(tr("Your account access will be deleted. Existing trips must be resolved first.", "Доступ к аккаунту будет удалён. Сначала необходимо урегулировать существующие поездки.", "Akkaunt o‘chiriladi. Avval mavjud safarlarni yakunlang.", "Аккаунт ўчирилади. Аввал мавжуд сафарларни якунланг.")) }
+        .confirmationDialog(
+            tr("Clear recent activity?", "Очистить недавние действия?", "So‘nggi harakatlar tozalansinmi?", "Сўнгги ҳаракатлар тозалансинми?"),
+            isPresented: $showClearRecentConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Clear activity", "Очистить историю", "Tarixni tozalash", "Тарихни тозалаш"), role: .destructive) {
+                homeHistory.clear(owner: HomePersonalizationStore.owner(account))
+            }
+            Button(tr("Cancel", "Отмена", "Bekor qilish", "Бекор қилиш"), role: .cancel) { }
+        }
         .sheet(isPresented: $showSignOutConfirmation) {
             IumrahActionConfirmationSheet(
                 title: tr("Sign out of iumrah?", "Выйти из iumrah?", "iumrah akkauntidan chiqasizmi?", "iumrah аккаунтидан чиқасизми?"),
@@ -283,12 +248,254 @@ struct IumrahAccountView: View {
     private var accountHeader: some View {
         IumrahPrimaryTabHeader(
             title: tr("Profile", "Профиль", "Profil", "Профиль"),
-            footer: account.account.map { profile in
-                AnyView(userDataEntryCard(profile).padding(.horizontal, IumrahDesign.pagePadding))
-            },
-            flexibleFooter: account.account != nil,
             animateMap: false
         )
+    }
+
+    // Profile 2.0. The Account tab is navigation, not a second storefront.
+    // Every row opens its existing destination; all old feature screens stay.
+    private func compactAccountContent(_ profile: IumrahAccountProfile) -> some View {
+        VStack(spacing: 16) {
+            NavigationLink { IumrahUserDataView() } label: {
+                HStack(spacing: 13) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.system(size: 34, weight: .regular))
+                        .foregroundStyle(.primary)
+                        .frame(width: 47, height: 48)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(displayName(profile))
+                            .font(.system(size: 19, weight: .bold, design: .rounded))
+                            .lineLimit(1)
+                        Text(userDataReady
+                            ? tr("Profile complete", "Профиль заполнен", "Profil tayyor", "Профил тайёр")
+                            : tr("Complete profile details", "Заполните данные профиля", "Profilni to‘ldiring", "Профилни тўлдиринг"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+                .padding(15)
+                .background(Color.iumrahCardBackground,
+                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
+            compactAccountGroup(tr("Your journeys", "Ваши путешествия", "Safarlaringiz", "Сафарларингиз")) {
+                Button { chrome.navigate(to: .booking) } label: {
+                    compactAccountRow("suitcase.rolling", tr("Bookings", "Бронирования", "Bronlar", "Бронлар"),
+                        tr("Current and past trips", "Активные и прошлые поездки", "Faol va oldingi safarlar", "Фаол ва олдинги сафарлар"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { SavedJourneysView() } label: {
+                    compactAccountRow("bookmark", tr("Saved journeys", "Сохранённые путешествия", "Saqlangan safarlar", "Сақланган сафарлар"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink {
+                    AccountRewardsPage(title: tr("Saved hotels", "Избранные отели", "Saqlangan mehmonxonalar", "Сақланган меҳмонхоналар")) {
+                        NuiteeHotelsCatalogView(refreshSignal: 0, favoritesOnly: true)
+                    }
+                } label: {
+                    compactAccountRow("heart", tr("Saved hotels", "Избранные отели", "Saqlangan mehmonxonalar", "Сақланган меҳмонхоналар"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahFindBookingView() } label: {
+                    compactAccountRow("magnifyingglass", tr("Find booking", "Найти бронирование", "Bronni topish", "Бронни топиш"),
+                        tr("Access a trip without an account", "Доступ к поездке без аккаунта", "Akkauntsiz bronni topish", "Аккаунтсиз бронни топиш"))
+                }.buttonStyle(.plain)
+            }
+
+            compactAccountGroup(tr("Personal details", "Личные данные", "Shaxsiy ma’lumotlar", "Шахсий маълумотлар")) {
+                NavigationLink { IumrahUserDataView() } label: {
+                    compactAccountRow("person.crop.circle", tr("Profile details", "Данные профиля", "Profil ma’lumotlari", "Профил маълумотлари"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahTravelCompanionsView() } label: {
+                    compactAccountRow("person.2", tr("My pilgrims", "Мои паломники", "Ziyoratchilarim", "Зиёратчиларим"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                Button {
+                    IumrahHaptics.soft()
+                    showIdentityFullscreen = true
+                } label: {
+                    compactAccountRow("person.text.rectangle", "iumrah ID",
+                        tr("Digital pilgrim ID", "Карта паломника", "Ziyoratchi kartasi", "Зиёратчи картаси"))
+                }.buttonStyle(.plain)
+            }
+
+            compactAccountGroup(tr("Benefits", "Бонусы", "Bonuslar", "Бонуслар")) {
+                NavigationLink { IumrahBalanceVisualPage(language: settings.language) } label: {
+                    compactAccountRow("wallet.bifold", "iumrah Balance")
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahRewardsVisualPage(language: settings.language) } label: {
+                    compactAccountRow("star", "iumrah Rewards")
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahFriendsVisualPage(language: settings.language) } label: {
+                    compactAccountRow("gift", tr("Invite a friend", "Пригласите друга", "Do‘stingizni taklif qiling", "Дўстингизни таклиф қилинг"))
+                }.buttonStyle(.plain)
+            }
+
+            compactAccountGroup(tr("Settings", "Настройки", "Sozlamalar", "Созламалар")) {
+                Button {
+                    IumrahHaptics.soft()
+                    showLanguageSheet = true
+                } label: {
+                    compactAccountRow("globe", tr("Language", "Язык", "Til", "Тил"), settings.language.title)
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahAppearanceView() } label: {
+                    compactAccountRow("circle.lefthalf.filled", tr("Appearance", "Оформление", "Ko‘rinish", "Кўриниш"), settings.appearance.title(settings.language))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { AccountNotificationsView() } label: {
+                    compactAccountRow("bell", tr("Notifications", "Уведомления", "Bildirishnomalar", "Билдиришномалар"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahAccountSecurityView() } label: {
+                    compactAccountRow("lock.shield", tr("Account security", "Безопасность", "Xavfsizlik", "Хавфсизлик"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                Toggle(isOn: $automaticPageHelp) {
+                    Label(tr("Automatic tips", "Подсказки", "Maslahatlar", "Маслаҳатлар"), systemImage: "questionmark.circle")
+                        .font(.subheadline.weight(.medium))
+                }
+                .tint(.green)
+                .padding(.vertical, 12)
+                compactAccountDivider
+                Toggle(isOn: Binding(
+                    get: { homeHistory.enabled },
+                    set: { homeHistory.setEnabled($0) }
+                )) {
+                    Label(tr("Personal recommendations", "Персональные рекомендации", "Shaxsiy tavsiyalar", "Шахсий тавсиялар"), systemImage: "slider.horizontal.3")
+                        .font(.subheadline.weight(.medium))
+                }
+                .tint(.green)
+                .padding(.vertical, 12)
+                compactAccountDivider
+                Button { showClearRecentConfirmation = true } label: {
+                    compactAccountRow("clock.arrow.circlepath", tr("Clear recent activity", "Очистить недавние действия", "So‘nggi tarixni tozalash", "Сўнгги тарихни тозалаш"))
+                }
+                .buttonStyle(.plain)
+            }
+
+            compactAccountGroup(tr("Help & information", "Помощь и информация", "Yordam va ma’lumot", "Ёрдам ва маълумот")) {
+                Button { chrome.navigate(to: .care) } label: {
+                    compactAccountRow("headphones", tr("iumrah Support", "Поддержка iumrah", "iumrah Yordam", "iumrah Ёрдам"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahTelegramIntegrationView(preferredBookingID: activeTrip?.id) } label: {
+                    compactAccountRow("paperplane", "Telegram")
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahPolicyDetailView(kind: .paymentSecurity) } label: {
+                    compactAccountRow("creditcard", tr("Payment", "Оплата", "To‘lov", "Тўлов"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahPolicyDetailView(kind: .refund) } label: {
+                    compactAccountRow("arrow.uturn.backward", tr("Refunds", "Возвраты", "Qaytarish", "Қайтариш"))
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { IumrahPolicyDetailView(kind: .privacy) } label: {
+                    compactAccountRow("hand.raised", tr("Privacy", "Конфиденциальность", "Maxfiylik", "Махфийлик"))
+                }.buttonStyle(.plain)
+            }
+
+            compactAccountGroup(tr("Services", "Сервисы", "Xizmatlar", "Хизматлар")) {
+                NavigationLink { IumrahFlightsView(preferredBookingID: activeTrip?.id) } label: {
+                    compactAccountRow("airplane", "iumrah Flights")
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { ZiyaratJourneyView() } label: {
+                    compactAccountRow("map", "iumrah Ziyarats")
+                }.buttonStyle(.plain)
+                compactAccountDivider
+                NavigationLink { ESIMView() } label: {
+                    compactAccountRow("simcard", "iumrah eSIM")
+                }.buttonStyle(.plain)
+            }
+
+            signOutButton
+            deleteAccountButton
+        }
+    }
+
+    private var compactGuestActions: some View {
+        compactAccountGroup(tr("Your journeys", "Ваши путешествия", "Safarlaringiz", "Сафарларингиз")) {
+            NavigationLink { SavedJourneysView() } label: {
+                compactAccountRow("bookmark", tr("Saved journeys", "Сохранённые путешествия", "Saqlangan safarlar", "Сақланган сафарлар"))
+            }.buttonStyle(.plain)
+            compactAccountDivider
+            NavigationLink { IumrahFindBookingView() } label: {
+                compactAccountRow("magnifyingglass", tr("Find booking", "Найти бронирование", "Bronni topish", "Бронни топиш"))
+            }.buttonStyle(.plain)
+        }
+    }
+
+    private var compactGuestSettings: some View {
+        compactAccountGroup(tr("Settings", "Настройки", "Sozlamalar", "Созламалар")) {
+            Button { showLanguageSheet = true } label: {
+                compactAccountRow("globe", tr("Language", "Язык", "Til", "Тил"), settings.language.title)
+            }.buttonStyle(.plain)
+            compactAccountDivider
+            NavigationLink { IumrahAppearanceView() } label: {
+                compactAccountRow("circle.lefthalf.filled", tr("Appearance", "Оформление", "Ko‘rinish", "Кўриниш"))
+            }.buttonStyle(.plain)
+            compactAccountDivider
+            NavigationLink { AccountNotificationsView() } label: {
+                compactAccountRow("bell", tr("Notifications", "Уведомления", "Bildirishnomalar", "Билдиришномалар"))
+            }.buttonStyle(.plain)
+            compactAccountDivider
+            Toggle(isOn: $automaticPageHelp) {
+                Label(tr("Automatic tips", "Подсказки", "Maslahatlar", "Маслаҳатлар"), systemImage: "questionmark.circle")
+                    .font(.subheadline.weight(.medium))
+            }
+            .tint(.green).padding(.vertical, 10)
+        }
+    }
+
+    private func compactAccountGroup<Content: View>(
+        _ title: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(title)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 3)
+            VStack(spacing: 0) { content() }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 5)
+                .background(Color.iumrahCardBackground,
+                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var compactAccountDivider: some View {
+        Divider().padding(.leading, 46)
+    }
+
+    private func compactAccountRow(_ icon: String, _ title: String, _ detail: String? = nil) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 38)
+                .background(Color.iumrahRaisedBackground,
+                            in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold))
+                if let detail {
+                    Text(detail).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+            }
+            Spacer(minLength: 5)
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
+        .foregroundStyle(.primary)
+        .frame(minHeight: 53)
+        .contentShape(Rectangle())
     }
 
     private var seamlessGuestProfile: some View {
@@ -564,6 +771,22 @@ struct IumrahAccountView: View {
                     Text(identityCopyMessage ?? tr("Tap the card to flip it", "Нажмите на карту, чтобы перевернуть", "Kartani aylantirish uchun bosing", "Картани айлантириш учун босинг"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle((identityCopyMessage == nil ? Color.secondary : Color.green).opacity(0.9))
+
+                    if PKPassLibrary.isPassLibraryAvailable() {
+                        Button {
+                            Task { await addIdentityToWallet() }
+                        } label: {
+                            Label(isLoadingWalletPass
+                                ? tr("Preparing Wallet", "Подготавливаем Wallet", "Wallet tayyorlanmoqda", "Wallet тайёрланмоқда")
+                                : tr("Add to Apple Wallet", "Добавить в Apple Wallet", "Apple Wallet’ga qo‘shish", "Apple Wallet’га қўшиш"),
+                                systemImage: "wallet.pass")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.black)
+                        .disabled(isLoadingWalletPass)
+                    }
 
                     Spacer()
                 }

@@ -38,11 +38,8 @@ struct HomeDashboardView: View {
                 // after Home is visibly mounted.
                 try? await Task.sleep(for: .milliseconds(650))
                 guard !Task.isCancelled else { return }
+                guard activeSession != nil else { return }
                 await bookings.refreshAll()
-                while !Task.isCancelled {
-                    if let activeSession { _ = try? await bookings.loadESIMs(for: activeSession.id) }
-                    try? await Task.sleep(nanoseconds: 120_000_000_000)
-                }
             }
             .navigationDestination(isPresented: Binding(get: { smartPresentation != nil }, set: { if !$0 { smartPresentation = nil } })) {
                 SmartConfiguratorFlow(resumeDraft: smartPresentation?.draft) { smartPresentation = nil }
@@ -84,6 +81,9 @@ struct HomeDashboardView: View {
                     IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded, flightsSelected: publishedSelection.complete, onContinue: continuePublishedFlights)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
+                // Home 2.0 — one visual hierarchy: journey first, brand second,
+                // then real trip continuation and the commercial offer. The search
+                // animation and published-flight selection are intentionally untouched.
                 publishedFlightSection
                 WhyIumrahCarousel(onPrimary: { focusJourneySearchRevision += 1; journeySearchExpanded = true })
                 IumrahMissionCard()
@@ -105,34 +105,9 @@ struct HomeDashboardView: View {
                         onDismiss: { dismissSystemNotification($0) }
                     )
                 }
-                SmartConfiguratorHomeCard { startNewSmart() }
-                HomeEmotionalJourneyPrompt()
-                HomeVideoCarousel()
-                HomeDestinationsSection()
-                IumrahHomeServicesSection(
-                    language: settings.language,
-                    onTransfer: { showTransferService = true },
-                    onESIM: { chrome.presentESIM() },
-                    onFlights: { showFlightsService = true },
-                    onZiyarats: { showZiyarats = true }
-                )
-                HomeAvailablePackagesSection(startSmart: { startNewSmart() })
-                JourneyTravelInfoView(showsPageSelector: true)
-                IumrahHomeAudienceSection(language: settings.language)
-                HomeRewardsOffersSection(showsOffers: false)
-                homeIntegrationsSection
-                HomeRecommendedHotelsSection()
-                HomeRewardsOffersSection(showsRewards: false)
-                confidenceStrip
-                VStack(alignment: .leading, spacing: 15) {
-                    IumrahHomeSectionHeader(title: homeProductsTitle)
-                    productsCarousel()
-                    IumrahHomeCarouselDots(count: 3, selectedIndex: productsCarouselIndex)
-                }
-                connectedTripCard
-                personalUmrahFAQ
-                homeAboutFooter
-                HomeWhyAndPreferencesSection(showsWhy: false)
+                HomeAvailablePackagesSection(showsFallback: false, startSmart: { startNewSmart() })
+                homeIncludedServicesSection
+                homeBenefitsSection
                 IumrahSloganCard()
             }
             // Same adaptive page-column rule as Account/Gear. Padding is part of
@@ -157,6 +132,139 @@ struct HomeDashboardView: View {
     }
 
 
+    // The list stays factual: each selected package defines its actual included
+    // services. This block shows the service categories, not a fixed promise.
+    private var homeIncludedServicesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            IumrahHomeSectionHeader(
+                title: IumrahFlightCopy.text(settings.language,
+                    "Что входит в пакет?", "What's in your package?",
+                    "Paketda nimalar bor?", "Пакетда нималар бор?")
+            )
+            VStack(alignment: .leading, spacing: 13) {
+                Text(IumrahFlightCopy.text(settings.language,
+                    "Выбирайте услуги самостоятельно — итоговый состав и стоимость видны перед бронированием.",
+                    "Choose your services. See the final inclusions and prices before booking.",
+                    "Xizmatlarni o‘zingiz tanlang. Tarkib va narx bron qilishdan oldin ko‘rsatiladi.",
+                    "Хизматларни ўзингиз танланг. Таркиб ва нарх брон қилишдан олдин кўрсатилади."))
+                    .font(.subheadline).foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    ForEach([IumrahServiceKind.visa, .flights, .hotels, .transfer, .guide, .ziyarat], id: \.self) { kind in
+                        NavigationLink {
+                            IumrahServicesView(initialService: kind)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: kind.icon)
+                                    .font(.system(size: 17, weight: .medium))
+                                    .frame(width: 25)
+                                Text(homeServiceName(kind))
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .lineLimit(2)
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .background(Color.iumrahRaisedBackground,
+                                        in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                NavigationLink {
+                    IumrahServicesView()
+                } label: {
+                    HStack {
+                        Text(IumrahServicesCopy.seeAll(settings.language))
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(height: 44)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(17)
+            .background(Color.iumrahCardBackground,
+                        in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .accessibilityIdentifier("iumrah.home.package.inclusions")
+    }
+
+    private func homeServiceName(_ service: IumrahServiceKind) -> String {
+        switch service {
+        case .visa: return IumrahFlightCopy.text(settings.language, "Виза", "Visa", "Viza", "Виза")
+        case .flights: return IumrahFlightCopy.text(settings.language, "Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар")
+        case .hotels: return IumrahFlightCopy.text(settings.language, "Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар")
+        case .transfer: return IumrahFlightCopy.text(settings.language, "Трансфер", "Transfer", "Transfer", "Трансфер")
+        case .guide: return IumrahFlightCopy.text(settings.language, "Личный гид", "Private guide", "Shaxsiy gid", "Шахсий гид")
+        case .ziyarat: return IumrahFlightCopy.text(settings.language, "Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар")
+        default: return "iumrah"
+        }
+    }
+
+    // One compact, neutral card. Reward details remain in their original pages;
+    // no second dashboard fetch is started just to paint the Home screen.
+    private var homeBenefitsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            IumrahHomeSectionHeader(title: IumrahFlightCopy.text(settings.language,
+                "Бонусы iumrah", "iumrah benefits", "iumrah bonuslari", "iumrah бонуслари"))
+            VStack(spacing: 0) {
+                NavigationLink {
+                    IumrahBalanceVisualPage(language: settings.language)
+                } label: {
+                    homeBenefitsRow("wallet.bifold", title: "iumrah Balance", subtitle: IumrahFlightCopy.text(settings.language,
+                        "Баланс и история начислений", "Balance and reward history",
+                        "Balans va bonuslar tarixi", "Баланс ва бонуслар тарихи"))
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.leading, 49)
+                NavigationLink {
+                    IumrahRewardsVisualPage(language: settings.language)
+                } label: {
+                    homeBenefitsRow("star", title: "iumrah Rewards", subtitle: IumrahFlightCopy.text(settings.language,
+                        "Преимущества и уровни программы", "Rewards and membership levels",
+                        "Afzalliklar va dastur darajalari", "Афзалликлар ва дастур даражалари"))
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.leading, 49)
+                NavigationLink {
+                    IumrahFriendsVisualPage(language: settings.language)
+                } label: {
+                    homeBenefitsRow("gift", title: IumrahFlightCopy.text(settings.language,
+                        "Пригласите друга", "Invite a friend", "Do‘stingizni taklif qiling", "Дўстингизни таклиф қилинг"),
+                        subtitle: IumrahFlightCopy.text(settings.language,
+                        "Бонусы по условиям программы", "Rewards subject to program terms",
+                        "Dastur shartlariga muvofiq bonuslar", "Дастур шартларига мувофиқ бонуслар"))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 15)
+            .background(Color.iumrahCardBackground,
+                        in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        }
+        .accessibilityIdentifier("iumrah.home.benefits")
+    }
+
+    private func homeBenefitsRow(_ icon: String, title: String, subtitle: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .frame(width: 34, height: 38)
+                .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+            Spacer(minLength: 5)
+            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+        }
+        .foregroundStyle(.primary)
+        .frame(minHeight: 66)
+        .contentShape(Rectangle())
+    }
+
     private var publishedFlightSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             IumrahGlassPillSelector(options: [
@@ -171,6 +279,33 @@ struct HomeDashboardView: View {
                 Button(IumrahFlightCopy.text(settings.language, "Продолжить и выбрать отель", "Continue and choose hotel", "Davom etish va mehmonxona tanlash", "Давом этиш ва меҳмонхона танлаш"), action: continuePublishedFlights)
                     .buttonStyle(IumrahPrimaryButtonStyle())
             }
+            Button {
+                IumrahHaptics.selection()
+                startNewSmart()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 18, weight: .medium))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("iumrah Smart")
+                            .font(.subheadline.weight(.semibold))
+                        Text(IumrahFlightCopy.text(settings.language,
+                            "Собрать индивидуальную умру автоматически",
+                            "Build your individual Umrah with Smart",
+                            "Individual umrani Smart bilan tuzing",
+                            "Индивидуал умрани Smart билан тузинг"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 5)
+                    Image(systemName: "chevron.right")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+                .padding(12)
+                .background(Color.iumrahCardBackground,
+                            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
         }
     }
 

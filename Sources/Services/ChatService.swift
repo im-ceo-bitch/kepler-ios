@@ -79,6 +79,19 @@ struct IumrahPublicProfile: Decodable, Hashable, Identifiable {
     let whatsapp: String
     let instagram: String
     let bio: String
+    let bioRU: String?
+    let bioUZ: String?
+    let bioUZCyrl: String?
+    let isHeadGuide: Bool?
+    let guideAvailability: String?
+    let availabilityStatus: String?
+    let publicRoles: [String]?
+
+    func localizedBio(_ language: AppSettingsStore.Language) -> String {
+        let preferred: String?
+        switch language { case .uzbek: preferred = bioUZ; case .uzbekCyrillic: preferred = bioUZCyrl; default: preferred = bioRU }
+        return [preferred, bio, bioRU, bioUZ, bioUZCyrl].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first(where: { !$0.isEmpty }) ?? ""
+    }
     let publicSlug: String
     let publicVisible: Bool
     let active: Bool
@@ -122,9 +135,9 @@ enum IumrahGuideDates {
 }
 
 extension ChatService {
-    func loadGuideProfiles(start: Date, end: Date) async throws -> [IumrahPublicProfile] {
-        let value: IumrahPublicProfilesResponse = try await api.get("/api/catalog/hotels/team", query: [URLQueryItem(name: "guideStart", value: IumrahGuideDates.day(start)), URLQueryItem(name: "guideEnd", value: IumrahGuideDates.day(end))])
+    func loadGuideProfiles(start: Date, end: Date, includeTeam: Bool = false) async throws -> [IumrahPublicProfile] {
+        let value: IumrahPublicProfilesResponse = try await api.get("/api/catalog/hotels/team", query: [URLQueryItem(name: "guideStart", value: IumrahGuideDates.day(start)), URLQueryItem(name: "guideEnd", value: IumrahGuideDates.day(end)), URLQueryItem(name: "teamDirectory", value: "1")])
         guard value.ok else { throw APIError.invalidResponse }
-        return value.members.filter { $0.active && $0.publicVisible && !$0.isOwner && $0.roleKind.lowercased() == "guide" }
+        return value.members.filter { $0.active && $0.publicVisible && (includeTeam || (!$0.isOwner && $0.roleKind.lowercased() == "guide")) }
     }
 }

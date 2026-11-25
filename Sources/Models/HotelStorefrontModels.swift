@@ -88,6 +88,7 @@ struct StorefrontFlightBoardResponse: Codable, Hashable {
     let generatedAt: String
     let baseline: StorefrontFlightBaseline?
     let options: [StorefrontFlightOption]
+    var catalogComplete: Bool? = nil
 }
 
 /// A locally composed Umrah package attached to one or more catalog flight rows.

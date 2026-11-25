@@ -224,10 +224,12 @@ struct HotelStorefrontService {
     /// Flight First and the configurator read the same staff-published flight board.
     /// There is intentionally no fare-calendar/synthetic fallback here: a missing
     /// published row must stay missing instead of creating a second client-side truth.
-    func flightBoard(origin: String = "TAS") async throws -> StorefrontFlightBoardResponse {
-        try await api.get(
+    func flightBoard(origin: String = "TAS", allPublished: Bool = false) async throws -> StorefrontFlightBoardResponse {
+        var query = [URLQueryItem(name: "origin", value: origin)]
+        if allPublished { query.append(URLQueryItem(name: "all", value: "1")) }
+        return try await api.get(
             "/api/package/storefront/flights",
-            query: [URLQueryItem(name: "origin", value: origin)],
+            query: query,
             timeoutInterval: 10
         )
     }

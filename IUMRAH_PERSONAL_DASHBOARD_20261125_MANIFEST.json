@@ -1,0 +1,112 @@
+{
+  "base": "a5d7efd2f83954625777247aa9df1a7c8056d069",
+  "cumulative": true,
+  "revision": "team-localized",
+  "changed_swift_count": 19,
+  "files": [
+    {
+      "path": "IUMRAH_GUIDE_CATALOG_20261125.md",
+      "sha256": "95b0c52353be047721aa8c34fbe6c6020a4bb0856103d1165cd4b665b0f0dcde"
+    },
+    {
+      "path": "IUMRAH_GUIDE_CATALOG_20261125_IOS_MANIFEST.json",
+      "sha256": "bd0bce4b63dd231e2979c3bad0795c2385d4fd9fb25688f40407d07ad20d11a6"
+    },
+    {
+      "path": "IUMRAH_HOME_DIRECT_FLIGHTS_20261125.md",
+      "sha256": "7f0aa9cdb3a1275b682c78abecb598da8959b9db50fc7ba26d5a149da53b5a87"
+    },
+    {
+      "path": "IUMRAH_PERSONAL_DASHBOARD_20261125.md",
+      "sha256": "43ac0e3c4bb3fdce6281d9af7459470e686c2a7543d497dffcb166670fc4f684"
+    },
+    {
+      "path": "IUMRAH_TEAM_LOCALIZED_20261125.md",
+      "sha256": "cb938e054545323337e98ce7e18360b385fbc661e7c32a88e38db3601be62544"
+    },
+    {
+      "path": "Sources/AppShell/IumrahAccountView.swift",
+      "sha256": "c534040795b59ea8488e8d40a172f7fe659e5d7acfa6b0c3487163f73afa9155"
+    },
+    {
+      "path": "Sources/Core/BookingDraftBuilder.swift",
+      "sha256": "fde6d1829a71cd75e5d1e1735f31657fa9f8bd60ae443ac00e247e35a840ad01"
+    },
+    {
+      "path": "Sources/Core/Components/IumrahSignatureHeaders.swift",
+      "sha256": "cf01ee5cd937262f48bc584834f16c1bef26102c3254632f18f8898f839e3aa9"
+    },
+    {
+      "path": "Sources/Models/BookingModels.swift",
+      "sha256": "48f67b55fe767a0d796be38c2060c25eb44060829e156717ba7423327289d3e7"
+    },
+    {
+      "path": "Sources/Models/HotelStorefrontModels.swift",
+      "sha256": "7bb0967fd314eda7fd15541de2aa67cce02a30e36c82cf605fc536cb183b7e19"
+    },
+    {
+      "path": "Sources/Models/TripModels.swift",
+      "sha256": "7134c71dc6eb8d6ddc5f63f903477c403045d480d0a5391d84df84c7b0ab4e9c"
+    },
+    {
+      "path": "Sources/Services/ChatService.swift",
+      "sha256": "bd1011fe4bac67cffef032f1984764917ba5f0aa7d3d3ad9959a31e9c53a1303"
+    },
+    {
+      "path": "Sources/Services/HotelStorefrontService.swift",
+      "sha256": "6afaf807beb8432fe561467c379d8af0f8bbe62b915cdca272c512eb53ad9a8b"
+    },
+    {
+      "path": "Sources/State/IumrahAccountStore.swift",
+      "sha256": "e03c27d4666854e637728d333b0b2ba09cf63308799780b24239b3c5b44db90a"
+    },
+    {
+      "path": "Sources/State/IumrahManualJourneyStore.swift",
+      "sha256": "fc7af69efa6d593eeef0ded7c442918f8da58fc185b0fa025910b3d284f26c91"
+    },
+    {
+      "path": "Sources/Views/Booking/IumrahGuideTransferView.swift",
+      "sha256": "d69f6ba04356d4fb91e60cbf9f7eeb800bedf9db688e4bd9af1322cbd752fb7f"
+    },
+    {
+      "path": "Sources/Views/Guides/IumrahGuideCatalog.swift",
+      "sha256": "79dbee7715e0bbee8a02d286cc90414bc93ff51646f4cc90e0555105f3b5a19f"
+    },
+    {
+      "path": "Sources/Views/Home/HomeDashboardView.swift",
+      "sha256": "d10cf6554dbddf9d7cf6f02047339d5bbe3862d8d2d60caec16abd2f33410241"
+    },
+    {
+      "path": "Sources/Views/Home/IumrahFriendsAnimatedCard.swift",
+      "sha256": "55032c768fb33bfe3027a8c3bc2593cce314faf2bdd62fee2e0a8e864a20eae7"
+    },
+    {
+      "path": "Sources/Views/Home/IumrahPersonalDashboardCards.swift",
+      "sha256": "199ed664766da56d2abd521addd02253e5ce1c7de8be638bc4d163944ffcc50c"
+    },
+    {
+      "path": "Sources/Views/Home/IumrahPublishedFlightCarousel.swift",
+      "sha256": "6a8e9e0c9c435dd697947c8853b6f16b0da92c0b59fc74e41be6034924d40e2b"
+    },
+    {
+      "path": "Sources/Views/Package/FinalPackageView.swift",
+      "sha256": "66d9dfffd66b1e698b647fa449651e1849ced1e63ef0334a2c97809c799cb173"
+    },
+    {
+      "path": "Sources/Views/Package/IumrahManualPackageView.swift",
+      "sha256": "0c5ff4050c0c3e279c210aa96e5cc6dd2e1c393b9244978956045ab181df6723"
+    },
+    {
+      "path": "Sources/Views/Tabs/HotelsHomeView.swift",
+      "sha256": "8b16a43a297d357837f058418ae0da12911cd0fae7234408d7821155313e7195"
+    },
+    {
+      "path": "Tests/iumrah_dashboard_cache_smoke.py",
+      "sha256": "87522523994852fb19f2f5f3eed7e6b092d819375a4dc347ebb9d6b3b79e26ac"
+    },
+    {
+      "path": "Tests/iumrah_home_direct_flights_smoke.py",
+      "sha256": "493d88ef22ae49ee660f8995940059fac3c244859ce7f160c41fe6f34f729c79"
+    }
+  ]
+}

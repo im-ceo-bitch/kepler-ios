@@ -9,7 +9,24 @@ final class IumrahAccountStore: ObservableObject {
     @Published private(set) var lastError: String?
 
     private let service = IumrahAccountService()
-    private var token: String?
+    @Published private(set) var dashboardRewards: IumrahFriendsDashboard?
+    @Published private(set) var dashboardRewardsLoading = false
+    @Published private(set) var dashboardRewardsStale = false
+    private var dashboardRewardsLoadedAt: Date?
+    private var dashboardRequest: Task<IumrahFriendsDashboard, Error>?
+    private var dashboardRequestID: UUID?
+    private var token: String? {
+        didSet {
+            guard oldValue != token else { return }
+            dashboardRequest?.cancel()
+            dashboardRequest = nil
+            dashboardRequestID = nil
+            dashboardRewards = nil
+            dashboardRewardsLoadedAt = nil
+            dashboardRewardsLoading = false
+            dashboardRewardsStale = false
+        }
+    }
 
     init() {
         LegacyClientIdentityCleanup.purge()
@@ -262,21 +279,68 @@ final class IumrahAccountStore: ObservableObject {
         return try await service.securityOverview(token: token)
     }
 
+    func refreshDashboardRewards(force: Bool = false) async {
+        guard isAuthenticated else { return }
+        if !force, let loaded = dashboardRewardsLoadedAt, Date().timeIntervalSince(loaded) < 55 { return }
+        _ = try? await rewardsDashboard()
+    }
+
     func rewardsDashboard() async throws -> IumrahFriendsDashboard {
-        guard let token else { throw APIError.status(401) }
-        do { return try await service.friendsDashboard(token: token) }
-        catch {
-            guard self.token == token else { throw APIError.status(401) }
-            // One retry for an older session without a registered device.
-            _ = try await service.registerCurrentSession(token: token, locale: Locale.current.identifier)
-            return try await service.friendsDashboard(token: token)
+        guard let token, isAuthenticated else { throw APIError.status(401) }
+        if let request = dashboardRequest {
+            let data = try await request.value
+            guard self.token == token, isAuthenticated else { throw APIError.status(401) }
+            return data
         }
+        let requestID = UUID()
+        dashboardRequestID = requestID
+        dashboardRewardsLoading = true
+        let request = Task<IumrahFriendsDashboard, Error> { [weak self] in
+            guard let self else { throw CancellationError() }
+            do {
+                let data: IumrahFriendsDashboard
+                do { data = try await self.service.friendsDashboard(token: token) }
+                catch {
+                    try Task.checkCancellation()
+                    guard self.token == token else { throw APIError.status(401) }
+                    _ = try await self.service.registerCurrentSession(token: token, locale: Locale.current.identifier)
+                    data = try await self.service.friendsDashboard(token: token)
+                }
+                try Task.checkCancellation()
+                guard self.token == token, self.isAuthenticated else { throw APIError.status(401) }
+                self.dashboardRewards = data
+                self.dashboardRewardsStale = false
+                self.dashboardRewardsLoadedAt = Date()
+                return data
+            } catch {
+                if self.token == token, self.dashboardRequestID == requestID {
+                    switch error {
+                    case APIError.status(let code) where code == 401 || code == 403:
+                        self.dashboardRewards = nil; self.dashboardRewardsLoadedAt = nil
+                    case APIError.server(let code, _) where code == 401 || code == 403:
+                        self.dashboardRewards = nil; self.dashboardRewardsLoadedAt = nil
+                    default: break
+                    }
+                    self.dashboardRewardsStale = self.dashboardRewards != nil
+                }
+                throw error
+            }
+        }
+        dashboardRequest = request
+        defer {
+            if dashboardRequestID == requestID {
+                dashboardRequest = nil
+                dashboardRequestID = nil
+                dashboardRewardsLoading = false
+            }
+        }
+        let data = try await request.value
+        guard self.token == token, isAuthenticated else { throw APIError.status(401) }
+        return data
     }
 
     func friendsDashboard() async throws -> IumrahFriendsDashboard {
-        guard let token else { throw APIError.status(401) }
-        _ = try? await service.registerCurrentSession(token: token, locale: Locale.current.identifier)
-        return try await service.friendsDashboard(token: token)
+        try await rewardsDashboard()
     }
 
     func claimPrimaryDevice(password: String) async throws -> IumrahSecurityOverview {

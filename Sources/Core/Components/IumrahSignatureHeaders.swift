@@ -149,7 +149,7 @@ struct IumrahDiscoveryMasthead: View {
                      tr("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"),
                      tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"),
                      tr("Трансфер", "Transfer", "Transfer", "Трансфер"),
-                     tr("Гиды", "Guides", "Gidlar", "Гидлар"),
+                     tr("Гиды и команда", "Guides & team", "Gidlar va jamoa", "Гидлар ва жамоа"),
                      tr("Мой пакет", "My package", "Mening paketim", "Менинг пакетим") + (manual.componentCount > 0 ? " · \(manual.componentCount)" : "")],
             symbols: ["sparkles", "bed.double", "airplane", "car.side", "person.crop.circle.badge.checkmark", "suitcase"], selection: selection,
             onSelect: { index in

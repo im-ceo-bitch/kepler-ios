@@ -59,7 +59,7 @@ struct HotelsHomeView: View {
          copy("Выходные", "Weekends", "Dam olish", "Дам олиш"),
          copy("Трансфер", "Transfer", "Transfer", "Трансфер"),
          copy("Мой пакет", "My package", "Mening paketim", "Менинг пакетим"),
-         copy("Гиды", "Guides", "Gidlar", "Гидлар")]
+         copy("Гиды и команда", "Guides & team", "Gidlar va jamoa", "Гидлар ва жамоа")]
     }
 
     private var matchingPairID: String? {

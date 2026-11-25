@@ -47,6 +47,7 @@ struct IumrahAccountView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dashboardTypeSize
     @Environment(\.iumrahTabIsActive) private var activeTab
     @AppStorage("iumrah.autoPageHelp") private var automaticPageHelp = true
     @ObservedObject private var homeHistory = HomePersonalizationStore.shared
@@ -127,6 +128,8 @@ struct IumrahAccountView: View {
                         compactAccountContent(profile)
                     } else {
                         seamlessGuestProfile
+                        IumrahFriendsAnimatedCard(language: settings.language)
+                        IumrahDashboardRewardsCard()
                         compactGuestActions
                         compactGuestSettings
                     }
@@ -155,6 +158,7 @@ struct IumrahAccountView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
         .modifier(IumrahPrimaryTabScrollChrome())
         .modifier(IumrahPerformanceHost())
+        .modifier(IumrahDashboardRewardsRefresh())
         .task(id: activeTab) {
             guard activeTab else { return }
             loadProfileDraftIfNeeded(force: false)
@@ -248,38 +252,53 @@ struct IumrahAccountView: View {
     private var accountHeader: some View {
         IumrahPrimaryTabHeader(
             title: tr("Profile", "Профиль", "Profil", "Профиль"),
+            footer: account.account.map { profile in AnyView(accountHeaderProfile(profile)) },
+            flexibleFooter: account.account != nil,
             animateMap: false
         )
     }
 
-    // Profile 2.0. The Account tab is navigation, not a second storefront.
-    // Every row opens its existing destination; all old feature screens stay.
+    private func accountHeaderProfile(_ profile: IumrahAccountProfile) -> some View {
+        NavigationLink { IumrahUserDataView() } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 43, weight: .regular))
+                    .foregroundStyle(.white).frame(width: 54, height: 54)
+                    .background(.white.opacity(0.10), in: Circle())
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(displayName(profile)).font(.system(.title3, design: .rounded, weight: .bold)).lineLimit(2)
+                    if let tier = account.dashboardRewards?.tier, ["member", "plus", "elite"].contains(tier.lowercased()) {
+                        Text("iumrah " + tier.capitalized).font(.subheadline).foregroundStyle(.white.opacity(0.78))
+                    }
+                    Text(tr("Manage your account", "Управление аккаунтом", "Akkauntni boshqarish", "Аккаунтни бошқариш"))
+                        .font(.caption).foregroundStyle(.white.opacity(0.72))
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").font(.subheadline.weight(.semibold)).foregroundStyle(.white.opacity(0.85))
+            }.foregroundStyle(.white).padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 22))
+                .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(.white.opacity(0.12), lineWidth: 1) }
+                .padding(.horizontal, IumrahDesign.pagePadding)
+        }.buttonStyle(IumrahDashboardPressStyle()).accessibilityIdentifier("iumrah.account.header.profile")
+    }
+
+    // Original grouped destinations are preserved. The dashboard exposes the
+    // primary benefits without making users search inside those groups.
     private func compactAccountContent(_ profile: IumrahAccountProfile) -> some View {
         VStack(spacing: 16) {
-            NavigationLink { IumrahUserDataView() } label: {
-                HStack(spacing: 13) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 34, weight: .regular))
-                        .foregroundStyle(.primary)
-                        .frame(width: 47, height: 48)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(displayName(profile))
-                            .font(.system(size: 19, weight: .bold, design: .rounded))
-                            .lineLimit(1)
-                        Text(userDataReady
-                            ? tr("Profile complete", "Профиль заполнен", "Profil tayyor", "Профил тайёр")
-                            : tr("Complete profile details", "Заполните данные профиля", "Profilni to‘ldiring", "Профилни тўлдиринг"))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+            IumrahDashboardBalanceCard()
+            if dashboardTypeSize.isAccessibilitySize {
+                VStack(spacing: 12) {
+                    IumrahDashboardFriendsTile()
+                    IumrahDashboardRewardsCard()
                 }
-                .foregroundStyle(.primary)
-                .padding(15)
-                .background(Color.iumrahCardBackground,
-                            in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    IumrahDashboardFriendsTile()
+                    IumrahDashboardRewardsCard(compact: true)
+                }.fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.plain)
+            IumrahDashboardIdentityCard { showIdentityFullscreen = true }
 
             compactAccountGroup(tr("Your journeys", "Ваши путешествия", "Safarlaringiz", "Сафарларингиз")) {
                 Button { chrome.navigate(to: .booking) } label: {
@@ -404,6 +423,15 @@ struct IumrahAccountView: View {
                 NavigationLink { IumrahPolicyDetailView(kind: .privacy) } label: {
                     compactAccountRow("hand.raised", tr("Privacy", "Конфиденциальность", "Maxfiylik", "Махфийлик"))
                 }.buttonStyle(.plain)
+            }
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: dashboardTypeSize.isAccessibilitySize ? 1 : 2), spacing: 12) {
+                NavigationLink { ESIMView() } label: {
+                    IumrahDashboardServiceTile(symbol: "simcard", title: "iumrah Mobile", subtitle: tr("Your eSIM", "Ваша eSIM", "Sizning eSIM", "Сизнинг eSIM"), tone: .green)
+                }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.navigate(to: .care) } label: {
+                    IumrahDashboardServiceTile(symbol: "headphones", title: "iumrah Care", subtitle: tr("Support 24/7", "Поддержка 24/7", "Yordam 24/7", "Ёрдам 24/7"), tone: .violet)
+                }.buttonStyle(IumrahDashboardPressStyle())
             }
 
             compactAccountGroup(tr("Services", "Сервисы", "Xizmatlar", "Хизматлар")) {
@@ -2576,6 +2604,7 @@ struct IumrahAccountView: View {
     @MainActor
     private func refreshAccountContent() async {
         balanceRefreshRevision &+= 1
+        await account.refreshDashboardRewards(force: true)
         bookings.setAccountToken(account.bearerToken, owner: account.iumrahID)
         if let token = account.bearerToken {
             await bookings.restoreAccountTrips(token: token)

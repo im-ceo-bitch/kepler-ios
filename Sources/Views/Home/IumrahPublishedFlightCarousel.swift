@@ -137,3 +137,133 @@ struct IumrahPublishedFlightCarousel: View {
         return true
     }
 }
+
+// Home discovery is deliberately independent of the current trip filters.
+// The original route-scoped carousel remains available to all configurators.
+@MainActor final class IumrahAllPublishedFlightStore: ObservableObject {
+    static let shared = IumrahAllPublishedFlightStore()
+    @Published private(set) var flights: [LocalJourneyFlight] = []
+    @Published private(set) var loaded = false
+    @Published private(set) var loading = false
+    @Published private(set) var failed = false
+    @Published private(set) var complete = false
+    private var fetched: Date?
+    private var request: Task<Void, Never>?
+
+    func load(force: Bool = false) async {
+        if let request { await request.value; return }
+        if !force, let fetched, Date().timeIntervalSince(fetched) < 300 { return }
+        let task = Task { @MainActor in
+            loading = true
+            defer { loading = false; request = nil }
+            do {
+                let board = try await HotelStorefrontService().flightBoard(allPublished: true)
+                guard board.ok else { throw APIError.invalidResponse }
+                flights = Self.flatten(board.options)
+                complete = board.catalogComplete == true
+                loaded = true; failed = false; fetched = Date()
+            } catch {
+                failed = true
+            }
+        }
+        request = task
+        await task.value
+    }
+
+    static func flatten(_ options: [StorefrontFlightOption]) -> [LocalJourneyFlight] {
+        var seen = Set<String>()
+        return options.flatMap { option -> [LocalJourneyFlight] in
+            let price: Double? = option.currency.uppercased() == "USD" && option.perTravelerFare.isFinite && option.perTravelerFare > 0 ? option.perTravelerFare : nil
+            return [Optional(option.outbound), option.inbound].compactMap { leg -> LocalJourneyFlight? in
+                guard let leg, leg.stops == 0 else { return nil }
+                return LocalJourneyFlight(id: "published:\(option.id):\(leg.origin):\(leg.departureAt)", origin: leg.origin, destination: leg.destination, airline: leg.airline, flightNumber: leg.flightNumber, airlineCode: leg.airlineCode, durationMinutes: leg.durationMinutes, stops: leg.stops, departureAt: leg.departureAt, arrivalAt: leg.arrivalAt, displayedPrice: price, publishedID: option.id, publishedIsPair: option.inbound != nil, publishedCabin: leg.cabinClass)
+            }
+        }.sorted { a, b in
+            a.departureAt == b.departureAt ? a.id < b.id : a.departureAt < b.departureAt
+        }.filter { seen.insert($0.id).inserted }
+    }
+}
+
+struct IumrahAllPublishedFlightBoard: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var journey: JourneyStore
+    @ObservedObject private var store = IumrahAllPublishedFlightStore.shared
+    @ObservedObject var selection: IumrahHomePublishedSelection
+    let horizontal: Bool
+    let onOpen: (LocalJourneyFlight) -> Void
+
+    private func t(_ r: String, _ e: String, _ u: String, _ c: String) -> String { IumrahFlightCopy.text(settings.language, r, e, u, c) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if store.loading && !store.loaded { ProgressView().frame(maxWidth: .infinity).padding(18) }
+            if store.failed || (store.loaded && !store.complete) {
+                Text(store.failed ? t("Не удалось обновить рейсы", "Could not refresh flights", "Reyslar yangilanmadi", "Рейслар янгиланмади") : t("Полный каталог пока недоступен", "Complete catalogue not available yet", "To‘liq katalog hozircha mavjud emas", "Тўлиқ каталог ҳозирча мавжуд эмас"))
+                    .font(.footnote).foregroundStyle(.secondary)
+                Button(t("Обновить рейсы", "Refresh flights", "Reyslarni yangilash", "Рейсларни янгилаш")) { Task { await store.load(force: true) } }.buttonStyle(.bordered)
+            }
+            if store.loaded && store.complete && !store.failed && store.flights.isEmpty {
+                Text(t("Нет опубликованных рейсов", "No published flights", "E’lon qilingan reyslar yo‘q", "Эълон қилинган рейслар йўқ")).font(.footnote).foregroundStyle(.secondary)
+            }
+            if !store.flights.isEmpty {
+                if horizontal {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(alignment: .top, spacing: 12) {
+                            ForEach(store.flights) { flight in card(flight).frame(width: 290) }
+                        }.scrollTargetLayout()
+                    }.scrollTargetBehavior(.viewAligned)
+                } else {
+                    LazyVStack(spacing: 12) { ForEach(store.flights) { flight in card(flight) } }
+                }
+            }
+        }.task { await store.load() }
+            .accessibilityIdentifier(horizontal ? "iumrah.home.directFlights" : "iumrah.home.allDirectFlights")
+    }
+
+    private func card(_ flight: LocalJourneyFlight) -> some View {
+        IumrahFlightResultCard(airline: flight.airline, airlineCode: flight.airlineCode, flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination, departureAt: flight.departureAt, arrivalAt: flight.arrivalAt, duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice, isAviasales: false, isRoundTripFare: flight.publishedIsPair == true, selected: selection.outbound?.id == flight.id || selection.inbound?.id == flight.id, selectionAccent: .green, onSelect: selection.canChoose(flight, trip: journey.trip) ? { _ = selection.choose(flight, direction: flight.origin == journey.trip.originCode ? 0 : 1, journey: journey) } : nil, action: { onOpen(flight) })
+    }
+}
+
+struct IumrahAllPublishedFlightsPage: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @ObservedObject var selection: IumrahHomePublishedSelection
+    @State private var detail: LocalJourneyFlight?
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                IumrahHomeSectionHeader(title: IumrahFlightCopy.text(settings.language, "Прямые рейсы", "Direct flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"))
+                IumrahAllPublishedFlightBoard(selection: selection, horizontal: false, onOpen: { detail = $0 })
+            }.padding(.horizontal, IumrahDesign.pagePadding).padding(.bottom, 40)
+        }.background(Color.iumrahPageBackground)
+            .refreshable { await IumrahAllPublishedFlightStore.shared.load(force: true) }
+            .iumrahInternalNavigation()
+            .navigationDestination(item: $detail) { flight in IumrahHomePublishedFlightDetail(flight: flight, selection: selection) }
+    }
+}
+
+struct IumrahHomePublishedFlightDetail: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var journey: JourneyStore
+    @ObservedObject var selection: IumrahHomePublishedSelection
+    let flight: LocalJourneyFlight
+    init(flight: LocalJourneyFlight, selection: IumrahHomePublishedSelection) { self.flight = flight; self.selection = selection }
+    var body: some View {
+        IumrahManualFlightDetail(flight: flight, onConfirm: {
+            guard selection.canChoose(flight, trip: journey.trip) else { return false }
+            return selection.choose(flight, direction: flight.origin == journey.trip.originCode ? 0 : 1, journey: journey)
+        }, selectedOverride: selection.outbound?.id == flight.id || selection.inbound?.id == flight.id,
+        selectionUnavailableMessage: selection.canChoose(flight, trip: journey.trip) ? nil : IumrahFlightCopy.text(settings.language, "Для этого рейса настройте подходящий маршрут, даты и класс в конфигураторе.", "Configure a matching route, dates and cabin for this flight.", "Bu reys uchun mos yo‘nalish, sana va klassni tanlang.", "Бу рейс учун мос йўналиш, сана ва классни танланг."))
+    }
+}
+
+extension IumrahHomePublishedSelection {
+    func canChoose(_ flight: LocalJourneyFlight, trip: TripDraft) -> Bool {
+        guard flight.publishedID != nil, flight.stops == 0, let price = flight.displayedPrice, price.isFinite, price > 0,
+              let day = IumrahPublishedCarouselCatalog.day(flight.departureAt, flight.origin), day >= Calendar.current.startOfDay(for: Date()),
+              flight.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") == trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() else { return false }
+        if flight.origin == trip.originCode && flight.destination == trip.outboundDestinationCode { return true }
+        guard flight.destination == trip.originCode, flight.origin == trip.returnOriginCode, day > trip.departureDate else { return false }
+        if let outbound { return IumrahPublishedCarouselCatalog.compatible(outbound, flight, scope: trip.scope) }
+        return true
+    }
+}

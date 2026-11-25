@@ -572,15 +572,12 @@ struct IumrahGuideTransferView: View {
     private var founderPhotoURL: URL? { AppConfig.absoluteURL(ownerProfile?.photoURL) }
 
     private var guidePhone: String {
-        if let guideProfile {
-            return preferredPhone(phoneSA: guideProfile.phoneSA, phoneUZ: guideProfile.phoneUZ)
-        }
         guard let guide else { return "" }
         return preferredPhone(phoneSA: guide.phoneSA, phoneUZ: guide.phoneUZ)
     }
 
     private var guideTelegram: String {
-        cleanHandle(guideProfile?.telegram ?? guide?.telegram ?? "")
+        cleanHandle(guide?.telegram ?? "")
     }
 
     private var ownerPhone: String {

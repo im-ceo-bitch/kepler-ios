@@ -7,6 +7,7 @@ struct IumrahManualFlightDetail: View {
     let flight: LocalJourneyFlight
     var onConfirm: (() -> Bool)? = nil
     var selectedOverride: Bool? = nil
+    var selectionUnavailableMessage: String? = nil
     private var selected: Bool { selectedOverride ?? (manual.outbound?.id == flight.id || manual.inbound?.id == flight.id) }
     private var leg: IumrahPremiumFlightLeg {
         .init(airline: flight.airline, airlineCode: flight.airlineCode, number: flight.flightNumber,
@@ -24,12 +25,19 @@ struct IumrahManualFlightDetail: View {
                 if flight.publishedIsPair == true {
                     Text(t("Этот рейс опубликован в паре. Выберите второй рейс из того же маршрута.", "This flight belongs to a published pair. Select its matching leg.", "Bu reys juft yo‘nalishda. Ikkinchi reysni shu yo‘nalishdan tanlang.", "Бу рейс жуфт йўналишда. Иккинчи рейсни шу йўналишдан танланг.")).font(.footnote).foregroundStyle(.secondary)
                 }
-                Button {
-                    if let onConfirm { if onConfirm() { dismiss() } } else if manual.select(flight) { IumrahHaptics.success(); dismiss() }
-                } label: {
-                    Text(selected ? t("Авиабилет добавлен в пакет", "Flight added to package", "Aviachipta paketga qo‘shildi", "Авиачипта пакетга қўшилди") : t("Добавить в мой пакет", "Add to my package", "Paketimga qo‘shish", "Пакетимга қўшиш"))
-                        .frame(maxWidth: .infinity)
-                }.buttonStyle(IumrahPrimaryButtonStyle())
+                if let selectionUnavailableMessage {
+                    Text(selectionUnavailableMessage).font(.footnote).foregroundStyle(.secondary)
+                    NavigationLink { IumrahGuidedFlightSelectionView() } label: {
+                        Text(t("Настроить маршрут", "Configure route", "Yo‘nalishni sozlash", "Йўналишни созлаш")).frame(maxWidth: .infinity)
+                    }.buttonStyle(IumrahPrimaryButtonStyle())
+                } else {
+                    Button {
+                        if let onConfirm { if onConfirm() { dismiss() } } else if manual.select(flight) { IumrahHaptics.success(); dismiss() }
+                    } label: {
+                        Text(selected ? t("Авиабилет добавлен в пакет", "Flight added to package", "Aviachipta paketga qo‘shildi", "Авиачипта пакетга қўшилди") : t("Добавить в мой пакет", "Add to my package", "Paketimga qo‘shish", "Пакетимга қўшиш"))
+                            .frame(maxWidth: .infinity)
+                    }.buttonStyle(IumrahPrimaryButtonStyle())
+                }
             }.padding(.horizontal, 18).padding(.bottom, 30)
         }.background(Color.iumrahPageBackground)
             .iumrahFlightDetailChrome(title: leg.title, shareText: leg.share)

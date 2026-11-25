@@ -20,7 +20,7 @@ struct IumrahManualGuideCatalog: View {
                     Button(t("Применить", "Apply", "Qo‘llash", "Қўллаш")) { manual.routeConfigured = true; withAnimation { expanded = false } }.buttonStyle(IumrahPrimaryButtonStyle())
                 }.tint(.primary)
             }.padding(.top, -40)
-            IumrahGuideCatalog(trip: manual.plannedTrip, preference: manual.guidePreference, priceText: nil) { preference in
+            IumrahGuideCatalog(trip: manual.plannedTrip, preference: manual.guidePreference, priceText: nil, includeTeam: true) { preference in
                 manual.guidePreference = preference
                 chrome.openHotels(board: .summary)
             }
@@ -36,8 +36,11 @@ struct IumrahGuideCatalog: View {
     let trip: TripDraft
     let preference: IumrahGuidePreference?
     let priceText: String?
+    var includeTeam = false
     let onSelect: (IumrahGuidePreference?) -> Void
+    @EnvironmentObject private var chrome: AppChromeStore
     @State private var guides: [IumrahPublicProfile] = []
+    @State private var team: [IumrahPublicProfile] = []
     @State private var loading = true
     @State private var failed = false
     @State private var revision = 0
@@ -47,7 +50,7 @@ struct IumrahGuideCatalog: View {
     private var dateKey: String { IumrahGuideDates.day(trip.hotelStayStartDate) + "|" + IumrahGuideDates.day(trip.returnDate) + "|\(revision)" }
     private var visibleGuides: [IumrahPublicProfile] {
         let value = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? guides : guides.filter { [$0.displayName, $0.bio, $0.roleTitle].joined(separator: " ").localizedCaseInsensitiveContains(value) }
+        return value.isEmpty ? guides : guides.filter { [$0.displayName, $0.localizedBio(settings.language), $0.roleTitle].joined(separator: " ").localizedCaseInsensitiveContains(value) }
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -73,6 +76,18 @@ struct IumrahGuideCatalog: View {
                 }
             }
             autoChoice
+            if includeTeam && !team.isEmpty {
+                ForEach(team.filter { $0.isOwner }) { member in
+                    Text(t("Основатель проекта", "Founder", "Loyiha asoschisi", "Лойиҳа асосчиси")).font(.system(.title2, design: .rounded, weight: .bold))
+                    IumrahTeamDirectoryCard(member: member) { chrome.navigate(to: .care) }
+                }
+                let staff = team.filter { !$0.isOwner }
+                if !staff.isEmpty {
+                    Text(t("Команда iumrah", "iumrah team", "iumrah jamoasi", "iumrah жамоаси")).font(.system(.title2, design: .rounded, weight: .bold))
+                    ForEach(staff) { member in IumrahTeamDirectoryCard(member: member) { chrome.navigate(to: .care) } }
+                }
+                Label(t("Личные контакты назначенного гида доступны после подтверждения оплаты.", "Assigned guide contacts are available after payment confirmation.", "Biriktirilgan gid kontaktlari to‘lov tasdiqlangach ochiladi.", "Бириктирилган гид контактлари тўлов тасдиқлангач очилади."), systemImage: "lock.shield").font(.footnote).foregroundStyle(.secondary).guideSurface()
+            }
             IumrahGuideProgram(trip: trip)
             costCard
             brandClosing
@@ -139,19 +154,52 @@ struct IumrahGuideCatalog: View {
         }.padding(24).frame(maxWidth: .infinity, alignment: .leading).foregroundStyle(.white).background(Color.black, in: RoundedRectangle(cornerRadius: 30))
     }
     private func choose(_ guide: IumrahPublicProfile) {
-        guard !loading, !failed, guides.contains(where: { $0.id == guide.id && $0.guideAvailable != false }) else { return }
+        guard !loading, !failed, guides.contains(where: { $0.id == guide.id && $0.guideAvailable == true }) else { return }
         IumrahHaptics.selection(); onSelect(.init(memberID: guide.id, displayName: guide.displayName))
     }
     @MainActor private func load() async {
-        loading = true; failed = false; guides = []
+        loading = true; failed = false; guides = []; team = []
         do {
-            let value = try await ChatService().loadGuideProfiles(start: trip.hotelStayStartDate, end: trip.returnDate)
+            let value = try await ChatService().loadGuideProfiles(start: trip.hotelStayStartDate, end: trip.returnDate, includeTeam: includeTeam)
             guard !Task.isCancelled else { return }
-            guides = value; loading = false
+            guides = value.filter { !$0.isOwner && $0.roleKind == "guide" }; team = value.filter { $0.isOwner || $0.roleKind != "guide" }; loading = false
         } catch {
             guard !Task.isCancelled else { return }
             failed = true; loading = false
         }
+    }
+}
+
+private struct IumrahTeamDirectoryCard: View {
+    @EnvironmentObject private var settings: AppSettingsStore
+    @Environment(\.colorScheme) private var colorScheme
+    let member: IumrahPublicProfile
+    let onConsult: () -> Void
+    private func t(_ r: String, _ e: String, _ u: String, _ c: String) -> String { IumrahFlightCopy.text(settings.language, r, e, u, c) }
+    private func title(_ role: String) -> String {
+        switch role {
+        case "owner", "founder": return t("Основатель iumrah", "Founder", "iumrah asoschisi", "iumrah асосчиси")
+        case "admin": return t("Администратор", "Administrator", "Administrator", "Администратор")
+        case "support": return t("Специалист поддержки", "Care specialist", "Yordam mutaxassisi", "Ёрдам мутахассиси")
+        case "manager": return t("Менеджер путешествий", "Travel manager", "Safar menejeri", "Сафар менежери")
+        case "transfer": return t("Координатор трансфера", "Transfer coordinator", "Transfer koordinatori", "Трансфер координатори")
+        case "guide": return t("Персональный гид", "Personal guide", "Shaxsiy gid", "Шахсий гид")
+        default: return t("Организация поездок", "Operations", "Safarni tashkil etish", "Сафарни ташкил этиш")
+        }
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            IumrahGuidePortrait(guide: member, height: member.isOwner ? 300 : 220)
+            Text(member.isOwner ? "FOUNDER OF IUMRAH" : "IUMRAH TEAM").font(.caption2.weight(.semibold)).tracking(2).foregroundStyle(.secondary)
+            Text(member.displayName).font(.system(.title, design: .rounded, weight: .bold))
+            Text((member.publicRoles ?? [member.isOwner ? "founder" : member.roleKind]).map(title).joined(separator: " · ")).font(.subheadline.weight(.semibold))
+            let description = member.localizedBio(settings.language)
+            if !description.isEmpty { Text(description).font(.subheadline).fixedSize(horizontal: false, vertical: true) }
+            Divider()
+            Button(t("Проконсультироваться через iumrah Care", "Consult through iumrah Care", "iumrah Care orqali maslahat olish", "iumrah Care орқали маслаҳат олиш"), action: onConsult).buttonStyle(IumrahSecondaryButtonStyle())
+        }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+            .background(member.isOwner ? Color(white: 0.08) : Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
+            .environment(\.colorScheme, member.isOwner ? .dark : colorScheme)
     }
 }
 
@@ -168,14 +216,14 @@ private struct IumrahGuideProfileCard: View {
         VStack(alignment: .leading, spacing: 14) {
             Button(action: onDetails) { IumrahGuidePortrait(guide: guide, height: 260) }.buttonStyle(.plain)
             IumrahGuideIdentity(guide: guide)
-            if !guide.bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text(guide.bio).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
+            if !guide.localizedBio(settings.language).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Text(guide.localizedBio(settings.language)).font(.subheadline).foregroundStyle(.secondary).lineLimit(3) }
             Divider()
             Label(t("Индивидуальное сопровождение семьи", "Private family accompaniment", "Oilaga shaxsiy hamrohlik", "Оилага шахсий ҳамроҳлик"), systemImage: "person.2").font(.subheadline)
             Label(trip.scope.title(settings.language), systemImage: "mappin.and.ellipse").font(.subheadline)
             IumrahGuideAvailability(guide: guide)
             if let priceText, priceText != "—" { HStack { Text(t("Сопровождение в пакете", "Accompaniment in package", "Paketdagi hamrohlik", "Пакетдаги ҳамроҳлик")).font(.footnote).foregroundStyle(.secondary); Spacer(); Text(priceText).font(.headline.monospacedDigit()) } }
             Button(t("Подробнее", "View profile", "Batafsil", "Батафсил"), action: onDetails).buttonStyle(IumrahSecondaryButtonStyle())
-            Button(selected ? t("✓ Выбран", "✓ Selected", "✓ Tanlangan", "✓ Танланган") : t("Выбрать гида", "Choose guide", "Gid tanlash", "Гид танлаш"), action: onSelect).buttonStyle(IumrahPrimaryButtonStyle()).disabled(guide.guideAvailable == false)
+            Button(selected ? t("✓ Выбран", "✓ Selected", "✓ Tanlangan", "✓ Танланган") : t("Выбрать гида", "Choose guide", "Gid tanlash", "Гид танлаш"), action: onSelect).buttonStyle(IumrahPrimaryButtonStyle()).disabled(guide.guideAvailable != true)
         }.guideSurface()
     }
 }
@@ -189,7 +237,7 @@ private struct IumrahGuidePortrait: View {
             if guide.photoURL == nil {
                 Text(String(guide.displayName.prefix(1)).uppercased()).font(.system(size: 100, weight: .bold, design: .rounded)).foregroundStyle(.secondary.opacity(0.15)).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            Text("iumrah · GUIDE").font(.caption2.bold()).tracking(1.2).foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7).background(Color.black.opacity(0.72), in: Capsule()).padding(12)
+            Text(guide.roleKind == "guide" && !guide.isOwner ? "iumrah · GUIDE" : "iumrah · TEAM").font(.caption2.bold()).tracking(1.2).foregroundStyle(.white).padding(.horizontal, 12).padding(.vertical, 7).background(Color.black.opacity(0.72), in: Capsule()).padding(12)
         }.frame(height: height).clipShape(RoundedRectangle(cornerRadius: 24)).accessibilityLabel(guide.displayName)
     }
 }
@@ -204,7 +252,7 @@ private struct IumrahGuideIdentity: View {
                 Text(guide.displayName).font(.system(.title, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
                 Image(systemName: "checkmark.seal.fill").foregroundStyle(.blue).accessibilityLabel(t("Профиль команды iumrah", "iumrah team profile", "iumrah jamoasi profili", "iumrah жамоаси профили"))
             }
-            Text(guide.roleTitle.isEmpty ? t("Гид iumrah", "iumrah guide", "iumrah gidi", "iumrah гиди") : guide.roleTitle).font(.subheadline).foregroundStyle(.secondary)
+            Text(guide.isHeadGuide == true ? t("Главный гид iumrah", "Head guide", "iumrah bosh gidi", "iumrah бош гиди") : t("Персональный гид iumrah", "Personal guide", "iumrah shaxsiy gidi", "iumrah шахсий гиди")).font(.subheadline).foregroundStyle(.secondary)
             if let years = guide.experienceYears, years > 0 { Label(t("Опыт: \(years) г.", "Experience: \(years) years", "Tajriba: \(years) yil", "Тажриба: \(years) йил"), systemImage: "clock").font(.footnote) }
             if let languages = guide.languages, !languages.isEmpty { Label(languages.joined(separator: " · "), systemImage: "globe").font(.footnote) }
         }
@@ -216,8 +264,10 @@ private struct IumrahGuideAvailability: View {
     let guide: IumrahPublicProfile
     private func t(_ r: String, _ e: String, _ u: String, _ c: String) -> String { IumrahFlightCopy.text(settings.language, r, e, u, c) }
     var body: some View {
-        Label(guide.guideAvailable == false ? t("Занят на выбранные даты", "Busy on selected dates", "Tanlangan sanalarda band", "Танланган саналарда банд") : guide.guideAvailable == true ? t("Можно запросить · требуется подтверждение", "Requestable · confirmation required", "So‘rov mumkin · tasdiqlash kerak", "Сўров мумкин · тасдиқлаш керак") : t("Доступность уточняется", "Availability to be confirmed", "Mavjudlik aniqlanadi", "Мавжудлик аниқланади"), systemImage: guide.guideAvailable == false ? "calendar.badge.exclamationmark" : "calendar.badge.clock")
-            .font(.footnote.weight(.medium)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        let status = guide.availabilityStatus
+        let label = status == "unavailable" ? t("Временно недоступен", "Temporarily unavailable", "Vaqtincha mavjud emas", "Вақтинча мавжуд эмас") : status == "busy" ? t("Занят", "Busy", "Band", "Банд") : guide.guideAvailable == false ? t("Занят на выбранные даты", "Busy on selected dates", "Tanlangan sanalarda band", "Танланган саналарда банд") : guide.guideAvailable == true ? t("Доступен для заявок · требуется подтверждение", "Available for requests · confirmation required", "So‘rov uchun ochiq · tasdiqlash kerak", "Сўров учун очиқ · тасдиқлаш керак") : t("Доступность уточняется", "Availability to be confirmed", "Mavjudlik aniqlanadi", "Мавжудлик аниқланади")
+        Label(label, systemImage: guide.guideAvailable == true ? "calendar.badge.clock" : "calendar.badge.exclamationmark")
+            .font(.footnote.weight(.medium)).foregroundStyle(guide.guideAvailable == true ? Color.green : Color.secondary).fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -238,8 +288,8 @@ private struct IumrahGuideProfileSheet: View {
                     VStack(alignment: .leading, spacing: 14) {
                         IumrahGuideIdentity(guide: guide)
                         IumrahGuideAvailability(guide: guide)
-                        if !guide.bio.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Divider(); Text(t("О гиде", "About the guide", "Gid haqida", "Гид ҳақида")).font(.headline); Text(guide.bio).font(.body).fixedSize(horizontal: false, vertical: true)
+                        if !guide.localizedBio(settings.language).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Divider(); Text(t("О гиде", "About the guide", "Gid haqida", "Гид ҳақида")).font(.headline); Text(guide.localizedBio(settings.language)).font(.body).fixedSize(horizontal: false, vertical: true)
                         }
                         if let url = AppConfig.absoluteURL(guide.introVideoURL), url.scheme == "https" {
                             Divider(); Text(t("Знакомство с гидом", "Meet your guide", "Gid bilan tanishuv", "Гид билан танишув")).font(.headline)
@@ -261,7 +311,7 @@ private struct IumrahGuideProfileSheet: View {
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 7) {
                     if let priceText, priceText != "—" { Text(priceText + " · " + t("в пакете", "in package", "paketda", "пакетда")).font(.footnote.weight(.semibold)) }
-                    Button(selected ? t("✓ Выбран", "✓ Selected", "✓ Tanlangan", "✓ Танланган") : t("Добавить в мой пакет", "Add to my package", "Paketimga qo‘shish", "Пакетимга қўшиш"), action: onSelect).buttonStyle(IumrahPrimaryButtonStyle()).disabled(guide.guideAvailable == false)
+                    Button(selected ? t("✓ Выбран", "✓ Selected", "✓ Tanlangan", "✓ Танланган") : t("Добавить в мой пакет", "Add to my package", "Paketimga qo‘shish", "Пакетимга қўшиш"), action: onSelect).buttonStyle(IumrahPrimaryButtonStyle()).disabled(guide.guideAvailable != true)
                 }.padding(14).background(.regularMaterial)
             }
         }

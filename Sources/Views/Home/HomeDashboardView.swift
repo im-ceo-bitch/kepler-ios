@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeDashboardView: View {
     @EnvironmentObject private var chrome: AppChromeStore
+    @Environment(\.dynamicTypeSize) private var dashboardTypeSize
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var bookings: BookingStore
     @EnvironmentObject private var account: IumrahAccountStore
@@ -23,16 +24,17 @@ struct HomeDashboardView: View {
     @State private var focusJourneySearchRevision = 0
     @State private var journeySearchExpanded = false
     @StateObject private var publishedSelection = IumrahHomePublishedSelection()
-    @State private var publishedDirection = 0
+    @State private var showAllPublishedFlights = false
     @State private var publishedDetail: LocalJourneyFlight?
     @State private var showPublishedHotels = false
 
     private var activeSession: StoredBookingSession? {
-        bookings.sessions.first { $0.effectiveStatus.uppercased() != "COMPLETED" }
+        bookings.homeSessions(accountToken: account.bearerToken).first { !["COMPLETED", "CANCELLED", "CANCELED"].contains($0.effectiveStatus.uppercased()) }
     }
 
     var body: some View {
         marketingHome
+            .modifier(IumrahDashboardRewardsRefresh())
             .task(id: activeSession?.id) {
                 // Do not compete with the first app frame. Booking refresh begins only
                 // after Home is visibly mounted.
@@ -60,7 +62,10 @@ struct HomeDashboardView: View {
             }
             .navigationDestination(isPresented: $showPublishedHotels) { NuiteeJourneyHotelsView() }
             .navigationDestination(item: $publishedDetail) { flight in
-                IumrahManualFlightDetail(flight: flight, onConfirm: { publishedSelection.choose(flight, direction: flight.origin == journey.trip.originCode ? 0 : 1, journey: journey) }, selectedOverride: publishedSelection.outbound?.id == flight.id || publishedSelection.inbound?.id == flight.id)
+                IumrahHomePublishedFlightDetail(flight: flight, selection: publishedSelection)
+            }
+            .navigationDestination(isPresented: $showAllPublishedFlights) {
+                IumrahAllPublishedFlightsPage(selection: publishedSelection)
             }
             .onChange(of: journey.trip) { _, next in publishedSelection.reconcile(next) }
             .navigationDestination(isPresented: $showAboutProject) {
@@ -72,21 +77,20 @@ struct HomeDashboardView: View {
     private var marketingHome: some View {
         ScrollViewReader { scrollProxy in
             IumrahRootScrollingPage(onRefresh: {
+                await account.refreshDashboardRewards(force: true)
+                await IumrahAllPublishedFlightStore.shared.load(force: true)
                 await bookings.refreshAll()
                 await clientNotifications.refresh(accountToken: account.bearerToken)
-            }, searchCardOverlap: 40, helpContext: "home.default", header: {
+            }, searchCardOverlap: 40, helpContext: "home.default", scrollingRefresh: true, header: {
                 IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header, searchExpanded: $journeySearchExpanded)
             }, content: {
                 LazyVStack(spacing: 30) {
                     IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded, flightsSelected: publishedSelection.complete, onContinue: continuePublishedFlights)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
-                // Home 2.0 — one visual hierarchy: journey first, brand second,
-                // then real trip continuation and the commercial offer. The search
-                // animation and published-flight selection are intentionally untouched.
+                if let session = activeSession { activeBookingCard(session) }
+                if account.isAuthenticated { IumrahDashboardBalanceCard(compact: true) }
                 publishedFlightSection
-                WhyIumrahCarousel(onPrimary: { focusJourneySearchRevision += 1; journeySearchExpanded = true })
-                IumrahMissionCard()
                 HomeRecentActivitySection(resumeSmart: { draft in
                     smartPresentation = SmartPresentation(draft: draft)
                 }, repeatFlight: { trip in
@@ -105,9 +109,19 @@ struct HomeDashboardView: View {
                         onDismiss: { dismissSystemNotification($0) }
                     )
                 }
+                dashboardSavedJourneyLink
+                dashboardPlanningSection.modifier(IumrahDashboardEntryMotion())
+                IumrahFriendsAnimatedCard(language: settings.language)
+                dashboardServicesSection.modifier(IumrahDashboardEntryMotion())
+                dashboardGuideShowcase
+                IumrahDashboardRewardsCard()
                 HomeAvailablePackagesSection(showsFallback: false, startSmart: { startNewSmart() })
+                HomeDestinationsSection()
                 homeIncludedServicesSection
                 homeBenefitsSection
+                WhyIumrahCarousel(onPrimary: { focusJourneySearchRevision += 1; journeySearchExpanded = true })
+                IumrahMissionCard()
+                dashboardCareCard
                 IumrahSloganCard()
             }
             // Same adaptive page-column rule as Account/Gear. Padding is part of
@@ -117,7 +131,6 @@ struct HomeDashboardView: View {
             // A top gap exposes the page background between the status bar and hero.
             .padding(.bottom, 46)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .background(IumrahNoVerticalBounce())
             })
             .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
             .onAppear { consumeHeaderBuildRequest() }
@@ -131,6 +144,75 @@ struct HomeDashboardView: View {
         .background(Color.iumrahPageBackground.ignoresSafeArea())
     }
 
+
+    private var dashboardCopy: IumrahDashboardCopy { .init(language: settings.language) }
+    private var dashboardColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: dashboardTypeSize.isAccessibilitySize ? 1 : 2)
+    }
+    private var dashboardSavedJourneyLink: some View {
+        let c = dashboardCopy
+        return NavigationLink { SavedJourneysView() } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "bookmark.fill").font(.title2).foregroundStyle(Color(red: 0.24, green: 0.38, blue: 0.64))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(c.t("Сохранённые путешествия", "Saved journeys", "Saqlangan safarlar", "Сақланган сафарлар")).font(.system(.headline, design: .rounded))
+                    Text(c.t("Продолжите сборку и проверьте актуальную цену", "Resume planning and check the latest price", "Tuzishni davom ettiring va narxni tekshiring", "Тузишни давом эттиринг ва нархни текширинг")).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }.foregroundStyle(.primary).padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
+        }.buttonStyle(IumrahDashboardPressStyle()).accessibilityIdentifier("iumrah.home.dashboard.saved")
+    }
+    private var dashboardPlanningSection: some View {
+        let c = dashboardCopy
+        return VStack(alignment: .leading, spacing: 12) {
+            IumrahHomeSectionHeader(title: c.t("Организуйте свою умру", "Plan your Umrah", "Umrangizni rejalashtiring", "Умрангизни режалаштиринг"))
+            Button {
+                journeySearchExpanded = true
+                focusJourneySearchRevision += 1
+            } label: {
+                IumrahDashboardPhotoCard(image: "MakkahBackground", title: c.t("Ваша умра. Ваш выбор.", "Your Umrah. Your choice.", "Umrangiz. Tanlovingiz.", "Умрангиз. Танловингиз."), subtitle: c.t("Соберите индивидуальное путешествие для своей семьи.", "Build a private journey for your family.", "Oilangiz uchun individual safar tuzing.", "Оилангиз учун индивидуал сафар тузинг."), actionTitle: c.t("Собрать умру", "Build your Umrah", "Umra tuzish", "Умра тузиш"))
+            }.buttonStyle(IumrahDashboardPressStyle())
+            LazyVGrid(columns: dashboardColumns, spacing: 12) {
+                Button { chrome.openHotels(board: .flights) } label: {
+                    IumrahDashboardServiceTile(symbol: "slider.horizontal.3", title: c.t("Ручной подбор", "Manual planner", "Qo‘lda tanlash", "Қўлда танлаш"), subtitle: c.t("Полная свобода выбора", "Full control of your choices", "To‘liq tanlov erkinligi", "Тўлиқ танлов эркинлиги"), tone: .blue)
+                }.buttonStyle(IumrahDashboardPressStyle())
+                Button { startNewSmart() } label: {
+                    IumrahDashboardServiceTile(symbol: "sparkles", title: c.t("Smart подбор", "Smart planner", "Smart tanlov", "Smart танлов"), subtitle: c.t("Персональные варианты", "Personalized options", "Shaxsiy variantlar", "Шахсий вариантлар"), tone: .violet)
+                }.buttonStyle(IumrahDashboardPressStyle())
+            }
+        }.accessibilityIdentifier("iumrah.home.dashboard.planners")
+    }
+    private var dashboardServicesSection: some View {
+        let c = dashboardCopy
+        return VStack(alignment: .leading, spacing: 12) {
+            IumrahHomeSectionHeader(title: c.t("Всё для вашего путешествия", "Everything for your journey", "Safaringiz uchun hamma narsa", "Сафарингиз учун ҳамма нарса"))
+            LazyVGrid(columns: dashboardColumns, spacing: 12) {
+                Button { chrome.openHotels(board: .flights) } label: { IumrahDashboardServiceTile(symbol: "airplane", title: c.t("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"), subtitle: c.t("Прямые рейсы", "Direct flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"), tone: .blue) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.openHotels(board: .hotels) } label: { IumrahDashboardServiceTile(symbol: "bed.double", title: c.t("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"), subtitle: c.t("Мекка и Медина", "Makkah and Madinah", "Makka va Madina", "Макка ва Мадина"), tone: .gold) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.openHotels(board: .transfer) } label: { IumrahDashboardServiceTile(symbol: "car", title: c.t("Трансфер", "Transfer", "Transfer", "Трансфер"), subtitle: c.t("Личный автомобиль", "Private vehicle", "Shaxsiy avtomobil", "Шахсий автомобиль"), tone: .slate) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.openHotels(board: .guide) } label: { IumrahDashboardServiceTile(symbol: "person.2", title: c.t("Персональный гид", "Personal guide", "Shaxsiy gid", "Шахсий гид"), subtitle: c.t("Один гид на семью", "One guide per family", "Har oilaga bitta gid", "Ҳар оилага битта гид"), tone: .green) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { showZiyarats = true } label: { IumrahDashboardServiceTile(symbol: "map", title: c.t("Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар"), subtitle: c.t("Исторические места", "Historic places", "Tarixiy joylar", "Тарихий жойлар"), tone: .gold) }.buttonStyle(IumrahDashboardPressStyle())
+                NavigationLink { ESIMView() } label: { IumrahDashboardServiceTile(symbol: "simcard", title: "iumrah Mobile", subtitle: c.t("Оставайтесь на связи", "Stay connected", "Aloqada qoling", "Алоқада қолинг"), tone: .violet) }.buttonStyle(IumrahDashboardPressStyle())
+            }
+        }.accessibilityIdentifier("iumrah.home.dashboard.services")
+    }
+    private var dashboardGuideShowcase: some View {
+        let c = dashboardCopy
+        return VStack(alignment: .leading, spacing: 12) {
+            IumrahHomeSectionHeader(title: c.t("Персональное сопровождение", "Personal accompaniment", "Shaxsiy hamrohlik", "Шахсий ҳамроҳлик"))
+            Button { chrome.openHotels(board: .guide) } label: {
+                IumrahDashboardPhotoCard(image: "ZiyaratQuba1", title: c.t("Путешествуйте самостоятельно, но не в одиночку.", "Travel independently, but not alone.", "Mustaqil sayohat qiling, ammo yolg‘iz emas.", "Мустақил саёҳат қилинг, аммо ёлғиз эмас."), subtitle: c.t("Персональный гид: встреча, подготовка и сопровождение по программе поездки.", "Personal guide: arrival, preparation and accompaniment according to your itinerary.", "Shaxsiy gid: kutib olish, tayyorgarlik va safar dasturida hamrohlik.", "Шахсий гид: кутиб олиш, тайёргарлик ва сафар дастурида ҳамроҳлик."), actionTitle: c.t("Познакомиться с гидами", "Meet the guides", "Gidlar bilan tanishing", "Гидлар билан танишинг"))
+            }.buttonStyle(IumrahDashboardPressStyle())
+        }
+    }
+    private var dashboardCareCard: some View {
+        let c = dashboardCopy
+        return Button { chrome.navigate(to: .care) } label: {
+            IumrahDashboardServiceTile(symbol: "headphones", title: "iumrah Care", subtitle: c.t("Мы рядом на протяжении вашего путешествия. Связаться с поддержкой", "We're with you throughout your journey. Contact support", "Safaringiz davomida yoningizdamiz. Yordamga murojaat qiling", "Сафарингиз давомида ёнингиздамиз. Ёрдамга мурожаат қилинг"), tone: .green)
+        }.buttonStyle(IumrahDashboardPressStyle())
+    }
 
     // The list stays factual: each selected package defines its actual included
     // services. This block shows the service categories, not a fixed promise.
@@ -267,14 +349,16 @@ struct HomeDashboardView: View {
 
     private var publishedFlightSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            IumrahGlassPillSelector(options: [
-                .init(0, IumrahFlightCopy.text(settings.language, "Туда", "Outbound", "Borish", "Бориш")),
-                .init(1, IumrahFlightCopy.text(settings.language, "Обратно", "Return", "Qaytish", "Қайтиш"))
-            ], selection: publishedDirection, onSelect: { publishedDirection = $0 })
-            IumrahPublishedFlightCarousel(trip: journey.trip, direction: publishedDirection,
-                selected: publishedDirection == 0 ? publishedSelection.outbound : publishedSelection.inbound,
-                other: publishedDirection == 0 ? publishedSelection.inbound : publishedSelection.outbound,
-                showTitle: false, onSelect: { flight in _ = publishedSelection.choose(flight, direction: publishedDirection, journey: journey) }, onOpen: { publishedDetail = $0 })
+            HStack(alignment: .firstTextBaseline) {
+                IumrahHomeSectionHeader(title: dashboardCopy.t("Прямые рейсы", "Direct flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"))
+                Button { showAllPublishedFlights = true } label: {
+                    HStack(spacing: 4) {
+                        Text(dashboardCopy.t("Все рейсы", "All flights", "Barcha reyslar", "Барча рейслар"))
+                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
+                    }.font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                }.buttonStyle(.plain)
+            }
+            IumrahAllPublishedFlightBoard(selection: publishedSelection, horizontal: true, onOpen: { publishedDetail = $0 })
             if publishedSelection.complete {
                 Button(IumrahFlightCopy.text(settings.language, "Продолжить и выбрать отель", "Continue and choose hotel", "Davom etish va mehmonxona tanlash", "Давом этиш ва меҳмонхона танлаш"), action: continuePublishedFlights)
                     .buttonStyle(IumrahPrimaryButtonStyle())

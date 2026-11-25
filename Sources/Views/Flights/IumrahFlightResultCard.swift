@@ -20,6 +20,8 @@ struct IumrahFlightResultCard: View {
     var selectionAccent: Color = .primary
     var selectedSearchDay: String? = nil
     var onSelect: (() -> Void)? = nil
+    static let standardHeight: CGFloat = 224
+    @ScaledMetric(relativeTo: .body) private var cardHeight: CGFloat = 224
     let action: () -> Void
 
     private func tr(_ ru: String, _ en: String, _ uz: String, _ cy: String) -> String {
@@ -43,13 +45,13 @@ struct IumrahFlightResultCard: View {
         let arrival = self.arrival
         let localDeparture = self.localDeparture
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 13) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 10) {
                     AirlineLogoView(airlineCode: airlineCode, size: 34)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(airline).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(2)
+                        Text(airline).font(IumrahType.bold(16, relativeTo: .headline)).lineLimit(1).minimumScaleFactor(0.75)
                         HStack(spacing: 6) {
-                            if let number { Text(number).font(IumrahType.bold(12, relativeTo: .caption)).monospacedDigit().lineLimit(1) }
+                            if let number { Text(number).font(IumrahType.bold(12, relativeTo: .caption)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.75) }
                             Text(isAviasales ? tr("Авиабилет", "Flight", "Aviachipta", "Авиачипта") : "iumrah Direct")
                                 .font(IumrahType.regular(10, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1)
                         }
@@ -58,10 +60,11 @@ struct IumrahFlightResultCard: View {
                     if selected && onSelect == nil { Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.primary) }
                 }
                 .padding(.trailing, onSelect == nil ? 0 : 44)
+                .frame(height: 42)
                 HStack(alignment: .top, spacing: 8) {
                     endpoint(origin, time: IumrahFlightClock.time(localDeparture), day: localDeparture, trailing: false)
                     VStack(spacing: 5) {
-                        if duration > 0 { Text(durationTitle).font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center) }
+                        Text(duration > 0 ? durationTitle : "—").font(IumrahType.regular(11)).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.75).multilineTextAlignment(.center).frame(height: 28)
                         Image(systemName: stops == 0 ? "airplane" : "arrow.triangle.branch")
                             .font(.system(size: 18, weight: .medium)).foregroundStyle(.primary)
                             .frame(height: 22).accessibilityHidden(true)
@@ -69,25 +72,28 @@ struct IumrahFlightResultCard: View {
                             Text(stops == 0 ? tr("Прямой", "Direct", "To‘g‘ri", "Тўғри") : tr("Пересадок: \(stops)", "Stops: \(stops)", "Transfer: \(stops)", "Трансфер: \(stops)"))
                                 .font(IumrahType.regular(11, relativeTo: .caption2)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7).multilineTextAlignment(.center)
                         }
-                    }.frame(maxWidth: .infinity).padding(.top, 2)
+                    }.frame(width: 76).padding(.top, 2)
                     endpoint(destination, time: arrival?.time, day: arrival?.day, trailing: true, estimated: arrival?.estimated == true)
                 }
+                Spacer(minLength: 0)
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(height: 1)
                 HStack(alignment: .center, spacing: 8) {
                     if usablePrice != nil {
                         Text(isRoundTripFare ? tr("Туда и обратно · за пассажира", "Round trip · per passenger", "Borib qaytish · bir yo‘lovchi", "Бориб қайтиш · бир йўловчи") : tr("За пассажира", "Per passenger", "Bir yo‘lovchi uchun", "Бир йўловчи учун"))
-                            .font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary)
+                            .font(IumrahType.regular(12, relativeTo: .caption)).foregroundStyle(.secondary).lineLimit(2).minimumScaleFactor(0.8)
                     }
                     Spacer(minLength: 6)
                     if let price = usablePrice {
-                        Text("$" + price.formatted(.number.precision(.fractionLength(0)))).font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit()
+                        Text("$" + price.formatted(.number.precision(.fractionLength(0)))).font(IumrahType.bold(25, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.65)
                     } else {
-                        Text(tr("Подробнее", "Details", "Batafsil", "Батафсил")).font(IumrahType.bold(15))
+                        Text(tr("Подробнее", "Details", "Batafsil", "Батафсил")).font(IumrahType.bold(15)).lineLimit(1).minimumScaleFactor(0.7)
                     }
                     if onSelect == nil { Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).accessibilityHidden(true) }
-                }
+                }.frame(height: 35)
             }
-            .foregroundStyle(Color.primary).padding(16)
+            .foregroundStyle(Color.primary).padding(14)
+            .frame(maxWidth: .infinity)
+            .frame(height: max(Self.standardHeight, cardHeight))
             .background(IumrahFlightPalette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(selected ? selectionAccent : Color.primary.opacity(0.07), lineWidth: selected ? 1.5 : 0.75))
             .contentShape(RoundedRectangle(cornerRadius: 22))
@@ -111,12 +117,10 @@ struct IumrahFlightResultCard: View {
     }
     private func endpoint(_ code: String, time: String?, day: String?, trailing: Bool, estimated: Bool = false) -> some View {
         VStack(alignment: trailing ? .trailing : .leading, spacing: 3) {
-            if let time, time != "—" { Text(time).font(IumrahType.bold(28, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7) }
+            Text(time ?? "—").font(IumrahType.bold(28, relativeTo: .title2)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
             Text(code.uppercased()).font(IumrahType.bold(19, relativeTo: .headline)).lineLimit(1).minimumScaleFactor(0.75)
-            if let day, (String(day.prefix(10)) != selectedSearchDay || (trailing && String(day.prefix(10)) != String(localDeparture.prefix(10)))) {
-                Text(IumrahFlightClock.day(day, locale: locale)).font(IumrahType.regular(12)).foregroundStyle(.secondary).lineLimit(1)
-            }
-            if estimated { Text(tr("Расчётное", "Estimated", "Hisoblangan", "Ҳисобланган")).font(IumrahType.regular(10)).foregroundStyle(.secondary) }
+            Text(day.map { IumrahFlightClock.day($0, locale: locale) } ?? "—").font(IumrahType.regular(12)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.75)
+            Text(tr("Расчётное", "Estimated", "Hisoblangan", "Ҳисобланган")).font(IumrahType.regular(10)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7).opacity(estimated ? 1 : 0).accessibilityHidden(!estimated)
         }.frame(maxWidth: .infinity, alignment: trailing ? .trailing : .leading)
     }
 

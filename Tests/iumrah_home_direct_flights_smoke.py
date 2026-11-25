@@ -3,14 +3,19 @@
 from pathlib import Path
 import subprocess, tempfile
 home=Path('Sources/Views/Home/HomeDashboardView.swift').read_text()
-assert home.index('if account.isAuthenticated { IumrahDashboardBalanceCard(compact: true) }') < home.index('publishedFlightSection\n') < home.index('HomeRecentActivitySection(')
+assert home.index('.id("journey-search")') < home.index('publishedFlightSection\n') < home.index('IumrahDashboardBalanceCard(compact: true)') < home.index('SmartConfiguratorHomeCard(onOpen: startNewSmart)')
 assert home.count('publishedFlightSection\n') == 1
-assert '"Прямые рейсы", "Direct flights"' in home and '"Все рейсы", "All flights"' in home
+assert 'direction: 0, onAllFlights: openOfficialFlights' in home and 'direction: 1, onAllFlights: openOfficialFlights' in home
+assert 'Продолжить выбор отеля' in home and 'showPublishedHotels = true' in home
+assert 'IumrahGuidedFlightSelectionView()' in home and 'NuiteeJourneyHotelsView()' in home
 source=Path('Sources/Views/Home/IumrahPublishedFlightCarousel.swift').read_text()
+assert 'Прямые рейсы туда' in source and 'Прямые рейсы обратно' in source and 'Все авиабилеты' in source
+assert 'onSelect: { select(flight) }' in source and 'ForEach(flights)' in source
+assert 'SmartConfiguratorFlow(firstLaunch: true)' in Path('Sources/Views/RootView.swift').read_text()
 start=source.index('    static func flatten(')
 end=source.index('\n}\n\nstruct IumrahAllPublishedFlightBoard',start)
 flatten=source[start:end]
-assert 'ForEach(store.flights)' in source and 'flightBoard(allPublished: true)' in source
+assert 'ForEach(flights)' in source and 'flightBoard(allPublished: true)' in source
 assert 'board.catalogComplete == true' in source
 models=Path('Sources/Models/HotelStorefrontModels.swift').read_text()
 leg=models[models.index('struct StorefrontFlightLeg:'):models.index('/// One independently selectable')]

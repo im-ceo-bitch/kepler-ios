@@ -24,7 +24,7 @@ struct HomeDashboardView: View {
     @State private var focusJourneySearchRevision = 0
     @State private var journeySearchExpanded = false
     @StateObject private var publishedSelection = IumrahHomePublishedSelection()
-    @State private var showAllPublishedFlights = false
+    @State private var publishedSelectionError = false
     @State private var publishedDetail: LocalJourneyFlight?
     @State private var showPublishedHotels = false
 
@@ -64,8 +64,10 @@ struct HomeDashboardView: View {
             .navigationDestination(item: $publishedDetail) { flight in
                 IumrahHomePublishedFlightDetail(flight: flight, selection: publishedSelection)
             }
-            .navigationDestination(isPresented: $showAllPublishedFlights) {
-                IumrahAllPublishedFlightsPage(selection: publishedSelection)
+            .alert(dashboardCopy.t("Проверьте выбранные рейсы", "Check selected flights", "Tanlangan reyslarni tekshiring", "Танланган рейсларни текширинг"), isPresented: $publishedSelectionError) {
+                Button(dashboardCopy.t("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
+            } message: {
+                Text(dashboardCopy.t("Проверьте даты, маршрут, класс и наличие опубликованного тарифа. Выберите совместимые рейсы.", "Check dates, route, cabin and published fare. Choose compatible flights.", "Sana, yo‘nalish, klass va tarifni tekshiring. Mos reyslarni tanlang.", "Сана, йўналиш, класс ва тарифни текширинг. Мос рейсларни танланг."))
             }
             .onChange(of: journey.trip) { _, next in publishedSelection.reconcile(next) }
             .navigationDestination(isPresented: $showAboutProject) {
@@ -85,12 +87,13 @@ struct HomeDashboardView: View {
                 IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header, searchExpanded: $journeySearchExpanded)
             }, content: {
                 LazyVStack(spacing: 20) {
-                    IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded, flightsSelected: publishedSelection.complete, onContinue: continuePublishedFlights)
+                    IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
+                publishedFlightSection
                 if let session = activeSession { activeBookingCard(session) }
                 if account.isAuthenticated { IumrahDashboardBalanceCard(compact: true) }
-                publishedFlightSection
+                SmartConfiguratorHomeCard(onOpen: startNewSmart)
                 HomeRecentActivitySection(resumeSmart: { draft in
                     smartPresentation = SmartPresentation(draft: draft)
                 }, repeatFlight: { trip in
@@ -348,53 +351,49 @@ struct HomeDashboardView: View {
     }
 
     private var publishedFlightSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                IumrahHomeSectionHeader(title: dashboardCopy.t("Прямые рейсы", "Direct flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"))
-                Button { showAllPublishedFlights = true } label: {
-                    HStack(spacing: 4) {
-                        Text(dashboardCopy.t("Все рейсы", "All flights", "Barcha reyslar", "Барча рейслар"))
-                        Image(systemName: "chevron.right").font(.caption.weight(.semibold))
-                    }.font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                }.buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 20) {
+            IumrahAllPublishedFlightBoard(selection: publishedSelection, horizontal: true, direction: 0, onAllFlights: openOfficialFlights, onOpen: { publishedDetail = $0 })
+            IumrahAllPublishedFlightBoard(selection: publishedSelection, horizontal: true, direction: 1, onAllFlights: openOfficialFlights, onOpen: { publishedDetail = $0 })
+            if let outbound = publishedSelection.outbound, let inbound = publishedSelection.inbound {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.iumrahJourneyGreen)
+                        Text(dashboardCopy.t("Оба рейса выбраны", "Both flights selected", "Ikkala reys tanlandi", "Иккала рейс танланди")).foregroundStyle(.primary)
+                    }.font(.system(.headline, design: .rounded, weight: .semibold))
+                    publishedSelectionRow(outbound, title: dashboardCopy.t("Туда", "Outbound", "Borish", "Бориш"))
+                    Divider()
+                    publishedSelectionRow(inbound, title: dashboardCopy.t("Обратно", "Return", "Qaytish", "Қайтиш"))
+                    Button(action: continuePublishedFlights) {
+                        HStack(spacing: 10) {
+                            Text(dashboardCopy.t("Продолжить выбор отеля", "Continue to hotel selection", "Mehmonxona tanlashni davom ettirish", "Меҳмонхона танлашни давом эттириш"))
+                                .lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.85)
+                            Image(systemName: "arrow.right")
+                        }
+                    }.buttonStyle(IumrahPrimaryButtonStyle())
+                    .accessibilityIdentifier("iumrah.home.continueToHotels")
+                }.padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
             }
-            IumrahAllPublishedFlightBoard(selection: publishedSelection, horizontal: true, onOpen: { publishedDetail = $0 })
-            if publishedSelection.complete {
-                Button(IumrahFlightCopy.text(settings.language, "Продолжить и выбрать отель", "Continue and choose hotel", "Davom etish va mehmonxona tanlash", "Давом этиш ва меҳмонхона танлаш"), action: continuePublishedFlights)
-                    .buttonStyle(IumrahPrimaryButtonStyle())
-            }
-            Button {
-                IumrahHaptics.selection()
-                startNewSmart()
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18, weight: .medium))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("iumrah Smart")
-                            .font(.subheadline.weight(.semibold))
-                        Text(IumrahFlightCopy.text(settings.language,
-                            "Собрать индивидуальную умру автоматически",
-                            "Build your individual Umrah with Smart",
-                            "Individual umrani Smart bilan tuzing",
-                            "Индивидуал умрани Smart билан тузинг"))
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 5)
-                    Image(systemName: "chevron.right")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                .foregroundStyle(.primary)
-                .padding(12)
-                .background(Color.iumrahCardBackground,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-            .buttonStyle(.plain)
         }
     }
 
+    private func publishedSelectionRow(_ flight: LocalJourneyFlight, title: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Spacer(minLength: 6)
+            Text("\(flight.origin) → \(flight.destination) · \(IumrahFlightClock.day(IumrahFlightClock.local(flight.departureAt, airport: flight.origin), locale: Locale(identifier: settings.language.localeIdentifier)))")
+                .font(.subheadline.weight(.semibold)).multilineTextAlignment(.trailing)
+        }
+    }
+
+    private func openOfficialFlights() {
+        // Keep Home's independent selection until the user edits the actual trip.
+        // Use the same first step as the existing search, not a second catalogue page.
+        journeySearchExpanded = false
+        showGuidedFlightSelection = true
+    }
+
     private func continuePublishedFlights() {
-        guard publishedSelection.commit(journey) else { IumrahHaptics.error(); return }
+        guard publishedSelection.commit(journey) else { IumrahHaptics.error(); publishedSelectionError = true; return }
         showPublishedHotels = true
     }
 

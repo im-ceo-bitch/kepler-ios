@@ -32,7 +32,7 @@ import SwiftUI
             for leg in [row.outbound, row.inbound].compactMap({ $0 }) where leg.stops == 0 && leg.cabinClass.lowercased().replacingOccurrences(of: " ", with: "_") == cabin {
                 guard direction == 0 ? (leg.origin == origin && leg.destination == saudi) : (leg.origin == saudi && leg.destination == origin) else { continue }
                 guard let date = Self.day(leg.departureAt, leg.origin), date >= today, let price = row.fareUsdPerTraveler, price.isFinite, price > 0 else { continue }
-                let flight = LocalJourneyFlight(id: "published:\(row.id):\(leg.origin):\(leg.departureAt)", origin: leg.origin, destination: leg.destination, airline: leg.airline, flightNumber: leg.flightNumber, airlineCode: leg.airlineCode, durationMinutes: leg.durationMinutes, stops: leg.stops, departureAt: leg.departureAt, arrivalAt: leg.arrivalAt, displayedPrice: price, publishedID: row.id, publishedIsPair: row.inbound != nil, publishedCabin: leg.cabinClass)
+                let flight = LocalJourneyFlight(id: "published:\(row.id):\(leg.origin):\(leg.departureAt)", origin: leg.origin.uppercased(), destination: leg.destination.uppercased(), airline: leg.airline, flightNumber: leg.flightNumber, airlineCode: leg.airlineCode, durationMinutes: leg.durationMinutes, stops: leg.stops, departureAt: leg.departureAt, arrivalAt: leg.arrivalAt, displayedPrice: price, publishedID: row.id, publishedIsPair: row.inbound != nil, publishedCabin: leg.cabinClass)
                 if direction == 1, let other, !Self.compatible(other, flight, scope: trip.scope) { continue }
                 items.append(flight)
             }
@@ -82,8 +82,8 @@ struct IumrahPublishedFlightCarousel: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 12) {
                         ForEach(flights) { flight in
-                            IumrahFlightResultCard(airline: flight.airline, airlineCode: flight.airlineCode, flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination, departureAt: flight.departureAt, arrivalAt: flight.arrivalAt, duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice, isAviasales: false, isRoundTripFare: flight.publishedIsPair == true, selected: selected?.id == flight.id, selectionAccent: .green, onSelect: { onSelect(flight) }, action: { onOpen(flight) })
-                                .frame(width: 290)
+                            IumrahFlightResultCard(airline: flight.airline, airlineCode: flight.airlineCode, flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination, departureAt: flight.departureAt, arrivalAt: flight.arrivalAt, duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice, isAviasales: false, isRoundTripFare: flight.publishedIsPair == true, selected: selected?.id == flight.id, selectionAccent: .primary, onSelect: { onSelect(flight) }, action: { onOpen(flight) })
+                                .containerRelativeFrame(.horizontal) { width, _ in min(330, width * 0.86) }
                         }
                     }.scrollTargetLayout()
                 }.scrollTargetBehavior(.viewAligned)
@@ -98,27 +98,78 @@ struct IumrahPublishedFlightCarousel: View {
     var complete: Bool { outbound != nil && inbound != nil }
     func clear() { outbound = nil; inbound = nil }
     func reconcile(_ trip: TripDraft) {
-        if let f = outbound, f.origin != trip.originCode || f.destination != trip.outboundDestinationCode || f.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") != trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() || IumrahPublishedCarouselCatalog.day(f.departureAt, f.origin).map({ !Calendar.current.isDate($0, inSameDayAs: trip.departureDate) }) != false { clear(); return }
+        if let f = outbound, f.origin != trip.originCode || f.destination != trip.outboundDestinationCode || f.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") != trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() || IumrahPublishedCarouselCatalog.day(f.departureAt, f.origin).map({ !Calendar.current.isDate($0, inSameDayAs: trip.departureDate) }) != false { outbound = nil }
         if let f = inbound, f.destination != trip.originCode || f.origin != trip.returnOriginCode || f.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") != trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() || IumrahPublishedCarouselCatalog.day(f.departureAt, f.origin).map({ !Calendar.current.isDate($0, inSameDayAs: trip.returnDate) }) != false { inbound = nil }
     }
     @discardableResult func choose(_ flight: LocalJourneyFlight, direction: Int, journey: JourneyStore) -> Bool {
-        guard let day = IumrahPublishedCarouselCatalog.day(flight.departureAt, flight.origin), day >= Calendar.current.startOfDay(for: Date()), flight.publishedID != nil, flight.stops == 0 else { return false }
-        if direction == 0 {
-            guard flight.origin == journey.trip.originCode, flight.destination == journey.trip.outboundDestinationCode else { return false }
-            if let inbound, !IumrahPublishedCarouselCatalog.compatible(flight, inbound, scope: journey.trip.scope) { self.inbound = nil }
-            outbound = flight
-            journey.trip.departureDate = day
-            if journey.trip.returnDate <= day { journey.trip.returnDate = Calendar.current.date(byAdding: .day, value: 7, to: day) ?? day }
-        } else {
-            guard flight.destination == journey.trip.originCode, flight.origin == journey.trip.returnOriginCode else { return false }
-            if let outbound, !IumrahPublishedCarouselCatalog.compatible(outbound, flight, scope: journey.trip.scope) { return false }
-            guard day > journey.trip.departureDate else { return false }
-            inbound = flight; journey.trip.returnDate = day
-        }
+        // Selection is reversible, and an incompatible second leg never silently discards the first.
+        if direction == 0, outbound?.id == flight.id { outbound = nil; IumrahHaptics.selection(); return true }
+        if direction == 1, inbound?.id == flight.id { inbound = nil; IumrahHaptics.selection(); return true }
+        guard let next = proposedTrip(flight, direction: direction, trip: journey.trip) else { return false }
+        if direction == 0 { outbound = flight } else { inbound = flight }
+        journey.trip = next
         IumrahHaptics.selection(); return true
+    }
+
+    private func proposedTrip(_ flight: LocalJourneyFlight, direction: Int, trip: TripDraft) -> TripDraft? {
+        guard IumrahAllPublishedFlightStore.direction(of: flight) == direction,
+              flight.publishedID != nil, flight.stops == 0, IumrahAllPublishedFlightStore.isFuture(flight),
+              let price = flight.displayedPrice, price.isFinite, price > 0,
+              let cabin = FlightCabinClass(rawValue: flight.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") ?? ""),
+              let day = IumrahPublishedCarouselCatalog.day(flight.departureAt, flight.origin),
+              let rawArrival = flight.arrivalAt, IumrahPublishedCarouselCatalog.day(rawArrival, flight.destination) != nil else { return nil }
+        var next = trip
+        let origin = direction == 0 ? flight.origin : flight.destination
+        let saudi = direction == 0 ? flight.destination : flight.origin
+        guard let airport = SaudiArrivalAirport(rawValue: saudi) else { return nil }
+        let other = direction == 0 ? inbound : outbound
+        if let other {
+            guard other.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") == cabin.rawValue,
+                  IumrahAllPublishedFlightStore.isFuture(other) else { return nil }
+        }
+        // The full Home catalogue is not filtered by the search form. Selecting a leg
+        // updates the form's actual airport, cabin and dates, preserving family/room settings.
+        if next.originCode != origin { next.origin = origin; next.originAirport = AirportMapBootstrapCatalog.airport(code: origin) }
+        var filters = next.effectiveFlightFilters; filters.cabinClass = cabin; next.flightFilters = filters
+        next.flightTripType = .roundTrip; next.flexibility = .exact; next.saudiArrivalDate = nil
+        if airport == .madinah { next.scope = .makkahAndMadinah }
+        if direction == 0 {
+            next.arrivalAirport = airport; next.departureDate = day
+            if let other {
+                guard IumrahPublishedCarouselCatalog.compatible(flight, other, scope: next.scope),
+                      let back = IumrahPublishedCarouselCatalog.day(other.departureAt, other.origin) else { return nil }
+                next.returnDate = back; next.selectedReturnAirport = SaudiArrivalAirport(rawValue: other.origin)
+            } else {
+                next.selectedReturnAirport = nil
+                let arrival = IumrahPublishedCarouselCatalog.day(rawArrival, flight.destination) ?? day
+                let minimum = Calendar.current.date(byAdding: .day, value: next.scope == .makkahAndMadinah ? 2 : 1, to: arrival) ?? arrival
+                if next.returnDate < minimum { next.returnDate = Calendar.current.date(byAdding: .day, value: 7, to: arrival) ?? minimum }
+            }
+        } else {
+            next.selectedReturnAirport = airport; next.returnDate = day
+            if let other {
+                guard IumrahPublishedCarouselCatalog.compatible(other, flight, scope: next.scope),
+                      let departure = IumrahPublishedCarouselCatalog.day(other.departureAt, other.origin) else { return nil }
+                next.departureDate = departure; next.arrivalAirport = SaudiArrivalAirport(rawValue: other.destination) ?? .jeddah
+            } else {
+                if next.scope == .makkahOnly { next.arrivalAirport = .jeddah }
+                if next.departureDate >= day {
+                    let today = Calendar.current.startOfDay(for: Date())
+                    guard let earlier = Calendar.current.date(byAdding: .day, value: -7, to: day), day > today else { return nil }
+                    next.departureDate = max(today, earlier)
+                }
+            }
+        }
+        guard next.canContinue else { return nil }
+        return next
     }
     func commit(_ journey: JourneyStore) -> Bool {
         guard let a = outbound, let b = inbound, let aID = a.publishedID, let bID = b.publishedID,
+              IumrahAllPublishedFlightStore.isFuture(a), IumrahAllPublishedFlightStore.isFuture(b),
+              a.origin == journey.trip.originCode, b.destination == journey.trip.originCode,
+              a.destination == journey.trip.outboundDestinationCode, b.origin == journey.trip.returnOriginCode,
+              a.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") == journey.trip.effectiveFlightFilters.cabinClass.rawValue,
+              b.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") == journey.trip.effectiveFlightFilters.cabinClass.rawValue,
               IumrahPublishedCarouselCatalog.compatible(a,b,scope: journey.trip.scope),
               let departure = IumrahPublishedCarouselCatalog.day(a.departureAt,a.origin), let raw = a.arrivalAt,
               let arrival = IumrahPublishedCarouselCatalog.day(raw,a.destination), let back = IumrahPublishedCarouselCatalog.day(b.departureAt,b.origin), journey.trip.canContinue else { return false }
@@ -148,6 +199,7 @@ struct IumrahPublishedFlightCarousel: View {
     @Published private(set) var failed = false
     @Published private(set) var complete = false
     private var fetched: Date?
+    private var departureInstants: [String: Date] = [:]
     private var request: Task<Void, Never>?
 
     func load(force: Bool = false) async {
@@ -159,7 +211,11 @@ struct IumrahPublishedFlightCarousel: View {
             do {
                 let board = try await HotelStorefrontService().flightBoard(allPublished: true)
                 guard board.ok else { throw APIError.invalidResponse }
-                flights = Self.flatten(board.options)
+                let next = Self.flatten(board.options)
+                departureInstants = Dictionary(uniqueKeysWithValues: next.compactMap { flight in
+                    Self.departureInstant(flight).map { (flight.id, $0) }
+                })
+                flights = next
                 complete = board.catalogComplete == true
                 loaded = true; failed = false; fetched = Date()
             } catch {
@@ -170,13 +226,45 @@ struct IumrahPublishedFlightCarousel: View {
         await task.value
     }
 
+    nonisolated static func direction(of flight: LocalJourneyFlight) -> Int? {
+        let saudi: Set<String> = ["JED", "MED"]
+        if saudi.contains(flight.destination) && !saudi.contains(flight.origin) { return 0 }
+        if saudi.contains(flight.origin) && !saudi.contains(flight.destination) { return 1 }
+        return nil
+    }
+
+    func visibleFlights(direction: Int?, now: Date = Date()) -> [LocalJourneyFlight] {
+        flights.filter { flight in
+            (departureInstants[flight.id].map { $0 >= now } ?? false) &&
+            (direction == nil || Self.direction(of: flight) == direction)
+        }
+    }
+
+    nonisolated static func isFuture(_ flight: LocalJourneyFlight, now: Date = Date()) -> Bool {
+        departureInstant(flight).map { $0 >= now } ?? false
+    }
+
+    nonisolated static func departureInstant(_ flight: LocalJourneyFlight) -> Date? {
+        let iso = ISO8601DateFormatter()
+        if let date = iso.date(from: flight.departureAt) { return date }
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: flight.departureAt) { return date }
+        // Legacy publications may carry airport-local times rather than an ISO offset.
+        let parser = DateFormatter(); parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.timeZone = FlightReferenceCatalog.timeZone(for: flight.origin) ?? TimeZone(secondsFromGMT: 0)
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        if let date = parser.date(from: String(flight.departureAt.prefix(19))) { return date }
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        return parser.date(from: String(flight.departureAt.prefix(16)))
+    }
+
     static func flatten(_ options: [StorefrontFlightOption]) -> [LocalJourneyFlight] {
         var seen = Set<String>()
         return options.flatMap { option -> [LocalJourneyFlight] in
             let price: Double? = option.currency.uppercased() == "USD" && option.perTravelerFare.isFinite && option.perTravelerFare > 0 ? option.perTravelerFare : nil
             return [Optional(option.outbound), option.inbound].compactMap { leg -> LocalJourneyFlight? in
                 guard let leg, leg.stops == 0 else { return nil }
-                return LocalJourneyFlight(id: "published:\(option.id):\(leg.origin):\(leg.departureAt)", origin: leg.origin, destination: leg.destination, airline: leg.airline, flightNumber: leg.flightNumber, airlineCode: leg.airlineCode, durationMinutes: leg.durationMinutes, stops: leg.stops, departureAt: leg.departureAt, arrivalAt: leg.arrivalAt, displayedPrice: price, publishedID: option.id, publishedIsPair: option.inbound != nil, publishedCabin: leg.cabinClass)
+                return LocalJourneyFlight(id: "published:\(option.id):\(leg.origin):\(leg.departureAt)", origin: leg.origin.uppercased(), destination: leg.destination.uppercased(), airline: leg.airline, flightNumber: leg.flightNumber, airlineCode: leg.airlineCode, durationMinutes: leg.durationMinutes, stops: leg.stops, departureAt: leg.departureAt, arrivalAt: leg.arrivalAt, displayedPrice: price, publishedID: option.id, publishedIsPair: option.inbound != nil, publishedCabin: leg.cabinClass)
             }
         }.sorted { a, b in
             a.departureAt == b.departureAt ? a.id < b.id : a.departureAt < b.departureAt
@@ -190,37 +278,82 @@ struct IumrahAllPublishedFlightBoard: View {
     @ObservedObject private var store = IumrahAllPublishedFlightStore.shared
     @ObservedObject var selection: IumrahHomePublishedSelection
     let horizontal: Bool
+    var direction: Int? = nil
+    var onAllFlights: (() -> Void)? = nil
     let onOpen: (LocalJourneyFlight) -> Void
+    @State private var selectionError = false
+    @ScaledMetric(relativeTo: .body) private var terminalHeight: CGFloat = 224
 
     private func t(_ r: String, _ e: String, _ u: String, _ c: String) -> String { IumrahFlightCopy.text(settings.language, r, e, u, c) }
+    private var title: String {
+        direction == 0 ? t("Прямые рейсы туда", "Direct outbound flights", "Borish uchun to‘g‘ri reyslar", "Бориш учун тўғри рейслар") : t("Прямые рейсы обратно", "Direct return flights", "Qaytish uchun to‘g‘ri reyslar", "Қайтиш учун тўғри рейслар")
+    }
     var body: some View {
+        let flights = store.visibleFlights(direction: direction)
         VStack(alignment: .leading, spacing: 12) {
+            if let onAllFlights {
+                Button(action: onAllFlights) {
+                    HStack(spacing: 7) {
+                        Text(title).font(.system(size: 26, weight: .bold, design: .rounded)).tracking(-0.5)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Image(systemName: "chevron.right").font(.system(size: 17, weight: .semibold))
+                    }.foregroundStyle(.primary).frame(maxWidth: .infinity, alignment: .leading)
+                }.buttonStyle(.plain)
+            }
             if store.loading && !store.loaded { ProgressView().frame(maxWidth: .infinity).padding(18) }
             if store.failed || (store.loaded && !store.complete) {
                 Text(store.failed ? t("Не удалось обновить рейсы", "Could not refresh flights", "Reyslar yangilanmadi", "Рейслар янгиланмади") : t("Полный каталог пока недоступен", "Complete catalogue not available yet", "To‘liq katalog hozircha mavjud emas", "Тўлиқ каталог ҳозирча мавжуд эмас"))
                     .font(.footnote).foregroundStyle(.secondary)
                 Button(t("Обновить рейсы", "Refresh flights", "Reyslarni yangilash", "Рейсларни янгилаш")) { Task { await store.load(force: true) } }.buttonStyle(.bordered)
             }
-            if store.loaded && store.complete && !store.failed && store.flights.isEmpty {
+            if store.loaded && store.complete && !store.failed && flights.isEmpty {
                 Text(t("Нет опубликованных рейсов", "No published flights", "E’lon qilingan reyslar yo‘q", "Эълон қилинган рейслар йўқ")).font(.footnote).foregroundStyle(.secondary)
             }
-            if !store.flights.isEmpty {
-                if horizontal {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(alignment: .top, spacing: 12) {
-                            ForEach(store.flights) { flight in card(flight).frame(width: 290) }
-                        }.scrollTargetLayout()
-                    }.scrollTargetBehavior(.viewAligned)
-                } else {
-                    LazyVStack(spacing: 12) { ForEach(store.flights) { flight in card(flight) } }
-                }
+            if horizontal {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: 12) {
+                        ForEach(flights) { flight in
+                            card(flight).containerRelativeFrame(.horizontal) { width, _ in min(330, width * 0.86) }
+                        }
+                        if let onAllFlights {
+                            terminalCard(onAllFlights).containerRelativeFrame(.horizontal) { width, _ in min(330, width * 0.86) }
+                        }
+                    }.scrollTargetLayout()
+                }.scrollTargetBehavior(.viewAligned)
+            } else {
+                LazyVStack(spacing: 12) { ForEach(flights) { flight in card(flight) } }
             }
         }.task { await store.load() }
-            .accessibilityIdentifier(horizontal ? "iumrah.home.directFlights" : "iumrah.home.allDirectFlights")
+            .alert(t("Проверьте совместимость рейсов", "Check flight compatibility", "Reyslar mosligini tekshiring", "Рейслар мослигини текширинг"), isPresented: $selectionError) {
+                Button(t("Понятно", "OK", "Tushunarli", "Тушунарли"), role: .cancel) { }
+            } message: {
+                Text(t("Выберите совместимые даты, аэропорты, класс и опубликованный тариф. Чтобы заменить несовместимый рейс, сначала снимите его выбор.", "Choose compatible dates, airports, cabin and published fare. Deselect an incompatible leg before replacing it.", "Mos sana, aeroport, klass va tarifni tanlang. Mos kelmagan reysni almashtirishdan oldin tanlovni bekor qiling.", "Мос сана, аэропорт, класс ва тарифни танланг. Мос келмаган рейсни алмаштиришдан олдин танловни бекор қилинг."))
+            }
+            .accessibilityIdentifier(horizontal ? (direction == 0 ? "iumrah.home.directFlights.outbound" : "iumrah.home.directFlights.return") : "iumrah.home.allDirectFlights")
+    }
+
+    private func terminalCard(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                Image(systemName: "arrow.right").font(.system(size: 24, weight: .semibold))
+                    .frame(width: 56, height: 56).background(.white.opacity(0.12), in: Circle())
+                Text(t("Все авиабилеты", "All flight tickets", "Barcha aviachiptalar", "Барча авиачипталар"))
+                    .font(.system(.title2, design: .rounded, weight: .bold)).multilineTextAlignment(.center)
+                Text(t("Перейти к выбору рейсов", "Go to flight selection", "Reyslarni tanlashga o‘tish", "Рейсларни танлашга ўтиш"))
+                    .font(.footnote).foregroundStyle(.white.opacity(0.7)).multilineTextAlignment(.center)
+            }.padding(16).frame(maxWidth: .infinity).frame(height: max(IumrahFlightResultCard.standardHeight, terminalHeight))
+                .foregroundStyle(.white).background(Color(white: 0.125), in: RoundedRectangle(cornerRadius: 22))
+        }.buttonStyle(.plain).accessibilityIdentifier("iumrah.home.allTickets.\(direction ?? 0)")
+    }
+
+    private func select(_ flight: LocalJourneyFlight) {
+        guard let leg = IumrahAllPublishedFlightStore.direction(of: flight), selection.choose(flight, direction: leg, journey: journey) else {
+            IumrahHaptics.error(); selectionError = true; return
+        }
     }
 
     private func card(_ flight: LocalJourneyFlight) -> some View {
-        IumrahFlightResultCard(airline: flight.airline, airlineCode: flight.airlineCode, flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination, departureAt: flight.departureAt, arrivalAt: flight.arrivalAt, duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice, isAviasales: false, isRoundTripFare: flight.publishedIsPair == true, selected: selection.outbound?.id == flight.id || selection.inbound?.id == flight.id, selectionAccent: .green, onSelect: selection.canChoose(flight, trip: journey.trip) ? { _ = selection.choose(flight, direction: flight.origin == journey.trip.originCode ? 0 : 1, journey: journey) } : nil, action: { onOpen(flight) })
+        IumrahFlightResultCard(airline: flight.airline, airlineCode: flight.airlineCode, flightNumber: flight.flightNumber, origin: flight.origin, destination: flight.destination, departureAt: flight.departureAt, arrivalAt: flight.arrivalAt, duration: flight.durationMinutes, stops: flight.stops, price: flight.displayedPrice, isAviasales: false, isRoundTripFare: flight.publishedIsPair == true, selected: selection.outbound?.id == flight.id || selection.inbound?.id == flight.id, selectionAccent: .primary, onSelect: { select(flight) }, action: { onOpen(flight) })
     }
 }
 
@@ -249,21 +382,18 @@ struct IumrahHomePublishedFlightDetail: View {
     init(flight: LocalJourneyFlight, selection: IumrahHomePublishedSelection) { self.flight = flight; self.selection = selection }
     var body: some View {
         IumrahManualFlightDetail(flight: flight, onConfirm: {
+            if selection.outbound?.id == flight.id || selection.inbound?.id == flight.id { return true }
             guard selection.canChoose(flight, trip: journey.trip) else { return false }
-            return selection.choose(flight, direction: flight.origin == journey.trip.originCode ? 0 : 1, journey: journey)
+            guard let direction = IumrahAllPublishedFlightStore.direction(of: flight) else { return false }
+            return selection.choose(flight, direction: direction, journey: journey)
         }, selectedOverride: selection.outbound?.id == flight.id || selection.inbound?.id == flight.id,
-        selectionUnavailableMessage: selection.canChoose(flight, trip: journey.trip) ? nil : IumrahFlightCopy.text(settings.language, "Для этого рейса настройте подходящий маршрут, даты и класс в конфигураторе.", "Configure a matching route, dates and cabin for this flight.", "Bu reys uchun mos yo‘nalish, sana va klassni tanlang.", "Бу рейс учун мос йўналиш, сана ва классни танланг."))
+        selectionUnavailableMessage: selection.canChoose(flight, trip: journey.trip) ? nil : IumrahFlightCopy.text(settings.language, "Рейс недоступен для текущей пары. Проверьте даты, аэропорты, класс и опубликованный тариф.", "This flight cannot be selected for the current pair. Check dates, airports, cabin and published fare.", "Bu reys joriy juftlikka mos emas. Sana, aeroport, klass va tarifni tekshiring.", "Бу рейс жорий жуфтликка мос эмас. Сана, аэропорт, класс ва тарифни текширинг."))
     }
 }
 
 extension IumrahHomePublishedSelection {
     func canChoose(_ flight: LocalJourneyFlight, trip: TripDraft) -> Bool {
-        guard flight.publishedID != nil, flight.stops == 0, let price = flight.displayedPrice, price.isFinite, price > 0,
-              let day = IumrahPublishedCarouselCatalog.day(flight.departureAt, flight.origin), day >= Calendar.current.startOfDay(for: Date()),
-              flight.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") == trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() else { return false }
-        if flight.origin == trip.originCode && flight.destination == trip.outboundDestinationCode { return true }
-        guard flight.destination == trip.originCode, flight.origin == trip.returnOriginCode, day > trip.departureDate else { return false }
-        if let outbound { return IumrahPublishedCarouselCatalog.compatible(outbound, flight, scope: trip.scope) }
-        return true
+        guard let direction = IumrahAllPublishedFlightStore.direction(of: flight) else { return false }
+        return proposedTrip(flight, direction: direction, trip: trip) != nil
     }
 }

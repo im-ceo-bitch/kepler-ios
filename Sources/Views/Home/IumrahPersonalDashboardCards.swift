@@ -18,8 +18,8 @@ struct IumrahDashboardBalanceCard: View {
     private var balance: Double? { account.dashboardRewards?.availableCreditUsd }
     private var validBalance: Double? { balance.flatMap { $0.isFinite ? $0 : nil } }
     private var amount: String { validBalance.map { $0.formatted(.currency(code: "USD").locale(Locale(identifier: "en_US"))) } ?? "—" }
-    private var ink: Color { compact ? Color(red: 0.07, green: 0.25, blue: 0.18) : .white }
-    private var subdued: Color { ink.opacity(compact ? 0.78 : 0.73) }
+    private var ink: Color { .white }
+    private var subdued: Color { ink.opacity(0.73) }
     private var detail: String {
         if !account.isAuthenticated { return c.t("Бонусы после регистрации", "Rewards after registration", "Ro‘yxatdan keyin bonuslar", "Рўйхатдан кейин бонуслар") }
         if validBalance == nil { return account.dashboardRewardsLoading ? c.t("Обновляем баланс…", "Updating balance…", "Balans yangilanmoqda…", "Баланс янгиланмоқда…") : c.t("Баланс недоступен · откройте для обновления", "Balance unavailable · open to refresh", "Balans mavjud emas · yangilash uchun oching", "Баланс мавжуд эмас · янгилаш учун очинг") }
@@ -51,7 +51,7 @@ struct IumrahDashboardBalanceCard: View {
             .foregroundStyle(ink).padding(compact ? 18 : 23)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                RoundedRectangle(cornerRadius: 26).fill(LinearGradient(colors: compact ? [Color(red: 0.89, green: 0.96, blue: 0.92), Color(red: 0.76, green: 0.88, blue: 0.82)] : [Color(red: 0.13, green: 0.36, blue: 0.29), Color(red: 0.035, green: 0.16, blue: 0.13)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                RoundedRectangle(cornerRadius: 26).fill(Color(white: 0.067))
             }
         }.buttonStyle(IumrahDashboardPressStyle()).accessibilityIdentifier("iumrah.dashboard.balance")
     }
@@ -63,7 +63,7 @@ struct IumrahDashboardRewardsCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     var compact = false
     private var c: IumrahDashboardCopy { .init(language: settings.language) }
-    private let ink = Color(red: 0.37, green: 0.24, blue: 0.09)
+    private let ink = Color.black
     private var level: String? {
         guard let tier = account.dashboardRewards?.tier?.lowercased(), ["member", "plus", "elite"].contains(tier) else { return nil }
         return tier.capitalized
@@ -81,7 +81,7 @@ struct IumrahDashboardRewardsCard: View {
                     Spacer(minLength: 4)
                     Image(systemName: "arrow.up.right").font(.caption.weight(.semibold))
                 }
-                Text(level ?? "Rewards").font(.system(size: compact ? 27 : 35, weight: .bold, design: .rounded))
+                Text(level ?? "—").font(.system(size: compact ? 27 : 35, weight: .bold, design: .rounded))
                     .lineLimit(1).minimumScaleFactor(0.55).contentTransition(.opacity)
                     .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: level)
                 Text("iumrah Rewards").font(.system(.headline, design: .rounded)).fixedSize(horizontal: false, vertical: true)
@@ -101,7 +101,7 @@ struct IumrahDashboardRewardsCard: View {
             .padding(18).frame(maxWidth: .infinity, minHeight: compact ? 184 : 0, maxHeight: compact ? .infinity : nil, alignment: .topLeading)
             .foregroundStyle(ink)
             .background {
-                RoundedRectangle(cornerRadius: 25).fill(LinearGradient(colors: [Color(red: 0.99, green: 0.95, blue: 0.84), Color(red: 0.91, green: 0.79, blue: 0.55)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                RoundedRectangle(cornerRadius: 25).fill(Color.white)
                     .overlay { IumrahDashboardMetallicLight().clipShape(RoundedRectangle(cornerRadius: 25)) }
             }
         }.buttonStyle(IumrahDashboardPressStyle()).accessibilityIdentifier("iumrah.dashboard.rewards")
@@ -111,17 +111,17 @@ struct IumrahDashboardRewardsCard: View {
 struct IumrahDashboardFriendsTile: View {
     @EnvironmentObject private var settings: AppSettingsStore
     private var c: IumrahDashboardCopy { .init(language: settings.language) }
-    private let ink = Color(red: 0.12, green: 0.25, blue: 0.54)
+    private let ink = Color.black
     var body: some View {
         NavigationLink { IumrahFriendsVisualPage(language: settings.language) } label: {
             VStack(alignment: .leading, spacing: 12) {
                 HStack { Image(systemName: "gift").font(.system(size: 25, weight: .medium)); Spacer(minLength: 4); Image(systemName: "arrow.up.right").font(.caption.weight(.semibold)) }
-                Text("+$100").font(.system(size: 32, weight: .bold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.55)
+                Text("+$100").foregroundStyle(Color(red: 0.196, green: 0.588, blue: 0.357)).font(.system(size: 32, weight: .bold, design: .rounded)).lineLimit(1).minimumScaleFactor(0.55)
                 Text(c.t("Пригласите друга", "Invite a friend", "Do‘stingizni taklif qiling", "Дўстингизни таклиф қилинг")).font(.system(.headline, design: .rounded)).fixedSize(horizontal: false, vertical: true)
-                Text(c.t("За каждую первую подходящую оплаченную поездку друга", "For each friend's first eligible paid trip", "Do‘stning birinchi mos to‘langan safari uchun", "Дўстнинг биринчи мос тўланган сафари учун")).font(.subheadline).foregroundStyle(ink.opacity(0.82)).fixedSize(horizontal: false, vertical: true)
+                Text(c.t("Бонус после оплаты подходящей поездки другом", "For each friend's first eligible paid trip", "Do‘stning birinchi mos to‘langan safari uchun", "Дўстнинг биринчи мос тўланган сафари учун")).font(.subheadline).foregroundStyle(ink.opacity(0.82)).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }.padding(18).frame(maxWidth: .infinity, minHeight: 184, maxHeight: .infinity, alignment: .topLeading).foregroundStyle(ink)
-                .background(LinearGradient(colors: [Color(red: 0.91, green: 0.94, blue: 1), Color(red: 0.79, green: 0.85, blue: 0.99)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 25))
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 25))
         }.buttonStyle(IumrahDashboardPressStyle()).accessibilityIdentifier("iumrah.dashboard.friends.tile")
     }
 }
@@ -140,7 +140,7 @@ struct IumrahDashboardIdentityCard: View {
                     Spacer(minLength: 6); Image(systemName: "arrow.up.right").font(.subheadline.weight(.semibold))
                 }
             }.padding(21).foregroundStyle(.white).frame(maxWidth: .infinity, alignment: .leading)
-                .background(LinearGradient(colors: [Color(red: 0.19, green: 0.21, blue: 0.30), Color(red: 0.075, green: 0.08, blue: 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 26))
+                .background(Color(white: 0.11), in: RoundedRectangle(cornerRadius: 26))
         }.buttonStyle(IumrahDashboardPressStyle()).accessibilityIdentifier("iumrah.dashboard.identity")
     }
 }
@@ -170,17 +170,17 @@ struct IumrahDashboardPressStyle: ButtonStyle {
     }
 }
 
-enum IumrahDashboardTone {
-    case blue, gold, slate, green, violet
-    var colors: (Color, Color, Color) {
+enum IumrahDashboardTone: Equatable {
+    case white, silver, graphite
+    var surface: Color {
         switch self {
-        case .blue: return (Color(red: 0.90, green: 0.94, blue: 1), Color(red: 0.80, green: 0.87, blue: 0.98), Color(red: 0.14, green: 0.30, blue: 0.55))
-        case .gold: return (Color(red: 0.99, green: 0.95, blue: 0.88), Color(red: 0.94, green: 0.87, blue: 0.75), Color(red: 0.45, green: 0.30, blue: 0.12))
-        case .slate: return (Color(red: 0.94, green: 0.95, blue: 0.97), Color(red: 0.83, green: 0.87, blue: 0.92), Color(red: 0.25, green: 0.33, blue: 0.44))
-        case .green: return (Color(red: 0.91, green: 0.97, blue: 0.93), Color(red: 0.78, green: 0.89, blue: 0.83), Color(red: 0.12, green: 0.36, blue: 0.24))
-        case .violet: return (Color(red: 0.96, green: 0.93, blue: 0.99), Color(red: 0.87, green: 0.81, blue: 0.95), Color(red: 0.34, green: 0.22, blue: 0.52))
+        case .white: return .white
+        case .silver: return Color(red: 0.89, green: 0.894, blue: 0.906)
+        case .graphite: return Color(white: 0.125)
         }
     }
+    var ink: Color { self == .graphite ? .white : .black }
+    var secondaryInk: Color { self == .graphite ? Color(white: 0.73) : Color(white: 0.40) }
 }
 
 struct IumrahDashboardServiceTile: View {
@@ -189,14 +189,14 @@ struct IumrahDashboardServiceTile: View {
     let subtitle: String
     let tone: IumrahDashboardTone
     var body: some View {
-        let palette = tone.colors
+        let palette = tone
         VStack(alignment: .leading, spacing: 9) {
             HStack { Image(systemName: symbol).font(.system(size: 26, weight: .medium)); Spacer(minLength: 4); Image(systemName: "arrow.up.right").font(.caption.weight(.semibold)) }
             Spacer(minLength: 3)
             Text(title).font(.system(.headline, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
-            Text(subtitle).font(.subheadline).foregroundStyle(palette.2.opacity(0.83)).fixedSize(horizontal: false, vertical: true)
-        }.padding(16).frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading).foregroundStyle(palette.2)
-            .background(LinearGradient(colors: [palette.0, palette.1], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 23))
+            Text(subtitle).font(.subheadline).foregroundStyle(palette.secondaryInk).fixedSize(horizontal: false, vertical: true)
+        }.padding(16).frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading).foregroundStyle(palette.ink)
+            .background(palette.surface, in: RoundedRectangle(cornerRadius: 23))
     }
 }
 
@@ -216,6 +216,59 @@ struct IumrahDashboardPhotoCard: View {
                 HStack { Text(actionTitle).font(.headline); Spacer(minLength: 4); Image(systemName: "arrow.up.right").font(.subheadline.weight(.semibold)) }.padding(.top, 4)
             }.padding(19).frame(maxWidth: .infinity, alignment: .leading)
         }.foregroundStyle(.primary).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26)).clipShape(RoundedRectangle(cornerRadius: 26))
+    }
+}
+
+/// Team preview uses the same public directory as the guide catalogue.
+/// No photos, names or availability are fabricated when the API is unavailable.
+struct IumrahDashboardTeamShowcase: View {
+    let trip: TripDraft
+    let title: String
+    let subtitle: String
+    let actionTitle: String
+    @State private var members: [IumrahPublicProfile] = []
+    @EnvironmentObject private var settings: AppSettingsStore
+    private var c: IumrahDashboardCopy { .init(language: settings.language) }
+    private var key: String { IumrahGuideDates.day(trip.hotelStayStartDate) + "|" + IumrahGuideDates.day(trip.returnDate) }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("THE IUMRAH TEAM").font(.caption2.weight(.semibold)).tracking(1.5).foregroundStyle(.white.opacity(0.65))
+                HStack(spacing: 12) {
+                    Spacer(minLength: 0)
+                    if members.isEmpty {
+                        Image(systemName: "person.2.circle").font(.system(size: 52, weight: .light)).foregroundStyle(.white.opacity(0.8))
+                    } else {
+                        ForEach(members.prefix(3)) { member in
+                            IumrahTeamAvatar(member: member, size: 60)
+                                .overlay { Circle().strokeBorder(.white.opacity(0.22), lineWidth: 1) }
+                                .accessibilityLabel(member.displayName)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                Text(c.t("Команда iumrah", "iumrah team", "iumrah jamoasi", "iumrah жамоаси")).font(.caption).foregroundStyle(.white.opacity(0.74)).frame(maxWidth: .infinity)
+            }.padding(18).frame(maxWidth: .infinity, alignment: .leading).background(Color(white: 0.125)).environment(\.colorScheme, .dark)
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title).font(.system(.title2, design: .rounded, weight: .bold)).fixedSize(horizontal: false, vertical: true)
+                Text(subtitle).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack { Text(actionTitle).font(.headline); Spacer(minLength: 4); Image(systemName: "arrow.up.right").font(.subheadline.weight(.semibold)) }
+            }.padding(19).frame(maxWidth: .infinity, alignment: .leading)
+        }.foregroundStyle(.primary).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 26)).clipShape(RoundedRectangle(cornerRadius: 26))
+        .task(id: key) {
+            do {
+                let published = try await ChatService().loadGuideProfiles(start: trip.hotelStayStartDate, end: trip.returnDate, includeTeam: true)
+                guard !Task.isCancelled else { return }
+                let guides = published.filter { !$0.isOwner && $0.roleKind == "guide" }
+                let leads = guides.filter { $0.isHeadGuide == true }
+                let other = guides.filter { $0.isHeadGuide != true }
+                let founders = published.filter { $0.isOwner }
+                let staff = published.filter { !$0.isOwner && $0.roleKind != "guide" }
+                members = Array((Array(leads.prefix(1)) + Array(other.prefix(leads.isEmpty ? 2 : 1)) + founders + Array(leads.dropFirst()) + other + staff).reduce(into: [IumrahPublicProfile]()) { result, member in
+                    if !result.contains(where: { $0.id == member.id }) { result.append(member) }
+                }.prefix(3))
+            } catch { /* Existing public avatars remain visible after transient failures. */ }
+        }
     }
 }
 

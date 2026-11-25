@@ -98,7 +98,7 @@ private struct IumrahFriendsCouponArtwork: View {
             IumrahDecorativeTimeline(maxFPS: 30, staticWhenConstrained: true) { date in
                 let isStatic = date.timeIntervalSinceReferenceDate == 0
                 let time = isStatic ? 4.0 : max(0, date.timeIntervalSince(startedAt))
-                let phase = time.truncatingRemainder(dividingBy: 10)
+                let phase = time
                 ZStack {
                     IumrahFriendsRippleField(time: time)
                     ZStack {
@@ -125,10 +125,9 @@ private struct IumrahFriendsCouponArtwork: View {
 
     private func coupon(index: Int, phase: Double) -> some View {
         let delay = Double(index) * 0.72
-        // Three tickets arrive in sequence, settle and withdraw before the next cycle.
+        // Three tickets arrive in sequence and remain visible once settled.
         let entry = smooth((phase - delay) / 1.0)
-        let exit = 1 - smooth((phase - (9.0 - Double(index) * 0.52)) / 0.9)
-        let presence = entry * exit
+        let presence = entry
         let x: CGFloat = [-26, 27, 0][index]
         let y: CGFloat = [-37, -7, 27][index]
         let angle: Double = [-15, 13, -5][index]
@@ -138,6 +137,7 @@ private struct IumrahFriendsCouponArtwork: View {
             .rotation3DEffect(.degrees((1 - presence) * 13), axis: (x: 0, y: 1, z: 0), perspective: 0.55)
             .scaleEffect(0.88 + 0.12 * presence)
             .offset(x: x + CGFloat(1 - presence) * 24, y: y + drift + CGFloat(1 - presence) * 27)
+            .compositingGroup()
             .opacity(presence)
             .zIndex(Double(index))
     }
@@ -164,7 +164,7 @@ private struct IumrahFriendsRippleField: View {
                 }
                 path.closeSubpath()
                 let alpha = 0.14 * pow(sin(p * .pi), 1.3)
-                context.stroke(path, with: .color(Color(red: 0.68, green: 0.79, blue: 1).opacity(alpha)), lineWidth: 0.8)
+                context.stroke(path, with: .color(Color(white: 0.85).opacity(alpha)), lineWidth: 0.8)
             }
         }
         .background {
@@ -176,12 +176,12 @@ private struct IumrahFriendsRippleField: View {
 private struct IumrahFriendsCoupon: View {
     let index: Int
 
-    private var ink: Color { index == 2 ? Color(red: 0.10, green: 0.20, blue: 0.37) : .white }
+    private var ink: Color { index == 2 ? Color(white: 0.10) : .white }
     private var shades: [Color] {
         switch index {
-        case 0: return [Color(red: 0.30, green: 0.39, blue: 0.58), Color(red: 0.12, green: 0.20, blue: 0.34)]
-        case 1: return [Color(red: 0.53, green: 0.65, blue: 0.85), Color(red: 0.24, green: 0.36, blue: 0.58)]
-        default: return [Color(red: 0.96, green: 0.98, blue: 1), Color(red: 0.70, green: 0.80, blue: 0.94), Color(red: 0.92, green: 0.95, blue: 1)]
+        case 0: return [Color(white: 0.35), Color(white: 0.16)]
+        case 1: return [Color(white: 0.60), Color(white: 0.32)]
+        default: return [Color(white: 0.99), Color(white: 0.71), Color(white: 0.94)]
         }
     }
     var body: some View {

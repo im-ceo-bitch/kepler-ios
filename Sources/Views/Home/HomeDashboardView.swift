@@ -84,7 +84,7 @@ struct HomeDashboardView: View {
             }, searchCardOverlap: 40, helpContext: "home.default", scrollingRefresh: true, header: {
                 IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header, searchExpanded: $journeySearchExpanded)
             }, content: {
-                LazyVStack(spacing: 30) {
+                LazyVStack(spacing: 20) {
                     IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded, flightsSelected: publishedSelection.complete, onContinue: continuePublishedFlights)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
@@ -176,10 +176,10 @@ struct HomeDashboardView: View {
             }.buttonStyle(IumrahDashboardPressStyle())
             LazyVGrid(columns: dashboardColumns, spacing: 12) {
                 Button { chrome.openHotels(board: .flights) } label: {
-                    IumrahDashboardServiceTile(symbol: "slider.horizontal.3", title: c.t("Ручной подбор", "Manual planner", "Qo‘lda tanlash", "Қўлда танлаш"), subtitle: c.t("Полная свобода выбора", "Full control of your choices", "To‘liq tanlov erkinligi", "Тўлиқ танлов эркинлиги"), tone: .blue)
+                    IumrahDashboardServiceTile(symbol: "slider.horizontal.3", title: c.t("Ручной подбор", "Manual planner", "Qo‘lda tanlash", "Қўлда танлаш"), subtitle: c.t("Полная свобода выбора", "Full control of your choices", "To‘liq tanlov erkinligi", "Тўлиқ танлов эркинлиги"), tone: .white)
                 }.buttonStyle(IumrahDashboardPressStyle())
                 Button { startNewSmart() } label: {
-                    IumrahDashboardServiceTile(symbol: "sparkles", title: c.t("Smart подбор", "Smart planner", "Smart tanlov", "Smart танлов"), subtitle: c.t("Персональные варианты", "Personalized options", "Shaxsiy variantlar", "Шахсий вариантлар"), tone: .violet)
+                    IumrahDashboardServiceTile(symbol: "sparkles", title: c.t("Smart подбор", "Smart planner", "Smart tanlov", "Smart танлов"), subtitle: c.t("Персональные варианты", "Personalized options", "Shaxsiy variantlar", "Шахсий вариантлар"), tone: .graphite)
                 }.buttonStyle(IumrahDashboardPressStyle())
             }
         }.accessibilityIdentifier("iumrah.home.dashboard.planners")
@@ -189,12 +189,12 @@ struct HomeDashboardView: View {
         return VStack(alignment: .leading, spacing: 12) {
             IumrahHomeSectionHeader(title: c.t("Всё для вашего путешествия", "Everything for your journey", "Safaringiz uchun hamma narsa", "Сафарингиз учун ҳамма нарса"))
             LazyVGrid(columns: dashboardColumns, spacing: 12) {
-                Button { chrome.openHotels(board: .flights) } label: { IumrahDashboardServiceTile(symbol: "airplane", title: c.t("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"), subtitle: c.t("Прямые рейсы", "Direct flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"), tone: .blue) }.buttonStyle(IumrahDashboardPressStyle())
-                Button { chrome.openHotels(board: .hotels) } label: { IumrahDashboardServiceTile(symbol: "bed.double", title: c.t("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"), subtitle: c.t("Мекка и Медина", "Makkah and Madinah", "Makka va Madina", "Макка ва Мадина"), tone: .gold) }.buttonStyle(IumrahDashboardPressStyle())
-                Button { chrome.openHotels(board: .transfer) } label: { IumrahDashboardServiceTile(symbol: "car", title: c.t("Трансфер", "Transfer", "Transfer", "Трансфер"), subtitle: c.t("Личный автомобиль", "Private vehicle", "Shaxsiy avtomobil", "Шахсий автомобиль"), tone: .slate) }.buttonStyle(IumrahDashboardPressStyle())
-                Button { chrome.openHotels(board: .guide) } label: { IumrahDashboardServiceTile(symbol: "person.2", title: c.t("Персональный гид", "Personal guide", "Shaxsiy gid", "Шахсий гид"), subtitle: c.t("Один гид на семью", "One guide per family", "Har oilaga bitta gid", "Ҳар оилага битта гид"), tone: .green) }.buttonStyle(IumrahDashboardPressStyle())
-                Button { showZiyarats = true } label: { IumrahDashboardServiceTile(symbol: "map", title: c.t("Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар"), subtitle: c.t("Исторические места", "Historic places", "Tarixiy joylar", "Тарихий жойлар"), tone: .gold) }.buttonStyle(IumrahDashboardPressStyle())
-                NavigationLink { ESIMView() } label: { IumrahDashboardServiceTile(symbol: "simcard", title: "iumrah Mobile", subtitle: c.t("Оставайтесь на связи", "Stay connected", "Aloqada qoling", "Алоқада қолинг"), tone: .violet) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.openHotels(board: .flights) } label: { IumrahDashboardServiceTile(symbol: "airplane", title: c.t("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"), subtitle: c.t("Прямые рейсы", "Direct flights", "To‘g‘ridan-to‘g‘ri reyslar", "Тўғридан-тўғри рейслар"), tone: .white) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.openHotels(board: .hotels) } label: { IumrahDashboardServiceTile(symbol: "bed.double", title: c.t("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"), subtitle: c.t("Мекка и Медина", "Makkah and Madinah", "Makka va Madina", "Макка ва Мадина"), tone: .silver) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.openHotels(board: .transfer) } label: { IumrahDashboardServiceTile(symbol: "car", title: c.t("Трансфер", "Transfer", "Transfer", "Трансфер"), subtitle: c.t("Личный автомобиль", "Private vehicle", "Shaxsiy avtomobil", "Шахсий автомобиль"), tone: .silver) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { chrome.openHotels(board: .guide) } label: { IumrahDashboardServiceTile(symbol: "person.2", title: c.t("Гиды и команда", "Guides & team", "Gidlar va jamoa", "Гидлар ва жамоа"), subtitle: c.t("Один гид на семью", "One guide per family", "Har oilaga bitta gid", "Ҳар оилага битта гид"), tone: .graphite) }.buttonStyle(IumrahDashboardPressStyle())
+                Button { showZiyarats = true } label: { IumrahDashboardServiceTile(symbol: "map", title: c.t("Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар"), subtitle: c.t("Исторические места", "Historic places", "Tarixiy joylar", "Тарихий жойлар"), tone: .white) }.buttonStyle(IumrahDashboardPressStyle())
+                NavigationLink { ESIMView() } label: { IumrahDashboardServiceTile(symbol: "simcard", title: "iumrah Mobile", subtitle: c.t("Оставайтесь на связи", "Stay connected", "Aloqada qoling", "Алоқада қолинг"), tone: .silver) }.buttonStyle(IumrahDashboardPressStyle())
             }
         }.accessibilityIdentifier("iumrah.home.dashboard.services")
     }
@@ -203,14 +203,14 @@ struct HomeDashboardView: View {
         return VStack(alignment: .leading, spacing: 12) {
             IumrahHomeSectionHeader(title: c.t("Персональное сопровождение", "Personal accompaniment", "Shaxsiy hamrohlik", "Шахсий ҳамроҳлик"))
             Button { chrome.openHotels(board: .guide) } label: {
-                IumrahDashboardPhotoCard(image: "ZiyaratQuba1", title: c.t("Путешествуйте самостоятельно, но не в одиночку.", "Travel independently, but not alone.", "Mustaqil sayohat qiling, ammo yolg‘iz emas.", "Мустақил саёҳат қилинг, аммо ёлғиз эмас."), subtitle: c.t("Персональный гид: встреча, подготовка и сопровождение по программе поездки.", "Personal guide: arrival, preparation and accompaniment according to your itinerary.", "Shaxsiy gid: kutib olish, tayyorgarlik va safar dasturida hamrohlik.", "Шахсий гид: кутиб олиш, тайёргарлик ва сафар дастурида ҳамроҳлик."), actionTitle: c.t("Познакомиться с гидами", "Meet the guides", "Gidlar bilan tanishing", "Гидлар билан танишинг"))
+                IumrahDashboardTeamShowcase(trip: journey.trip, title: c.t("Путешествуйте самостоятельно, но не в одиночку.", "Travel independently, but not alone.", "Mustaqil sayohat qiling, ammo yolg‘iz emas.", "Мустақил саёҳат қилинг, аммо ёлғиз эмас."), subtitle: c.t("Персональный гид: встреча, подготовка и сопровождение по программе поездки.", "Personal guide: arrival, preparation and accompaniment according to your itinerary.", "Shaxsiy gid: kutib olish, tayyorgarlik va safar dasturida hamrohlik.", "Шахсий гид: кутиб олиш, тайёргарлик ва сафар дастурида ҳамроҳлик."), actionTitle: c.t("Познакомиться с командой", "Meet the team", "Jamoa bilan tanishing", "Жамоа билан танишинг"))
             }.buttonStyle(IumrahDashboardPressStyle())
         }
     }
     private var dashboardCareCard: some View {
         let c = dashboardCopy
         return Button { chrome.navigate(to: .care) } label: {
-            IumrahDashboardServiceTile(symbol: "headphones", title: "iumrah Care", subtitle: c.t("Мы рядом на протяжении вашего путешествия. Связаться с поддержкой", "We're with you throughout your journey. Contact support", "Safaringiz davomida yoningizdamiz. Yordamga murojaat qiling", "Сафарингиз давомида ёнингиздамиз. Ёрдамга мурожаат қилинг"), tone: .green)
+            IumrahDashboardServiceTile(symbol: "headphones", title: "iumrah Care", subtitle: c.t("Мы рядом на протяжении вашего путешествия. Связаться с поддержкой", "We're with you throughout your journey. Contact support", "Safaringiz davomida yoningizdamiz. Yordamga murojaat qiling", "Сафарингиз давомида ёнингиздамиз. Ёрдамга мурожаат қилинг"), tone: .white)
         }.buttonStyle(IumrahDashboardPressStyle())
     }
 

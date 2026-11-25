@@ -72,7 +72,7 @@ struct HotelsHomeView: View {
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, helpContext: mode == .guide ? "review.local" : mode == .transfer ? "transfer.default" : mode == .summary ? "review.local" : mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights", header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: mode != .guide, helpContext: mode == .guide ? "review.local" : mode == .transfer ? "transfer.default" : mode == .summary ? "review.local" : mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights", header: {
             fixedHeader
         }, content: {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -175,6 +175,11 @@ struct HotelsHomeView: View {
             .padding(.bottom, 115)
         })
         .background(Color.iumrahPageBackground.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) {
+            if mode == .guide {
+                Color.iumrahHeaderBackground.frame(height: 1).ignoresSafeArea(edges: .top).allowsHitTesting(false)
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if (mode == .flights || mode == .weekends) && openedManualFlight == nil {
                 flightConfirmationBar

@@ -1,7 +1,7 @@
 {
   "base": "a5d7efd2f83954625777247aa9df1a7c8056d069",
   "cumulative": true,
-  "revision": "team-localized",
+  "revision": "team-localized-approved-ui-refinement",
   "changed_swift_count": 19,
   "files": [
     {
@@ -25,8 +25,12 @@
       "sha256": "cb938e054545323337e98ce7e18360b385fbc661e7c32a88e38db3601be62544"
     },
     {
+      "path": "IUMRAH_UI_REFINEMENT_20261125.md",
+      "sha256": "4b430a3b87ae1afa87d7f643312ee2704f9c8fdc7e6eb7e807a4f8dc8531eb8d"
+    },
+    {
       "path": "Sources/AppShell/IumrahAccountView.swift",
-      "sha256": "c534040795b59ea8488e8d40a172f7fe659e5d7acfa6b0c3487163f73afa9155"
+      "sha256": "08008f36f092472eb5059de9436c38d265b54ab83e8c9e7f0337c9a7a20ed9cf"
     },
     {
       "path": "Sources/Core/BookingDraftBuilder.swift",
@@ -70,19 +74,19 @@
     },
     {
       "path": "Sources/Views/Guides/IumrahGuideCatalog.swift",
-      "sha256": "79dbee7715e0bbee8a02d286cc90414bc93ff51646f4cc90e0555105f3b5a19f"
+      "sha256": "f4c2b59b0cecfbb739cff53ba7be84e027ea326829c637e81b705a302e8fdfdf"
     },
     {
       "path": "Sources/Views/Home/HomeDashboardView.swift",
-      "sha256": "d10cf6554dbddf9d7cf6f02047339d5bbe3862d8d2d60caec16abd2f33410241"
+      "sha256": "3d6d76a8b45f9fbebccb601d6abefc47b1dd947650312670ba4cd01f201eeb76"
     },
     {
       "path": "Sources/Views/Home/IumrahFriendsAnimatedCard.swift",
-      "sha256": "55032c768fb33bfe3027a8c3bc2593cce314faf2bdd62fee2e0a8e864a20eae7"
+      "sha256": "2743b0b0cf5db3e0ef2b69c7898dbb9c50b5e22c8165cb86922a63743a94338c"
     },
     {
       "path": "Sources/Views/Home/IumrahPersonalDashboardCards.swift",
-      "sha256": "199ed664766da56d2abd521addd02253e5ce1c7de8be638bc4d163944ffcc50c"
+      "sha256": "cddc3e13089eb1ddb9425f057218d1c717307401221c801c555e151585e3a5b7"
     },
     {
       "path": "Sources/Views/Home/IumrahPublishedFlightCarousel.swift",
@@ -98,7 +102,7 @@
     },
     {
       "path": "Sources/Views/Tabs/HotelsHomeView.swift",
-      "sha256": "8b16a43a297d357837f058418ae0da12911cd0fae7234408d7821155313e7195"
+      "sha256": "8e78ae9ee4f4c6c3b9003cff9e3af1bd8a61829ea60b67d37ebd2bb60d165f1a"
     },
     {
       "path": "Tests/iumrah_dashboard_cache_smoke.py",

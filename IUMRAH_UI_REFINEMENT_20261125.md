@@ -1,0 +1,9 @@
+# iumrah iOS — approved UI refinement
+
+Cumulative client patch based on `iumrah-beta-update-20261125-zzz-team-localized.zip`. Existing server API, balance, booking preferences, team data, and flight catalog are retained. No Business or backend files included. No signature masthead or workflow modifications relative to the previous patch.
+
+- Home/account: black balance, white Friends/Rewards tiles with green reward amount, graphite ID, white/silver/graphite service tiles, tighter spacing. Home keeps flights immediately after balance and all existing sections. Home team preview displays real public avatars, with a neutral icon fallback. Account links to team.
+- Friends: three opaque graphite/metallic silver coupons enter sequentially and stay visible with gentle motion; native waves remain. Reduced motion retains static settled artwork.
+- Guides: 68-point circular avatars in list, 80-point avatars in profile, compact heading and availability, adjacent action buttons for available guides, details only for unavailable guides, compact founder/team cards and staff profile sheets. Head guides sorted first using server role. Six matching native SF Symbols replace unrelated photo assets. Profile and catalog safe-area handling adjusted; original masthead unchanged. Existing localized biography fields and backend fallback remain; missing translations must be entered in Business. Contact privacy is unchanged; personal guide contact access after payment remains handled by existing booking functionality.
+
+Validation: Linux Swift frontend syntax parse for all 19 patched Swift files, dashboard cache test and full 354-flight projection test. No Xcode/iOS SDK in this environment; actual iPhone rendering, compilation and production data require TestFlight verification. No claims of pixel-level visual verification.

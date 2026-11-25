@@ -427,12 +427,25 @@ struct IumrahAccountView: View {
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: dashboardTypeSize.isAccessibilitySize ? 1 : 2), spacing: 12) {
                 NavigationLink { ESIMView() } label: {
-                    IumrahDashboardServiceTile(symbol: "simcard", title: "iumrah Mobile", subtitle: tr("Your eSIM", "Ваша eSIM", "Sizning eSIM", "Сизнинг eSIM"), tone: .green)
+                    IumrahDashboardServiceTile(symbol: "simcard", title: "iumrah Mobile", subtitle: tr("Your eSIM", "Ваша eSIM", "Sizning eSIM", "Сизнинг eSIM"), tone: .silver)
                 }.buttonStyle(IumrahDashboardPressStyle())
                 Button { chrome.navigate(to: .care) } label: {
-                    IumrahDashboardServiceTile(symbol: "headphones", title: "iumrah Care", subtitle: tr("Support 24/7", "Поддержка 24/7", "Yordam 24/7", "Ёрдам 24/7"), tone: .violet)
+                    IumrahDashboardServiceTile(symbol: "headphones", title: "iumrah Care", subtitle: tr("Support 24/7", "Поддержка 24/7", "Yordam 24/7", "Ёрдам 24/7"), tone: .graphite)
                 }.buttonStyle(IumrahDashboardPressStyle())
             }
+
+            Button { chrome.openHotels(board: .guide) } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.2").font(.title2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("Guides & team", "Гиды и команда iumrah", "Gidlar va jamoa", "Гидлар ва жамоа")).font(.headline)
+                        Text(tr("People who care for you", "Люди, которые заботятся о вас", "Sizga g‘amxo‘rlik qiladigan insonlar", "Сизга ғамхўрлик қиладиган инсонлар")).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right").foregroundStyle(.secondary)
+                }.padding(18).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
+            }.buttonStyle(IumrahDashboardPressStyle())
 
             compactAccountGroup(tr("Services", "Сервисы", "Xizmatlar", "Хизматлар")) {
                 NavigationLink { IumrahFlightsView(preferredBookingID: activeTrip?.id) } label: {

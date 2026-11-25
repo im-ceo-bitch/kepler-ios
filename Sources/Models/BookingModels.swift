@@ -160,6 +160,7 @@ struct BookingCustomization: Codable, Hashable {
     let ziyaratMadinah: Bool
     let meals: Bool
     let esim: Bool
+    var preferredGuideID: String? = nil
 }
 
 struct BookingHotelNames: Codable, Hashable {

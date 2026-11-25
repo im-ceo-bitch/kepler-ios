@@ -149,15 +149,17 @@ struct IumrahDiscoveryMasthead: View {
                      tr("Отели", "Hotels", "Mehmonxonalar", "Меҳмонхоналар"),
                      tr("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"),
                      tr("Трансфер", "Transfer", "Transfer", "Трансфер"),
+                     tr("Гиды", "Guides", "Gidlar", "Гидлар"),
                      tr("Мой пакет", "My package", "Mening paketim", "Менинг пакетим") + (manual.componentCount > 0 ? " · \(manual.componentCount)" : "")],
-            symbols: ["sparkles", "bed.double", "airplane", "car.side", "suitcase"], selection: selection,
+            symbols: ["sparkles", "bed.double", "airplane", "car.side", "person.crop.circle.badge.checkmark", "suitcase"], selection: selection,
             onSelect: { index in
                 switch index {
                 case 0: chrome.openUmrahPlan()
                 case 1: chrome.openHotels(board: .hotels)
                 case 2: chrome.openHotels(board: .flights)
                 case 3: chrome.openHotels(board: .transfer)
-                case 4: chrome.openHotels(board: .summary)
+                case 4: chrome.openHotels(board: .guide)
+                case 5: chrome.openHotels(board: .summary)
                 default: break
                 }
             })), discovery: true)

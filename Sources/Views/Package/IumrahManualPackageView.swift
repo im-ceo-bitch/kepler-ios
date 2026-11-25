@@ -142,12 +142,21 @@ struct IumrahManualPackageView: View {
             }
             ForEach(manual.cities, id: \.self) { city in hotelCard(city) }
             transferCard
+            guidePreferenceCard
             totalCard
         }.padding(.horizontal, IumrahDesign.pagePadding)
             .task(id: manual.revisionKey + ":\(retry)") { await requestQuote() }
             .navigationDestination(isPresented: $showFinal) {
                 if let pricedJourney { FinalPackageView().environmentObject(pricedJourney) }
             }
+    }
+    private var guidePreferenceCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(t("Персональный гид", "Personal guide", "Shaxsiy gid", "Шахсий гид"), systemImage: "person.crop.circle.badge.checkmark").font(.headline)
+            Text(manual.guidePreference?.displayName ?? t("Подбор от iumrah", "Selected by iumrah", "iumrah tanlovi", "iumrah танлови")).font(.title3.bold())
+            Text(t("Сопровождение включено в расчёт пакета. Назначение подтверждается после проверки дат.", "Accompaniment is included in the package quote. Assignment is confirmed after checking dates.", "Hamrohlik paket hisobiga kiradi. Gid sanalar tekshirilgach tasdiqlanadi.", "Ҳамроҳлик пакет ҳисобига киради. Гид саналар текширилгач тасдиқланади.")).font(.footnote).foregroundStyle(.secondary)
+            Button(t("Выбрать гида", "Choose guide", "Gid tanlash", "Гид танлаш")) { chrome.openHotels(board: .guide) }.buttonStyle(IumrahSecondaryButtonStyle())
+        }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 28))
     }
     private var tripDetails: some View {
         VStack(alignment: .leading, spacing: 7) {

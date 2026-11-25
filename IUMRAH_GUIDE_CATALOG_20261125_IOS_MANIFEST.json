@@ -1,0 +1,49 @@
+{
+  "base": "kepler-ios-main 5.zip",
+  "files": [
+    {
+      "path": "IUMRAH_GUIDE_CATALOG_20261125.md",
+      "sha256": "95b0c52353be047721aa8c34fbe6c6020a4bb0856103d1165cd4b665b0f0dcde"
+    },
+    {
+      "path": "Sources/Core/BookingDraftBuilder.swift",
+      "sha256": "fde6d1829a71cd75e5d1e1735f31657fa9f8bd60ae443ac00e247e35a840ad01"
+    },
+    {
+      "path": "Sources/Core/Components/IumrahSignatureHeaders.swift",
+      "sha256": "a923a2cee51bbe9b2daf5ba5f8a2887869ee5ac2b9c8e2504cb8fc2c8e01bdb7"
+    },
+    {
+      "path": "Sources/Models/BookingModels.swift",
+      "sha256": "48f67b55fe767a0d796be38c2060c25eb44060829e156717ba7423327289d3e7"
+    },
+    {
+      "path": "Sources/Models/TripModels.swift",
+      "sha256": "7134c71dc6eb8d6ddc5f63f903477c403045d480d0a5391d84df84c7b0ab4e9c"
+    },
+    {
+      "path": "Sources/Services/ChatService.swift",
+      "sha256": "03a50df9fe606eb7def12cdb86be06ba58f78629c5e128bb7d1d2f8c71d8758b"
+    },
+    {
+      "path": "Sources/State/IumrahManualJourneyStore.swift",
+      "sha256": "fc7af69efa6d593eeef0ded7c442918f8da58fc185b0fa025910b3d284f26c91"
+    },
+    {
+      "path": "Sources/Views/Guides/IumrahGuideCatalog.swift",
+      "sha256": "797c5c736c6257b98ac5deb1de85a2dd814b616015e8ceb14d27bafb23f32c31"
+    },
+    {
+      "path": "Sources/Views/Package/FinalPackageView.swift",
+      "sha256": "66d9dfffd66b1e698b647fa449651e1849ced1e63ef0334a2c97809c799cb173"
+    },
+    {
+      "path": "Sources/Views/Package/IumrahManualPackageView.swift",
+      "sha256": "d3776de1e1d0b7bb62c58676ef53c009789e84269dd482d63d60bc18b1b5de6c"
+    },
+    {
+      "path": "Sources/Views/Tabs/HotelsHomeView.swift",
+      "sha256": "e2444467003a6335758030c482cebd408a2b99e8ecfa3aac634274da0a92d7ef"
+    }
+  ]
+}

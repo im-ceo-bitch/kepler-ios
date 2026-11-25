@@ -200,7 +200,14 @@ enum FlightTripType: String, CaseIterable, Codable, Identifiable, Hashable {
     var id: String { rawValue }
 }
 
+/// A preferred person, not a confirmed operational assignment. Nil lets iumrah choose.
+struct IumrahGuidePreference: Codable, Hashable {
+    let memberID: String
+    let displayName: String
+}
+
 struct TripDraft: Codable, Hashable {
+    var guidePreference: IumrahGuidePreference? = nil
     var origin: String = "TAS"
     var originAirport: Airport? = nil
     var arrivalAirport: SaudiArrivalAirport = .jeddah

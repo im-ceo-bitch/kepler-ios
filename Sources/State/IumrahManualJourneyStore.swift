@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 final class IumrahManualJourneyStore: ObservableObject {
     private var cachedRevisionKey: String?
+    @Published var guidePreference: IumrahGuidePreference? = nil { didSet { cachedRevisionKey = nil } }
     @Published var outbound: LocalJourneyFlight? = nil { didSet { cachedRevisionKey = nil } }
     @Published var inbound: LocalJourneyFlight? = nil { didSet { cachedRevisionKey = nil } }
     @Published var rooms: [String: LocalJourneyRoom] = [:] { didSet { cachedRevisionKey = nil } }
@@ -32,7 +33,7 @@ final class IumrahManualJourneyStore: ObservableObject {
         let components = [flights, values, transfer?.rawValue ?? "", scope.rawValue, String(adults), cabin.rawValue]
         let route = [plannedOrigin, plannedArrival.rawValue, String(plannedDeparture.timeIntervalSince1970), String(plannedReturn.timeIntervalSince1970), String(routeConfigured)]
         let train = [String(haramainSelected), haramainFareClass.rawValue, String(haramainAdultTickets)]
-        let key = (components + route + train).joined(separator: "|")
+        let key = (components + route + train + [guidePreference?.memberID ?? "", guidePreference?.displayName ?? ""]).joined(separator: "|")
         cachedRevisionKey = key
         return key
     }
@@ -95,6 +96,7 @@ final class IumrahManualJourneyStore: ObservableObject {
               scope != .makkahOnly || (first == .jeddah && last == .jeddah),
               scope != .makkahAndMadinah || (Calendar.current.dateComponents([.day], from: arrival, to: returning).day ?? 0) >= 2 else { return nil }
         var draft = TripDraft()
+        draft.guidePreference = guidePreference
         draft.origin = outbound.origin; draft.originAirport = nil
         draft.departureDate = departure; draft.saudiArrivalDate = arrival; draft.returnDate = returning
         draft.arrivalAirport = first; draft.selectedReturnAirport = last
@@ -106,6 +108,7 @@ final class IumrahManualJourneyStore: ObservableObject {
     var plannedTrip: TripDraft {
         if let trip { return trip }
         var draft = TripDraft()
+        draft.guidePreference = guidePreference
         draft.origin = plannedOrigin; draft.originAirport = nil
         draft.scope = scope; draft.arrivalAirport = scope == .makkahOnly ? .jeddah : plannedArrival
         draft.departureDate = outbound.flatMap { day($0.departureAt, airport: $0.origin) } ?? plannedDeparture

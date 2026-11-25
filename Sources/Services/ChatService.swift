@@ -60,7 +60,13 @@ private struct EmptyPayload: Encodable {}
 
 private struct BasicOKResponse: Decodable { let ok: Bool }
 
-struct IumrahPublicProfile: Decodable, Hashable {
+struct IumrahGuideReview: Decodable, Hashable {
+    let id: String
+    let author: String
+    let text: String
+}
+
+struct IumrahPublicProfile: Decodable, Hashable, Identifiable {
     let id: String
     let firstName: String
     let lastName: String
@@ -78,6 +84,11 @@ struct IumrahPublicProfile: Decodable, Hashable {
     let active: Bool
     let isOwner: Bool
     let photoURL: String?
+    let guideAvailable: Bool?
+    let experienceYears: Int?
+    let languages: [String]?
+    let introVideoURL: String?
+    let guideReviews: [IumrahGuideReview]?
 }
 
 private struct IumrahPublicProfilesResponse: Decodable {
@@ -99,5 +110,21 @@ extension ChatService {
     func loadTeamProfile(id: String) async throws -> IumrahPublicProfile? {
         let members = try await loadTeamProfiles()
         return members.first(where: { $0.id == id })
+    }
+}
+
+/// Civil trip dates use the same local calendar convention as BookingDraftBuilder.
+enum IumrahGuideDates {
+    static func day(_ date: Date) -> String {
+        let f = DateFormatter(); f.calendar = Calendar(identifier: .gregorian); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
+}
+
+extension ChatService {
+    func loadGuideProfiles(start: Date, end: Date) async throws -> [IumrahPublicProfile] {
+        let value: IumrahPublicProfilesResponse = try await api.get("/api/catalog/hotels/team", query: [URLQueryItem(name: "guideStart", value: IumrahGuideDates.day(start)), URLQueryItem(name: "guideEnd", value: IumrahGuideDates.day(end))])
+        guard value.ok else { throw APIError.invalidResponse }
+        return value.members.filter { $0.active && $0.publicVisible && !$0.isOwner && $0.roleKind.lowercased() == "guide" }
     }
 }

@@ -32,6 +32,7 @@ struct LegacyFinalPackageView: View {
     @State private var bookingBlockMessage: String?
     @State private var infoSheet: StorefrontPackageInfoSheet?
     @State private var showTransferDetails = false
+    @State private var showGuideCatalog = false
     @State private var localHotelForDetails: LocalJourneyRoom?
     @State private var hotelForDetails: HotelSummary?
     @State private var expandedSummary: Set<String> = []
@@ -124,6 +125,22 @@ struct LegacyFinalPackageView: View {
     }
     private var reviewSheets: some View {
         AnyView(reviewBase)
+        .sheet(isPresented: $showGuideCatalog) {
+            NavigationStack {
+                ScrollView {
+                    IumrahGuideCatalog(trip: journey.trip, preference: journey.trip.guidePreference, priceText: componentText(["accompaniment"]), onSelect: { preference in
+                        if journey.trip.guidePreference != preference {
+                            journey.trip.guidePreference = preference
+                            savedQuoteID = nil
+                        }
+                        showGuideCatalog = false
+                    }).padding(18)
+                }.background(Color.iumrahPageBackground)
+                    .navigationTitle(copy("Гиды", "Guides", "Gidlar", "Гидлар"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button(copy("Закрыть", "Close", "Yopish", "Ёпиш")) { showGuideCatalog = false } } }
+            }
+        }
         .sheet(item: $editSession) { session in
             AnyView(summaryEditor(session))
         }
@@ -367,7 +384,7 @@ struct LegacyFinalPackageView: View {
             .background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 22))
     }
     @ViewBuilder private var serviceTiles: some View {
-        serviceTile("iumrah Guide", icon: "person.crop.circle.badge.checkmark", role: .care) { infoSheet = .guide }
+        serviceTile("iumrah Guide", icon: "person.crop.circle.badge.checkmark", role: .care) { showGuideCatalog = true }
         serviceTile("iumrah Care", icon: "heart", role: .care) { infoSheet = .care }
         serviceTile("iumrah Transfer", icon: "car.side", role: .transfer) { showTransferDetails = true }
     }
@@ -1138,9 +1155,9 @@ private extension LegacyFinalPackageView {
                 if let vehicle = journey.selectedTransferVehicle, vehicle.passengerCapacity < journey.trip.travelerCount { policyLabel(copy("Нужен автомобиль подходящей вместимости", "Select a vehicle with enough seats", "Yetarli o‘rinli avtomobilni tanlang", "Етарли ўринли автомобилни танланг")) }
                 if expandedSummary.contains("transfer") { IumrahTransferRouteDetails(); Text(IumrahRefundComponent.transfer.summary(settings.language)).font(.caption).foregroundStyle(.secondary) }
             }
-            simpleService("guide", title: copy("Персональный гид", "Personal guide", "Shaxsiy gid", "Шахсий гид"), subtitle: copy("Один гид для вашей семьи", "One guide for your family", "Oilangiz uchun bitta gid", "Оилангиз учун битта гид"), icon: "person.crop.circle.badge.checkmark", asset: "AboutIumrahPilgrims", codes: ["accompaniment"], policy: fullRefundText, refundable: true) {
+            simpleService("guide", title: copy("Персональный гид", "Personal guide", "Shaxsiy gid", "Шахсий гид"), subtitle: journey.trip.guidePreference?.displayName ?? copy("Подбор от iumrah", "Selected by iumrah", "iumrah tanlovi", "iumrah танлови"), icon: "person.crop.circle.badge.checkmark", asset: "AboutIumrahPilgrims", codes: ["accompaniment"], policy: fullRefundText, refundable: true) {
                 Text(copy("Встреча в аэропорту, заселение, сопровождение при умре и зияратах, помощь до возвращения домой.", "Airport welcome, check-in, Umrah and ziyarat accompaniment, help until the return home.", "Aeroportda kutib olish, joylashish, umra va ziyoratlarda hamrohlik, qaytishgacha yordam.", "Аэропортда кутиб олиш, жойлашиш, умра ва зиёратларда ҳамроҳлик, қайтишгача ёрдам.")).font(.subheadline)
-                Button(copy("Подробнее о гиде", "Guide details", "Gid haqida", "Гид ҳақида")) { infoSheet = .guide }.buttonStyle(IumrahSecondaryButtonStyle())
+                Text(copy("Назначение подтверждается после проверки дат.", "Assignment is confirmed after checking dates.", "Gid sanalar tekshirilgach tasdiqlanadi.", "Гид саналар текширилгач тасдиқланади.")).font(.caption).foregroundStyle(.secondary)
             }
             simpleService("ziyarat", title: copy("Зияраты", "Ziyarats", "Ziyoratlar", "Зиёратлар"), subtitle: journey.trip.scope.title(settings.language), icon: "mappin.and.ellipse", asset: needsMadinah ? "ZiyaratQuba1" : nil, codes: ["ziyarat_makkah", "ziyarat_madinah"], policy: fullRefundText, refundable: true) {
                 if let amount = componentAmount(["ziyarat_makkah"]) { detailLine(copy("Мекка", "Makkah", "Makka", "Макка"), usd(amount)) }
@@ -1169,6 +1186,9 @@ private extension LegacyFinalPackageView {
             HStack(alignment: .center, spacing: 8) {
                 policyLabel(policy, refundable: refundable).frame(maxWidth: .infinity, alignment: .leading)
                 capsuleToggle("service-" + id, id == "ziyarat" ? copy("Программа", "Program", "Dastur", "Дастур") : copy("Подробнее", "Details", "Batafsil", "Батафсил"))
+            }
+            if id == "guide" {
+                Button(copy("Выбрать или изменить гида", "Choose or change guide", "Gidni tanlash yoki almashtirish", "Гидни танлаш ёки алмаштириш")) { showGuideCatalog = true }.buttonStyle(IumrahSecondaryButtonStyle())
             }
             if expandedSummary.contains("service-" + id) { AnyView(content()) }
         }

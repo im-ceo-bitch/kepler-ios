@@ -111,7 +111,8 @@ enum BookingDraftBuilder {
                 ziyaratMakkah: true,
                 ziyaratMadinah: includeMadinah,
                 meals: includesMeals,
-                esim: true
+                esim: true,
+                preferredGuideID: trip.guidePreference?.memberID
             ),
             includedServices: services,
             hotelNames: .init(

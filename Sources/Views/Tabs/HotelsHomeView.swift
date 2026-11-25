@@ -4,7 +4,7 @@ import SwiftUI
 /// components remain available below for existing deep links, never displayed
 /// as an alternative supplier catalogue on this root tab.
 struct HotelsHomeView: View {
-    private enum Discovery: Int { case hotels, flights, weekends, transfer, summary }
+    private enum Discovery: Int { case hotels, flights, weekends, transfer, summary, guide }
 
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var chrome: AppChromeStore
@@ -33,6 +33,7 @@ struct HotelsHomeView: View {
         city: "makkah", checkin: Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date(),
         nights: 7, adults: 2)
     @State private var hotelSearchRevision = 0
+    @State private var guideRefreshRevision = 0
     @State private var showHotelResults = true
     @State private var searchExpanded = false
     @State private var flightDirection = 0
@@ -57,7 +58,8 @@ struct HotelsHomeView: View {
          copy("Авиабилеты", "Flights", "Aviachiptalar", "Авиачипталар"),
          copy("Выходные", "Weekends", "Dam olish", "Дам олиш"),
          copy("Трансфер", "Transfer", "Transfer", "Трансфер"),
-         copy("Мой пакет", "My package", "Mening paketim", "Менинг пакетим")]
+         copy("Мой пакет", "My package", "Mening paketim", "Менинг пакетим"),
+         copy("Гиды", "Guides", "Gidlar", "Гидлар")]
     }
 
     private var matchingPairID: String? {
@@ -66,15 +68,17 @@ struct HotelsHomeView: View {
     }
 
     private var fixedHeader: some View {
-        IumrahDiscoveryMasthead(selection: mode == .hotels ? 1 : mode == .transfer ? 3 : mode == .summary ? 4 : 2)
+        IumrahDiscoveryMasthead(selection: mode == .hotels ? 1 : mode == .transfer ? 3 : mode == .guide ? 4 : mode == .summary ? 5 : 2)
     }
 
     var body: some View {
-        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, helpContext: mode == .transfer ? "transfer.default" : mode == .summary ? "review.local" : mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights", header: {
+        IumrahRootScrollingPage(onRefresh: { await refreshSearch() }, searchCardOverlap: 40, extendsUnderStatusBar: true, helpContext: mode == .guide ? "review.local" : mode == .transfer ? "transfer.default" : mode == .summary ? "review.local" : mode == .hotels ? (manualQuoteRequired ? "discovery.family" : "discovery.hotels") : mode == .weekends ? "discovery.weekends" : "discovery.flights", header: {
             fixedHeader
         }, content: {
             LazyVStack(alignment: .leading, spacing: 0) {
-                if mode == .transfer {
+                if mode == .guide {
+                    IumrahManualGuideCatalog().id(guideRefreshRevision)
+                } else if mode == .transfer {
                     IumrahManualTransferCatalog()
                 } else if mode == .summary {
                     IumrahManualPackageView()
@@ -92,7 +96,7 @@ struct HotelsHomeView: View {
                         case .hotels: hotelFields
                         case .flights: flightFields
                         case .weekends: weekendFields
-                        case .transfer, .summary: EmptyView()
+                        case .transfer, .summary, .guide: EmptyView()
                         }
                         searchAction
                     }
@@ -509,6 +513,7 @@ struct HotelsHomeView: View {
 
     private func refreshSearch() async {
         searchExpanded = false
+        if mode == .guide { guideRefreshRevision += 1; return }
         if mode == .flights || mode == .weekends { flightSearchRevision += 1; return }
         guard mode == .hotels else { return }
         if mode == .hotels && showHotelResults {
@@ -537,6 +542,7 @@ struct HotelsHomeView: View {
             browseTrip = manual.plannedTrip
         case .sundayClub: mode = .weekends
         case .transfer: mode = .transfer
+        case .guide: mode = .guide
         case .summary: mode = .summary
         default:
             let switchingFromOtherBoard = mode != .hotels

@@ -1,0 +1,8 @@
+# Contextual Home flight carousels — 2026-11-26
+Cumulative iOS patch on top of saved-package hotfix. This revision changes only HomeDashboardView.swift and IumrahPublishedFlightCarousel.swift plus the tests and this note. No backend, Business, signature headers, Smart, Account, guides, workflows or pricing changes relative to the previous patch.
+
+Both carousels retain all future direct published legs. Prioritize exact requested route, cabin and departure day; next matching route/cabin on other dates; then every other published leg. Chronological order within each group by departure instant, stable tie-break by ID. If an opposite leg is selected, incompatible fares are demoted without hiding them. Default return airport is the existing TripDraft.returnOriginCode: MED arrival with Makkah+Madinah returns via JED, JED arrival via MED, Makkah-only via JED. Explicit manual alternate selection keeps existing behavior. Re-rank locally and reposition carousel on search criteria changes; no live supplier search. Existing expiry, selection and published ID rules preserved.
+
+Only a single Continue to hotels CTA is displayed after both carousels when the selected pair matches current trip. The expanded search button shows the same label and calls the same existing commit and hotel navigation handler. No re-selection of flights. Without a valid pair the search button still starts official flight selection. Chevron and terminal cards keep the first step behavior.
+
+Checks: Swift frontend parse; compiled Swift projection and selection/ranking smoke tests with real DTOs, mocked JourneyStore; static assertions for CTA wiring. No iOS SDK or TestFlight runtime in this environment. Full inventory still depends on the existing all-published backend endpoint.

@@ -6,7 +6,7 @@ home=Path('Sources/Views/Home/HomeDashboardView.swift').read_text()
 assert home.index('.id("journey-search")') < home.index('publishedFlightSection\n') < home.index('IumrahDashboardBalanceCard(compact: true)') < home.index('SmartConfiguratorHomeCard(onOpen: startNewSmart)')
 assert home.count('publishedFlightSection\n') == 1
 assert 'direction: 0, onAllFlights: openOfficialFlights' in home and 'direction: 1, onAllFlights: openOfficialFlights' in home
-assert 'Продолжить выбор отеля' in home and 'showPublishedHotels = true' in home
+assert 'Продолжить к отелям' in home and 'showPublishedHotels = true' in home
 assert 'IumrahGuidedFlightSelectionView()' in home and 'NuiteeJourneyHotelsView()' in home
 source=Path('Sources/Views/Home/IumrahPublishedFlightCarousel.swift').read_text()
 assert 'Прямые рейсы туда' in source and 'Прямые рейсы обратно' in source and 'Все авиабилеты' in source
@@ -17,6 +17,11 @@ end=source.index('\n}\n\nstruct IumrahAllPublishedFlightBoard',start)
 flatten=source[start:end]
 assert 'ForEach(flights)' in source and 'flightBoard(allPublished: true)' in source
 assert 'board.catalogComplete == true' in source
+assert 'flightsSelected: publishedSelection.canContinue(journey.trip), onContinue: continuePublishedFlights' in home
+assert 'if flightsSelected { onContinue() } else { searchExpanded = false; findFlights() }' in home
+assert 'publishedSelectionRow' not in home
+assert 'store.prioritizedFlights(trip: journey.trip, direction: direction, other: other)' in source
+assert '.scrollPosition(id: $scrollID, anchor: .leading)' in source
 models=Path('Sources/Models/HotelStorefrontModels.swift').read_text()
 leg=models[models.index('struct StorefrontFlightLeg:'):models.index('/// One independently selectable')]
 board=models[models.index('struct StorefrontFlightBaseline:'):models.index('/// A locally composed')]

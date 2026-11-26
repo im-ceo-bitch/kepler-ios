@@ -97,6 +97,19 @@ struct IumrahPublishedFlightCarousel: View {
     @Published var inbound: LocalJourneyFlight?
     var complete: Bool { outbound != nil && inbound != nil }
     func clear() { outbound = nil; inbound = nil }
+    func canContinue(_ trip: TripDraft) -> Bool {
+        guard let a = outbound, let b = inbound, trip.canContinue,
+              IumrahAllPublishedFlightStore.isFuture(a), IumrahAllPublishedFlightStore.isFuture(b),
+              a.origin == trip.originCode, a.destination == trip.outboundDestinationCode,
+              b.origin == trip.returnOriginCode, b.destination == trip.originCode,
+              let departure = IumrahPublishedCarouselCatalog.day(a.departureAt, a.origin),
+              let returning = IumrahPublishedCarouselCatalog.day(b.departureAt, b.origin),
+              Calendar.current.isDate(departure, inSameDayAs: trip.departureDate),
+              Calendar.current.isDate(returning, inSameDayAs: trip.returnDate) else { return false }
+        let cabin = trip.effectiveFlightFilters.cabinClass.rawValue.lowercased()
+        return [a,b].allSatisfy { $0.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") == cabin }
+            && IumrahPublishedCarouselCatalog.compatible(a,b,scope: trip.scope)
+    }
     func reconcile(_ trip: TripDraft) {
         if let f = outbound, f.origin != trip.originCode || f.destination != trip.outboundDestinationCode || f.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") != trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() || IumrahPublishedCarouselCatalog.day(f.departureAt, f.origin).map({ !Calendar.current.isDate($0, inSameDayAs: trip.departureDate) }) != false { outbound = nil }
         if let f = inbound, f.destination != trip.originCode || f.origin != trip.returnOriginCode || f.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") != trip.effectiveFlightFilters.cabinClass.rawValue.lowercased() || IumrahPublishedCarouselCatalog.day(f.departureAt, f.origin).map({ !Calendar.current.isDate($0, inSameDayAs: trip.returnDate) }) != false { inbound = nil }
@@ -164,7 +177,7 @@ struct IumrahPublishedFlightCarousel: View {
         return next
     }
     func commit(_ journey: JourneyStore) -> Bool {
-        guard let a = outbound, let b = inbound, let aID = a.publishedID, let bID = b.publishedID,
+        guard canContinue(journey.trip), let a = outbound, let b = inbound, let aID = a.publishedID, let bID = b.publishedID,
               IumrahAllPublishedFlightStore.isFuture(a), IumrahAllPublishedFlightStore.isFuture(b),
               a.origin == journey.trip.originCode, b.destination == journey.trip.originCode,
               a.destination == journey.trip.outboundDestinationCode, b.origin == journey.trip.returnOriginCode,
@@ -189,7 +202,7 @@ struct IumrahPublishedFlightCarousel: View {
     }
 }
 
-// Home discovery is deliberately independent of the current trip filters.
+// Home discovery keeps the complete catalogue, but ranks the current trip first.
 // The original route-scoped carousel remains available to all configurators.
 @MainActor final class IumrahAllPublishedFlightStore: ObservableObject {
     static let shared = IumrahAllPublishedFlightStore()
@@ -240,6 +253,47 @@ struct IumrahPublishedFlightCarousel: View {
         }
     }
 
+    // Stable partition by relevance: exact requested route, cabin and day first;
+    // matching route/cabin on other dates second; every other publication last.
+    // Each group is chronological (absolute departure time, then stable ID).
+    static func prioritized(_ flights: [LocalJourneyFlight], trip: TripDraft, direction: Int,
+                            other: LocalJourneyFlight?, departureInstants: [String: Date]) -> [LocalJourneyFlight] {
+        let origin = direction == 0 ? trip.originCode : trip.returnOriginCode
+        let destination = direction == 0 ? trip.outboundDestinationCode : trip.originCode
+        let date = direction == 0 ? trip.departureDate : trip.returnDate
+        let cabin = trip.effectiveFlightFilters.cabinClass.rawValue.lowercased()
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        let targetDay = formatter.string(from: date)
+        let ranked = flights.map { flight -> (flight: LocalJourneyFlight, rank: Int) in
+            let routeMatches = flight.origin == origin && flight.destination == destination
+            let cabinMatches = flight.publishedCabin?.lowercased().replacingOccurrences(of: " ", with: "_") == cabin
+            guard routeMatches, cabinMatches else { return (flight, 2) }
+            if let other {
+                let compatible = direction == 0
+                    ? IumrahPublishedCarouselCatalog.compatible(flight, other, scope: trip.scope)
+                    : IumrahPublishedCarouselCatalog.compatible(other, flight, scope: trip.scope)
+                guard compatible else { return (flight, 2) }
+            }
+            let day = String(IumrahFlightClock.local(flight.departureAt, airport: flight.origin).prefix(10))
+            return (flight, day == targetDay ? 0 : 1)
+        }
+        return ranked.sorted { a,b in
+            if a.rank != b.rank { return a.rank < b.rank }
+            let first = departureInstants[a.flight.id] ?? .distantFuture
+            let second = departureInstants[b.flight.id] ?? .distantFuture
+            return first == second ? a.flight.id < b.flight.id : first < second
+        }.map(\.flight)
+    }
+
+    func prioritizedFlights(trip: TripDraft, direction: Int?, other: LocalJourneyFlight?) -> [LocalJourneyFlight] {
+        let rows = visibleFlights(direction: direction)
+        guard let direction else { return rows }
+        return Self.prioritized(rows, trip: trip, direction: direction, other: other, departureInstants: departureInstants)
+    }
+
     nonisolated static func isFuture(_ flight: LocalJourneyFlight, now: Date = Date()) -> Bool {
         departureInstant(flight).map { $0 >= now } ?? false
     }
@@ -282,6 +336,7 @@ struct IumrahAllPublishedFlightBoard: View {
     var onAllFlights: (() -> Void)? = nil
     let onOpen: (LocalJourneyFlight) -> Void
     @State private var selectionError = false
+    @State private var scrollID: String?
     @ScaledMetric(relativeTo: .body) private var terminalHeight: CGFloat = 224
 
     private func t(_ r: String, _ e: String, _ u: String, _ c: String) -> String { IumrahFlightCopy.text(settings.language, r, e, u, c) }
@@ -289,7 +344,9 @@ struct IumrahAllPublishedFlightBoard: View {
         direction == 0 ? t("Прямые рейсы туда", "Direct outbound flights", "Borish uchun to‘g‘ri reyslar", "Бориш учун тўғри рейслар") : t("Прямые рейсы обратно", "Direct return flights", "Qaytish uchun to‘g‘ri reyslar", "Қайтиш учун тўғри рейслар")
     }
     var body: some View {
-        let flights = store.visibleFlights(direction: direction)
+        let other = direction == 0 ? selection.inbound : selection.outbound
+        let flights = store.prioritizedFlights(trip: journey.trip, direction: direction, other: other)
+        let rankKey = "\(journey.trip.originCode)|\(journey.trip.outboundDestinationCode)|\(journey.trip.returnOriginCode)|\(journey.trip.departureDate)|\(journey.trip.returnDate)|\(journey.trip.effectiveFlightFilters.cabinClass.rawValue)|\(other?.id ?? "")"
         VStack(alignment: .leading, spacing: 12) {
             if let onAllFlights {
                 Button(action: onAllFlights) {
@@ -313,13 +370,18 @@ struct IumrahAllPublishedFlightBoard: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: 12) {
                         ForEach(flights) { flight in
-                            card(flight).containerRelativeFrame(.horizontal) { width, _ in min(330, width * 0.86) }
+                            card(flight).containerRelativeFrame(.horizontal) { width, _ in min(330, width * 0.86) }.id(flight.id)
                         }
                         if let onAllFlights {
-                            terminalCard(onAllFlights).containerRelativeFrame(.horizontal) { width, _ in min(330, width * 0.86) }
+                            terminalCard(onAllFlights).containerRelativeFrame(.horizontal) { width, _ in min(330, width * 0.86) }.id("all-tickets-\(direction ?? 0)")
                         }
                     }.scrollTargetLayout()
                 }.scrollTargetBehavior(.viewAligned)
+                    .scrollPosition(id: $scrollID, anchor: .leading)
+                    .onChange(of: rankKey) { _, _ in
+                        let selected = direction == 0 ? selection.outbound : selection.inbound
+                        scrollID = selected.flatMap { chosen in flights.contains(where: { $0.id == chosen.id }) ? chosen.id : nil } ?? flights.first?.id
+                    }
             } else {
                 LazyVStack(spacing: 12) { ForEach(flights) { flight in card(flight) } }
             }

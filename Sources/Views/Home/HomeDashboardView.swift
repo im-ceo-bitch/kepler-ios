@@ -87,7 +87,7 @@ struct HomeDashboardView: View {
                 IumrahHomeJourneySearchHero(onSearch: { showGuidedFlightSelection = true }, presentation: .header, searchExpanded: $journeySearchExpanded)
             }, content: {
                 LazyVStack(spacing: 20) {
-                    IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded)
+                    IumrahHomeJourneySearchHero(onSearch: { publishedSelection.clear(); showGuidedFlightSelection = true }, presentation: .search, searchExpanded: $journeySearchExpanded, flightsSelected: publishedSelection.canContinue(journey.trip), onContinue: continuePublishedFlights)
                         .padding(.horizontal, -IumrahDesign.pagePadding)
                         .id("journey-search")
                 publishedFlightSection
@@ -354,34 +354,16 @@ struct HomeDashboardView: View {
         VStack(alignment: .leading, spacing: 20) {
             IumrahAllPublishedFlightBoard(selection: publishedSelection, horizontal: true, direction: 0, onAllFlights: openOfficialFlights, onOpen: { publishedDetail = $0 })
             IumrahAllPublishedFlightBoard(selection: publishedSelection, horizontal: true, direction: 1, onAllFlights: openOfficialFlights, onOpen: { publishedDetail = $0 })
-            if let outbound = publishedSelection.outbound, let inbound = publishedSelection.inbound {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.iumrahJourneyGreen)
-                        Text(dashboardCopy.t("Оба рейса выбраны", "Both flights selected", "Ikkala reys tanlandi", "Иккала рейс танланди")).foregroundStyle(.primary)
-                    }.font(.system(.headline, design: .rounded, weight: .semibold))
-                    publishedSelectionRow(outbound, title: dashboardCopy.t("Туда", "Outbound", "Borish", "Бориш"))
-                    Divider()
-                    publishedSelectionRow(inbound, title: dashboardCopy.t("Обратно", "Return", "Qaytish", "Қайтиш"))
-                    Button(action: continuePublishedFlights) {
-                        HStack(spacing: 10) {
-                            Text(dashboardCopy.t("Продолжить выбор отеля", "Continue to hotel selection", "Mehmonxona tanlashni davom ettirish", "Меҳмонхона танлашни давом эттириш"))
-                                .lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.85)
-                            Image(systemName: "arrow.right")
-                        }
-                    }.buttonStyle(IumrahPrimaryButtonStyle())
-                    .accessibilityIdentifier("iumrah.home.continueToHotels")
-                }.padding(16).background(Color.iumrahCardBackground, in: RoundedRectangle(cornerRadius: 24))
+            if publishedSelection.canContinue(journey.trip) {
+                Button(action: continuePublishedFlights) {
+                    HStack(spacing: 10) {
+                        Text(dashboardCopy.t("Продолжить к отелям", "Continue to hotels", "Mehmonxonalarga o‘tish", "Меҳмонхоналарга ўтиш"))
+                            .lineLimit(2).multilineTextAlignment(.center).minimumScaleFactor(0.85)
+                        Image(systemName: "arrow.right")
+                    }
+                }.buttonStyle(IumrahPrimaryButtonStyle())
+                .accessibilityIdentifier("iumrah.home.continueToHotels")
             }
-        }
-    }
-
-    private func publishedSelectionRow(_ flight: LocalJourneyFlight, title: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title).font(.subheadline).foregroundStyle(.secondary)
-            Spacer(minLength: 6)
-            Text("\(flight.origin) → \(flight.destination) · \(IumrahFlightClock.day(IumrahFlightClock.local(flight.departureAt, airport: flight.origin), locale: Locale(identifier: settings.language.localeIdentifier)))")
-                .font(.subheadline.weight(.semibold)).multilineTextAlignment(.trailing)
         }
     }
 
@@ -2149,7 +2131,7 @@ private struct IumrahHomeJourneySearchHero: View {
 
             Button(action: { if flightsSelected { onContinue() } else { searchExpanded = false; findFlights() } }) {
                 HStack(spacing: 10) {
-                    Text(flightsSelected ? tr("Продолжить и выбрать отель", "Continue and choose hotel", "Davom etish va mehmonxona tanlash", "Давом этиш ва меҳмонхона танлаш") : tr("Найти авиабилеты", "Find flights", "Reyslarni topish", "Рейсларни топиш"))
+                    Text(flightsSelected ? tr("Продолжить к отелям", "Continue to hotels", "Mehmonxonalarga o‘tish", "Меҳмонхоналарга ўтиш") : tr("Найти авиабилеты", "Find flights", "Reyslarni topish", "Рейсларни топиш"))
                 }
                 .font(IumrahType.bold(16, relativeTo: .headline))
                 .foregroundStyle(.white)

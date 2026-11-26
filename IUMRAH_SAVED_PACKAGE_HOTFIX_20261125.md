@@ -1,0 +1,1 @@
+Fix save and share: refresh stale server quote once, bypass quote cache without forced catalog refresh; require explicit acceptance if total changes. Requires deployed backend quote projection hotfix. Swift syntax checked; Xcode/device not tested.

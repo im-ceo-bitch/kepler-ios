@@ -1186,13 +1186,13 @@ final class JourneyStore: ObservableObject {
         }
     }
 
-    func buildQuote(forceHotelRefresh: Bool = false) async {
+    func buildQuote(forceHotelRefresh: Bool = false, forceQuoteRefresh: Bool = false) async {
         // Transfer preview, confirmation and final review may request the same quote.
         // Share a single request instead of repeatedly prebooking the same supplier offers.
         if usesLocalJourney, let tier = localPackageTier, trip.packageTier != tier { trip.packageTier = tier }
         let key = usesLocalJourney ? "local|" + localBookingInputKey + "|" + String(packageQuoteRevision) : "catalog|" + String(packageQuoteRevision) + "|" + String(trip.hashValue)
         if quoteTaskKey == key, let task = quoteTask { await task.value; return }
-        if usesLocalJourney, !forceHotelRefresh, completedQuoteKey == key, hasFinalGeneratorQuote, quote?.tripSummary != nil, quote?.bookingAllowed == true,
+        if usesLocalJourney, !forceHotelRefresh, !forceQuoteRefresh, completedQuoteKey == key, hasFinalGeneratorQuote, quote?.tripSummary != nil, quote?.bookingAllowed == true,
            let completedQuoteAt, Date().timeIntervalSince(completedQuoteAt) < 300 { return }
         quoteTask?.cancel()
         let generation = UUID()

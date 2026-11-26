@@ -472,14 +472,14 @@ struct LegacyFinalPackageView: View {
             }
         }.frame(maxWidth: .infinity, alignment: .leading).iumrahCard()
     }
-    @MainActor private func recalculatePrice() async {
+    @MainActor private func recalculatePrice(forceQuoteRefresh: Bool = false) async {
         let trace = IumrahPerformanceTrace.begin("Final package quote")
         defer { IumrahPerformanceTrace.end("Final package quote", trace) }
         let generation = UUID()
         quoteGeneration = generation
         isCalculatingPrice = true
         defer { if quoteGeneration == generation { isCalculatingPrice = false } }
-        await journey.buildQuote(forceHotelRefresh: false)
+        await journey.buildQuote(forceHotelRefresh: false, forceQuoteRefresh: forceQuoteRefresh)
         guard !Task.isCancelled, quoteGeneration == generation else { return }
         if journey.hasFinalGeneratorQuote, journey.quote?.tripSummary == nil {
             errorMessage = ConfiguratorBookingCopy.message("PACKAGE_PRICE_BREAKDOWN_MISSING", language: settings.language)
@@ -1372,7 +1372,7 @@ private extension LegacyFinalPackageView {
         }
         Task {
             await saveCurrentPackage()
-            if savedQuoteID == journey.quote?.quoteId, savedPackage != nil {
+            if let currentID = journey.quote?.quoteId, savedQuoteID == currentID, savedPackage != nil {
                 if share { prepareShareImage(); showSharePreview = true }
             } else if let errorMessage { bookingBlockMessage = errorMessage }
         }
@@ -1438,22 +1438,60 @@ private extension LegacyFinalPackageView {
         editSession = nil
         if session.kind == .flights, journey.usesLocalJourney, !journey.localRoomsComplete { editSession = TripSummaryEditSession(kind: .allHotels, journey: journey) }
     }
+    private func requiresSavedQuoteRefresh(_ error: Error) -> Bool {
+        guard let api = error as? APIError, case .server(_, let message) = api else { return false }
+        let code = message.uppercased()
+        return code.contains("BOOKING_QUOTE_REFRESH_REQUIRED") || code.contains("QUOTE_EXPIRED")
+    }
     @MainActor func saveCurrentPackage() async {
-        guard canSavePackage, let q = journey.quote, let hotel = journey.selectedHotel, let out = journey.selectedOutbound else { return }
-        if savedQuoteID == q.quoteId, savedPackage != nil { return }
+        guard canSavePackage, let initial = journey.quote, let initialID = initial.quoteId else { return }
+        if savedQuoteID == initialID, savedPackage != nil { return }
         savingPackage = true; errorMessage = nil
         defer { savingPackage = false }
+        let originalInput = quoteInputKey
+        let acceptedTotal = initial.totalPackagePrice
         do {
             let credential = try ownerCredential ?? TripSummaryOwnerCredential.create()
             ownerCredential = credential
-            let payload = BookingDraftBuilder.make(trip: journey.trip, hotel: hotel, madinahHotel: journey.selectedMadinahHotel, room: journey.selectedRoom, roomCategory: journey.selectedRoomCategory, madinahRoom: journey.selectedMadinahRoom, madinahRoomCategory: journey.selectedMadinahRoomCategory, intercityTransport: needsMadinah ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil, outbound: out, inbound: journey.selectedInbound, quote: q, language: settings.language, pilgrimProfile: nil, nuiteeRooms: journey.usesLocalJourney ? journey.localBookingRooms : nil)
-            guard let price = q.tripSummary else { throw APIError.invalidResponse }
-            let receipt = try await TripSummarySavedClient.save(payload, credential: credential, previous: savedPackage, price: price)
-            savedPackage = receipt
-            credential.recordDraft(TripSummaryLocalDraft(journey: journey), packageID: receipt.packageID)
-            savedQuoteID = q.quoteId
-            IumrahHaptics.success()
-        } catch { errorMessage = L10n.error(error, settings.language) }
+            var q = initial
+            for attempt in 0...1 {
+                guard !Task.isCancelled, originalInput == quoteInputKey,
+                      let quoteID = q.quoteId, let hotel = journey.selectedHotel, let out = journey.selectedOutbound,
+                      let price = q.tripSummary, price.reconciles(with: q.totalPackagePrice),
+                      q.bookingAllowed != false, flightSelectionReady, roomsComplete else {
+                    throw BookingStoreError.authoritativeQuoteRequired
+                }
+                let payload = BookingDraftBuilder.make(trip: journey.trip, hotel: hotel, madinahHotel: journey.selectedMadinahHotel, room: journey.selectedRoom, roomCategory: journey.selectedRoomCategory, madinahRoom: journey.selectedMadinahRoom, madinahRoomCategory: journey.selectedMadinahRoomCategory, intercityTransport: needsMadinah ? (journey.haramainTrainSelected ? .haramainTrain : .road) : nil, outbound: out, inbound: journey.selectedInbound, quote: q, language: settings.language, pilgrimProfile: nil, nuiteeRooms: journey.usesLocalJourney ? journey.localBookingRooms : nil)
+                let localDraft = TripSummaryLocalDraft(journey: journey)
+                do {
+                    let receipt = try await TripSummarySavedClient.save(payload, credential: credential, previous: savedPackage, price: price)
+                    savedPackage = receipt
+                    credential.recordDraft(localDraft, packageID: receipt.packageID)
+                    savedQuoteID = quoteID
+                    IumrahHaptics.success()
+                    return
+                } catch where attempt == 0 && requiresSavedQuoteRefresh(error) && !isSubmitting {
+                    // Refresh exactly once, without forcing the hotel catalog inventory refresh.
+                    // Never save a changed amount without explicit review and acceptance.
+                    beginPriceChange()
+                    await recalculatePrice(forceQuoteRefresh: true)
+                    guard !Task.isCancelled, originalInput == quoteInputKey,
+                          let fresh = journey.quote, journey.hasFinalGeneratorQuote,
+                          fresh.tripSummary != nil, fresh.bookingAllowed != false else {
+                        throw BookingStoreError.authoritativeQuoteRequired
+                    }
+                    guard fresh.totalPackagePrice == acceptedTotal else {
+                        errorMessage = copy("Стоимость обновилась. Подтвердите новую цену и повторите сохранение.", "The price changed. Accept the new total and save again.", "Narx yangilandi. Yangi narxni tasdiqlang va qayta saqlang.", "Нарх янгиланди. Янги нархни тасдиқланг ва қайта сақланг.")
+                        return
+                    }
+                    q = fresh
+                }
+            }
+        } catch {
+            errorMessage = requiresSavedQuoteRefresh(error)
+                ? copy("Не удалось подтвердить актуальный расчёт. Повторите сохранение или обратитесь в поддержку.", "The current quote could not be verified. Try saving again or contact support.", "Joriy narxni tasdiqlab bo‘lmadi. Qayta saqlang yoki yordamga murojaat qiling.", "Жорий нархни тасдиқлаб бўлмади. Қайта сақланг ёки ёрдамга мурожаат қилинг.")
+                : L10n.error(error, settings.language)
+        }
     }
     var packageSupportSheet: some View {
         NavigationStack { ScrollView { VStack(alignment: .leading, spacing: 18) {

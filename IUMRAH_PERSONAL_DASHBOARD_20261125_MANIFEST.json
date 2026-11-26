@@ -1,8 +1,8 @@
 {
   "base": "a5d7efd2f83954625777247aa9df1a7c8056d069",
   "cumulative": true,
-  "revision": "approved-dual-flight-carousels-smart-restoration",
-  "changed_swift_count": 21,
+  "revision": "saved-package-quote-refresh-hotfix",
+  "changed_swift_count": 22,
   "files": [
     {
       "path": "IUMRAH_GUIDE_CATALOG_20261125.md",
@@ -23,6 +23,10 @@
     {
       "path": "IUMRAH_PERSONAL_DASHBOARD_20261125.md",
       "sha256": "43ac0e3c4bb3fdce6281d9af7459470e686c2a7543d497dffcb166670fc4f684"
+    },
+    {
+      "path": "IUMRAH_SAVED_PACKAGE_HOTFIX_20261125.md",
+      "sha256": "4e28661bcfcdb13c974912f7577a280f87374bfa6f3f5af2f765e3e29b392a08"
     },
     {
       "path": "IUMRAH_TEAM_LOCALIZED_20261125.md",
@@ -73,6 +77,10 @@
       "sha256": "fc7af69efa6d593eeef0ded7c442918f8da58fc185b0fa025910b3d284f26c91"
     },
     {
+      "path": "Sources/State/JourneyStore.swift",
+      "sha256": "32dd614710a7e96ee2f19c4a1c1641d52301766cc7fa4337497930e56a8f9391"
+    },
+    {
       "path": "Sources/Views/Booking/IumrahGuideTransferView.swift",
       "sha256": "d69f6ba04356d4fb91e60cbf9f7eeb800bedf9db688e4bd9af1322cbd752fb7f"
     },
@@ -102,7 +110,7 @@
     },
     {
       "path": "Sources/Views/Package/FinalPackageView.swift",
-      "sha256": "66d9dfffd66b1e698b647fa449651e1849ced1e63ef0334a2c97809c799cb173"
+      "sha256": "a80a3bf91e6ebc9e2879202b52fce578e2f58ce3ee0923a56f0f28c53288b1e9"
     },
     {
       "path": "Sources/Views/Package/IumrahManualPackageView.swift",

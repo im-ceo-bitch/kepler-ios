@@ -42,6 +42,8 @@ targets:
         buildPhase: sources
       - path: Sources/Core/Components/IumrahWorldDotsShaders.metal
         buildPhase: sources
+      - path: Resources/iumrah-notification.wav
+        buildPhase: resources
       - path: Resources/Assets.xcassets
         buildPhase: resources
       - path: Resources/Animations

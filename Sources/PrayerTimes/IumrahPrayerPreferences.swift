@@ -172,7 +172,7 @@ enum IumrahPrayerNotifications {
                 let content = UNMutableNotificationContent()
                 content.title = entry.kind.title
                 content.body = "Prayer time in \(place.name)"
-                content.sound = preference.sound ? .default : nil
+                content.sound = preference.sound ? IumrahNotificationSound.sound : nil
                 content.userInfo = ["iumrahCategory": "prayerTimes", "kind": entry.kind.rawValue]
                 let id = prefix + String(Int(fireDate.timeIntervalSince1970)) + "." + entry.kind.rawValue
                 let request = UNNotificationRequest(identifier: id, content: content,
@@ -187,7 +187,7 @@ enum IumrahPrayerNotifications {
                         let earlyContent = UNMutableNotificationContent()
                         earlyContent.title = entry.kind.title
                         earlyContent.body = "Prayer begins in \(lead) minutes · \(place.name)"
-                        earlyContent.sound = preference.sound ? .default : nil
+                        earlyContent.sound = preference.sound ? IumrahNotificationSound.sound : nil
                         earlyContent.userInfo = ["iumrahCategory": "prayerTimes", "kind": entry.kind.rawValue, "earlyReminder": true]
                         let earlyRequest = UNNotificationRequest(
                             identifier: prefix + String(Int(earlyFire.timeIntervalSince1970)) + ".early." + entry.kind.rawValue,
@@ -213,7 +213,7 @@ enum IumrahPrayerNotifications {
         let content = UNMutableNotificationContent()
         content.title = kind.title
         content.body = "iumrah Prayer Times · test notification"
-        content.sound = sound ? .default : nil
+        content.sound = sound ? IumrahNotificationSound.sound : nil
         return (try? await center.add(UNNotificationRequest(
             identifier: prefix + "preview", content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)

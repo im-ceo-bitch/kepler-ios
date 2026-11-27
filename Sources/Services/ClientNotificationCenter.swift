@@ -26,11 +26,13 @@ private struct ClientNotificationDeviceRegistration: Encodable {
     let appBundleID: String
     let locale: String
     let hasTrip: Bool
+    let soundMode: String
 }
 
 private struct ClientNotificationDeviceResponse: Decodable {
     let ok: Bool
     let ready: Bool?
+    let soundMode: String?
 }
 
 private struct ClientNotificationFeedResponse: Decodable {
@@ -57,6 +59,7 @@ final class ClientNotificationCenter: ObservableObject {
     @Published private(set) var lastError: String?
     @Published private(set) var dismissedHomeIDs: Set<String> = []
     @Published private(set) var pushProviderReady: Bool?
+    @Published private(set) var registeredSoundMode: String?
 
     private var registrationTask: Task<Void, Never>?
     private var registrationRevision = 0
@@ -127,9 +130,11 @@ final class ClientNotificationCenter: ObservableObject {
             environment: "production",
             appBundleID: AppIdentity.runtimeBundleID,
             locale: locale,
-            hasTrip: hasTrip
+            hasTrip: hasTrip,
+            soundMode: IumrahNotificationSound.mode
         )
 
+        registeredSoundMode = nil
         var lastRegistrationError: Error?
         for attempt in 0..<3 {
             guard registrationRevision == revision else { return }
@@ -142,6 +147,7 @@ final class ClientNotificationCenter: ObservableObject {
                 guard registrationRevision == revision else { return }
                 guard response.ok else { throw APIError.invalidResponse }
                 pushProviderReady = response.ready
+                registeredSoundMode = request.deviceToken == nil ? nil : response.soundMode
                 await refresh(accountToken: accountToken, expectedRevision: revision)
                 guard registrationRevision == revision else { return }
                 return

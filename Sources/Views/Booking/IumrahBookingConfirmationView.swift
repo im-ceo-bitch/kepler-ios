@@ -417,7 +417,8 @@ struct IumrahBookingConfirmationView: View {
                     verificationToken: verificationProof, locale: settings.language.rawValue,
                     pushDeviceToken: deviceToken, pushEnvironment: "production",
                     appBundleID: AppIdentity.runtimeBundleID,
-                    installationID: ClientNotificationCenter.shared.installationID
+                    installationID: ClientNotificationCenter.shared.installationID,
+                    soundMode: IumrahNotificationSound.mode
                 )
                 committed = try await createBooking(profile, intent)
                 savedBooking = committed // retries never create a duplicate booking

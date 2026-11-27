@@ -48,6 +48,9 @@ struct RootView: View {
             .task {
                 await IumrahIntelligence.shared.start(initialScreen: telemetryScreen)
             }
+            .task {
+                await IumrahNotificationSound.refreshPendingCalendarSounds()
+            }
             .task { @MainActor in
                 quickActions.refreshShortcutItems(language: settings.language, activeBooking: bookings.sessions.first)
                 handlePendingLaunchLink()

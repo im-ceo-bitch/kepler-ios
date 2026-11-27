@@ -739,7 +739,7 @@ struct IumrahFlightsView: View {
         let content = UNMutableNotificationContent()
         content.title = IumrahFlightsCopy.text(.localNotificationTitle, settings.language)
         content.body = IumrahFlightsCopy.text(.localNotificationBody, settings.language)
-        content.sound = .default
+        content.sound = IumrahNotificationSound.sound
         content.userInfo = ["type": "iumrah_flights_demo"]
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1.0, repeats: false)

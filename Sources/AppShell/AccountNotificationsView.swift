@@ -18,6 +18,9 @@ struct AccountNotificationsView: View {
     @ObservedObject private var push = PushNotificationManager.shared
     @State private var pushTesting = false
     @State private var pushTestResult: String?
+    @AppStorage(IumrahNotificationSound.key) private var soundMode = "iumrah"
+    @State private var soundSaving = false
+    @State private var soundPreviewFailed = false
 
     private static let isoFractionalFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -136,6 +139,7 @@ struct AccountNotificationsView: View {
     private var signalPage: some View {
         VStack(spacing: 22) {
             hero
+            notificationSoundCard
             if account.isAuthenticated { pushDiagnosticCard }
 
             if clientNotifications.inboxNotifications.isEmpty {
@@ -160,6 +164,45 @@ struct AccountNotificationsView: View {
                 }
             }
         }
+    }
+
+    private var notificationSoundCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(tr("Notification sound", "Звук уведомлений", "Bildirishnoma ovozi", "Билдиришнома овози"), systemImage: "speaker.wave.2")
+                .font(.headline)
+            Picker(tr("Notification sound", "Звук уведомлений", "Bildirishnoma ovozi", "Билдиришнома овози"), selection: $soundMode) {
+                Text("iumrah").tag("iumrah")
+                Text(tr("System default", "Системный", "Tizim ovozi", "Тизим овози")).tag("system")
+            }.pickerStyle(.segmented).disabled(soundSaving)
+            if soundSaving { ProgressView().frame(maxWidth: .infinity) }
+            if push.deviceToken != nil && clientNotifications.registeredSoundMode != soundMode {
+                Text(tr("Push sound will update after device sync.", "Звук push обновится после синхронизации устройства.", "Push ovozi qurilma sinxronlangach yangilanadi.", "Push овози қурилма синхронлангач янгиланади."))
+                    .font(.caption).foregroundStyle(.secondary)
+                Button(tr("Sync sound", "Синхронизировать звук", "Ovozni sinxronlash", "Овозни синхронлаш")) { Task { await syncSoundChoice() } }.disabled(soundSaving)
+            }
+            Button {
+                Task { @MainActor in
+                    soundPreviewFailed = !(await IumrahNotificationSound.preview(title: "iumrah", body: tr("Notification sound preview", "Проверка звука уведомлений", "Bildirishnoma ovozi sinovi", "Билдиришнома овози синови")))
+                }
+            } label: { Label(tr("Test sound", "Проверить звук", "Ovozni tekshirish", "Овозни текшириш"), systemImage: "play.circle") }
+                .buttonStyle(.bordered)
+            if soundPreviewFailed {
+                Text(tr("Enable notification sounds in iOS settings.", "Разрешите звуки уведомлений в настройках iOS.", "iOS sozlamalarida bildirishnoma ovoziga ruxsat bering.", "iOS созламаларида билдиришнома овозига рухсат беринг."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }.iumrahCard()
+        .onChange(of: soundMode) { _, _ in Task { await syncSoundChoice() } }
+    }
+
+    @MainActor private func syncSoundChoice() async {
+        guard !soundSaving else { return }
+        soundSaving = true
+        defer { soundSaving = false }
+        await IumrahNotificationSound.refreshPendingCalendarSounds()
+        await push.refreshAndRegisterIfAllowed()
+        guard let token = push.deviceToken else { return }
+        await clientNotifications.sync(deviceToken: token, accountToken: account.bearerToken, hasTrip: !bookings.sessions.isEmpty, locale: settings.language.rawValue)
+        await bookings.syncPushSubscriptions(deviceToken: token, locale: settings.language.rawValue)
     }
 
     private var pushDiagnosticCard: some View {

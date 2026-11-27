@@ -134,7 +134,7 @@ final class FlightFavoritesStore: ObservableObject {
         language: AppSettingsStore.Language
     ) {
         let content = UNMutableNotificationContent()
-        content.sound = .default
+        content.sound = IumrahNotificationSound.sound
 
         let route = "\(offer.originAirport.isEmpty ? offer.origin : offer.originAirport) → \(offer.destinationAirport.isEmpty ? offer.destination : offer.destinationAirport)"
         let old = money(oldPrice, currency: currency)

@@ -83,6 +83,7 @@ final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
+        if notification.request.identifier == "iumrah.sound.preview" { return [.banner, .list, .sound] }
         if !notification.request.identifier.hasPrefix("iumrah.prayer.") {
             let inCurrentChat = await MainActor.run {
                 let manager = PushNotificationManager.shared
@@ -100,7 +101,7 @@ final class IumrahAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
         didReceive response: UNNotificationResponse
     ) async {
         // Prayer alerts are local reminders, not server booking events.
-        guard !response.notification.request.identifier.hasPrefix("iumrah.prayer.") else { return }
+        guard !response.notification.request.identifier.hasPrefix("iumrah.prayer."), response.notification.request.identifier != "iumrah.sound.preview" else { return }
         await MainActor.run {
             PushNotificationManager.shared.receiveRemotePayload(response.notification.request.content.userInfo, opened: true)
         }

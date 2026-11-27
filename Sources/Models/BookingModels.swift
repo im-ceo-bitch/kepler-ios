@@ -20,6 +20,7 @@ struct BookingCreationNotificationIntent: Encodable {
     let pushEnvironment: String
     let appBundleID: String
     let installationID: String
+    var soundMode: String? = nil
 }
 
 struct BookingDraftRequest: Encodable {

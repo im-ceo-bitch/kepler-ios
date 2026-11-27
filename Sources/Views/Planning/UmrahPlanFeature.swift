@@ -109,7 +109,7 @@ enum UmrahPlanNotificationScheduler {
             let content = UNMutableNotificationContent()
             content.title = notificationTitle(daysBefore: daysBefore, languageRaw: trip.languageRaw)
             content.body = notificationBody(daysBefore: daysBefore, startDate: trip.startDate, languageRaw: trip.languageRaw)
-            content.sound = .default
+            content.sound = IumrahNotificationSound.sound
             content.userInfo = [
                 "type": "system_notification",
                 "destination": "home",
@@ -131,7 +131,7 @@ enum UmrahPlanNotificationScheduler {
         let content = UNMutableNotificationContent()
         content.title = notificationTitle(daysBefore: 20, languageRaw: trip.languageRaw)
         content.body = notificationBody(daysBefore: 20, startDate: trip.startDate, languageRaw: trip.languageRaw)
-        content.sound = .default
+        content.sound = IumrahNotificationSound.sound
         let request = UNNotificationRequest(
             identifier: "\(identifierPrefix)preview",
             content: content,

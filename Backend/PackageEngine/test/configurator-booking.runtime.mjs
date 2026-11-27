@@ -248,3 +248,47 @@ test('mixed supplier quote seals authoritative fare and rejects altered routes',
   const rejected=await send();assert.notEqual(rejected.status,200);assert.match(JSON.stringify(await rejected.json()),/MIXED_ROUTE_MISMATCH/);
  });
 });
+
+test('official summary requotes 2 → 4 → 5 → 6 → 2 adults with preserved flights and hotels', async()=>{
+ const env=fixture({stars:4,sandbox:true});
+ const mid=new Date(Date.parse(checkin)+3*86400000).toISOString().slice(0,10);
+ env.put('catalog:v1:madinah',[{id:'lp456',name:'Medina Hotel',stars:4,city:'Madinah'}]);
+ const provider=`aviasales:pair:TAS:JED:${checkin}:${checkout}:HY:335:HY:336`;
+ let lastTotal=0;
+ await mockFetch(async(raw)=>{
+  assert.ok(!String(raw).includes('/rates/prebook'));
+  const u=new URL(raw),reverse=u.searchParams.get('origin')==='JED';
+  return Response.json({success:true,currency:'usd',data:[{origin:reverse?'JED':'TAS',destination:reverse?'TAS':'JED',airline:'HY',flight_number:reverse?'336':'335',departure_at:`${reverse?checkout:checkin}T12:00:00+03:00`,duration:360,price:300}]});
+ },async()=>{
+  for(const adults of [2,4,5,6,2]){
+   const count=Math.ceil(adults/5), rooms=[];
+   for(const [city,hotelId,start,end] of [['makkah','lp123',checkin,mid],['madinah','lp456',mid,checkout]]){
+    for(let i=0;i<count;i++){
+     const occupancy=Math.floor(adults/count)+(i<adults%count?1:0);
+     const offerId=`${hotelId}-${occupancy}`;
+     env.put(`rates:v2:${hotelId}:${start}:${end}:${occupancy}::UZ:USD`,[{offerId,roomId:'room',price:100+occupancy*30,currency:'USD',mealPlan:'Room only'}]);
+     rooms.push({id:`${city}:${i}`,city,hotelId,offerId,roomId:'room',checkin:start,checkout:end,adults:occupancy,children:[]});
+    }
+   }
+   const travelers={adults,children:0,infants:0,rooms:count};
+   const input={tier:'standard',tripType:'roundTrip',includeMadinah:true,travelers,transferVehicle:'carnival',hotels:{makkah:{hotelId:'lp123',roomId:'room',nights:3},madinah:{hotelId:'lp456',roomId:'room',nights:4}},flight:{providerItineraryId:provider,legs:[{origin:'TAS',destination:'JED',departureDate:checkin},{origin:'JED',destination:'TAS',departureDate:checkout}]},nuiteeRooms:rooms};
+   const response=await generatePackageQuote(new Request('https://fixture/api/package/quote',{method:'POST',body:JSON.stringify(input)}),env);
+   const body=await response.json();assert.equal(response.status,200,JSON.stringify(body));
+   const q=body.quote,snapshot=await unsealPricingSnapshot(q.quoteProof,env);
+   assert.equal(snapshot.nuiteeRooms.length,count*2);
+   for(const city of ['makkah','madinah']){
+    const selected=snapshot.nuiteeRooms.filter(x=>x.city===city);
+    assert.equal(selected.length,count);assert.equal(selected.reduce((n,r)=>n+r.adults,0),adults);
+    assert.equal(snapshot.components.find(x=>x.code===`${city}_hotel`).supplierCostUsd,100*count+30*adults);
+   }
+   // This iOS archive contains the legacy PackageEngine only. The production
+   // trip-summary-v2 contract is verified separately by the Swift contract test.
+   assert.equal(snapshot.totals.publicTotalUsd,q.totalPackagePrice);
+   assert.equal(snapshot.totals.publicPricePerPilgrimUsd,q.pricePerPerson);
+   assert.equal(snapshot.components.find(x=>x.code==='flight_roundtrip').supplierCostUsd,600*adults);
+   if(adults===2 && lastTotal) assert.ok(q.totalPackagePrice<lastTotal);
+   else assert.ok(q.totalPackagePrice>lastTotal);
+   lastTotal=q.totalPackagePrice;
+  }
+ });
+});

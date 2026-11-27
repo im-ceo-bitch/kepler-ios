@@ -27,7 +27,7 @@ struct SmartConfiguratorPreferences: Codable, Hashable {
         trip.arrivalAirport = scope == .makkahOnly ? .jeddah : firstCity
         trip.departureDate = out; trip.returnDate = back; trip.flexibility = .exact
         trip.adults = adults; trip.children = children; trip.infants = infants
-        trip.rooms = max(1, (adults + 4) / 5)
+        trip.rooms = ConfiguratorRepricingPolicy.minimumRooms(adults)
         trip.hotelStars = tier.primaryHotelStars; trip.packageTier = tier
         return trip
     }
@@ -95,7 +95,7 @@ final class SmartConfiguratorStore: ObservableObject {
             return rooms.count == journey.trip.rooms && Set(rooms.map { $0.hotel.id }).count == 1 &&
                 rooms.reduce(0) { $0 + $1.adults } == journey.trip.adults &&
                 rooms.reduce(0) { $0 + $1.childrenAges.count } == journey.trip.children + journey.trip.infants &&
-                rooms.allSatisfy { $0.checkin == window.checkIn && $0.checkout == window.checkOut &&
+                rooms.allSatisfy { Calendar.current.isDate($0.checkin, inSameDayAs: window.checkIn) && Calendar.current.isDate($0.checkout, inSameDayAs: window.checkOut) &&
                     $0.checkin < $0.checkout && $0.adults > 0 && $0.rate.currency.uppercased() == "USD" &&
                     $0.rate.price.isFinite && $0.rate.price > 0 && !$0.rate.offerId.isEmpty }
         }
@@ -122,7 +122,7 @@ final class SmartConfiguratorStore: ObservableObject {
     }
 
     func assemble() async {
-        guard !busy else { return }
+        guard !busy, replacingCity == nil else { return }
         clear(); busy = true
         defer { busy = false; hotelSearchCity = nil }
         let p = preferences
@@ -194,31 +194,15 @@ final class SmartConfiguratorStore: ObservableObject {
                 if let madinah = windows.madinah { values.append(("madinah", madinah)) }
                 return values.sorted { $0.1.checkIn < $1.1.checkIn }
             }()
-            // Start with the adult-only occupancy rule; if no compatible supplier
-            // room exists, retry with an additional room and show the real allocation.
-            let minimum = journey.trip.rooms
-            let fallback = min(p.adults, max(minimum, (p.adults + p.children + p.infants + 1) / 2))
-            var selectedRooms: [String: LocalJourneyRoom]?
-            for count in minimum...fallback {
-                var candidate: [String: LocalJourneyRoom] = [:]
-                roomPreview = []
-                do {
-                    for (city, window) in stays {
-                        hotelSearchCity = city
-                        let selected = try await selectRooms(city: city, window: window, p: p, count: count)
-                        candidate.merge(selected) { _, new in new }
-                        roomPreview = Self.sortedRooms(candidate)
-                    }
-                    journey.trip.rooms = count
-                    selectedRooms = candidate
-                    break
-                } catch Failure.room {
-                    try Task.checkCancellation()
-                    if count == fallback { throw Failure.room }
-                }
+            // Only the user may choose extra rooms below the adult threshold.
+            var rooms: [String: LocalJourneyRoom] = [:]
+            for (city, window) in stays {
+                hotelSearchCity = city
+                let selected = try await selectRooms(city: city, window: window, p: p, count: journey.trip.rooms)
+                rooms.merge(selected) { _, new in new }
+                roomPreview = Self.sortedRooms(rooms)
             }
             hotelSearchCity = nil
-            guard let rooms = selectedRooms else { throw Failure.room }
             journey.localJourneyRooms = rooms
             try Task.checkCancellation()
             progress = .transfer
@@ -226,8 +210,9 @@ final class SmartConfiguratorStore: ObservableObject {
             journey.confirmTransferSelection()
             transferPreview = journey.selectedTransferVehicle?.modelName
             progress = .price
-            await journey.buildQuote()
+            await journey.buildConfiguratorQuote()
             try Task.checkCancellation()
+            guard preferences == p else { throw CancellationError() }
             guard Self.validReview(journey) else { throw APIError.server(409, journey.errorMessage ?? "SMART_QUOTE_UNAVAILABLE") }
             result = journey; progress = .ready
             syncReview()
@@ -247,24 +232,8 @@ final class SmartConfiguratorStore: ObservableObject {
     enum EditKind: Hashable { case flights, hotel(String), transfer }
 
     func makeEditJourney() -> JourneyStore? {
-        guard let previous = result, !busy else { return nil }
-        let next = JourneyStore()
-        next.usesLocalJourney = true
-        next.trip = previous.trip
-        next.tripSummaryChildAges = previous.tripSummaryChildAges
-        next.flightSearchFlexDays = previous.flightSearchFlexDays
-        next.packageFlightPath = previous.packageFlightPath
-        next.selectedPublishedCompleteID = previous.selectedPublishedCompleteID
-        next.selectedPublishedOutboundID = previous.selectedPublishedOutboundID
-        next.selectedPublishedReturnID = previous.selectedPublishedReturnID
-        next.stagedUmrahFlights = previous.stagedUmrahFlights
-        next.stagedAviasalesOffers = previous.stagedAviasalesOffers
-        next.mixedFlightIdentity = previous.mixedFlightIdentity
-        next.localJourneyFlights = previous.localJourneyFlights
-        next.localJourneyRooms = previous.localJourneyRooms
-        next.selectedOutbound = previous.selectedOutbound
-        next.selectedInbound = previous.selectedInbound
-        copyTransfer(from: previous, to: next)
+        guard let previous = result, !busy, replacingCity == nil else { return nil }
+        let next = previous.tripSummaryEditingCopy()
         return next
     }
 
@@ -279,9 +248,8 @@ final class SmartConfiguratorStore: ObservableObject {
 
     /// Never mutate the last confirmed package until the replacement is priced.
     func applyEdit(_ next: JourneyStore, kind: EditKind) async {
-        guard !busy, let previous = result else { return }
+        guard !busy, replacingCity == nil, let previous = result else { return }
         busy = true; replacementError = nil
-        var replacedHotel = false
         defer { busy = false; hotelSearchCity = nil }
         do {
             guard next.trip.adults == previous.trip.adults,
@@ -300,53 +268,34 @@ final class SmartConfiguratorStore: ObservableObject {
                         next.localJourneyRooms.merge(old) { _, new in new }
                     } else {
                         hotelSearchCity = city
-                        var p = preferences
-                        if let stars = old.values.first?.hotel.roundedStars {
-                            p.tier = stars <= 2 ? .economy : stars == 3 ? .standard : stars == 4 ? .comfort : .luxury
-                        }
-                        let rooms: [String: LocalJourneyRoom]
-                        if let refreshed = try await refreshPreviousRooms(old, window: window, count: next.trip.rooms) {
-                            rooms = refreshed
-                        } else {
-                            rooms = try await selectRooms(city: city, window: window, p: p, count: next.trip.rooms)
-                            replacedHotel = true
+                        guard let rooms = pendingPreviousRooms(old, window: window, count: next.trip.rooms) else {
+                            throw Failure.room
                         }
                         next.localJourneyRooms.merge(rooms) { _, new in new }
                     }
                 }
             }
-            guard next.localRoomsComplete,
-                  let vehicle = next.selectedTransferVehicle,
+            guard let vehicle = next.selectedTransferVehicle,
                   vehicle.passengerCapacity >= next.trip.travelerCount else { throw Failure.room }
             next.confirmTransferSelection()
-            await next.buildQuote()
+            await next.buildConfiguratorQuote()
             try Task.checkCancellation()
             guard Self.validReview(next) else { throw APIError.server(409, next.errorMessage ?? "SMART_QUOTE_UNAVAILABLE") }
             result = next
-            hotelsChangedWithFlights = kind == .flights && replacedHotel
+            hotelsChangedWithFlights = false
             connecting = (next.selectedOutbound?.stops ?? 0) > 0 || (next.selectedInbound?.stops ?? 0) > 0
             syncReview()
         } catch is CancellationError { return }
         catch { if !Task.isCancelled { replacementError = error.localizedDescription } }
     }
 
-    private func refreshPreviousRooms(_ old: [String: LocalJourneyRoom], window: TripStayWindow, count: Int) async throws -> [String: LocalJourneyRoom]? {
+    private func pendingPreviousRooms(_ old: [String: LocalJourneyRoom], window: TripStayWindow, count: Int) -> [String: LocalJourneyRoom]? {
         guard old.count == count, window.checkOut > window.checkIn else { return nil }
-        let service = NuiteeHotelService()
-        var refreshed: [String: LocalJourneyRoom] = [:]
-        for (key, room) in old.sorted(by: { $0.key < $1.key }) {
-            try Task.checkCancellation()
-            let response = try await service.rates(hotelID: room.hotel.id, checkin: window.checkIn, checkout: window.checkOut,
-                adults: room.adults, childrenAges: room.childrenAges, smartTimeout: true)
-            guard response.ok, response.checkin == NuiteeHotelService.dateText(window.checkIn),
-                                  response.checkout == NuiteeHotelService.dateText(window.checkOut), response.adults == room.adults,
-                                  let rate = response.rates.filter({
-                $0.roomId == room.rate.roomId && $0.currency.uppercased() == "USD" && $0.price.isFinite && $0.price > 0 && !$0.offerId.isEmpty
-            }).min(by: { $0.price < $1.price }) else { return nil }
-            refreshed[key] = .init(id: room.id, city: room.city, hotel: room.hotel, rate: rate,
-                checkin: window.checkIn, checkout: window.checkOut, adults: room.adults, childrenAges: room.childrenAges, meals: room.meals)
+        return old.mapValues { room in
+            .init(id: room.id, city: room.city, hotel: room.hotel, rate: room.rate,
+                  checkin: window.checkIn, checkout: window.checkOut, adults: room.adults, childrenAges: room.childrenAges,
+                  meals: room.meals, requiresRateRefresh: true)
         }
-        return refreshed
     }
 
     private static func sortedRooms(_ rooms: [String: LocalJourneyRoom]) -> [LocalJourneyRoom] {
@@ -365,18 +314,7 @@ final class SmartConfiguratorStore: ObservableObject {
             excluded.insert(current.hotel.id)
             let rooms = try await selectRooms(city: city, window: .init(checkIn: current.checkin, checkOut: current.checkout), p: preferences, count: previous.trip.rooms, excluding: excluded)
             try Task.checkCancellation()
-            let next = JourneyStore()
-            next.usesLocalJourney = true; next.trip = previous.trip
-            next.tripSummaryChildAges = previous.tripSummaryChildAges
-            next.mixedFlightIdentity = previous.mixedFlightIdentity
-            next.packageFlightPath = previous.packageFlightPath
-            next.selectedPublishedCompleteID = previous.selectedPublishedCompleteID
-            next.selectedPublishedOutboundID = previous.selectedPublishedOutboundID
-            next.selectedPublishedReturnID = previous.selectedPublishedReturnID
-            next.stagedAviasalesOffers = previous.stagedAviasalesOffers
-            next.stagedUmrahFlights = previous.stagedUmrahFlights
-            next.localJourneyFlights = previous.localJourneyFlights
-            next.selectedOutbound = previous.selectedOutbound; next.selectedInbound = previous.selectedInbound
+            let next = previous.tripSummaryEditingCopy()
             next.localJourneyRooms = previous.localJourneyRooms.filter { $0.value.city != city }
             next.localJourneyRooms.merge(rooms) { _, new in new }
             next.selectedTransferVehicle = previous.selectedTransferVehicle
@@ -385,7 +323,7 @@ final class SmartConfiguratorStore: ObservableObject {
             next.haramainAdultTickets = previous.haramainAdultTickets
             next.haramainChildTickets = previous.haramainChildTickets
             next.confirmTransferSelection()
-            await next.buildQuote()
+            await next.buildConfiguratorQuote()
             try Task.checkCancellation()
             guard Self.validReview(next) else { throw APIError.server(409, next.errorMessage ?? "SMART_QUOTE_UNAVAILABLE") }
             excludedHotels[city] = excluded
@@ -399,7 +337,7 @@ final class SmartConfiguratorStore: ObservableObject {
     private func selectRooms(city: String, window: TripStayWindow, p: SmartConfiguratorPreferences, count: Int, excluding: Set<String> = []) async throws -> [String: LocalJourneyRoom] {
         guard count > 0, count <= p.adults, window.checkOut > window.checkIn else { throw Failure.room }
         let service = NuiteeHotelService()
-        let adults = (0..<count).map { p.adults / count + ($0 < p.adults % count ? 1 : 0) }
+        let adults = (0..<count).map { ConfiguratorRepricingPolicy.adultsInRoom(p.adults, rooms: count, index: $0) }
         var ages = Array(repeating: [Int](), count: count)
         for (i, age) in p.childAges.enumerated() { ages[i % count].append(age) }
         func price(_ hotel: NuiteeHotel) -> Double {

@@ -165,9 +165,14 @@ struct NuiteeHotelService {
             let language: String
             let forceRefresh: Bool
         }
-        return try await APIClient.hotelPrices.post("/api/package/nuitee/rates", body: Request(
-            hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges, language: language, forceRefresh: forceRefresh
-        ), timeoutInterval: 120)
+        let request = Request(hotelId: hotelID, checkin: Self.dateText(checkin), checkout: Self.dateText(checkout), adults: adults, children: childrenAges, language: language, forceRefresh: forceRefresh)
+        do {
+            return try await APIClient.hotelPrices.post("/api/package/nuitee/rates", body: request, timeoutInterval: 120)
+        } catch APIError.decoding(_) where language != "en" {
+            // The monetary offer is language independent. A malformed translation must not hide it.
+            try Task.checkCancellation()
+            return try await APIClient.hotelPrices.post("/api/package/nuitee/rates", body: Request(hotelId: hotelID, checkin: request.checkin, checkout: request.checkout, adults: adults, children: childrenAges, language: "en", forceRefresh: false), timeoutInterval: 120)
+        }
     }
 
     static func deadlineText(_ value: String, locale: String) -> String {

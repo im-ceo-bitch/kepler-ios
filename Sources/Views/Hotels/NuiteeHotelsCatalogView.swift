@@ -582,7 +582,7 @@ struct NuiteeHotelsCatalogView: View {
         }
         .navigationDestination(item: $opened) { hotel in
             if let onManualRoom {
-                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox, childrenAges: childrenAges,
+                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox, childrenAges: childrenAges, cataloguePriceForStay: true,
                     onSelectRate: { rate in
                         guard rate.currency == "USD", rate.price.isFinite, rate.price > 0 else { return }
                         onManualRoom(LocalJourneyRoom(id: "\(city.rawValue):0", city: city.rawValue, hotel: hotel, rate: rate, checkin: checkin, checkout: checkout, adults: adults, childrenAges: childrenAges, meals: manualMeals))
@@ -590,7 +590,7 @@ struct NuiteeHotelsCatalogView: View {
                         model.acceptDetailRates(hotelID: hotel.id, city: city.rawValue, checkin: start, checkout: end, adults: guests, childrenAges: childrenAges, rates: rates)
                     })
             } else {
-                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox, childrenAges: childrenAges, onRatesLoaded: { start, end, guests, rates in
+                NuiteeHotelDetailView(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: model.sandbox, childrenAges: childrenAges, cataloguePriceForStay: true, onRatesLoaded: { start, end, guests, rates in
                     model.acceptDetailRates(hotelID: hotel.id, city: city.rawValue, checkin: start, checkout: end, adults: guests, childrenAges: childrenAges, rates: rates)
                 })
             }
@@ -800,6 +800,7 @@ struct NuiteeHotelDetailView: View {
     @State var adults: Int
     let sandbox: Bool
     var childrenAges: [Int] = []
+    var cataloguePriceForStay: Bool = false
     var onSelectRate: ((NuiteeRoomRate) -> Void)? = nil
     var onSelectMeals: ((HotelMealChoices) -> Void)? = nil
     var onRatesLoaded: ((Date, Date, Int, [NuiteeRoomRate]) -> Void)? = nil
@@ -808,6 +809,7 @@ struct NuiteeHotelDetailView: View {
     @State private var showAllAmenities = false
     @State private var detail: NuiteeHotelDetail?
     @State private var rates: [NuiteeRoomRate] = []
+    @State private var initialPriceContext: String?
     @State private var detailError: String?
     @State private var loadedDetailKey: String?
     @State private var loadedRatesKey: String?
@@ -825,6 +827,7 @@ struct NuiteeHotelDetailView: View {
     private let service = NuiteeHotelService()
 
     private var checkout: Date { Calendar.current.date(byAdding: .day, value: nights, to: checkin) ?? checkin }
+    private var priceContext: String { "\(hotel.id):\(NuiteeHotelService.dateText(checkin)):\(NuiteeHotelService.dateText(checkout)):\(adults):\(childrenAges)" }
     private var reloadID: String { "\(hotel.id):\(checkin.timeIntervalSince1970):\(nights):\(adults):\(childrenAges):\(settings.language.rawValue)" }
     private var photos: [String] {
         let hotelPhotos = detail?.images ?? []
@@ -886,6 +889,14 @@ struct NuiteeHotelDetailView: View {
                                           reviewCount: detail?.reviewCount ?? hotel.reviewCount)
                 sectionTitle(NuiteeCopy.text("Выберите номер", "Xona tanlang", "Choose a room", settings.language)).id("nuitee.rooms")
                 Text(NuiteeCopy.text("Наличие и стоимость проверим после заявки, до оплаты.", "Mavjudlik va narx arizadan keyin, to‘lovdan oldin tekshiriladi.", "Availability and price are checked after your request, before payment.", settings.language)).font(.caption).foregroundStyle(.secondary)
+                if cataloguePriceForStay && rates.isEmpty && (ratesLoading || ratesError != nil), initialPriceContext == priceContext,
+                   let previous = hotel.minimumRate, previous.currency.uppercased() == "USD", previous.price.isFinite, previous.price > 0 {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(NuiteeCopy.text("Последняя цена из каталога", "Katalogdagi oxirgi narx", "Last catalogue price", settings.language)).font(.caption).foregroundStyle(.secondary)
+                        Text(NuiteeHotelService.usd(previous.price)).font(.title2.bold())
+                        Text(NuiteeCopy.text("Не подтверждена для бронирования. Проверяем тарифы номера.", "Bron uchun tasdiqlanmagan. Xona tariflari tekshirilmoqda.", "Not confirmed for booking. Checking room rates.", settings.language)).font(.caption).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if ratesLoading && rates.isEmpty { ProgressView().frame(maxWidth: .infinity).padding(22) }
                 else if ratesError != nil && rates.isEmpty {
                     Label(NuiteeCopy.text("Не удалось загрузить цены", "Narxlarni yuklab bo‘lmadi", "Could not load prices", settings.language), systemImage: "exclamationmark.circle")
@@ -965,7 +976,7 @@ struct NuiteeHotelDetailView: View {
             HomePersonalizationStore.shared.visitHotel(.init(hotel: hotel, checkin: checkin, nights: nights, adults: adults, sandbox: sandbox), owner: HomePersonalizationStore.owner(account))
         }
         .task(id: hotel.id + "|" + settings.language.hotelContentCode) { await refreshDetail() }
-        .task(id: reloadID) { await refreshRates(force: false) }
+        .task(id: reloadID) { if initialPriceContext == nil { initialPriceContext = priceContext }; await refreshRates(force: false) }
         .fullScreenCover(isPresented: $isGalleryPresented) {
             NuiteeHotelGallery(images: photos, hotelName: hotel.name, rooms: detail?.rooms ?? [], onChooseRooms: { isGalleryPresented = false; galleryScrollToRooms = true })
         }

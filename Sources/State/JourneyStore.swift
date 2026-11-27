@@ -1720,10 +1720,27 @@ final class JourneyStore: ObservableObject {
         invalidateTripSummaryQuote()
         trip = next
         tripSummaryChildAges = ages
-        // Exact supplier offers are specific to occupancy; they must be selected again.
-        localJourneyRooms = [:]
-        selectedRoom = nil; selectedRoomCategory = nil
-        selectedMadinahRoom = nil; selectedMadinahRoomCategory = nil
+        // Keep hotel and room identity. Old supplier tokens cannot price a changed occupancy.
+        let previous = localJourneyRooms
+        var preserved: [String: LocalJourneyRoom] = [:]
+        for city in ["makkah", "madinah"] {
+            let old = previous.values.filter { $0.city == city }.sorted { $0.id < $1.id }
+            guard let first = old.first else { continue }
+            for index in 0..<next.rooms {
+                let key = "\(city):\(index)"
+                let existing = previous[key]
+                let source = existing ?? first
+                let adults = next.adults / next.rooms + (index < next.adults % next.rooms ? 1 : 0)
+                let children = ages.enumerated().filter { $0.offset % next.rooms == index }.map(\.element)
+                let pending = existing == nil || source.requiresRateRefresh == true || source.adults != adults || source.childrenAges != children
+                var hotel = source.hotel
+                if pending { hotel.minimumRate = nil; hotel.rateStatus = nil }
+                preserved[key] = LocalJourneyRoom(id: key, city: city, hotel: hotel, rate: source.rate,
+                    checkin: source.checkin, checkout: source.checkout, adults: adults, childrenAges: children,
+                    meals: source.meals, requiresRateRefresh: pending)
+            }
+        }
+        localJourneyRooms = preserved
         hotelPriceSnapshot = nil; cancelHotelPricePrefetch()
         if let vehicle = selectedTransferVehicle, vehicle.passengerCapacity < next.travelerCount {
             selectedTransferVehicle = TransferVehicleKind.carnival.passengerCapacity >= next.travelerCount ? .carnival : nil

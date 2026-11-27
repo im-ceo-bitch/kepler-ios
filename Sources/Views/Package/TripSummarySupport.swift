@@ -23,7 +23,7 @@ struct TripSummaryGuestDraft {
     }
     func trip(from original: TripDraft) -> TripDraft {
         var next = original
-        next.adults = adults; next.rooms = rooms
+        next.adults = adults; next.rooms = max(rooms, Self.minimumRooms(total))
         next.children = ages.filter { $0 >= 2 }.count
         next.infants = ages.filter { $0 >= 0 && $0 < 2 }.count
         return next
@@ -278,7 +278,7 @@ struct TripSummaryHotelOverview: View {
     var compactReview = false
     private func t(_ ru: String,_ en: String,_ uz: String,_ cy: String) -> String { IumrahFlightCopy.text(language,ru,en,uz,cy) }
     private var estimate: Decimal? {
-        guard !rooms.isEmpty, rooms.allSatisfy({ $0.rate.currency.uppercased() == "USD" && $0.rate.price.isFinite && $0.rate.price > 0 }) else { return nil }
+        guard !rooms.isEmpty, rooms.allSatisfy({ $0.requiresRateRefresh != true && $0.rate.currency.uppercased() == "USD" && $0.rate.price.isFinite && $0.rate.price > 0 }) else { return nil }
         return rooms.reduce(Decimal.zero) { $0 + Decimal($1.rate.price) }
     }
     var body: some View {
@@ -294,6 +294,7 @@ struct TripSummaryHotelOverview: View {
                         else { Text(t("Категория не указана", "Unrated", "Toifasi ko‘rsatilmagan", "Тоифаси кўрсатилмаган")).font(.caption).foregroundStyle(.secondary) }
                         if compactReview { Text("\(rooms.count) " + t("ном. · ", "rooms · ", "xona · ", "хона · ") + "\(rooms.reduce(0) { $0 + $1.adults + $1.childrenAges.count }) " + t("гостей", "guests", "mehmon", "меҳмон")).font(.caption).foregroundStyle(.secondary) }
                         if let total = confirmedTotal ?? estimate { Text(IumrahPackageDisplayPrices.money(total, currency: "USD", language: language)).font(.title3.bold()).monospacedDigit() }
+                        else if rooms.contains(where: { $0.requiresRateRefresh == true }) { Text(t("Тариф уточняется", "Rate pending", "Narx aniqlanmoqda", "Нарх аниқланмоқда")).font(.subheadline).foregroundStyle(.secondary) }
                         Text(confirmedTotal == nil ? t("За все номера и ночи", "All rooms and nights", "Barcha xona va tunlar uchun", "Барча хона ва тунлар учун") : t("За все номера и ночи", "All rooms and nights", "Barcha xona va tunlar", "Барча хона ва тунлар")).font(.caption2).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)

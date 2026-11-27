@@ -97,18 +97,27 @@ func ranked(_ input:[LocalJourneyFlight], _ plan:TripDraft, _ direction:Int, _ o
 }
 let outboundRows=[tasJed,nmaMed,tasMedLater,tasMedBusiness,tasMedExact,tasMedEarlier]
 let inboundRows=[jedTasTooSoon,medTas,jedFeg,jedTasLater,jedTasExact]
-precondition(ranked(outboundRows,plan,0)==["tasMedExact","tasMedEarlier","tasMedLater","tasJed","nmaMed","tasMedBusiness"])
-precondition(ranked(inboundRows,plan,1,tasMedExact)==["jedTasExact","jedTasLater","jedTasTooSoon","jedFeg","medTas"])
+precondition(ranked(outboundRows,plan,0)==["tasMedEarlier","tasMedExact","tasMedLater","tasMedBusiness","tasJed","nmaMed"])
+precondition(ranked(inboundRows,plan,1,tasMedExact)==["jedTasTooSoon","jedTasExact","jedTasLater","jedFeg","medTas"])
+func anchor(_ input:[LocalJourneyFlight],_ plan:TripDraft,_ direction:Int,_ other:LocalJourneyFlight?=nil)->String? {
+ let times=Dictionary(uniqueKeysWithValues:input.map{($0.id,IumrahAllPublishedFlightStore.departureInstant($0)!)})
+ let sorted=IumrahAllPublishedFlightStore.prioritized(input,trip:plan,direction:direction,other:other,departureInstants:times)
+ return IumrahAllPublishedFlightStore.dateAnchor(sorted,trip:plan,direction:direction,other:other)
+}
+precondition(anchor(outboundRows,plan,0)=="tasMedExact")
+precondition(anchor(inboundRows,plan,1,tasMedExact)=="jedTasExact")
+var gap=plan; gap.departureDate=Calendar.current.date(byAdding:.day,value:1,to:plan.departureDate)!
+precondition(anchor(outboundRows,gap,0)=="tasMedLater")
 plan.arrivalAirport = .jeddah
 precondition(ranked(outboundRows,plan,0).first=="tasJed" && ranked(inboundRows,plan,1).first=="medTas")
 plan.scope = .makkahOnly
-precondition(ranked(inboundRows,plan,1).first=="jedTasExact")
+precondition(anchor(inboundRows,plan,1)=="jedTasExact")
 let many=(0..<350).map { flight("fallback-\($0)","FEG","JED","2099-12-05") }
 let result=ranked(outboundRows+many,plan,0)
 precondition(result.count==356 && Set(result).count==356)
 precondition(reverse.canContinue(j2.trip)); var changed=j2.trip; changed.returnDate=Calendar.current.date(byAdding:.day,value:1,to:changed.returnDate)!
 precondition(!reverse.canContinue(changed))
-print("PASS: route/day/cabin ranking, MED/JED reversal, compatible return priority, 356 retained, CTA invalidated after date edit")
+print("PASS: chronological route/cabin groups and date anchors, MED/JED reversal, compatible return priority, 356 retained, CTA invalidated after date edit")
 print("PASS: direction split, expiry, route/cabin synchronization, party preservation, incompatible legs, reverse-first, single-leg IDs, paired fare ID, idempotent hotel handoff")
 '''
 main='\n'.join([mock,read('Sources/Models/AirportModels.swift'),base,filters,read('Sources/Models/TripModels.swift'),local,read('Sources/FlightEngine/FlightReferenceCatalog.swift'),clock,'enum IumrahPublishedCarouselCatalog {\n'+helpers+'\n}', 'enum IumrahAllPublishedFlightStore {\n'+classifiers+ranking+'\n}',selection,test])

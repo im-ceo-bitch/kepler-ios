@@ -41,7 +41,7 @@ struct NuiteeJourneyHotelsView: View {
         journey.trip.adults / max(1, journey.trip.rooms) + (roomIndex < journey.trip.adults % max(1, journey.trip.rooms) ? 1 : 0)
     }
     private var roomChildren: [Int] { ages.enumerated().filter { $0.offset % max(1, journey.trip.rooms) == roomIndex }.map(\.element) }
-    private var ready: Bool { ages.count == journey.trip.children + journey.trip.infants && !ages.contains(-1) && roomAdults > 0 && window.checkOut > window.checkIn }
+    private var ready: Bool { journey.trip.rooms >= max(1, (journey.trip.travelerCount + 4) / 5) && journey.trip.rooms <= journey.trip.adults && ages.count == journey.trip.children + journey.trip.infants && !ages.contains(-1) && roomAdults > 0 && window.checkOut > window.checkIn }
     private var catalogCity: NuiteeCity { city == "madinah" ? .madinah : .makkah }
     private var catalogMatches: Bool {
         catalog.matches(city: catalogCity, checkin: window.checkIn, checkout: window.checkOut,
@@ -65,7 +65,7 @@ struct NuiteeJourneyHotelsView: View {
                         subtitle: "\(window.checkIn.formatted(date: .abbreviated, time: .omitted)) — \(window.checkOut.formatted(date: .abbreviated, time: .omitted)) · \(roomAdults) взр. · \(roomChildren.count) дет.",
                         priceCaption: "Состав поездки") {
                         if smartCity == nil {
-                        if !reviewEditing { Stepper("Номера: \(journey.trip.rooms)", value: $journey.trip.rooms, in: 1...max(1, journey.trip.adults)) }
+                        if !reviewEditing { Stepper("Номера: \(journey.trip.rooms)", value: $journey.trip.rooms, in: min(max(1, journey.trip.adults), max(1, (journey.trip.travelerCount + 4) / 5))...max(1, journey.trip.adults)) }
                         ForEach(ages.indices, id: \.self) { index in
                             Picker("Возраст ребёнка \(index + 1)", selection: $ages[index]) {
                                 Text("Укажите возраст").tag(-1)
@@ -103,11 +103,13 @@ struct NuiteeJourneyHotelsView: View {
                     }.pickerStyle(.segmented)
                     if window.checkOut <= window.checkIn {
                         Text(NuiteeCopy.text("Измените даты поездки: для каждого города нужна минимум одна ночь.", "Safar sanalarini o‘zgartiring: har bir shahar uchun kamida bir tun kerak.", "Change trip dates: each city requires at least one night.", settings.language)).font(.footnote)
+                    } else if journey.trip.adults < max(1, (journey.trip.travelerCount + 4) / 5) {
+                        Text(IumrahFlightCopy.text(settings.language, "Для размещения этой семьи обратитесь в поддержку: в каждом номере должен быть взрослый.", "Contact support for this family arrangement: each room needs an adult.", "Bu oila uchun yordam xizmatiga murojaat qiling: har bir xonada katta kishi bo‘lishi kerak.", "Бу оила учун ёрдам хизматига мурожаат қилинг: ҳар бир хонада катта киши бўлиши керак.")).font(.footnote)
                     } else if !ready { Text("Раскройте карточку сверху и укажите возраст детей для точного тарифа.").font(.footnote) }
                     if let selection = journey.localJourneyRooms[key] {
                         Label(selection.hotel.name + " · " + IumrahHotelRoomTitle.display(rate: selection.rate.roomName, fallback: NuiteeCopy.text("Номер", "Xona", "Room", settings.language)), systemImage: "checkmark.circle.fill")
                             .font(.subheadline).foregroundStyle(Color.iumrahJourneyGreen)
-                        Text(NuiteeHotelService.usd(selection.rate.price) + " · " + NuiteeCopy.text("за номер, весь срок", "butun muddat uchun xona narxi", "per room, entire stay", settings.language)).font(.caption)
+                        Text(selection.requiresRateRefresh == true ? NuiteeCopy.text("Тариф уточняется", "Narx aniqlanmoqda", "Rate pending", settings.language) : NuiteeHotelService.usd(selection.rate.price) + " · " + NuiteeCopy.text("за номер, весь срок", "butun muddat uchun xona narxi", "per room, entire stay", settings.language)).font(.caption)
                     }
                     if loading && results.isEmpty { ProgressView().frame(maxWidth: .infinity) }
 
@@ -145,6 +147,8 @@ struct NuiteeJourneyHotelsView: View {
         })
         .task(id: searchID) { await load() }
         .onAppear {
+            let minimum = max(1, (journey.trip.travelerCount + 4) / 5)
+            if journey.trip.rooms < minimum, minimum <= journey.trip.adults { journey.trip.rooms = minimum }
             if smartCity == nil && ages.count != journey.trip.children + journey.trip.infants {
                 let saved = journey.tripSummaryChildAges
                 ages = saved.count == journey.trip.children + journey.trip.infants ? saved : Array(repeating: -1, count: journey.trip.children + journey.trip.infants)
@@ -155,12 +159,12 @@ struct NuiteeJourneyHotelsView: View {
             guard smartCity == nil else { return }
             if journey.tripSummaryChildAges != value {
                 journey.tripSummaryChildAges = value
-                if !journey.localJourneyRooms.isEmpty { journey.localJourneyRooms = [:]; journey.invalidateLocalJourneyQuote() }
+                if !journey.localJourneyRooms.isEmpty && !value.contains(where: { $0 < 0 }) { journey.applyTripSummaryGuests(journey.trip, ages: value); Task { await journey.repricePendingJourneyRooms(language: settings.language.hotelContentCode) } }
             }
         }
         .navigationDestination(item: $opened) { hotel in
             NuiteeHotelDetailView(hotel: hotel, checkin: window.checkIn, nights: window.nights,
-                adults: roomAdults, sandbox: sandbox, childrenAges: roomChildren, onSelectRate: { rate in
+                adults: roomAdults, sandbox: sandbox, childrenAges: roomChildren, cataloguePriceForStay: true, onSelectRate: { rate in
                     guard rate.currency == "USD", rate.price.isFinite, rate.price > 0 else { return }
                     // A canonical booking has one hotel per city; changing it resets that city's room choices.
                     journey.localJourneyRooms = journey.localJourneyRooms.filter { $0.value.city != city || $0.value.hotel.id == hotel.id }
@@ -194,7 +198,7 @@ struct NuiteeJourneyHotelsView: View {
         let cities = smartCity.map { [$0] } ?? (journey.trip.scope == .makkahAndMadinah ? ["makkah", "madinah"] : ["makkah"])
         let orderedCities = [city] + cities.filter { $0 != city }
         for nextCity in orderedCities {
-            if let nextRoom = (0..<journey.trip.rooms).first(where: { journey.localJourneyRooms["\(nextCity):\($0)"] == nil }) {
+            if let nextRoom = (0..<journey.trip.rooms).first(where: { journey.localJourneyRooms["\(nextCity):\($0)"] == nil || journey.localJourneyRooms["\(nextCity):\($0)"]?.requiresRateRefresh == true }) {
                 city = nextCity
                 roomIndex = nextRoom
                 stars = 0
@@ -205,7 +209,7 @@ struct NuiteeJourneyHotelsView: View {
     }
 
     private var reviewRoomsComplete: Bool {
-        if let smartCity { return (0..<journey.trip.rooms).allSatisfy { journey.localJourneyRooms["\(smartCity):\($0)"] != nil } }
+        if let smartCity { return (0..<journey.trip.rooms).allSatisfy { journey.localJourneyRooms["\(smartCity):\($0)"] != nil && journey.localJourneyRooms["\(smartCity):\($0)"]?.requiresRateRefresh != true } }
         return journey.localRoomsComplete
     }
 
@@ -218,9 +222,8 @@ struct NuiteeJourneyHotelsView: View {
 
     private func invalidateRooms() {
         roomIndex = 0
-        journey.localJourneyRooms = [:]
-        journey.quote = nil
-        journey.transferSelectionConfirmed = false
+        journey.applyTripSummaryGuests(journey.trip, ages: ages)
+        if ready { Task { await journey.repricePendingJourneyRooms(language: settings.language.hotelContentCode) } }
     }
     @MainActor private func load(forceRefresh: Bool = false) async {
         guard ready else { return }

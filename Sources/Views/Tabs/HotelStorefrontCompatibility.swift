@@ -2244,12 +2244,7 @@ struct StorefrontUmrahPackageDetailView: View {
         )
     }
 
-    private var effectiveRoomCapacity: Int {
-        let makkah = journey.selectedRoom?.maxGuests ?? journey.selectedRoomCategory?.maxGuests ?? 4
-        guard journey.trip.scope == .makkahAndMadinah else { return max(1, makkah) }
-        let madinah = journey.selectedMadinahRoom?.maxGuests ?? journey.selectedMadinahRoomCategory?.maxGuests ?? 4
-        return max(1, min(makkah, madinah))
-    }
+    private var effectiveRoomCapacity: Int { 5 }
 
     private func recommendedRooms(for travelers: Int) -> Int {
         let count = max(1, travelers)
